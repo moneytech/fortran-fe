@@ -49,7 +49,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-static g95_file *first_file;
+static g95_file *first_file, *first_duplicated_file;
 g95_file *g95_current_file;
 static int continue_flag, end_flag;
 
@@ -60,6 +60,7 @@ void g95_scanner_init_1(void) {
 
   g95_current_file = NULL;
   first_file = NULL;
+  first_duplicated_file = NULL;
   end_flag = 0;
 }
 
@@ -83,6 +84,11 @@ g95_file *fp, *fp2;
       }
     }
 
+    fp2 = fp->next;
+    g95_free(fp);
+  }
+
+  for(fp=first_duplicated_file; fp; fp=fp2) {
     fp2 = fp->next;
     g95_free(fp);
   }
@@ -767,7 +773,12 @@ int len;
 /* See if the file has already been included */
 
   for(fp2=first_file; fp2; fp2=fp2->next)
-    if (strcmp(filename, fp2->filename) == 0) { *fp = *fp2; goto init_fp; }
+    if (strcmp(filename, fp2->filename) == 0) {
+      *fp = *fp2;
+      fp->next = first_duplicated_file;
+      first_duplicated_file = fp;
+      goto init_fp;
+    }
 
   strcpy(fp->filename, filename);
 

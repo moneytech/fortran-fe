@@ -1933,6 +1933,8 @@ done:
 
 duplicate_main:
   g95_error("Two main PROGRAMs at %L and %C", &prog_locus);
+  g95_reject_statement();
+  g95_done_2();
   return SUCCESS;
 }
 

@@ -643,8 +643,9 @@ match m;
 
     if (g95_find_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
-    if (sym->attr.flavor != FL_NAMELIST) {
-      g95_error("Symbol '%s' at %C must be a NAMELIST group name", sym->name);
+    if (sym == NULL || sym->attr.flavor != FL_NAMELIST) {
+      g95_error("Symbol '%s' at %C must be a NAMELIST group name",
+		sym != NULL ? sym->name : name );
       return MATCH_ERROR;
     }
 
