@@ -314,7 +314,7 @@ int i, c;
   do {
     buffer[i++] = c;
 
-    if (i >= G95_MAX_SYMBOL_LEN) {
+    if (i > G95_MAX_SYMBOL_LEN) {
       g95_error("Name at %C is too long");
       return MATCH_ERROR;
     }
