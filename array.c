@@ -57,9 +57,7 @@ int i;
 
   dest = g95_get_array_ref();
 
-  dest->type = src->type;
-  dest->dimen = src->dimen;
-  dest->as = src->as;
+  *dest = *src;
 
   for(i=0; i<G95_MAX_DIMENSIONS; i++) {
     dest->start[i] = g95_copy_expr(src->start[i]);
@@ -546,7 +544,7 @@ int i, a1, a2;
   return 1;
 
 error:
-  g95_internal_error("g95_compare_type(): Array spec clobbered");
+  g95_internal_error("g95_compare_array_spec(): Array spec clobbered");
   return 0;        /* Keep the compiler happy */
 }
 
@@ -577,10 +575,10 @@ g95_expr *result;
 void g95_append_constructor(g95_expr *base, g95_expr *new) {
 g95_constructor *c;
 
-  if (base->value.constructor.head == NULL)
-    base->value.constructor.head = c = g95_get_constructor();
+  if (base->value.constructor == NULL)
+    base->value.constructor = c = g95_get_constructor();
   else {
-    c = base->value.constructor.head;
+    c = base->value.constructor;
     while(c->next)
       c=c->next;
 
@@ -626,7 +624,7 @@ g95_expr *e;
     e = c->expr;
 
     if (e->expr_type == EXPR_ARRAY &&
-	check_duplicate_iterator(e->value.constructor.head, master)) return 1;
+	check_duplicate_iterator(e->value.constructor, master)) return 1;
 
     if (c->iterator == NULL) continue;
 
@@ -704,7 +702,7 @@ int n;
   e = g95_get_expr();
   e->expr_type = EXPR_ARRAY;
   e->where = old_loc;
-  e->value.constructor.head = head;
+  e->value.constructor = head;
 
   p = g95_get_constructor();
   p->where = *g95_current_locus();
@@ -789,7 +787,9 @@ empty:
 
   expr->expr_type = EXPR_ARRAY;
 
-  expr->value.constructor.head = head;
+  expr->value.constructor = head;
+  /* Size must be calculated at resolution time */
+
   expr->where = where;
   expr->rank = 1;
 
@@ -853,7 +853,7 @@ g95_expr *e;
     e = c->expr;
 
     if (e->expr_type == EXPR_ARRAY) {
-      if (check_constructor_type(e->value.constructor.head) == FAILURE)
+      if (check_constructor_type(e->value.constructor) == FAILURE)
 	return FAILURE;
 
       continue;
@@ -876,7 +876,7 @@ try t;
   cons_state = CONS_START;
   g95_clear_ts(&constructor_ts);
 
-  t = check_constructor_type(e->value.constructor.head);
+  t = check_constructor_type(e->value.constructor);
   if (t == SUCCESS && e->ts.type == BT_UNKNOWN) e->ts = constructor_ts;
 
   return t;
@@ -933,7 +933,7 @@ try t;
     element.iterator = c->iterator;
 
     base = &element;
-    t = check_constructor(e->value.constructor.head, check_function);
+    t = check_constructor(e->value.constructor, check_function);
     base = element.previous;
 
     if (t == FAILURE) return FAILURE;
@@ -957,7 +957,7 @@ try t;
   base_save = base;
   base = NULL;
 
-  t = check_constructor(expr->value.constructor.head, check_function);
+  t = check_constructor(expr->value.constructor, check_function);
   base = base_save;
 
   return t;
@@ -977,8 +977,10 @@ static iterator_stack *iter_stack;
 
 typedef struct {
   g95_constructor *new_head, *new_tail;
-  int count, extract_n;
+  int extract_count, extract_n;
   g95_expr *extracted;
+  mpz_t *count;
+
   try (*expand_work_function)(g95_expr *);
 } expand_info;
 
@@ -987,14 +989,25 @@ static expand_info current_expand;
 static try expand_constructor(g95_constructor *);
 
 
-/* count_elements()-- Work function that counts the number of elements present
- * in a constructor. */
+/* count_elements()-- Work function that counts the number of elements
+ * present in a constructor. */
 
 static try count_elements(g95_expr *e) {
+mpz_t result;
+
+  if (e->rank == 0) 
+    mpz_add_ui(*current_expand.count, *current_expand.count, 1);
+  else {
+    if (g95_array_size(e, &result) == FAILURE) {
+      g95_free_expr(e);
+      return FAILURE;
+    }
+
+    mpz_add(*current_expand.count, *current_expand.count, result);
+    mpz_clear(result);
+  }
 
   g95_free_expr(e);
-  current_expand.count++;
-
   return SUCCESS;
 }
 
@@ -1004,12 +1017,14 @@ static try count_elements(g95_expr *e) {
 
 static try extract_element(g95_expr *e) {
 
-  if (current_expand.count == current_expand.extract_n)
+  if (e->rank != 0) return FAILURE;  /* Something unextractable */
+
+  if (current_expand.extract_count == current_expand.extract_n)
     current_expand.extracted = e;
   else
     g95_free_expr(e);
 
-  current_expand.count++;
+  current_expand.extract_count++;
   return SUCCESS;
 }
 
@@ -1059,7 +1074,7 @@ iterator_stack *p;
 static try expand_expr(g95_expr *e) {
 
   if (e->expr_type == EXPR_ARRAY)
-    return expand_constructor(e->value.constructor.head);
+    return expand_constructor(e->value.constructor);
 
   e = g95_copy_expr(e);
 
@@ -1160,7 +1175,7 @@ g95_expr *e;
     e = c->expr;
 
     if (e->expr_type == EXPR_ARRAY) {
-      if (expand_constructor(e->value.constructor.head) == FAILURE)
+      if (expand_constructor(e->value.constructor) == FAILURE)
 	return FAILURE;
 
       continue;
@@ -1201,14 +1216,14 @@ try rc;
 
   current_expand.expand_work_function = expand;
 
-  if (expand_constructor(e->value.constructor.head) == FAILURE) {
+  if (expand_constructor(e->value.constructor) == FAILURE) {
     g95_free_constructor(current_expand.new_head);
     rc = FAILURE;
     goto done;
   }
 
-  g95_free_constructor(e->value.constructor.head);
-  e->value.constructor.head = current_expand.new_head;
+  g95_free_constructor(e->value.constructor);
+  e->value.constructor = current_expand.new_head;
 
   rc = SUCCESS;
 
@@ -1248,7 +1263,7 @@ try rc;
   expand_save = current_expand;
   current_expand.expand_work_function = constant_element;
 
-  rc = expand_constructor(e->value.constructor.head);
+  rc = expand_constructor(e->value.constructor);
   
   current_expand = expand_save;
   if ( rc == FAILURE) return 0;
@@ -1265,7 +1280,7 @@ int g95_expanded_ac(g95_expr *e) {
 g95_constructor *p;
 
   if (e->expr_type == EXPR_ARRAY)
-    for(p=e->value.constructor.head; p; p=p->next)
+    for(p=e->value.constructor; p; p=p->next)
       if (p->iterator != NULL || !g95_expanded_ac(p->expr)) return 0;
 
   return 1;
@@ -1299,7 +1314,7 @@ try t;
 try g95_resolve_array_constructor(g95_expr *expr) {
 try t;
 
-  t = resolve_array_list(expr->value.constructor.head);
+  t = resolve_array_list(expr->value.constructor);
   if (t == SUCCESS) t = g95_check_constructor_type(expr);
 
   return t;
@@ -1358,11 +1373,11 @@ try rc;
   current_expand.extract_n = element;
   current_expand.expand_work_function = extract_element;
   current_expand.extracted = NULL;
-  current_expand.count = 0;
+  current_expand.extract_count = 0;
 
   iter_stack = NULL;
 
-  rc = expand_constructor(array->value.constructor.head);
+  rc = expand_constructor(array->value.constructor);
   e = current_expand.extracted;
   current_expand = expand_save; 
 
@@ -1488,7 +1503,7 @@ try t;
     return t;
 
   default:
-    g95_internal_error("size_from_section(): Bad dimen type");
+    g95_internal_error("ref_dimen_size(): Bad dimen type");
   }
 
   return t;
@@ -1514,63 +1529,57 @@ int d;
   return SUCCESS;
 }
 
-/* g95_array_dimen_size()-- Given a shape argument to the RESHAPE
- * intrinsic, figure out how many elements are in the SHAPE
- * specification for a given dimension. */
+
+/* g95_array_dimen_size()-- Given an array expression and a dimension,
+ * figure out how many elements it has along that dimension.  Returns
+ * SUCCESS if we were able to return a result in the 'result'
+ * variable, FAILURE otherwise. */
 
 try g95_array_dimen_size(g95_expr *array, int dimen, mpz_t *result) {
 g95_ref *ref;
 
   if (dimen > array->rank - 1)
-    g95_internal_error("g95_array_dimen_size(): Wrong dimension");
+    g95_internal_error("g95_array_dimen_size(): Bad dimension");
 
-  if (array->rank == 1)
-    return g95_array_size(array, result);
-    
   switch(array->expr_type) {
   case EXPR_ARRAY:
-    mpz_init_set(*result, array->value.constructor.shape[dimen]);
+    if (array->shape == NULL) return FAILURE;
+
+    mpz_init_set(*result, array->shape[dimen]);
     break;
 
   case EXPR_VARIABLE:
     for(ref=array->ref; ref; ref=ref->next) {
       if (ref->type != REF_ARRAY) continue;
 
-      if (ref->u.ar.type == AR_FULL) {
-	if (spec_dimen_size(ref->u.ar.as, dimen, result) == FAILURE)
-	  return FAILURE;
-	goto done;
-      }
+      if (ref->u.ar.type == AR_FULL)
+	return spec_dimen_size(ref->u.ar.as, dimen, result);
 
-      if (ref->u.ar.type == AR_SECTION) {
-	if (ref_dimen_size(&ref->u.ar, dimen, result) == FAILURE)
-	  return FAILURE;
-	goto done;
-      }
+      if (ref->u.ar.type == AR_SECTION)
+	return ref_dimen_size(&ref->u.ar, dimen, result);
     }
 
     if (spec_dimen_size(array->symbol->as, dimen, result) == FAILURE)
       return FAILURE;
+
     break;
 
   default:
     return FAILURE;
   }
 
-done:
   return SUCCESS;
 }
 
-/* g95_array_size()-- Given a shape argument to the RESHAPE
- * intrinsic, figure out how many elements are in the SHAPE
- * specification.  Type and rank have already been verified. Returns
- * the rank of the argument (>0) or a negative number to indicate an
- * error. */
+
+/* g95_array_size()-- Given an array expression, figure out how many
+ * elements are in the array.  Returns SUCCESS if this is possible,
+ * and sets the 'result' variable.  Otherwise returns FAILURE. */
 
 try g95_array_size(g95_expr *array, mpz_t *result) {
 expand_info expand_save;
 g95_ref *ref;
-int flag;
+int i, flag;
 try t;
 
   switch(array->expr_type) {
@@ -1579,14 +1588,17 @@ try t;
     g95_suppress_error = 1;
 
     expand_save = current_expand;
-    current_expand.count = 0;
+
+    current_expand.count = result;
+    mpz_init_set_ui(*result, 0);
+
     current_expand.expand_work_function = count_elements;
     iter_stack = NULL;
 
-    t = expand_constructor(array->value.constructor.head);
+    t = expand_constructor(array->value.constructor);
     g95_suppress_error = flag;
 
-    if (t == SUCCESS) mpz_init_set_ui(*result, current_expand.count);
+    if (t == FAILURE) mpz_clear(*result);
     current_expand = expand_save;
     return t;
 
@@ -1594,25 +1606,25 @@ try t;
     for(ref=array->ref; ref; ref=ref->next) {
       if (ref->type != REF_ARRAY) continue;
 
-      if (ref->u.ar.type == AR_FULL) {
-	if (spec_size(ref->u.ar.as, result) == FAILURE) return FAILURE;
-	goto done;
-      }
+      if (ref->u.ar.type == AR_FULL) return spec_size(ref->u.ar.as, result);
 
-      if (ref->u.ar.type == AR_SECTION) {
-	if (ref_size(&ref->u.ar, result) == FAILURE) return FAILURE;
-	goto done;
-      }
+      if (ref->u.ar.type == AR_SECTION)	return ref_size(&ref->u.ar, result);
     }
 
-    if (spec_size(array->symbol->as, result) == FAILURE) return FAILURE;
-    break;
+    return spec_size(array->symbol->as, result);
+
 
   default:
-    return FAILURE;
+    if (array->rank == 0 || array->shape == NULL) return FAILURE;
+
+    mpz_init_set_ui(*result, 1);
+
+    for(i=0; i<array->rank; i++)
+      mpz_mul(*result, *result, array->shape[i]);
+
+    break;
   }
 
-done:
   return SUCCESS;
 }
 

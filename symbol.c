@@ -298,9 +298,9 @@ g95_typespec *ts;
 /* g95_check_conformance()-- Given two expressions, make sure that
  * the arrays are conformable. */
 
-try g95_check_conformance(const char* optype, g95_expr *op1, g95_expr *op2){
-mpz_t op1size, op2size;
-int op1flag, op2flag, d;
+try g95_check_conformance(const char *optype, g95_expr *op1, g95_expr *op2) {
+int op1_flag, op2_flag, d;
+mpz_t op1_size, op2_size;
 try t;
 
   if (op1->rank == 0 || op2->rank == 0) return SUCCESS;
@@ -311,19 +311,21 @@ try t;
   }
 
   t = SUCCESS;
+
   for(d=0; d<op1->rank; d++) {
-    op1flag = g95_array_dimen_size(op1, d, &op1size) == SUCCESS;
-    op2flag = g95_array_dimen_size(op2, d, &op2size) == SUCCESS;
+    op1_flag = g95_array_dimen_size(op1, d, &op1_size) == SUCCESS;
+    op2_flag = g95_array_dimen_size(op2, d, &op2_size) == SUCCESS;
     
-    if (op1flag && op2flag && mpz_cmp(op1size, op2size) != 0) {
-      g95_error("%s at %L has different shape on dimension %d",
-		optype, &op1->where, d+1);
+    if (op1_flag && op2_flag && mpz_cmp(op1_size, op2_size) != 0) {
+      g95_error("%s at %L has different shape on dimension %d (%d/%d)",
+		optype, &op1->where, d+1, mpz_get_si(op1_size),
+		mpz_get_si(op2_size));
       
       t = FAILURE;
     }
 
-    if (op1flag) mpz_clear(op1size);
-    if (op2flag) mpz_clear(op2size);
+    if (op1_flag) mpz_clear(op1_size);
+    if (op2_flag) mpz_clear(op2_size);
 
     if (t == FAILURE) return FAILURE;
   }
@@ -358,6 +360,7 @@ g95_symbol *sym;
   }
 
   /* Check size of array assignments */
+
   if (lvalue->rank != 0 && rvalue->rank != 0 &&
       g95_check_conformance("Array assignment", lvalue, rvalue) != SUCCESS)
     return FAILURE;

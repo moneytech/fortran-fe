@@ -1512,7 +1512,7 @@ match m;
   e->ts.derived = sym;
   e->where = where;
 
-  e->value.constructor.head = head;
+  e->value.constructor = head;
 
   *result = e;
   return MATCH_YES;  

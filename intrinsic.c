@@ -161,7 +161,7 @@ g95_constructor *head, *c, *tail=NULL;
 
     head = NULL;
 
-    for(c=e->value.constructor.head; c; c=c->next) {
+    for(c=e->value.constructor; c; c=c->next) {
       if (head == NULL)
 	head = tail = g95_get_constructor();
       else {
@@ -189,9 +189,8 @@ g95_constructor *head, *c, *tail=NULL;
     result->ts.type = type;
     result->ts.kind = kind;
     result->expr_type = EXPR_ARRAY;
-    result->value.constructor.head = head;
-    result->value.constructor.shape = 
-      g95_copy_cons_shape(e->value.constructor.shape, e->rank);
+    result->value.constructor = head;
+    result->shape = g95_copy_shape(e->shape, e->rank);
     result->where = e->where;
     result->rank = e->rank;
     break;

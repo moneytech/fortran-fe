@@ -4,6 +4,7 @@ AM_CONFIG_HEADER(config.h)
 
 #############################################################################
 AC_PROG_CC
+AC_PROG_CPP
 AC_CANONICAL_HOST
 
 AC_C_CONST
@@ -12,13 +13,38 @@ case "$host" in
 hppa*) CFLAGS="-Ae $CFLAGS";;
 esac
 
+
+#####################################################################
+
+AC_ARG_WITH(gcc-dir, [  --with-gcc-dir=PATH     Specify directory for GCC ])
+
+if test "x$with_gcc_dir" != x -a -d "$with_gcc_dir"; then
+   CFLAGS="$CFLAGS -DBACKEND -DIN_GCC"
+   CPPFLAGS="-I- -I$with_gcc_dir/gcc -I$with_gcc_dir/include -I$with_gcc_dir/gcc/config $CPPFLAGS"
+
+   LDFLAGS="$LDFLAGS -L$with_gcc_dir/gcc -L$with_gcc_dir/libiberty"
+   LIBS="$LIBS -lbackend -liberty -lgcc"
+
+   DEFAULT_INCLUDES=" "
+
+   AC_CHECK_HEADER(ansidecl.h, [], [AC_MSG_ERROR([ansidecl.h not found])])
+
+   AC_MSG_CHECKING([for libbackend.a])
+   if test -f $with_gcc_dir/gcc/libbackend.a; then
+      AC_MSG_RESULT([yes])
+   else
+      AC_MSG_ERROR([could not link with libbackend])
+   fi
+fi
+
+
 #############################################################################
 # Find GMP (GNU Multi-Precision) library:
 
-AC_ARG_WITH(gmp-dir, [--with-gmp-dir=PATH       Specify directory for the GMP library])
+AC_ARG_WITH(gmp-dir, [  --with-gmp-dir=PATH     Specify directory for the GMP library])
 
 if test "x$with_gmp_dir" != x -a -d "$with_gmp_dir"; then
-	CPPFLAGS="-I$with_gmp_dir $CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -I$with_gmp_dir"
 	LDFLAGS="-L$with_gmp_dir/.libs $LDFLAGS"
 fi
 
@@ -27,7 +53,7 @@ AC_FUNC_ALLOCA([AC_MSG_ERROR([alloca not found])])
 AC_CHECK_HEADER(gmp.h, [], [AC_MSG_ERROR([gmp.h not found])])
 
 AC_MSG_CHECKING([for correct version of gmp.h])
-AC_TRY_COMPILE([#include <gmp.h>],[
+AC_TRY_COMPILE([#include "gmp.h"],[
 #if __GNU_MP_VERSION < 3
        choke me
 #endif
@@ -40,6 +66,7 @@ LIBS="$LIBS -lgmp"
 
 AC_TRY_LINK([#include <gmp.h>], [mpf_t n; mpf_init(n);],
   [AC_MSG_RESULT([yes])],  [AC_MSG_ERROR([could not link with libgmp])])
+
 
 
 #############################################################################

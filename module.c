@@ -1781,9 +1781,9 @@ char *p;
 }
 
 
-/* mio_cons_shape()-- Save and restore the shape of an array constructor. */
+/* mio_shape()-- Save and restore the shape of an array constructor. */
 
-static void mio_cons_shape (mpz_t **pshape, int rank) {
+static void mio_shape(mpz_t **pshape, int rank) {
 mpz_t *shape;
 atom_type t;
 int n;
@@ -1805,7 +1805,7 @@ int n;
       return;
     }
 
-    shape = g95_get_cons_shape(rank);
+    shape = g95_get_shape(rank);
     *pshape = shape;
   }
 
@@ -1949,8 +1949,8 @@ int flag;
     /* Fall through */
 
   case EXPR_ARRAY:
-    mio_constructor(&e->value.constructor.head);
-    mio_cons_shape(&e->value.constructor.shape, e->rank);
+    mio_constructor(&e->value.constructor);
+    mio_shape(&e->shape, e->rank);
     break;
 
   case EXPR_CONSTANT:

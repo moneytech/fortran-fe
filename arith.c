@@ -1565,7 +1565,7 @@ arith rc;
   if (op->expr_type == EXPR_CONSTANT) return eval(op, result);
 
   rc = ARITH_OK;
-  head = g95_copy_constructor(op->value.constructor.head);
+  head = g95_copy_constructor(op->value.constructor);
 
   for(c=head; c; c=c->next) {
     rc = eval(c->expr, &r);
@@ -1579,9 +1579,8 @@ arith rc;
   else {
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
-    r->value.constructor.head = head;
-    r->value.constructor.shape =
-      g95_copy_cons_shape(op->value.constructor.shape, op->rank);
+    r->value.constructor = head;
+    r->shape = g95_copy_shape(op->shape, op->rank);
 
     r->ts = head->expr->ts;
     r->where = op->where;
@@ -1600,7 +1599,7 @@ g95_constructor *c, *head;
 g95_expr *r;
 arith rc;
 
-  head = g95_copy_constructor(op1->value.constructor.head);
+  head = g95_copy_constructor(op1->value.constructor);
   rc = ARITH_OK;
 
   for(c=head; c; c=c->next) {
@@ -1615,9 +1614,8 @@ arith rc;
   else {
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
-    r->value.constructor.head = head;
-    r->value.constructor.shape =
-      g95_copy_cons_shape(op1->value.constructor.shape, op1->rank);
+    r->value.constructor = head;
+    r->shape = g95_copy_shape(op1->shape, op1->rank);
 
     r->ts = head->expr->ts;
     r->where = op1->where;
@@ -1636,7 +1634,7 @@ g95_constructor *c, *head;
 g95_expr *r;
 arith rc;
 
-  head = g95_copy_constructor(op2->value.constructor.head);
+  head = g95_copy_constructor(op2->value.constructor);
   rc = ARITH_OK;
 
   for(c=head; c; c=c->next) {
@@ -1651,9 +1649,8 @@ arith rc;
   else {
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
-    r->value.constructor.head = head;
-    r->value.constructor.shape =
-      g95_copy_cons_shape(op2->value.constructor.shape, op2->rank);
+    r->value.constructor = head;
+    r->shape = g95_copy_shape(op2->shape, op2->rank);
 
     r->ts = head->expr->ts;
     r->where = op2->where;
@@ -1672,10 +1669,10 @@ g95_constructor *c, *d, *head;
 g95_expr *r;
 arith rc;
 
-  head = g95_copy_constructor(op1->value.constructor.head);
+  head = g95_copy_constructor(op1->value.constructor);
 
   rc = ARITH_OK;
-  d = op2->value.constructor.head;
+  d = op2->value.constructor;
 
   if (g95_check_conformance("Elemental binary operation", op1, op2) 
       != SUCCESS)
@@ -1702,9 +1699,8 @@ arith rc;
   else {
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
-    r->value.constructor.head = head;
-    r->value.constructor.shape =
-      g95_copy_cons_shape(op1->value.constructor.shape, op1->rank);
+    r->value.constructor = head;
+    r->shape = g95_copy_shape(op1->shape, op1->rank);
 
     r->ts = head->expr->ts;
     r->where = op1->where;

@@ -233,7 +233,7 @@ g95_component *comp;
 try t;
 
   t = SUCCESS;
-  cons = expr->value.constructor.head;
+  cons = expr->value.constructor;
   comp = expr->symbol->components;
 
   for(; comp; comp=comp->next, cons=cons->next) {
@@ -1022,12 +1022,26 @@ try t;
   case INTRINSIC_LE:
 
     if (op1->rank == 0 && op2->rank == 0) e->rank = 0;
-    if (op1->rank == 0 && op2->rank != 0) e->rank = op2->rank;
-    if (op1->rank != 0 && op2->rank == 0) e->rank = op1->rank;
+
+    if (op1->rank == 0 && op2->rank != 0) {
+      e->rank = op2->rank;
+
+      if (e->shape == NULL) e->shape = g95_copy_shape(op2->shape, op2->rank);
+    }
+
+    if (op1->rank != 0 && op2->rank == 0) {
+      e->rank = op1->rank;
+
+      if (e->shape == NULL) e->shape = g95_copy_shape(op1->shape, op1->rank);
+    }
+
     if (op1->rank != 0 && op2->rank != 0) {
-      if (op1->rank == op2->rank)
+      if (op1->rank == op2->rank) {
 	e->rank = op1->rank;
-      else {
+
+	if (e->shape == NULL) e->shape = g95_copy_shape(op1->shape, op1->rank);
+
+      } else {
 	g95_error("Inconsistent ranks for operator at %L and %L",
 		  &op1->where, &op2->where);
 	t = FAILURE;
@@ -1042,6 +1056,9 @@ try t;
   case INTRINSIC_UPLUS:
   case INTRINSIC_UMINUS:
     e->rank = op1->rank;
+
+    if (e->shape == NULL) e->shape = g95_copy_shape(op1->shape, op1->rank);
+
     break;           /* Simply copy arrayness attribute */
 
   default:
@@ -1377,6 +1394,31 @@ g95_ref *ref;
 }
 
 
+/* expression_shape()-- Given an expression, determine its shape.
+ * This is easier than it sounds.  Leaves the shape array NULL if it
+ * is not possible to determine the shape. */
+
+static void expression_shape(g95_expr *e) {
+mpz_t array[G95_MAX_DIMENSIONS];
+int i;
+
+  if (e->rank == 0 || e->shape != NULL) return; 
+
+  for(i=0; i<e->rank; i++)
+    if (g95_array_dimen_size(e, i, &array[i]) == FAILURE) goto fail;
+
+  e->shape = g95_get_shape(e->rank);
+
+  memcpy(e->shape, &array, e->rank*sizeof(mpz_t));
+
+  return;
+
+ fail:
+  for(i--; i>=0; i--)
+    mpz_clear(array[i]);
+}
+
+
 /* expression_rank()-- Given a variable expression node, compute the
  * rank of the expression by examining the base symbol and any
  * reference structures it may have. */
@@ -1391,11 +1433,11 @@ int i, rank;
 
     if (e->symbol == NULL) {
       e->rank = 0; 
-      return;
+      goto done;
     }
 
     e->rank = (e->symbol->as == NULL) ? 0 : e->symbol->as->rank;
-    return;
+    goto done;
   }
 
   rank = 0;
@@ -1420,6 +1462,9 @@ int i, rank;
   }
 
   e->rank = rank;
+
+done:
+  expression_shape(e);
 }
 
 
@@ -1441,7 +1486,6 @@ static try resolve_variable(g95_expr *e) {
     e->ts = e->symbol->ts;
   }
 
-  expression_rank(e);
   return SUCCESS;
 }
 
@@ -1488,6 +1532,16 @@ try t;
     t = g95_resolve_array_constructor(e);
 
     if (t == SUCCESS) t = g95_expand_constructor(e);
+
+    if (e->shape == NULL) {
+      e->shape = g95_get_shape(1);
+
+      if (g95_array_size(e, &e->shape[0]) == FAILURE) {
+	g95_free(e->shape);
+	e->shape = NULL;
+      }
+    }
+
     break;
 
   case EXPR_STRUCTURE:

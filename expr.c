@@ -137,7 +137,9 @@ int i;
 }
 
 
-static void free_cons_shape(mpz_t *shape, int rank) {
+/* free_shape()-- Free a shape array. */
+
+static void free_shape(mpz_t *shape, int rank) {
 int n;
 
   if (shape == NULL) return;
@@ -199,9 +201,8 @@ static void g95_free_expr0(g95_expr *e) {
 
   case EXPR_ARRAY:
   case EXPR_STRUCTURE:
-    g95_free_constructor(e->value.constructor.head);
-    if (e->value.constructor.shape)
-      free_cons_shape(e->value.constructor.shape, e->rank);
+    g95_free_constructor(e->value.constructor);
+    if (e->shape) free_shape(e->shape, e->rank);
     break;
 
   case EXPR_SUBSTRING:
@@ -302,15 +303,15 @@ g95_ref *dest;
 }
 
 
-/* g95_copy_cons_shape()-- Copy the shape of a constructor */
+/* g95_copy_shape()-- Copy a shape array. */
 
-mpz_t *g95_copy_cons_shape(mpz_t *shape, int rank) {
+mpz_t *g95_copy_shape(mpz_t *shape, int rank) {
 mpz_t *new_shape;
 int n;
 
   if (shape == NULL) return NULL;
 
-  new_shape = g95_get_cons_shape(rank);
+  new_shape = g95_get_shape(rank);
 
   for(n=0; n<rank; n++)
     mpz_init_set(new_shape[n], shape[n]);
@@ -402,10 +403,8 @@ char *s;
 
   case EXPR_STRUCTURE:
   case EXPR_ARRAY:
-    q->value.constructor.head =
-      g95_copy_constructor(p->value.constructor.head);
-    q->value.constructor.shape =
-      g95_copy_cons_shape(p->value.constructor.shape, p->rank);
+    q->value.constructor = g95_copy_constructor(p->value.constructor);
+    q->shape = g95_copy_shape(p->shape, p->rank);
     break;
 
   case EXPR_NULL:
@@ -696,7 +695,7 @@ int rv;
 
   case EXPR_STRUCTURE:
     rv = 0;
-    for(c=e->value.constructor.head; c; c=c->next)
+    for(c=e->value.constructor; c; c=c->next)
       if (!g95_is_constant_expr(c->expr)) break;
 
     if (c == NULL) rv = 1;
@@ -910,7 +909,7 @@ g95_actual_arglist *ap;
 
   case EXPR_STRUCTURE:
   case EXPR_ARRAY:
-    if (simplify_constructor(p->value.constructor.head, type) == FAILURE)
+    if (simplify_constructor(p->value.constructor, type) == FAILURE)
       return FAILURE;
 
     if (p->expr_type == EXPR_ARRAY && g95_expand_constructor(p) == FAILURE)
@@ -1528,13 +1527,13 @@ int i;
 
   case EXPR_STRUCTURE:
     g95_status("%s(", p->symbol->name);
-    show_constructor(p->value.constructor.head);
+    show_constructor(p->value.constructor);
     g95_status_char(')');
     break;
 
   case EXPR_ARRAY:
     g95_status("(/ ");
-    show_constructor(p->value.constructor.head);
+    show_constructor(p->value.constructor);
     g95_status(" /)");
 
     show_ref(p->ref);

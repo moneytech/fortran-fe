@@ -674,7 +674,9 @@ typedef struct g95_expr {
   expr_t expr_type;
 
   g95_typespec ts;         /* These two refer to the overall expression */
+
   int rank;
+  mpz_t *shape;    /* Can be NULL if shape is unknown at compile time */
 
   g95_intrinsic_op operator;
   g95_symbol *symbol;   /* Nonnull for functions and structure constructors */
@@ -705,16 +707,13 @@ typedef struct g95_expr {
       char *string;
     } character;
 
-    struct {
-      struct g95_constructor *head;
-      mpz_t *shape; /* For reshaped constructors.  */
-    } constructor;
+    struct g95_constructor *constructor;
   } value;
 
 } g95_expr;
 
-#define g95_get_cons_shape(rank) \
-    ((mpz_t *)g95_getmem(rank*sizeof(mpz_t)))
+
+#define g95_get_shape(rank) ((mpz_t *) g95_getmem(rank*sizeof(mpz_t)))
 
 /* Structures for information associated with different kinds of
  * numbers.  The first set of integer parameters define all there is
@@ -1390,7 +1389,7 @@ void g95_replace_expr(g95_expr *, g95_expr *);
 g95_expr *g95_int_expr(int);
 g95_expr *g95_logical_expr(int, locus *);
 g95_code *g95_build_call(char *, ...);
-mpz_t *g95_copy_cons_shape(mpz_t *, int);
+mpz_t *g95_copy_shape(mpz_t *, int);
 g95_expr *g95_copy_expr(g95_expr *);
 
 try g95_specification_expr(g95_expr *);
