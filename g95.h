@@ -894,11 +894,11 @@ typedef struct g95_code {
     g95_dt *dt;
     g95_forall_iterator *forall_iterator;
     struct g95_code *whichloop; 
-    /* Backend_decl is used for cycle and break labels in do loops
-     * in the first statement of a do block, which is otherwise unused */
-    tree backend_decl;
   } ext;     /* Points to additional structures required by statement */
 
+  /* Backend_decl is used for cycle and break labels in do loops, and
+   * probably for other constructs as well, once we translate them.  */
+  tree backend_decl;
 } g95_code;
 
 
