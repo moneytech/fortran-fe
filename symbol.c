@@ -1990,11 +1990,11 @@ g95_symbol *sym;
  * not freed.  These are taken care of when a specific name is freed. */
 
 void g95_free_namespace(g95_namespace *ns) {
-g95_namespace *next_ns;
 g95_charlen *cl, *cl2;
+g95_namespace *p, *q;
 int i;
 
-  if (ns == NULL) return; 
+  if (ns == NULL) return;
 
   g95_free_statements(ns->code);
 
@@ -2015,16 +2015,16 @@ int i;
     g95_free_interface(ns->operator[i]);
 
   g95_free_data(ns->data);
-  next_ns = ns->contained;
+  p = ns->contained;
   g95_free(ns);
 
   /* Recursively free any contained namespaces */
 
-  while(next_ns != NULL) {
-    ns = next_ns;
-    next_ns = next_ns->sibling;
+  while(p != NULL) {
+    q = p;
+    p = p->sibling;
 
-    g95_free_namespace(ns);
+    g95_free_namespace(q);
   }
 }
 
@@ -2038,6 +2038,7 @@ void g95_symbol_init_2(void) {
 void g95_symbol_done_2(void) {
 
   g95_free_namespace(g95_current_ns);
+  g95_current_ns = NULL;
 }
 
 
