@@ -821,14 +821,18 @@ done:
 /* g95_constant_result()-- Function to return a constant expression node
  * of a given type and kind. */
 
-g95_expr *g95_constant_result(bt type, int kind) {
+g95_expr *g95_constant_result(bt type, int kind, locus *where) {
 g95_expr *result;
+
+  if (! where)
+    g95_internal_error("g95_constant_result(): locus 'where' cannot be NULL");
 
   result = g95_get_expr();
 
   result->expr_type = EXPR_CONSTANT;
   result->ts.type = type;
   result->ts.kind = kind;
+  result->where = *where;
 
   switch(type) {
   case BT_INTEGER:
@@ -861,7 +865,7 @@ g95_expr *result;
 arith g95_arith_not(g95_expr *op1, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, op1->ts.kind);
+  result = g95_constant_result(BT_LOGICAL, op1->ts.kind, &op1->where);
   result->value.logical = !op1->value.logical;
   *resultp = result;
 
@@ -872,7 +876,8 @@ g95_expr *result;
 arith g95_arith_and(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2), 
+			       &op1->where);
   result->value.logical = op1->value.logical && op2->value.logical;
   *resultp = result;
 
@@ -883,7 +888,8 @@ g95_expr *result;
 arith g95_arith_or(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2), 
+			       &op1->where);
   result->value.logical = op1->value.logical || op2->value.logical;
   *resultp = result;
 
@@ -894,7 +900,8 @@ g95_expr *result;
 arith g95_arith_eqv(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2), 
+			       &op1->where);
   result->value.logical = op1->value.logical == op2->value.logical;
   *resultp = result;
 
@@ -905,7 +912,8 @@ g95_expr *result;
 arith g95_arith_neqv(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2), 
+			       &op1->where);
   result->value.logical = op1->value.logical != op2->value.logical;
   *resultp = result;
 
@@ -960,8 +968,7 @@ arith g95_arith_uminus(g95_expr *op1, g95_expr **resultp) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(op1->ts.type, op1->ts.kind);
-  result->where = op1->where;
+  result = g95_constant_result(op1->ts.type, op1->ts.kind, &op1->where);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -996,8 +1003,7 @@ arith g95_arith_plus(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(op1->ts.type, op1->ts.kind);
-  result->where = op1->where;
+  result = g95_constant_result(op1->ts.type, op1->ts.kind, &op1->where);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -1035,8 +1041,7 @@ arith g95_arith_minus(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(op1->ts.type, op1->ts.kind);
-  result->where = op1->where;
+  result = g95_constant_result(op1->ts.type, op1->ts.kind, &op1->where);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -1076,8 +1081,7 @@ g95_expr *result;
 mpf_t x, y;
 arith rc;
 
-  result = g95_constant_result(op1->ts.type, op1->ts.kind);
-  result->where = op1->where;
+  result = g95_constant_result(op1->ts.type, op1->ts.kind, &op1->where);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -1127,8 +1131,7 @@ arith rc;
 
   rc = ARITH_OK;
 
-  result = g95_constant_result(op1->ts.type, op1->ts.kind);
-  result->where = op1->where;
+  result = g95_constant_result(op1->ts.type, op1->ts.kind, &op1->where);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -1272,8 +1275,7 @@ arith rc;
   if (g95_extract_int(op2, &power) != NULL)
     g95_internal_error("g95_arith_power(): Bad exponent");
 
-  result = g95_constant_result(op1->ts.type, op1->ts.kind);
-  result->where = op1->where;
+  result = g95_constant_result(op1->ts.type, op1->ts.kind, &op1->where);
 
   if (power == 0) {     /* Handle something to the zeroth power */
     switch(op1->ts.type) {
@@ -1364,7 +1366,8 @@ arith g95_arith_concat(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 int len;
 
-  result = g95_constant_result(BT_CHARACTER, g95_default_character_kind());
+  result = g95_constant_result(BT_CHARACTER, g95_default_character_kind(),
+			       &op1->where);
 
   len = op1->value.character.length + op2->value.character.length;
 
@@ -1463,7 +1466,8 @@ int len, alen, blen, i, ac, bc;
 arith g95_arith_eq(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind(),
+			       &op1->where);
   result->value.logical = (op1->ts.type == BT_COMPLEX) ?
     compare_complex(op1, op2) : (g95_compare_expr(op1, op2) == 0);
 
@@ -1475,7 +1479,8 @@ g95_expr *result;
 arith g95_arith_ne(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind(),
+			       &op1->where);
   result->value.logical = (op1->ts.type == BT_COMPLEX) ?
     !compare_complex(op1, op2) : (g95_compare_expr(op1, op2) != 0);
 
@@ -1487,7 +1492,8 @@ g95_expr *result;
 arith g95_arith_gt(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind(),
+			       &op1->where);
   result->value.logical = (g95_compare_expr(op1, op2) > 0);
   *resultp = result;
 
@@ -1498,7 +1504,8 @@ g95_expr *result;
 arith g95_arith_ge(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind(),
+			       &op1->where);
   result->value.logical = (g95_compare_expr(op1, op2) >= 0);
   *resultp = result;
 
@@ -1509,7 +1516,8 @@ g95_expr *result;
 arith g95_arith_lt(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind(),
+			       &op1->where);
   result->value.logical = (g95_compare_expr(op1, op2) < 0);
   *resultp = result;
 
@@ -1520,7 +1528,8 @@ g95_expr *result;
 arith g95_arith_le(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind(),
+			       &op1->where);
   result->value.logical = (g95_compare_expr(op1, op2) <= 0);
   *resultp = result;
 
@@ -1947,10 +1956,11 @@ g95_expr *g95_user(g95_expr *op1, g95_expr *op2) {
 /* g95_convert_integer()-- Convert an integer string to an expression
  * node */
 
-g95_expr *g95_convert_integer(const char *buffer, int kind, int radix) {
+g95_expr *g95_convert_integer(const char *buffer, int kind, int radix,
+			      locus *where) {
 g95_expr *e;
 
-  e = g95_constant_result(BT_INTEGER, kind);
+  e = g95_constant_result(BT_INTEGER, kind, where);
   mpz_set_str(e->value.integer, buffer, radix);
 
   return e;
@@ -1959,10 +1969,10 @@ g95_expr *e;
 
 /* g95_convert_real()-- Convert a real string to an expression node. */
 
-g95_expr *g95_convert_real(const char *buffer, int kind) {
+g95_expr *g95_convert_real(const char *buffer, int kind, locus *where) {
 g95_expr *e;
 
-  e = g95_constant_result(BT_REAL, kind);
+  e = g95_constant_result(BT_REAL, kind, where);
   mpf_set_str(e->value.real, buffer, 10);
 
   return e;
@@ -1975,7 +1985,7 @@ g95_expr *e;
 g95_expr *g95_convert_complex(g95_expr *real, g95_expr *imag, int kind) {
 g95_expr *e;
 
-  e = g95_constant_result(BT_COMPLEX, kind);
+  e = g95_constant_result(BT_COMPLEX, kind, &real->where);
   mpf_set(e->value.complex.r, real->value.real);
   mpf_set(e->value.complex.i, imag->value.real);
 
@@ -2005,8 +2015,7 @@ g95_expr *g95_int2int(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_INTEGER, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_INTEGER, kind, &src->where);
 
   mpz_set(result->value.integer, src->value.integer);
 
@@ -2027,8 +2036,7 @@ g95_expr *g95_int2real(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_REAL, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_REAL, kind, &src->where);
 
   mpf_set_z(result->value.real, src->value.integer);
 
@@ -2048,8 +2056,7 @@ g95_expr *g95_int2complex(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_COMPLEX, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_COMPLEX, kind, &src->where);
 
   mpf_set_z(result->value.complex.r, src->value.integer);
   mpf_set_ui(result->value.complex.i, 0);
@@ -2070,8 +2077,7 @@ g95_expr *g95_real2int(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_INTEGER, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_INTEGER, kind, &src->where);
 
   mpz_set_f(result->value.integer, src->value.real);
 
@@ -2092,8 +2098,7 @@ g95_expr *g95_real2real(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_REAL, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_REAL, kind, &src->where);
 
   mpf_set(result->value.real, src->value.real);
 
@@ -2113,8 +2118,7 @@ g95_expr *g95_real2complex(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_COMPLEX, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_COMPLEX, kind, &src->where);
 
   mpf_set(result->value.complex.r, src->value.real);
   mpf_set_ui(result->value.complex.i, 0);
@@ -2135,8 +2139,7 @@ g95_expr *g95_complex2int(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_INTEGER, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_INTEGER, kind, &src->where);
 
   mpz_set_f(result->value.integer, src->value.complex.r);
 
@@ -2157,8 +2160,7 @@ g95_expr *g95_complex2real(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_REAL, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_REAL, kind, &src->where);
 
   mpf_set(result->value.real, src->value.complex.r);
 
@@ -2178,8 +2180,7 @@ g95_expr *g95_complex2complex(g95_expr *src, int kind) {
 g95_expr *result;
 arith rc;
 
-  result = g95_constant_result(BT_COMPLEX, kind);
-  result->where = src->where;
+  result = g95_constant_result(BT_COMPLEX, kind, &src->where);
 
   mpf_set(result->value.complex.r, src->value.complex.r);
   mpf_set(result->value.complex.i, src->value.complex.i);

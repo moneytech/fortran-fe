@@ -177,8 +177,7 @@ g95_expr *e;
     return MATCH_ERROR;
   }
 
-  e = g95_convert_integer(buffer, kind, 10);
-  e->where = *g95_current_locus();
+  e = g95_convert_integer(buffer, kind, 10, g95_current_locus());
 
   if (g95_range_check(e) != ARITH_OK) {
     g95_error("Integer too big for its kind at %C");
@@ -238,8 +237,8 @@ g95_expr *e;
   match_digits(0, radix, buffer);
   g95_next_char();
 
-  e = g95_convert_integer(buffer, g95_default_integer_kind(), radix);
-  e->where = *g95_current_locus();
+  e = g95_convert_integer(buffer, g95_default_integer_kind(), radix,
+			  g95_current_locus());
 
   if (g95_range_check(e) != ARITH_OK) {
     g95_error("Integer too big for default integer kind at %C");
@@ -394,8 +393,7 @@ done:
     }
   }
 
-  e = g95_convert_real(buffer, kind);
-  e->where = *g95_current_locus();
+  e = g95_convert_real(buffer, kind, g95_current_locus());
 
   switch(g95_range_check(e)) {
     case ARITH_OK: break;
@@ -925,7 +923,7 @@ done:
     }
   }
 
-  *result = g95_convert_real(buffer, kind);
+  *result = g95_convert_real(buffer, kind, g95_current_locus());
   return MATCH_YES;
 
 no_match:

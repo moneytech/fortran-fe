@@ -1085,7 +1085,7 @@ int g95_default_character_kind(void);
 int g95_default_logical_kind(void);
 int g95_default_complex_kind(void);
 
-g95_expr *g95_constant_result(bt, int);
+g95_expr *g95_constant_result(bt, int, locus *);
 int g95_validate_kind(bt, int);
 arith g95_range_check(g95_expr *);
 
@@ -1134,8 +1134,8 @@ g95_expr *g95_le(g95_expr *, g95_expr *);
 g95_expr *g95_unary_user(g95_expr *, g95_expr *);
 g95_expr *g95_user(g95_expr *, g95_expr *);
 
-g95_expr *g95_convert_integer(const char *, int, int);
-g95_expr *g95_convert_real(const char *, int);
+g95_expr *g95_convert_integer(const char *, int, int, locus *);
+g95_expr *g95_convert_real(const char *, int, locus *);
 g95_expr *g95_convert_complex(g95_expr *, g95_expr *, int);
 
 g95_expr *g95_int2int(g95_expr *, int);
