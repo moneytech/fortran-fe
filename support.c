@@ -848,7 +848,7 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
 				     errtype, funname,
 				     parmnum);
 	    }
-	
+
 	  if (pedantic && ! DECL_IN_SYSTEM_HEADER (fundecl))
 	    pedwarn ("ISO C prohibits argument conversion to union type");
 

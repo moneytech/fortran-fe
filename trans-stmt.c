@@ -87,6 +87,13 @@ g95_trans_call (g95_code *code)
 
       psym = &sym;
     }
+  else if (strcmp (psym->name, code->sub_name) != 0)
+    {
+      sym = *psym;
+      psym = &sym;
+      strcpy (psym->name, code->sub_name);
+    }
+
   g95_conv_function_call (&se, psym, code->ext.actual);
 
   TREE_SIDE_EFFECTS (se.expr) = 1;
@@ -211,13 +218,13 @@ g95_trans_if (g95_code * code)
       /* If this is an elseif, insert it into the else of the previous
          condition.  */
       if (tail)
-	TREE_OPERAND (tail, 2) = stmt;
+        TREE_OPERAND (tail, 2) = stmt;
       tail = ifstmt;
 
       /* Store in TOP if this is the first translated IF block of this
          construct.  */
       if (! top)
-	top = stmt;
+        top = stmt;
 
       /* Advance to the next block, if there is one.  */
       code = code->block;

@@ -485,13 +485,13 @@ g95_build_array_type (tree type, g95_array_spec * as)
               /* Only warn once.  */
               warn_assumed=0;
             }
-	  if (n < as->rank-1)
-	    {
+          if (n < as->rank-1)
+            {
               lbound[n] = g95_conv_array_bound (as->lower[n]);
               ubound[n] = g95_conv_array_bound (as->upper[n]);
               break;
-	    }
-	  /*else*/
+            }
+          /*else*/
           /* Fall through...  */
 
         case AS_ASSUMED_SHAPE:

@@ -88,10 +88,10 @@ remove_suffix (char *name, int len)
   for (i = 2;  i < 8 && len > i;  i++)
     {
       if (name[len - i] == '.')
-	{
-	  name[len - i] = '\0';
-	  break;
-	}
+        {
+          name[len - i] = '\0';
+          break;
+        }
     }
 }
 

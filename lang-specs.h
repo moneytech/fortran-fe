@@ -14,5 +14,5 @@ This file is licensed under the GPL.
   {"@f95",
    "%{!M:%{!MM:%{!E:f951 %i %(cc1_options) %{I*}\
          %{!fsyntax-only:%(invoke_as)}}}}", 0},
-		
+
 

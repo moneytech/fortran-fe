@@ -1,3 +1,7 @@
+2002-12-14  Paul Brook  <paul@nowt.org>
+
+	* trans-stmt.c (g95_trans_call): Use resolved symbol name.
+
 2002-12-12  Paul Brook  <paul@nowt.org>
 
 	* trans-array.c (g95_trans_array_constructor_subarray): Fully
@@ -169,7 +173,7 @@
 	* trans-types.c: Ditto.
 
 2002-09-19  Paul Brook  <paul@nowt.org>
-	
+
 	* trans-array.c (g95_get_array_cons_size): New Function.
 	(g95_con_ss_startstride): Handle Array constructors.
 	(g95_conv_loop_setup): Ditto.
@@ -200,7 +204,7 @@
 	* trans-array.c (g95_build_array_initializer): New Function.
 	(g95_trans_auto_array_allocation): Build initializer for static decls.
 	Don't use mpz_addmul, it's GMP4 only.
-	
+
 2002-09-12  Paul Brook  <paul@nowt.org>
 
 	* trans-decl.c (g95_generate_code): Fix thinko with return variable.

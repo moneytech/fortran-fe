@@ -976,7 +976,7 @@ g95_init_builtin_functions (void)
 				 NULL);	                                \
 									\
       built_in_decls[(int) ENUM] = decl;				\
-    }									
+    }
 #include "builtins.def"
 #undef DEF_BUILTIN
 

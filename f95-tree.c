@@ -112,7 +112,7 @@ make_type_writable (tree t)
 	      {
 		/* Make the field writable.  */
 		TREE_READONLY (it) = 0;
-		
+
 		/* Make the type of the field writable.  */
 		make_type_writable (it);
 		it = TREE_CHAIN (it);
