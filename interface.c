@@ -709,7 +709,7 @@ int i, n, na;
   f = formal;
   i = 0;
 
-  for(a=actual; a; a=a->next) {
+  for(a=actual; a; a=a->next, f=f->next) {
     if (a->name[0] != '\0') {
       i = 0;
       for(f=formal; f; f=f->next, i++)
