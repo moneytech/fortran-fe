@@ -576,24 +576,12 @@ atom_type t;
  * the enum value. */
 
 static int find_enum(mstring *m) {
-char msg[100];
 int i;
 
   i = g95_string2code(m, atom_name);
   if (i >= 0) return i;
 
-  strcat(msg, "Expected one of ");
-
-  for(i=0; i<3; i++) {
-    strcat(msg, m->string);
-
-    m++;
-    if (m->string == NULL) break;
-    strcat(msg, ", ");
-  }
-
-  if (m->string != NULL) strcat(msg, ", ...");
-  bad_module(msg);
+  bad_module("find_enum(): Enum not found");
 
   return 0;  /* Not reached */
 }
@@ -623,7 +611,7 @@ static void write_char(char out) {
  * of a deal, since the file really isn't meant to be read by people
  * anyway. */
 
-static void write_atom(atom_type atom, void *v) {
+static void write_atom(atom_type atom, const void *v) {
 char buffer[20];
 const char *p;
 int i, len;
@@ -643,7 +631,7 @@ int i, len;
     break;
 
   case ATOM_INTEGER:
-    i = *((int *) v);
+    i = *((const int *) v);
     if (i < 0) g95_internal_error("write_atom(): Writing negative integer");
 
     sprintf(buffer, "%d", i);
@@ -697,7 +685,7 @@ static void mio_symbol_ref(g95_symbol **);
 static int mio_name(int t, mstring *m) {
 
   if (iomode == IO_OUTPUT)
-    write_atom(ATOM_NAME, (char *) g95_code2string(m, t));
+    write_atom(ATOM_NAME, g95_code2string(m, t));
   else {
     require_atom(ATOM_NAME);
     t = find_enum(m);

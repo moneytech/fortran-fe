@@ -357,7 +357,7 @@ static mstring operators[] = {
   minit(".le.", INTRINSIC_LE),     minit("<=", INTRINSIC_LE),
   minit(".lt.", INTRINSIC_LT),     minit("<", INTRINSIC_LT),
   minit(".gt.", INTRINSIC_GT),     minit(">", INTRINSIC_GT),
-  minit(".not.", INTRINSIC_NOT),   minit(NULL, -1) };
+  minit(".not.", INTRINSIC_NOT),   minit(NULL, INTRINSIC_NONE) };
 
 /* g95_match_intrinsic_op()-- Match an intrinsic operator.  Returns an
  * INTRINSIC enum. */
@@ -367,7 +367,7 @@ g95_intrinsic_op op;
 
   op = g95_match_strings(operators);
 
-  if (op == -1) return MATCH_NO;
+  if (op == INTRINSIC_NONE) return MATCH_NO;
 
   *result = op;
   return MATCH_YES;

@@ -2722,7 +2722,7 @@ g95_expr *e;
 
   nsource = 0;
 
-  head = NULL;
+  head = tail = NULL;
 
   for(;; nsource++)
     if (g95_get_array_element(source, nsource) == NULL) break;

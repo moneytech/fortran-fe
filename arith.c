@@ -135,21 +135,6 @@ mpf_t i10, log10;
   mpf_clear(log10);
 }
 
-void factorial(int n, mpf_t *fac) {
-mpf_t term;
-int i;
-
-  mpf_init_set_ui(*fac,1);
-  if (n > 1) {
-    for (i=2; i<=n; ++i) {
-      mpf_set_ui(term,n);
-      mpf_mul(*fac,*fac,term);
-    }
-    mpf_clear(term);
-  }
-  return;
-}
-
 
 void exponential(mpf_t *arg, mpf_t *result) {
 mpf_t two, ln2, power, q, r, num, denom, term, x, xp;

@@ -1659,25 +1659,6 @@ g95_symtree *current = ns->root;
 }
 
 
-/* g95_get_symtree()-- Given a name, return a symbol tree node along
- * with a flag indicating whether the symbol is new or not */
-
-g95_symtree *g95_get_symtree(const char *name, int *newflag) {
-g95_symtree *p;
-
-  p = g95_find_symtree(g95_current_ns, name);
-
-  if (p != NULL)
-    *newflag = 0;
-  else {
-    *newflag = 1;
-    p = g95_new_symtree(g95_current_ns, name);
-  }
-  
-  return p;
-}
-
-
 /* g95_free_symbol()-- Remove a g95_symbol structure and everything it
  * points to. */
 
