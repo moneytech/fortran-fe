@@ -675,8 +675,8 @@ g95_symbol *m;
  ok:
   if (g95_get_symbol(sym->name, g95_current_ns->parent, 0, &m)) return FAILURE;
 
-  if (m->attr.flavor != FL_MODULE_PROC &&
-      g95_add_flavor(&m->attr, FL_MODULE_PROC, NULL) == FAILURE)
+  if (m->attr.proc != PROC_MODULE &&
+      g95_add_procedure(&m->attr, PROC_MODULE, NULL) == FAILURE)
     return FAILURE;
 
   if (sub_flag) {

@@ -173,16 +173,15 @@ typedef enum {
 
 typedef enum {
   FL_UNKNOWN=0, FL_PROGRAM, FL_BLOCK_DATA, FL_MODULE, FL_VARIABLE,
-  FL_PARAMETER, FL_LABEL, FL_ST_FUNCTION, FL_MODULE_PROC, FL_DUMMY_PROC,
-  FL_PROCEDURE, FL_DERIVED, FL_NAMELIST
-} sym_flavor;   /* 13 elements = 4 bits */
+  FL_PARAMETER, FL_LABEL, FL_PROCEDURE, FL_DERIVED, FL_NAMELIST
+} sym_flavor;   /* 10 elements = 4 bits */
 
 
-/* Scopes of functions and subroutines */
+/* Procedure types */
 
-typedef enum {
-  SCOPE_UNKNOWN=0, SCOPE_EXTERNAL, SCOPE_INTERNAL, SCOPE_INTRINSIC
-} sym_scope;    /* 4 elements = 2 bits */
+typedef enum { PROC_UNKNOWN, PROC_MODULE, PROC_INTERNAL, PROC_DUMMY,
+	       PROC_INTRINSIC, PROC_ST_FUNCTION, PROC_EXTERNAL
+} procedure_type;   /* 7 elements = 3 bits */
 
 
 /************************* Structures *****************************/
@@ -212,7 +211,8 @@ typedef struct {
   g95_access access:2;
   sym_intent intent:2;
   sym_flavor flavor:4;
-  sym_scope scope:2;
+
+  procedure_type proc:3;
 
 } symbol_attribute;
 
@@ -875,6 +875,7 @@ void *g95_getmem(int);
 void g95_free(void *);
 void g95_clear_ts(g95_typespec *);
 FILE *g95_open_included_file(const char *);
+const char *g95_article(const char *);
 const char *g95_typename(bt);
 void g95_show_typespec(g95_typespec *);
 
@@ -1052,6 +1053,7 @@ try g95_add_generic(symbol_attribute *, locus *);
 try g95_add_access(symbol_attribute *, g95_access, locus *);
 try g95_add_flavor(symbol_attribute *, sym_flavor, locus *);
 try g95_add_entry(symbol_attribute *, locus *);
+try g95_add_procedure(symbol_attribute *, procedure_type, locus *);
 try g95_add_intent(symbol_attribute *, sym_intent, locus *);
 
 int g95_compare_attr(symbol_attribute *, symbol_attribute *);

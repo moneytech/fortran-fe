@@ -728,21 +728,14 @@ static mstring flavors[] = {
   minit("UNKNOWN",     FL_UNKNOWN),      minit("PROGRAM",     FL_PROGRAM),
   minit("BLOCK-DATA",  FL_BLOCK_DATA),   minit("MODULE",      FL_MODULE),
   minit("VARIABLE",    FL_VARIABLE),     minit("PARAMETER",   FL_PARAMETER),
-  minit("LABEL",       FL_LABEL),        minit("ST-FUNCTION", FL_ST_FUNCTION),
-  minit("MODULE-PROC", FL_MODULE_PROC),  minit("DUMMY-PROC",  FL_DUMMY_PROC),
-  minit("PROCEDURE",   FL_PROCEDURE),    minit("DERIVED",     FL_DERIVED),
-  minit("NAMELIST",    FL_NAMELIST),     minit(NULL, -1)
+  minit("LABEL",       FL_LABEL),        minit("PROCEDURE",   FL_PROCEDURE),
+  minit("DERIVED",     FL_DERIVED),      minit("NAMELIST",    FL_NAMELIST),
+  minit(NULL, -1)
 },
 
 intents[] = {
   minit("UNKNOWN", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
   minit("OUT", INTENT_OUT),          minit("INOUT", INTENT_INOUT),
-  minit(NULL, -1)
-},
-
-scopes[] = {
-  minit("UNKNOWN",    SCOPE_UNKNOWN),    minit("EXTERNAL",   SCOPE_EXTERNAL),
-  minit("INTERNAL",   SCOPE_INTERNAL),   minit("INTRINSIC",  SCOPE_INTRINSIC),
   minit(NULL, -1)
 },
 
@@ -759,6 +752,13 @@ attr_bits[] = {
   minit("SEQUENCE",    AB_SEQUENCE),    minit("ELEMENTAL",    AB_ELEMENTAL),
   minit("PURE",        AB_PURE),        minit("RECURSIVE",    AB_RECURSIVE),
   minit("GENERIC",     AB_GENERIC),     minit(NULL, -1)
+},
+
+procedures[] = {
+  minit("UNKNOWN", PROC_UNKNOWN),      minit("MODULE-PROC", PROC_MODULE),
+  minit("INTERNAL", PROC_INTERNAL),    minit("DUMMY", PROC_DUMMY),
+  minit("INTRINSIC", PROC_INTRINSIC),  minit("ST-FUNCTION", PROC_ST_FUNCTION),
+  minit("EXTERNAL", PROC_EXTERNAL),    minit(NULL, -1)
 },
 
 access_types[] = {
@@ -782,7 +782,7 @@ atom_type t;
 
   attr->flavor = mio_name(attr->flavor, flavors);
   attr->intent = mio_name(attr->intent, intents);
-  attr->scope = mio_name(attr->scope, scopes);
+  attr->proc = mio_name(attr->proc, procedures);
 
   if (iomode == IO_OUTPUT) {
     if (attr->allocatable)   mio_name(AB_ALLOCATABLE, attr_bits);
@@ -1852,8 +1852,14 @@ g95_interface *intr;
     save_derived(sym->components);
     break;
 
-  case FL_VARIABLE:     case FL_PARAMETER:  case FL_ST_FUNCTION:
-  case FL_MODULE_PROC:
+  case FL_PROCEDURE:
+    if (sym->attr.proc != PROC_ST_FUNCTION &&
+	sym->attr.proc != PROC_MODULE) break;
+
+    /* Fall through */
+
+  case FL_VARIABLE:
+  case FL_PARAMETER:
     if (sym->ts.type != BT_DERIVED || sym->ts.derived->serial != -1) break;
 
     sym->ts.derived->serial = sym_num++;
@@ -1880,11 +1886,10 @@ static void find_writables(g95_symbol *sym) {
 
   switch(sym->attr.flavor) {
   case FL_UNKNOWN:      case FL_PROGRAM:     case FL_BLOCK_DATA:
-  case FL_MODULE:       case FL_LABEL:       case FL_ST_FUNCTION:
-  case FL_DUMMY_PROC:  /* Can't happen or don't save cases */
+  case FL_MODULE:       case FL_LABEL:
     break;
 
-  case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
+  case FL_VARIABLE:     case FL_PARAMETER:
   case FL_PROCEDURE:    case FL_DERIVED:     case FL_NAMELIST:
     if (sym->attr.access == ACCESS_PUBLIC ||
 	(g95_current_ns->default_access != ACCESS_PRIVATE &&
@@ -1911,7 +1916,7 @@ static void write_symbol(g95_symbol *sym) {
     if (phase == 1) break;
     return;
 
-  case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
+  case FL_VARIABLE:     case FL_PARAMETER:
   case FL_PROCEDURE:    case FL_NAMELIST:
     if (phase == 2) break;
     return;

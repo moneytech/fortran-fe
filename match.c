@@ -1899,7 +1899,7 @@ match m;
 
   g95_push_error(&old_error);
 
-  if (g95_add_flavor(&sym->attr, FL_ST_FUNCTION, NULL) == FAILURE)
+  if (g95_add_procedure(&sym->attr, PROC_ST_FUNCTION, NULL) == FAILURE)
     goto undo_error;
 
   if (g95_match_formal_arglist(sym, 1) != MATCH_YES) goto undo_error;

@@ -1902,8 +1902,8 @@ match m;
     if (g95_get_symbol(name, g95_current_ns->parent, 0, &sym))
       return MATCH_ERROR;
 
-    if (sym->attr.flavor != FL_MODULE_PROC &&
-	g95_add_flavor(&sym->attr, FL_MODULE_PROC, NULL) == FAILURE)
+    if (sym->attr.proc != PROC_MODULE &&
+	g95_add_procedure(&sym->attr, PROC_MODULE, NULL) == FAILURE)
       return MATCH_ERROR;
 
     g95_add_interface(sym);

@@ -1011,8 +1011,7 @@ int c;
     g95_find_symbol(name, NULL, 1, &sym);
     if (sym == NULL ||
 	(!sym->attr.intrinsic && !sym->attr.external &&
-	 sym->attr.flavor != FL_PROCEDURE &&
-	 sym->attr.flavor != FL_MODULE_PROC)) {
+	 sym->attr.flavor != FL_PROCEDURE)) {
 
       /* No clue about what we've got.  If we're compiling a module,
        * it still might be a procedure reference if the name is the
@@ -1534,13 +1533,12 @@ match m;
       break;
     }
 
-    /* Fall through to matching a function reference */
+    /* Match a function reference */
 
-  case FL_ST_FUNCTION:
   function0:
     m = g95_match_actual_arglist(0, &actual_arglist, NULL);
     if (m == MATCH_NO) {
-      if (sym->attr.flavor == FL_ST_FUNCTION)
+      if (sym->attr.proc == PROC_ST_FUNCTION)
 	g95_error("Statement function '%s' requires argument list at %C",
 		  sym->name);
       else
@@ -1669,7 +1667,6 @@ match m;
 
     break;
 
-  case FL_MODULE_PROC:
   function1:
     g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
 
@@ -1727,7 +1724,6 @@ match m;
 
     break;
 
-  case FL_MODULE_PROC:
   case FL_PROCEDURE:  /* Check for a nonrecursive function result */
     if (sym->attr.function) {
       st = g95_enclosing_unit(NULL);

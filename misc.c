@@ -117,6 +117,25 @@ FILE *f;
 }
 
 
+/* g95_article()-- Given a word, return the correct article */
+
+const char *g95_article(const char *word) {
+const char *p;
+
+  switch(*word) {
+  case 'a': case 'A':  case 'e': case 'E':  case 'i': case 'I':
+  case 'o': case 'O':  case 'u': case 'U':
+    p = "an";
+    break;
+
+  default:
+    p = "a";
+  }
+
+  return p;
+}
+
+
 /* g95_typename()-- Return a string for each type */
 
 const char *g95_typename(bt type) {

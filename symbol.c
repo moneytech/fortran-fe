@@ -382,10 +382,9 @@ static mstring flavors[] = {
   minit("UNKNOWN",     FL_UNKNOWN),      minit("PROGRAM",     FL_PROGRAM),
   minit("BLOCK-DATA",  FL_BLOCK_DATA),   minit("MODULE",      FL_MODULE),
   minit("VARIABLE",    FL_VARIABLE),     minit("PARAMETER",   FL_PARAMETER),
-  minit("LABEL",       FL_LABEL),        minit("ST-FUNCTION", FL_ST_FUNCTION),
-  minit("MODULE-PROC", FL_MODULE_PROC),  minit("DUMMY-PROC",  FL_DUMMY_PROC),
-  minit("PROCEDURE",   FL_PROCEDURE),    minit("DERIVED",     FL_DERIVED),
-  minit("NAMELIST",    FL_NAMELIST),     minit(NULL, -1)
+  minit("LABEL",       FL_LABEL),        minit("PROCEDURE",   FL_PROCEDURE),
+  minit("DERIVED",     FL_DERIVED),      minit("NAMELIST",    FL_NAMELIST),
+  minit(NULL, -1)
 },
 
 intents[] = {
@@ -394,18 +393,17 @@ intents[] = {
   minit(NULL, -1)
 },
 
-scopes[] = {
-  minit("UNKNOWN",    SCOPE_UNKNOWN),    minit("EXTERNAL",   SCOPE_EXTERNAL),
-  minit("INTERNAL",   SCOPE_INTERNAL),   minit("INTRINSIC",  SCOPE_INTRINSIC),
-  minit(NULL, -1)
+procedures[] = {
+  minit("UNKNOWN", PROC_UNKNOWN),      minit("MODULE-PROC", PROC_MODULE),
+  minit("INTERNAL", PROC_INTERNAL),    minit("DUMMY", PROC_DUMMY),
+  minit("INTRINSIC", PROC_INTRINSIC),  minit("ST-FUNCTION", PROC_ST_FUNCTION),
+  minit("EXTERNAL", PROC_EXTERNAL),    minit(NULL, -1)
 },
 
 accessibility[] = {
   minit("UNKNOWN", ACCESS_UNKNOWN),   minit("PUBLIC", ACCESS_PUBLIC),
   minit("PRIVATE", ACCESS_PRIVATE),   minit(NULL, -1)
 };
-
-
 
 
 
@@ -416,8 +414,8 @@ void g95_show_attr(symbol_attribute *attr) {
 
   g95_status("(%s %s %s %s", g95_code2string(flavors, attr->flavor),
 	     g95_code2string(intents, attr->intent),
-	     g95_code2string(scopes, attr->scope),
-	     g95_code2string(accessibility, attr->access));
+	     g95_code2string(accessibility, attr->access),
+	     g95_code2string(procedures, attr->proc));
 
   if (attr->allocatable)    g95_status(" ALLOCATABLE");
   if (attr->dimension)      g95_status(" DIMENSION");
@@ -526,8 +524,6 @@ static const char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
 
   switch(attr->flavor) {
   case FL_PROGRAM: case FL_BLOCK_DATA: case FL_MODULE: case FL_LABEL:
-    if (attr->intent != SCOPE_UNKNOWN) { a2 = intent; goto conflict; }
-
     conf2(dummy);         conf2(save);        conf2(pointer);
     conf2(target);        conf2(external);    conf2(intrinsic);
     conf2(allocatable);   conf2(result);      conf2(in_namelist);
@@ -538,21 +534,26 @@ static const char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
   case FL_NAMELIST:
     break;
 
-  case FL_MODULE_PROC:
-    conf2(dummy);
-
-    /* Fall through */
-
   case FL_PROCEDURE:
-  case FL_DUMMY_PROC:
-    conf2(result);
-    conf2(in_common);
-    conf2(save);
+    switch(attr->proc) {
+    case PROC_ST_FUNCTION:
+      conf2(in_common);
+      break;
 
-    break;
+    case PROC_MODULE:
+      conf2(dummy);
+      break;
 
-  case FL_ST_FUNCTION:
-    conf2(in_common);
+    case PROC_DUMMY:
+      conf2(result);
+      conf2(in_common);
+      conf2(save);
+      break;
+
+    default:
+      break;
+    }
+
     break;
 
   case FL_DERIVED:
@@ -768,8 +769,7 @@ try g95_add_entry(symbol_attribute *attr, locus *loc) {
 
 try g95_add_function(symbol_attribute *attr, locus *loc) {
 
-  if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_DUMMY_PROC &&
-      attr->flavor != FL_MODULE_PROC && !attr->generic &&
+  if (attr->flavor != FL_PROCEDURE &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
   attr->function = 1;
@@ -778,15 +778,17 @@ try g95_add_function(symbol_attribute *attr, locus *loc) {
 
 try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
 
-  if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_MODULE_PROC &&
-      !attr->generic && g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE)
-    return FAILURE;
+  if (attr->flavor != FL_PROCEDURE &&
+      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
   attr->subroutine = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_generic(symbol_attribute *attr, locus *loc) {
+
+  if (attr->flavor != FL_PROCEDURE &&
+      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
   attr->generic = 1;
   return check_conflict(attr, loc);
@@ -817,11 +819,36 @@ try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 
   attr->flavor = f;
 
+  return check_conflict(attr, loc);
+}
+
+
+try g95_add_procedure(symbol_attribute *attr, procedure_type t, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
+
+  if (attr->flavor != FL_PROCEDURE &&
+      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+
+  if (attr->proc != PROC_UNKNOWN) {
+    g95_error("%s procedure at %L is already %s %s procedure",
+	      g95_code2string(procedures, t),
+	      g95_article(g95_code2string(procedures, attr->proc)),
+	      g95_code2string(procedures, attr->proc));
+    
+    return FAILURE;
+  }
+
+  attr->proc = t;
+
 /* Statement functions are always functions */
-  if (f == FL_ST_FUNCTION) attr->function = 1;
+
+  if (t == PROC_ST_FUNCTION && !attr->function &&
+      g95_add_function(attr, loc) == FAILURE) return FAILURE;
 
   return check_conflict(attr, loc);
 }
+
 
 try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *loc) {
 
@@ -857,7 +884,6 @@ try g95_add_access(symbol_attribute *attr, g95_access access, locus *loc) {
 }
 
 
-
 /* g95_compare_attr()-- Compares two attributes */
 
 int g95_compare_attr(symbol_attribute *a1, symbol_attribute *a2) {
@@ -875,7 +901,7 @@ int g95_compare_attr(symbol_attribute *a1, symbol_attribute *a2) {
     a1->sequence == a2->sequence   && a1->elemental == a2->elemental &&
     a1->pure == a2->pure           && a1->recursive == a2->recursive &&
     a1->access == a2->access       && a1->intent == a2->intent &&
-    a1->flavor == a2->flavor       && a1->scope == a2->scope &&
+    a1->flavor == a2->flavor       && a1->proc == a2->proc &&
     a1->generic == a2->generic;
 }
 
@@ -914,7 +940,7 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->access = ACCESS_UNKNOWN;
   attr->intent = INTENT_UNKNOWN;
   attr->flavor = FL_UNKNOWN;
-  attr->scope = SCOPE_UNKNOWN;
+  attr->proc = PROC_UNKNOWN;
 }
 
 
@@ -2193,14 +2219,12 @@ static void set_sym_defaults(g95_symbol *sym) {
   switch(sym->attr.flavor) {
   case FL_VARIABLE:
   case FL_PARAMETER:
-  case FL_ST_FUNCTION:
     break;
 
-  case FL_MODULE_PROC:
-  case FL_DUMMY_PROC:
   case FL_PROCEDURE:
-    if (sym->attr.subroutine) return;
-    break;
+    if (sym->attr.function) break;
+
+    /* Fall through */
 
   default:
     return;
