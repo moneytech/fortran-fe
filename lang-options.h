@@ -42,8 +42,6 @@ This file is part of GNU Fortran.
       N_("Set the default integer kind to double precision") },
 { "-pedantic",
       N_("Warn about use of non-standard features") },
-{ "-r",
-      N_("Run the resolution phase") },
 { "-r8",
       N_("Set the default real kind to double precision") },
 { "-I[directory]",

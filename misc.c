@@ -360,11 +360,6 @@ int i;
     return 1;
   }
 
-  if (strcmp(option, "-r") == 0) {
-    g95_option.resolve = 1;
-    return 1;
-  }
-
   if (strcmp(option, "-F") == 0) {
     g95_option.fmode = 1;
     return 1;
@@ -479,7 +474,6 @@ static void init_options(void) {
   g95_option.module_dir = NULL;
   g95_option.verbose = 0;
   g95_option.pedantic = 0;
-  g95_option.resolve = 0;
   g95_option.line_truncation = 0;
   g95_option.fixed_80 = 0;
   g95_option.fmode = 0;

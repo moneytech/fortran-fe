@@ -1899,14 +1899,12 @@ loop:
 
   g95_current_ns->code = s.head;
 
+  g95_resolve(g95_current_ns);
+
   if (s.state == COMP_MODULE) {
-    g95_resolve(g95_current_ns);
-
     g95_get_errors(NULL, &errors);
-
     g95_dump_module(s.sym->name, errors_before == errors);
   } else {
-    if (g95_option.resolve) g95_resolve(g95_current_ns);
     /* generate_code(g95_current_ns); */
   }
 
