@@ -1,6 +1,6 @@
 /* SELECT CASE statement
    Copyright (C) 2000 Free Software Foundation, Inc.
-   Contributed by Andy Vaught
+   Contributed by Andy Vaught and Steven Bosscher
 
 This file is part of GNU G95.
 
@@ -25,60 +25,53 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-
 /* Structure which holds information about the AVL tree.
  * Node in this tree are of type "struct g95_case *". */
 typedef struct case_tree {
   g95_case root;		/* Tree root node is in root->link[0]. */
   g95_case *default_case;       /* Cannot store in AVL, so keep it here */
+  g95_case *unbounded[2];       /* Holds unbounded cases, 0 = low, 1 = high */
 }
 case_tree;
 
 
+/* compare_case_expr() -- compare two expressions of of types
+ * that are allowed in the eval-expr of a select case block */
 
-/* compare_cases() -- determines interval overlaps for CASEs.
- * Return <0 if op1 < op2, 0 for overlap, >0 for op1 > op2 */
-
-int compare_cases(const g95_case *op1, const g95_case *op2) {
-int i;
-
-  if (op1->low == NULL) { /* no lower bound for op1 */
-      if (op2->low != NULL)
-          if (g95_compare_expr(op1->high,op2->low) < 0) return -1; /* (inf,op1.high] < [op2.low,op2.high] */
+static int compare_case_expr(g95_expr *e1, g95_expr *e2) {
+  switch(e1->ts.type) {
+    case BT_INTEGER:   return g95_compare_expr(e1,e2);
+    case BT_CHARACTER: return g95_compare_string(e1,e2,NULL);
+    case BT_LOGICAL:   return (e1->value.logical - e2->value.logical);
+    default:
+      g95_internal_error("Expression at %L cannot be a case expression",
+                          &e1->where);
       return 0;
   }
+}
 
-  if (op1->high == NULL) {
-      if (op2->high != NULL)
-	if (g95_compare_expr(op1->low,op2->high) > 0) return i; /* [op1.low,inf) > [op2.low,op2.high] */
-      return 0;
-  }
 
-  if (op2->low == NULL) {
-      if (op1->low != NULL)
-        if ( g95_compare_expr(op1->low,op2->high) > 0) return 1; /* [op1.low,op1.high] > (inf,op2.high] */
-      return 0;
-  }
+/* compare_cases() -- helper function for overlap checker.
+ * determines interval overlaps for CASEs. Return <0 if op1 < op2,
+ * 0 for overlap, >0 for op1 > op2. 
+ * Assumes we're not dealing with unbounded or default cases */
 
-  if (op2->high == NULL) {
-      if (op1->high != NULL)
-        if (g95_compare_expr(op1->high,op2->low) < 0) return -1; /* [op1.low,op1.high) > [op2.low,inf) */
-      return 0;
-  }
+static int compare_cases(g95_case *op1, g95_case *op2) {
 
-  if (g95_compare_expr(op1->high,op2->low) < 0) return -1;
-  if (g95_compare_expr(op1->low,op2->high) > 0) return 1;
+  if (compare_case_expr(op1->high,op2->low) < 0) return -1;
+  if (compare_case_expr(op1->low,op2->high) > 0) return 1;
   return 0;
 }
 
 
 /* avl_create() -- Set up a new AVL tree. Free a tree with g95_free() */
 
-case_tree *avl_create(void) {
+static case_tree *avl_create(void) {
 case_tree *tree;
   tree = g95_getmem(sizeof(case_tree));
   tree->root.link[0] = tree->root.link[1] = NULL; 
   tree->default_case = NULL;
+  tree->unbounded[0] = tree->unbounded[1] = NULL; 
   return tree;
 }
 
@@ -90,35 +83,59 @@ case_tree *tree;
  * blocks where the evaluation expression is of type CHARACTER. Code
  * for such SELECT blocks will be generated from the AVL tree because
  * the GCC backend doesn't support them.
+ *
  * AVL insert routine is a modified version of that found in
- * Ben Pfaff's GNU libavl. */
+ * Ben Pfaff's GNU libavl. Uses Knuth's Algorithm 6.2.3A but caches
+ * results of comparisons */
 
-try check_case_overlap(case_tree *tree, g95_case *cp)
+static try check_case_overlap(case_tree *tree, g95_case *cp)
 {
 g95_case *t, *s, *p, *q, *r;
-
-  /* intercept the default case */
-  /* FIXME : g95 currently allows more than one CASE DEFAULT statement
-   * This is simple to fix: just check for default_case == NULL. The
-   * problem is how to generate a usefull error message */
-  if (cp->low == NULL && cp->high == NULL) {
-    tree->default_case = cp;
-    return SUCCESS;
-  }
-
-/* Uses a modified version of Knuth's Algorithm 6.2.3A (caches results of comparisons) */
+g95_expr *e1, *e2;
+int i;
 
   t = &tree->root;
   s = p = t->link[0];
 
-  if (s == NULL) {
+  /* intercept the default case and unbounded cases */
+  if (cp->low == NULL || cp->high == NULL) {
+
+    if (cp->low == NULL && cp->high == NULL) { /* default case */
+      tree->default_case = cp;
+      return SUCCESS;
+    }
+
+    i = (cp->low == NULL) ?  0 : 1;
+    s = tree->unbounded[i];
+    if (s != NULL) { /* already seen this unbounded case? */
+      p = s;
+      goto overlap;
+    }
+    tree->unbounded[i] = cp;
+
+    /* unbounded cases can only overlap with leftmost or rightmost node */
+    if (p != NULL) { /* could be an empty tree */
+      while(p->link[i] != NULL) 
+        p = p->link[i];
+      if (i == 0) {
+        if (compare_case_expr(cp->high,p->low) >= 0) goto overlap;
+      } else {
+        if (compare_case_expr(cp->low,p->high) <= 0) goto overlap;
+      }
+    }
+
+    return SUCCESS;
+  }
+
+  /* This is were we're going to build the tree */
+  if (s == NULL) { /* tree is empty */
     q = t->link[0] = cp;
     q->link[0] = q->link[1] = NULL;
     q->balance = 0;
     return SUCCESS;
   }
 
-  for (;;) {
+  for (;;) { /* search the tree */
     int diff = compare_cases(cp, p);
 
     if (diff < 0) { /* all values in range for *cp are smaller than  *p->low */
@@ -135,16 +152,10 @@ g95_case *t, *s, *p, *q, *r;
         p->link[1] = q = cp;
         break;
       }
-    } else { /* overlaps with prior CASE */
-        g95_expr *e1 = (cp->low == NULL) ? cp->high : cp->low; /* avoid SIGSEGV */
-        g95_expr *e2 = (p->low == NULL) ? p->high : p->low;
-        g95_error("CASE value range at %L overlaps with prior CASE statement at %L", 
-                  &e1->where, &e2->where); 
-        return FAILURE;
-      }
+    } else goto overlap; /* overlaps with prior CASE */
 
-      if (q->balance != 0) t = p, s = q;
-      p = q;
+    if (q->balance != 0) t = p, s = q;
+    p = q;
   }
   
   q->link[0] = q->link[1] = NULL;
@@ -230,13 +241,20 @@ g95_case *t, *s, *p, *q, *r;
     t->link[0] = p;
 
   return SUCCESS;
+
+overlap:
+  e1 = (cp->low == NULL) ? cp->high : cp->low; /* avoid SIGSEGV */
+  e2 = (p->low == NULL) ? p->high : p->low;
+  g95_error("CASE value range at %L overlaps with prior CASE statement at %L", 
+            &e1->where, &e2->where); 
+  return FAILURE;  
 }
 
 
 /* traverse_tree -- visits root, then left, then right (RLN).
  * This is a first step towards generating code for CHARACTER cases. */
 
-void traverse_tree(g95_case *tree, int depth) {
+static void traverse_tree(g95_case *tree, int depth) {
   if (tree == NULL) return;
 #if 0 
   generate_cmps_and_jmps();
@@ -525,9 +543,10 @@ try t;
       }      
  
       if (cp->low != NULL && cp->high != NULL && cp->low != cp->high) {
-        if (g95_compare_expr(cp->low,cp->high) > 0) {
+        if (compare_case_expr(cp->low,cp->high) > 0) {
           g95_warning("Range specification at %L can never be matched;\n\t "
-                      "first expression greater than second expression", &cp->high->where);
+                      "first expression greater than second expression",
+                      &cp->high->where);
 	  continue; /* just ignore this case, but don't fail */;
         }
       }
