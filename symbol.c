@@ -1363,7 +1363,11 @@ done:
  * of a statement is found to be incorrect.  Whenever a symbol is
  * looked up, we make a copy of it and link to it.  All of these
  * symbols are kept in a singly linked list so that we can commit or
- * undo the changes at a later time.  */
+ * undo the changes at a later time. 
+ *
+ * A symtree may point to a symbol node outside of it's namespace.  In
+ * this case, that symbol has been used as a host associated variable
+ * at some previous time.  */
 
 static g95_symbol *changed = NULL;
 
@@ -1770,13 +1774,69 @@ g95_symtree *st;
 }
 
 
-/* mark_new_symbol()-- Take care of bookkeeping that lets us mark new
- * symbols for possible undoing later. */
+/* g95_get_symbol()-- Given a name, find a symbol.  The parent_flag
+ * indicates if we try host association after a local search fails.
+ * If this flag is not set and a host-associated symbol is found, an
+ * error is generated.
+ *
+ * The integer return code indicates
+ *  0   All OK
+ *  1   The symbol name was ambiguous
+ *  2   The name meant to be established was already host associated.
+ *
+ * If nonzero, then an error was issued.  */
 
-static g95_symbol *mark_new_symbol(g95_symbol *p, const char *name,
-				   g95_namespace *ns) {
+int g95_get_symbol(const char *name, g95_namespace *ns, int parent_flag,
+		   g95_symbol **result) {
+g95_namespace *current_ns;
+g95_symtree *st;
+g95_symbol *p;
 
-  if (p != NULL && p->mark == 0) {
+  if (ns == NULL) ns = g95_current_ns;
+
+  for(current_ns=ns; current_ns; current_ns=current_ns->parent) {
+    st = g95_find_symtree(current_ns, name);
+    if (st != NULL || !parent_flag) break;
+  }
+
+  if (st == NULL) {     /* Create new symbol */
+    p = g95_new_symbol(name, ns);
+
+    p->old_symbol = NULL;   /* Add to the list of tentative symbols. */
+    p->tlink = changed;
+    p->mark = 1;
+    changed = p;
+
+    g95_new_symtree(ns, name)->sym = p;
+    p->refs++;
+
+  } else {    /* Make sure the existing symbol is OK */
+
+    if (st->ambiguous) {
+      if (st->sym->module[0])
+	g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
+		  "from module '%s'", name, st->sym->name, st->sym->module);
+      else
+	g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
+		  "from current program unit", name, st->sym->name);
+
+      return 1;
+    }
+
+    p = st->sym;
+
+    if (p->ns != ns) {  /* Symbol is from another namespace */
+      if (!parent_flag) {
+	g95_error("Symbol '%s' at %C has already been host associated", name);
+	return 2;
+      }
+
+      if (current_ns != ns) {  /* Was found in a parent namespace */
+	g95_new_symtree(ns, name)->sym = p;
+	p->refs++;
+      }
+    }
+
     p->mark = 1;
 
     if (p->old_symbol == NULL) { /* Copy in case this symbol is changed */
@@ -1788,74 +1848,8 @@ static g95_symbol *mark_new_symbol(g95_symbol *p, const char *name,
     }
   }
 
-  if (p == NULL) {
-    p = g95_new_symbol(name, ns);
-
-    p->old_symbol = NULL;   /* Add to the list of tentative symbols. */
-    p->tlink = changed;
-    p->mark = 1;
-    changed = p;
-
-    g95_new_symtree(ns, name)->sym = p;
-    p->refs++;
-  }
-
-  return p;
-}
-
-
-/* g95_get_symbol()-- Given a name, search the current namespace on up
- * for the symbol.  If we don't find it anywhere, create the symbol in
- * the current space.  The flag returned indicates whether the symbol
- * reference was ambiguous or not.  If it was, an error was issued.  */
-
-int g95_get_symbol(const char *name, g95_namespace *ns, int parent_flag,
-		   g95_symbol **result) {
-g95_namespace *current_ns;
-g95_symtree *st;
-g95_symbol *p;
-
-  if (ns == NULL) ns = g95_current_ns;
-  current_ns = ns;
-
-  for(;;) {
-    st = g95_find_symtree(current_ns, name);
-    if (st != NULL) break;
-
-    if (current_ns->proc_name != NULL &&
-	strcmp(current_ns->proc_name->name, name) == 0) {
-      *result = p = current_ns->proc_name;
-      mark_new_symbol(p, name, p->ns);
-      return 0;
-    }
-
-    if (!parent_flag) break;
-
-    current_ns = current_ns->parent;
-    if (current_ns == NULL) break;
-  }
-
-  if (current_ns == NULL) current_ns = ns;
-
-  if (st != NULL)
-    p = st->sym;
-  else
-    p = NULL;
-
-  *result = mark_new_symbol(p, name, current_ns);
-
-  if (st == NULL) return 0;
-
-  if (st->ambiguous) {
-    if (st->sym->module[0])
-      g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
-		"from module '%s'", name, st->sym->name, st->sym->module);
-    else
-      g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
-		"from current program unit", name, st->sym->name);
-  }
-
-  return st->ambiguous;
+  *result = p;
+  return 0;
 }
 
 
@@ -2135,7 +2129,11 @@ static void show_symtree(g95_symtree *st) {
 
   show_indent();
   g95_status("symtree: %s  Ambig %d", st->name, st->ambiguous);
-  g95_show_symbol(st->sym);
+
+  if (st->sym->ns != g95_current_ns)
+    g95_status(" from namespace %s", st->sym->ns->proc_name->name);
+  else
+    g95_show_symbol(st->sym);
 }
 
 
@@ -2246,8 +2244,10 @@ void g95_set_sym_defaults(g95_namespace *ns) {
 
 void g95_show_namespace(g95_namespace *ns) {
 g95_interface *intr;
+g95_namespace *save;
 int i;
 
+  save = g95_current_ns; 
   show_level++; 
 
   show_indent();
@@ -2266,6 +2266,7 @@ int i;
 
     g95_traverse_symtree(ns, clear_sym_mark);
 
+    g95_current_ns = ns;
     g95_traverse_symtree(ns, show_symtree);
 
     for(i=0; i<G95_INTRINSIC_OPS; i++) {    /* User operator interfaces */
@@ -2292,6 +2293,7 @@ int i;
 
   show_level--;
   g95_status_char('\n');
+  g95_current_ns = save;
 }
 
 
