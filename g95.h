@@ -1380,7 +1380,6 @@ match g95_match_generic_spec(interface_type *, char *, int *);
 match g95_match_interface(void);
 match g95_match_end_interface(void);
 void g95_start_interface(void);
-void g95_check_operator_interfaces(g95_namespace *);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
 int g95_compare_types(g95_typespec *, g95_typespec *);
 void g95_check_interfaces(g95_namespace *);

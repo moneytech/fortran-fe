@@ -334,8 +334,6 @@ g95_component *dt1, *dt2;
 }
 
 
-
-
 /* compare_type_rank()-- Given two symbols that are formal arguments,
  * compare their ranks and types.  Returns nonzero if they have the
  * same rank and type, zero otherwise. */
@@ -452,118 +450,11 @@ g95_symbol *g95_find_keyword_arg(char *name, g95_formal_arglist *f) {
 }
 
 
-/* operator_correspondence()-- Perform the abbreviated correspondence
- * test for operators.  The arguments cannot be optional and are
- * always ordered correctly, which makes this test much easier than
- * that for generic tests. */
-
-static int operator_correspondence(g95_formal_arglist *f1,
-				   g95_formal_arglist *f2) {
-  for(;;) {
-    if (f1 == NULL && f2 == NULL) break;
-    if (f1 == NULL || f2 == NULL) return 1;
-
-    if (!compare_type_rank(f1->sym, f2->sym)) return 1;
-
-    f1 = f1->next;
-    f2 = f2->next;
-  }
-
-  return 0;
-}
+/******** Interface checking subroutines **********/
 
 
-/* generic_correspondence()-- Perform the correspondence test in rule
- * 2 of section 14.1.2.3.  Returns zero if no argument is found that
- * satisifes rule 2, nonzero otherwise.  This test is also not
- * symmetric in f1 and f2 and must be called twice.
- *
- * This test finds problems caused by sorting the actual argument list
- * with keywords.  For example:
- *
- * INTERFACE FOO
- *     SUBROUTINE F1(A, B)
- *         INTEGER :: A ; REAL :: B
- *     END SUBROUTINE F1
- * 
- *     SUBROUTINE F2(B, A)
- *         INTEGER :: A ; REAL :: B
- *     END SUBROUTINE F1
- * END INTERFACE FOO
- *
- * At this point, 'CALL FOO(A=1, B=1.0)' is ambiguous. */
-
-static int generic_correspondence(g95_formal_arglist *f1,
-				  g95_formal_arglist *f2) {
-
-g95_formal_arglist *f2_save, *g;
-g95_symbol *sym;
-
-  f2_save = f2;
-
-  while(f1) {
-    if (f1->sym->attr.optional) goto next;
-
-    if (f2 != NULL && compare_type_rank(f1->sym, f2->sym)) goto next;
-
-    /* Now search for a disambiguating keyword argument starting at
-     * the current non-match. */
-
-    for(g=f1; g; g=g->next) {
-      if (g->sym->attr.optional) continue;
-
-      sym = g95_find_keyword_arg(g->sym->name, f2_save);
-      if (sym == NULL || !compare_type_rank(g->sym, sym)) return 1;
-    }
-
-  next:
-    f1 = f1->next;
-    if (f2 != NULL) f2 = f2->next;
-  }
-
-  return 0;
-}
-
-
-/* compare_interfaces()-- 'Compare' two formal interfaces
- * associated with a pair of symbols.  We return nonzero if there
- * exists an actual argument list that would be ambiguous between the
- * two interfaces, zero otherwise. */
-
-static int compare_interfaces(g95_symbol *s1, g95_symbol *s2,
-			      int generic_flag) {
-g95_formal_arglist *f1, *f2;
-
-  if ((s1->attr.function == 0 && s1->attr.subroutine == 0) ||
-      (s2->attr.function == 0 && s2->attr.subroutine == 0))
-    g95_internal_error("compare_interface(): "
-		       "procedure is neither function nor subroutine");
-
-  if (s1->attr.function != s2->attr.function &&
-      s1->attr.subroutine != s2->attr.subroutine)
-    return 0;   /* disagreement between function/subroutine */
-
-  f1 = s1->formal;
-  f2 = s2->formal;
-
-  if (f1 == NULL && f2 == NULL) return 1;   /* Special case */
-
-  if (count_types_test(f1, f2)) return 0;
-  if (count_types_test(f2, f1)) return 0;
-
-  if (generic_flag) {
-    if (generic_correspondence(f1, f2)) return 0;
-    if (generic_correspondence(f2, f1)) return 0;
-  } else {
-    if (operator_correspondence(f1, f2)) return 0;
-  }
-
-  return 1;
-}
-
-
-/* check_operator_interface()-- Given a namespace and an operator,
- * make sure that all interfaces for that operator are legal. */
+/* check_operator_interface()-- Given an operator interface and the
+ * operator, make sure that all interfaces for that operator are legal. */
 
 static void check_operator_interface(g95_interface *intr, int operator) {
 g95_formal_arglist *formal;
@@ -571,6 +462,8 @@ sym_intent i1, i2;
 g95_symbol *sym;
 bt t1, t2;
 int args;
+
+  if (intr == NULL) return; 
 
   args = 0;
   t1 = t2 = BT_UNKNOWN;
@@ -698,50 +591,174 @@ int args;
 }
 
 
-/* g95_check_operator_interfaces()-- Given a namespace, make sure all
- * of it's operator interfaces are legal. */
+/* operator_correspondence()-- Perform the abbreviated correspondence
+ * test for operators.  The arguments cannot be optional and are
+ * always ordered correctly, which makes this test much easier than
+ * that for generic tests. */
 
-void g95_check_operator_interfaces(g95_namespace *ns) {
-g95_interface *intr;
-int op;
+static int operator_correspondence(g95_formal_arglist *f1,
+				   g95_formal_arglist *f2) {
+  for(;;) {
+    if (f1 == NULL && f2 == NULL) break;
+    if (f1 == NULL || f2 == NULL) return 1;
 
-  for(op=0; op < G95_INTRINSIC_OPS; op++) {
-    for(intr=ns->operator[op]; intr; intr=intr->next)
-      check_operator_interface(intr, op);
+    if (!compare_type_rank(f1->sym, f2->sym)) return 1;
+
+    f1 = f1->next;
+    f2 = f2->next;
   }
+
+  return 0;
 }
 
 
-/* check_mod_interface()-- Given a pointer to an interface pointer,
- * remove duplicate interfaces and make sure that no two interfaces
- * are ambiguous between an actual argument list */
+/* generic_correspondence()-- Perform the correspondence test in rule
+ * 2 of section 14.1.2.3.  Returns zero if no argument is found that
+ * satisifes rule 2, nonzero otherwise.  This test is also not
+ * symmetric in f1 and f2 and must be called twice.
+ *
+ * This test finds problems caused by sorting the actual argument list
+ * with keywords.  For example:
+ *
+ * INTERFACE FOO
+ *     SUBROUTINE F1(A, B)
+ *         INTEGER :: A ; REAL :: B
+ *     END SUBROUTINE F1
+ * 
+ *     SUBROUTINE F2(B, A)
+ *         INTEGER :: A ; REAL :: B
+ *     END SUBROUTINE F1
+ * END INTERFACE FOO
+ *
+ * At this point, 'CALL FOO(A=1, B=1.0)' is ambiguous. */
 
-static void check_mod_interface(g95_interface **ip, char *interface_name,
-				int generic_flag) {
-g95_interface *p, *q, *qlast;
+static int generic_correspondence(g95_formal_arglist *f1,
+				  g95_formal_arglist *f2) {
 
-  if (*ip == NULL) return;
+g95_formal_arglist *f2_save, *g;
+g95_symbol *sym;
 
-  for(p=*ip; p; p=p->next) {
+  f2_save = f2;
+
+  while(f1) {
+    if (f1->sym->attr.optional) goto next;
+
+    if (f2 != NULL && compare_type_rank(f1->sym, f2->sym)) goto next;
+
+    /* Now search for a disambiguating keyword argument starting at
+     * the current non-match. */
+
+    for(g=f1; g; g=g->next) {
+      if (g->sym->attr.optional) continue;
+
+      sym = g95_find_keyword_arg(g->sym->name, f2_save);
+      if (sym == NULL || !compare_type_rank(g->sym, sym)) return 1;
+    }
+
+  next:
+    f1 = f1->next;
+    if (f2 != NULL) f2 = f2->next;
+  }
+
+  return 0;
+}
+
+
+/* compare_interfaces()-- 'Compare' two formal interfaces
+ * associated with a pair of symbols.  We return nonzero if there
+ * exists an actual argument list that would be ambiguous between the
+ * two interfaces, zero otherwise. */
+
+static int compare_interfaces(g95_symbol *s1, g95_symbol *s2,
+			      int generic_flag) {
+g95_formal_arglist *f1, *f2;
+
+  if (s1->attr.function != s2->attr.function &&
+      s1->attr.subroutine != s2->attr.subroutine)
+    return 0;   /* disagreement between function/subroutine */
+
+  f1 = s1->formal;
+  f2 = s2->formal;
+
+  if (f1 == NULL && f2 == NULL) return 1;   /* Special case */
+
+  if (count_types_test(f1, f2)) return 0;
+  if (count_types_test(f2, f1)) return 0;
+
+  if (generic_flag) {
+    if (generic_correspondence(f1, f2)) return 0;
+    if (generic_correspondence(f2, f1)) return 0;
+  } else {
+    if (operator_correspondence(f1, f2)) return 0;
+  }
+
+  return 1;
+}
+
+
+/* check_interface0()-- Given a pointer to an interface pointer,
+ * remove duplicate interfaces and make sure that all symbols are
+ * either functions or subroutines.  Returns nonzero if something goes
+ * wrong. */
+
+static int check_interface0(g95_interface *p, char *interface_name) {
+g95_interface *q, *qlast;
+
+  /* Make sure all symbols in the interface have been defined as
+   * functions or subroutines. */
+
+  for(; p; p=p->next)
+    if (!p->sym->attr.function && !p->sym->attr.subroutine) {
+      g95_error("Procedure '%s' in %s at %L is neither function nor "
+		"subroutine", p->sym->name, interface_name,
+		&p->sym->declared_at);
+      return 1;
+    }
+
+  /* Remove duplicate interfaces in this interface list */
+
+  for(; p; p=p->next) {
     qlast = p;
 
     for(q=p->next; q;) {
-      if (p->sym == q->sym) {   /* Duplicate interface */
+      if (p->sym != q->sym) {
+	qlast = q;
+	q = q->next;
+
+      } else {           /* Duplicate interface */
 	qlast->next = q->next;
 	g95_free(q);
-
 	q = qlast->next;
-	continue;
       }
-
-      if (compare_interfaces(p->sym, q->sym, generic_flag))
-	g95_error("Ambiguous interfaces '%s' and '%s' in %s at %C",
-		  p->sym->name, q->sym->name, interface_name);
-
-      qlast = q;
-      q = q->next;
     }
   }
+
+  return 0;
+}
+
+
+/* check_interface1()-- Check lists of interfaces to make sure that no
+ * two interfaces are ambiguous.  Duplicate interfaces (from the same
+ * symbol) are OK here. */
+
+static int check_interface1(g95_interface *p, g95_interface *q,
+			    int generic_flag, char *interface_name) {
+
+  for(; p; p=p->next)
+    for(; q; q=q->next) {
+      if (p->sym == q->sym) continue;   /* Duplicates OK here */
+
+      if (strcmp(p->sym->name, q->sym->name) == 0 &&
+	  strcmp(p->sym->module, q->sym->module) == 0) continue;
+
+      if (compare_interfaces(p->sym, q->sym, generic_flag)) {
+	g95_error("Ambiguous interfaces '%s' and '%s' in %s at %L",
+		  p->sym->name, q->sym->name, interface_name, &p->where);
+	return 1;
+      }
+    }
+
+  return 0;
 }
 
 
@@ -751,29 +768,53 @@ g95_interface *p, *q, *qlast;
 
 static void check_sym_interfaces(g95_symbol *sym) {
 char interface_name[100];
+g95_symbol *s2;
+
+  if (sym->ns != g95_current_ns) return; 
 
   if (sym->generic != NULL) {
     sprintf(interface_name, "generic interface '%s'", sym->name);
-    check_mod_interface(&sym->generic, interface_name, 1);
+    if (check_interface0(sym->generic, interface_name)) return;
+
+    s2 = sym;
+    while(s2 != NULL) {
+      if (check_interface1(sym->generic, s2->generic, 1, interface_name))
+	return;
+
+      if (s2->ns->parent == NULL) break;
+      if (g95_find_symbol(sym->name, s2->ns->parent, 1, &s2)) break;
+    }
   }
 
   if (sym->operator != NULL) {
     sprintf(interface_name, "operator interface '%s'", sym->name);
-    check_mod_interface(&sym->operator, interface_name, 0);
+    if (check_interface0(sym->operator, interface_name)) return;
+
+    s2 = sym;
+    while(s2 != NULL) {
+      if (check_interface1(sym->operator, s2->operator, 0, interface_name))
+	return;
+
+      if (s2->ns->parent == NULL) break;
+      if (g95_find_symbol(sym->name, s2->ns->parent, 1, &s2)) break;
+    }
   }
 }
 
 
-/* g95_check_interfaces()-- For the namespace, check generic and user
- * operator interfaces for consistency and to remove duplicate
- * interfaces.  During module loading, we can't just traverse the
- * sym_table, since generic names aren't guaranteed to be there.  We
- * traverse the whole namespace, counting on the fact that most
- * symbols will not have generic or operator interfaces. */
+/* g95_check_interfaces()-- For the namespace, check generic, user
+ * operator and intrinsic operator interfaces for consistency and to
+ * remove duplicate interfaces.  We traverse the whole namespace,
+ * counting on the fact that most symbols will not have generic or
+ * operator interfaces. */
 
 void g95_check_interfaces(g95_namespace *ns) {
+g95_namespace *old_ns, *ns2;
 char interface_name[100];
 int i;
+
+  old_ns = g95_current_ns;
+  g95_current_ns = ns;
 
   g95_traverse_ns(ns, check_sym_interfaces);
 
@@ -785,8 +826,16 @@ int i;
     else
       sprintf(interface_name, "intrinsic '%s' operator", g95_op2string(i));
 
-    check_mod_interface(&ns->operator[i], interface_name, 0);
+    if (check_interface0(ns->operator[i], interface_name)) continue;
+
+    check_operator_interface(ns->operator[i], i);
+
+    for(ns2=ns->parent; ns2; ns2=ns2->parent)
+      if (check_interface1(ns->operator[i], ns2->operator[i], 0,
+			   interface_name)) break;
   }
+
+  g95_current_ns = old_ns;
 }
 
 
@@ -1007,31 +1056,18 @@ g95_symbol *sym;
 }
 
 
-/* check_new_interface()-- Make sure that the interface just parsed
- * makes sense.  Depending on the type of interface this can mean
- * several things.  No checking is required for a nameless interface.
- * For a generic interface, the interface must be unique within the
- * block.  Intrinsic operator interfaces are checked during the
- * resolution phase in greater detail.  The 'base' pointer points to
- * the first symbol node in the list of operators (which might be NULL) */
+/* check_new_interface()-- Make sure that the interface just parsed is
+ * not already present in the given interface list.  Ambiguity isn't
+ * checked yet since module procedures can be present without
+ * interfaces.  */
 
-static try check_new_interface(g95_interface *base, g95_symbol *new,
-			       int generic_flag) {
+static try check_new_interface(g95_interface *base, g95_symbol *new) {
 g95_interface *ip;
 
   for(ip=base; ip; ip=ip->next) {
     if (ip->sym == new) {
       g95_error("Entity '%s' at %C is already present in the interface",
 		new->name);
-      return FAILURE;
-    }
-
-    if (new->formal == NULL) continue;
-
-    if (compare_interfaces(new, ip->sym, generic_flag)) {
-      g95_error("Interface ending at %C is ambiguous with interface at %L",
-		&ip->where);
-
       return FAILURE;
     }
   }
@@ -1053,8 +1089,8 @@ g95_symbol *sym;
 
   case INTERFACE_INTRINSIC_OP:
     for(ns=current_interface.ns; ns; ns=ns->parent)
-      if (check_new_interface(ns->operator[current_interface.op],
-			      new, 0) == FAILURE) return FAILURE;
+      if (check_new_interface(ns->operator[current_interface.op], new)
+	  == FAILURE) return FAILURE;
 
     head = &current_interface.ns->operator[current_interface.op];
     break;
@@ -1064,7 +1100,7 @@ g95_symbol *sym;
       g95_find_symbol(current_interface.sym->name, ns, 0, &sym);
       if (sym == NULL) continue;
 
-      if (check_new_interface(sym->generic, new, 1) == FAILURE) return FAILURE;
+      if (check_new_interface(sym->generic, new) == FAILURE) return FAILURE;
     }
 
     head = &current_interface.sym->generic;
@@ -1075,7 +1111,7 @@ g95_symbol *sym;
       g95_find_symbol(current_interface.sym->name, ns, 0, &sym);
       if (sym == NULL) continue;
 
-      if (check_new_interface(sym->operator, new, 1) == FAILURE)
+      if (check_new_interface(sym->operator, new) == FAILURE)
 	return FAILURE;
     }
 
