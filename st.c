@@ -222,7 +222,10 @@ void g95_undo_statement(void) {
 
 
 static void resolve_call(g95_symbol *sym, g95_actual_arglist **arg) {
+g95_actual_arglist *a;
 
+  for(a=*arg; a; a=a->next)
+    g95_resolve_expr(a->expr);
 }
 
 
