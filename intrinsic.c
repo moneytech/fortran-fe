@@ -264,29 +264,19 @@ static try check_allocated(g95_expr *array) {
 
 
 static try check_associated(g95_expr *pointer, g95_expr *target) {
-g95_ref *ref;
+symbol_attribute attr;
 
-  if (pointer->ref == NULL) {
-    if (pointer->symbol->attr.pointer == 0) return FAILURE;
-  } else {
-    for(ref=pointer->ref; ref->next;)
-      ref = ref->next;
+  if (pointer->expr_type != EXPR_VARIABLE) return FAILURE;
 
-    if (ref->component == NULL || ref->component->pointer == 0) return FAILURE;
-  }
+  attr = g95_variable_attr(pointer, NULL);
+  if (!attr.pointer) return FAILURE;
 
   if (target == NULL) return SUCCESS;
 
   /* Target argument is optional */
 
-  if (target->ref == NULL) {
-    if (target->symbol->attr.pointer == 0) return FAILURE;
-  } else {
-    for(ref=target->ref; ref->next;)
-      ref = ref->next;
-
-    if (ref->component == NULL || ref->component->pointer == 0) return FAILURE;
-  }
+  attr = g95_variable_attr(target, NULL);
+  if (!attr.pointer || !attr.target) return FAILURE;
 
   return SUCCESS;
 }
