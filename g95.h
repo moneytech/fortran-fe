@@ -350,7 +350,7 @@ typedef struct {
 
 #define g95_get_array_spec() g95_getmem(sizeof(g95_array_spec))
 
-#ifndef BACKEND
+#ifndef BACKEND_CODE
 typedef void *tree; /* Just a dummy place holder. */
 #endif
 
