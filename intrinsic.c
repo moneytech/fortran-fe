@@ -1673,7 +1673,7 @@ static try check_verify(g95_expr *x, g95_expr *y, g95_expr *z) {
  * forcing each function to manipulate the argument list */
 
 static try do_check(intrinsic_sym *specific, g95_actual_arglist *arg) {
-g95_expr *a1, *a2, *a3, *a4;
+g95_expr *a1, *a2, *a3, *a4, *a5;
 try t;
 
 /* max and min require special handling due to the variable number of args */
@@ -1711,7 +1711,14 @@ try t;
 	if (arg == NULL)
 	  t = (*specific->check_function)(a1, a2, a3, a4);
 	else {
-	  g95_internal_error("do_check(): too many args");
+	  a5 = arg->expr;
+	  arg = arg->next;
+	  
+	  if (arg == NULL)
+	    t = (*specific->check_function)(a1, a2, a3, a4, a5);
+	  else {
+	    g95_internal_error("do_check(): too many args");
+	  }
 	}
       }
     }
