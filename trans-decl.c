@@ -530,6 +530,8 @@ g95_get_extern_function_decl (g95_symbol *sym)
   type = g95_get_function_type (sym);
   fndecl = build_decl (FUNCTION_DECL, g95_sym_identifier (sym), type);
 
+  if (sym->module[0])
+    SET_DECL_ASSEMBLER_NAME (fndecl, g95_sym_mangled_identifier (sym));
   /* If the return type is a pointer, avoid alias issues by setting
      DECL_IS_MALLOC to nonzero. This means that the function should be
      treated as if it were a malloc, meaning it returns a pointer that
@@ -578,6 +580,8 @@ g95_build_function_decl (g95_symbol * sym)
   type = g95_get_function_type (sym);
   fndecl = build_decl (FUNCTION_DECL, g95_sym_identifier (sym), type);
 
+  if (sym->module[0])
+    SET_DECL_ASSEMBLER_NAME (fndecl, g95_sym_mangled_identifier (sym));
   /* Figure out the return type of the declared function, and build a
      RESULT_DECL for it.  If this is subroutine with alternate
      returns, build a RESULT_DECL for it.  */

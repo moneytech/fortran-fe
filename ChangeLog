@@ -1,6 +1,8 @@
 2002-09-12  Paul Brook  <paul@nowt.org>
 
 	* trans-decl.c (g95_generate_code): Fix thinko with return variable.
+	(g95_get_extern_function_decl, g95_build_function_decl): Mangle
+	assembler names for module procedures.
 
 2002-09-11  Tobias Schlueter  <Tobias.Schlueter@physik.uni-muenchen.de>
 

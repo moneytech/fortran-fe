@@ -675,7 +675,10 @@ g95_create_module_variable (g95_symbol * sym)
       pushdecl (length);
       rest_of_decl_compilation (length, NULL, 1, 0);
     }
+
   /* TODO: initialise array variables.  */
+  if (sym->attr.dimension)
+    g95_todo_error ("Array variables in a module");
 }
 
 /* This function is called after a complete module has been parsed
