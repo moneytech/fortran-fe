@@ -844,6 +844,16 @@ try g95_check_merge(g95_expr *tsource, g95_expr *fsource, g95_expr *mask) {
 
   if (same_type_check(tsource, 0, fsource, 1) == FAILURE) return FAILURE;
 
+  if (tsource->rank != fsource->rank) {
+    must_be(fsource, 1, "the same rank as 'tsource' argument");
+    return FAILURE;
+  }
+
+  if (tsource->rank != mask->rank) {
+    must_be(mask, 2, "the same rank as 'tsource' argument");
+    return FAILURE;
+  }
+
   if (type_check(mask, 2, BT_LOGICAL) == FAILURE) return FAILURE;
 
   return SUCCESS;

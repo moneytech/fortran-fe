@@ -516,6 +516,7 @@ void g95_resolve_merge(g95_expr *f, g95_expr *tsource, g95_expr *fsource,
 			g95_expr *mask) {
 
   f->ts = tsource->ts;
+  f->rank = tsource->rank;
 
   f->value.function.name =
     get_string("__merge_%c%d", g95_type_letter(tsource->ts.type),
