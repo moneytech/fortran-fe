@@ -582,8 +582,8 @@ typedef struct g95_state_data {
   struct g95_state_data *previous;
 /* This is for block-specific state data. There used to be a g95_data
  * and a g95_select structure, and I put their members in a union as
- * extra member in the state data struct. I later eliminatied g95_select
- * completely, but I guess we can use the union anyway. Just janizize
+ * extra member in the state data struct. I later eliminated g95_select
+ * completely, but I guess we can use the union anyway. Just sanitize
  * parse.c :-)  */
   union {
     g95_st_label * end_do_label; 
