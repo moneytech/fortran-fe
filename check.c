@@ -609,11 +609,9 @@ try g95_check_ibset(g95_expr *i, g95_expr *pos) {
 }
 
 
-try g95_check_idnint(g95_expr *a, g95_expr *kind) {
+try g95_check_idnint(g95_expr *a) {
 
   if (double_check(a, 0) == FAILURE) return FAILURE;
-
-  if (kind_check(kind, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }

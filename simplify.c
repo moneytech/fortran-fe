@@ -2065,9 +2065,9 @@ g95_expr *g95_simplify_nint(g95_expr *e, g95_expr *k) {
 }
 
 
-g95_expr *g95_simplify_idnint(g95_expr *e, g95_expr *k) {
+g95_expr *g95_simplify_idnint(g95_expr *e) {
 
-  return simplify_nint("IDNINT", e, k);
+  return simplify_nint("IDNINT", e, NULL);
 }
 
 

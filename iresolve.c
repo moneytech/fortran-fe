@@ -386,6 +386,11 @@ void g95_resolve_ichar(g95_expr *f, g95_expr *c) {
 }
 
 
+void g95_resolve_idnint(g95_expr *f, g95_expr *a) {
+  g95_resolve_nint(f, a, NULL);
+}
+
+
 void g95_resolve_ieor(g95_expr *f, g95_expr *i, g95_expr *j) {
 
   f->ts = i->ts;

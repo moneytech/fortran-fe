@@ -1139,8 +1139,8 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("idnint", 1, 1, BT_INTEGER, di,
-	  g95_check_idnint, g95_simplify_idnint, g95_resolve_nint,
-	  a, BT_REAL, dd, 0,   kind, BT_INTEGER, di, 1, NULL);
+	  g95_check_idnint, g95_simplify_idnint, g95_resolve_idnint,
+	  a, BT_REAL, dd, 0, NULL);
 
   make_generic("nint");
 
