@@ -1252,7 +1252,7 @@ int dr, di, dz, dd;
   add_conv(BT_REAL,    dr,  BT_REAL,    dd,  conv_r_d);
   add_conv(BT_REAL,    dd,  BT_REAL,    dd,  conv_null);
   add_conv(BT_COMPLEX, dz,  BT_REAL,    dd,  conv_z_d);
-  add_conv(BT_COMPLEX, dz,  BT_REAL,    dd,  conv_z_d);
+  add_conv(BT_COMPLEX, dd,  BT_REAL,    dd,  conv_z_d);
 
   add_conv(BT_INTEGER, di,  BT_COMPLEX, dz,  conv_i_z);
   add_conv(BT_REAL,    dr,  BT_COMPLEX, dz,  conv_r_z);
