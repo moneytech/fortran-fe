@@ -136,7 +136,7 @@ int i;
  * supplied by a special case in do_simplify(). */
 
 static g95_expr *convert_constant(g95_expr *e, bt type, int kind) {
-g95_expr *result, *(*f)(g95_expr *, int);
+g95_expr *g, *result, *(*f)(g95_expr *, int);
 g95_constructor *head, *c, *tail;
 
   switch(e->ts.type) {
@@ -188,9 +188,6 @@ g95_constructor *head, *c, *tail;
     head = NULL;
 
     for(c=e->value.constructor; c; c=c->next) {
-      if (c->iterator != NULL)
-	g95_internal_error("convert_constant(): Iterator present");
-
       if (head == NULL)
 	head = tail = g95_get_constructor();
       else {
@@ -199,12 +196,19 @@ g95_constructor *head, *c, *tail;
       }
 
       tail->where = c->where;
-      tail->expr = f(c->expr, kind);
+
+      if (c->iterator == NULL)
+	tail->expr = f(c->expr, kind);
+      else {
+	g = convert_constant(c->expr, type, kind);
+	if (g == &g95_bad_expr) return g;
+	tail->expr = g;
+      }
+
       if (tail->expr == NULL) {
 	g95_free_constructor(head);
 	return &g95_bad_expr;
       }
-
     }
 
     result = g95_get_expr();
