@@ -1717,7 +1717,10 @@ g95_namespace *ns;
  * mio_symbol() puts the interfaces with the symbol data. */
 
 void append_interface(symbol_info *info) {
+module_locus save;
 g95_symbol *sym;
+
+  get_module_locus(&save); 
 
   set_module_locus(&info->where);
   sym = info->sym;
@@ -1729,6 +1732,8 @@ g95_symbol *sym;
 
   mio_interface(&sym->operator);
   mio_interface(&sym->generic);
+
+  set_module_locus(&save);
 }
 
 
@@ -1825,11 +1830,10 @@ g95_symbol *sym;
       info->state = USED;
       info->sym = sym;
       info->referenced = 1;
-      continue;
+    } else {
+      info->sym = g95_new_symbol(info->true_name, ns);
+      strcpy(info->sym->module, info->module);
     }
-
-    info->sym = g95_new_symbol(info->true_name, ns);
-    strcpy(info->sym->module, info->module);
   }
 
   /* Append to interfaces of existing symbols */
@@ -1973,10 +1977,10 @@ g95_symbol *sym;
     sym = info->sym;
     if (sym == NULL) continue;
 
-    sprintf(name, "generic interface for '%s'", sym->name);
+    sprintf(if_name, "generic interface for '%s'", sym->name);
     check_mod_interface(&sym->generic, if_name);
 
-    sprintf(name, "operator interface for '%s'", sym->name);
+    sprintf(if_name, "operator interface for '%s'", sym->name);
     check_mod_interface(&sym->operator, if_name);
   }
 
