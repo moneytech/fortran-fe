@@ -1367,16 +1367,14 @@ g95_select s;
 
   cp = g95_state_stack->tail;
   push_state((g95_state_data *) &s, COMP_SELECT, g95_new_block);
-  cp = g95_new_level(cp);
 
 /* Make sure that the next statement is a CASE or END SELECT */
 
   for(;;) {
     st = next_statement();
-
     if (st == ST_NONE) unexpected_eof();
-
-    if (st == ST_CASE || st == ST_END_SELECT) break;
+    if (st == ST_END_SELECT) goto done;
+    if (st == ST_CASE) break;
 
     g95_error("Expected a CASE or END SELECT statement following SELECT CASE "
 	      "at %C");
@@ -1384,10 +1382,9 @@ g95_select s;
     g95_reject_statement();
   }
 
-  if (st == ST_END_SELECT) goto done;
+/* At this point, we're got a nonempty select block */
 
-/* At this point, we're really going to do something */
-
+  cp = g95_new_level(cp);
   *cp = new_st;
   accept_statement(st);
 
