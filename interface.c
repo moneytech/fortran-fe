@@ -539,39 +539,6 @@ g95_formal_arglist *f1, *f2;
 }
 
 
-/* check_new_interface()-- Make sure that the interface just parsed
- * makes sense.  Depending on the type of interface this can mean
- * several things.  No checking is required for a nameless interface.
- * For a generic interface, the interface must be unique within the
- * block.  Intrinsic operator interfaces are checked during the
- * resolution phase in greater detail.  The 'base' pointer points to
- * the first symbol node in the list of operators (which might be NULL) */
-
-static try check_new_interface(g95_interface *base, g95_symbol *new,
-			       int generic_flag) {
-g95_interface *ip;
-
-  for(ip=base; ip; ip=ip->next) {
-    if (ip->sym == new) {
-      g95_error("Entity '%s' at %C is already present in the interface",
-		new->name);
-      return FAILURE;
-    }
-
-    if (new->formal == NULL) continue;
-
-    if (compare_interfaces(new, ip->sym, generic_flag)) {
-      g95_error("Interface ending at %C is ambiguous with interface at %L",
-		&ip->where);
-
-      return FAILURE;
-    }
-  }
-
-  return SUCCESS;
-}
-
-
 /* check_operator_interface()-- Given a namespace and an operator,
  * make sure that all interfaces for that operator are legal. */
 
@@ -1038,36 +1005,81 @@ g95_symbol *sym;
 }
 
 
+/* check_new_interface()-- Make sure that the interface just parsed
+ * makes sense.  Depending on the type of interface this can mean
+ * several things.  No checking is required for a nameless interface.
+ * For a generic interface, the interface must be unique within the
+ * block.  Intrinsic operator interfaces are checked during the
+ * resolution phase in greater detail.  The 'base' pointer points to
+ * the first symbol node in the list of operators (which might be NULL) */
+
+static try check_new_interface(g95_interface *base, g95_symbol *new,
+			       int generic_flag) {
+g95_interface *ip;
+
+  for(ip=base; ip; ip=ip->next) {
+    if (ip->sym == new) {
+      g95_error("Entity '%s' at %C is already present in the interface",
+		new->name);
+      return FAILURE;
+    }
+
+    if (new->formal == NULL) continue;
+
+    if (compare_interfaces(new, ip->sym, generic_flag)) {
+      g95_error("Interface ending at %C is ambiguous with interface at %L",
+		&ip->where);
+
+      return FAILURE;
+    }
+  }
+
+  return SUCCESS;
+}
+
+
 /* g95_add_interface()-- Add a symbol to the current interface */
 
 try g95_add_interface(g95_symbol *new) {
 g95_interface **head, *intr;
-int generic_flag;
-
-  generic_flag = 0; 
+g95_namespace *ns;
+g95_symbol *sym;
 
   switch(current_interface.type) {
   case INTERFACE_NAMELESS:
     return SUCCESS;
 
   case INTERFACE_INTRINSIC_OP:
+    for(ns=current_interface.ns; ns; ns=ns->parent)
+      if (check_new_interface(ns->operator[current_interface.op],
+			      new, 0) == FAILURE) return FAILURE;
+
     head = &current_interface.ns->operator[current_interface.op];
     break;
 
   case INTERFACE_GENERIC:
+    sym = current_interface.sym;
+    while(sym) {
+      if (check_new_interface(sym->generic, new, 1) == FAILURE) return FAILURE;
+      g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+    }
+
     head = &current_interface.sym->generic;
-    generic_flag = 1;
     break;
 
   case INTERFACE_USER_OP:
+    sym = current_interface.sym;
+    while(sym) {
+      if (check_new_interface(sym->operator, new, 1) ==FAILURE) return FAILURE;
+      g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+    }
+
     head = &current_interface.sym->operator;
     break;
 
   default:
     g95_internal_error("g95_add_interface(): Bad interface type");
   }
-
-  if (check_new_interface(*head, new, generic_flag) == FAILURE) return FAILURE;
 
   intr = g95_get_interface();
   intr->sym = new;
