@@ -506,9 +506,7 @@ g95_get_derived_type (g95_symbol * derived)
    that is unsigned if UNSIGNEDP is nonzero, otherwise signed.  */
 
 tree
-g95_type_for_size (bits, unsignedp)
-     unsigned bits;
-     int unsignedp;
+g95_type_for_size (unsigned bits, int unsignedp)
 {
   if (bits == TYPE_PRECISION (integer_type_node))
     return unsignedp ? unsigned_type_node : integer_type_node;
@@ -550,9 +548,7 @@ g95_type_for_size (bits, unsignedp)
    then UNSIGNEDP selects between signed and unsigned types.  */
 
 tree
-g95_type_for_mode (mode, unsignedp)
-     enum machine_mode mode;
-     int unsignedp;
+g95_type_for_mode (enum machine_mode mode, int unsignedp)
 {
   if (mode == TYPE_MODE (integer_type_node))
     return unsignedp ? unsigned_type_node : integer_type_node;
@@ -645,8 +641,7 @@ g95_type_for_mode (mode, unsignedp)
 
 /* Return an unsigned type the same as TYPE in other respects.  */
 tree
-g95_unsigned_type (type)
-     tree type;
+g95_unsigned_type (tree type)
 {
   tree type1 = TYPE_MAIN_VARIANT (type);
   if (type1 == signed_char_type_node || type1 == char_type_node)
@@ -682,8 +677,7 @@ g95_unsigned_type (type)
 /* Return a signed type the same as TYPE in other respects.  */
 
 tree
-g95_signed_type (type)
-     tree type;
+g95_signed_type (tree type)
 {
   tree type1 = TYPE_MAIN_VARIANT (type);
   if (type1 == unsigned_char_type_node || type1 == char_type_node)
@@ -720,9 +714,7 @@ g95_signed_type (type)
    signed according to UNSIGNEDP.  */
 
 tree
-g95_signed_or_unsigned_type (unsignedp, type)
-     int unsignedp;
-     tree type;
+g95_signed_or_unsigned_type (int unsignedp, tree type)
 {
   if (! INTEGRAL_TYPE_P (type)
       || TREE_UNSIGNED (type) == unsignedp)

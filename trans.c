@@ -196,7 +196,7 @@ g95_pop_scope (tree body, tree tail)
 /* Start a statement.  */
 /* These may do more in the future. For now that just wrap g95_*_scope.  */
 void
-g95_start_stmt ()
+g95_start_stmt (void)
 {
   g95_push_scope ();
 }

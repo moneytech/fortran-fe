@@ -17,7 +17,7 @@ the GCC Garbage Collection system about G95.
 
 Create %gcc_src//gcc/f95/ and copy all the g95 files into it.
 
-Configure GCC as normal with --enable-lannguages=f95
+Configure GCC as normal with --enable-languages=f95
 Don't use the G95 configure system.
 You'll probably need GMP installed on your system.
 

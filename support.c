@@ -21,7 +21,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* support.c-- misc hacks */
 
-/* This file and exeryting in it should not exist.
+/* This file and everything in it should not exist.
  * It is here for two reasons.
  * a) The code generator is still not completely independant
  *   of the C frontend so we have to provide some functions.
@@ -51,7 +51,7 @@ Boston, MA 02111-1307, USA.  */
 
 tree c_global_trees[CTI_MAX];
 
-void g95_init_c_decl_hacks()
+void g95_init_c_decl_hacks(void)
 {
   boolean_type_node = integer_type_node;
   boolean_true_node = integer_one_node;

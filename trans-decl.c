@@ -96,7 +96,7 @@ g95_build_label_decl (tree label_id)
 
 /* Returns the return label for the current function.  */
 tree
-g95_get_return_label ()
+g95_get_return_label (void)
 {
   char name[G95_MAX_SYMBOL_LEN + 10];
 
@@ -479,7 +479,7 @@ g95_get_function_decl (g95_symbol * sym)
 
 /* Return the decl used to hold the function return value.  */
 tree
-g95_get_fake_result_decl ()
+g95_get_fake_result_decl (void)
 {
   tree decl;
   char name[G95_MAX_SYMBOL_LEN+10];

@@ -107,18 +107,18 @@ GTY (())
 void yyerror (const char *str);
 int yylex (void);
 
-static void g95_init_decl_processing PARAMS ((void));
+static void g95_init_decl_processing (void);
 
 /* Each front end provides its own.  */
-static const char *g95_init PARAMS ((const char *));
-static void g95_finish PARAMS ((void));
-static void g95_print_identifier PARAMS ((FILE *, tree, int));
-void do_expand_body PARAMS ((tree));
-void do_function_end PARAMS ((void));
-int global_bindings_p PARAMS ((void));
-void insert_block PARAMS ((tree));
-void set_block PARAMS ((tree));
-tree g95_truthvalue_conversion PARAMS ((tree));
+static const char *g95_init (const char *);
+static void g95_finish (void);
+static void g95_print_identifier (FILE *, tree, int);
+void do_expand_body (tree);
+void do_function_end (void);
+int global_bindings_p (void);
+void insert_block (tree);
+void set_block (tree);
+tree g95_truthvalue_conversion (tree);
 void g95_be_parse_file (void *);
 
 #undef LANG_HOOKS_NAME
@@ -296,20 +296,20 @@ anon_aggr_type_p (tree node ATTRIBUTE_UNUSED)
 }
 
 int
-stmts_are_full_exprs_p ()
+stmts_are_full_exprs_p (void)
 {
   return 0;
 }
 
 stmt_tree
-current_stmt_tree ()
+current_stmt_tree (void)
 {
   return &g95_stmt_tree;
 }
 
 
 tree *
-current_scope_stmt_stack ()
+current_scope_stmt_stack (void)
 {
   return &g95_scope_stmt_stack;
 }
@@ -404,13 +404,13 @@ static struct binding_level clear_binding_level = { NULL, NULL, NULL, NULL };
 /* Return non-zero if we are currently in the global binding level.  */
 
 int
-global_bindings_p ()
+global_bindings_p (void)
 {
   return current_binding_level == global_binding_level ? -1 : 0;
 }
 
 tree
-getdecls ()
+getdecls (void)
 {
   return current_binding_level->names;
 }
@@ -543,8 +543,7 @@ poplevel (int keep, int reverse, int functionbody)
    to handle the BLOCK node inside the BIND_EXPR.  */
 
 void
-insert_block (block)
-     tree block;
+insert_block (tree block)
 {
   TREE_USED (block) = 1;
   current_binding_level->blocks
@@ -604,7 +603,7 @@ pushdecl (tree decl)
    Make definitions for built-in primitive functions.  */
 /* G95_TODO */
 static void
-g95_init_decl_processing ()
+g95_init_decl_processing (void)
 {
   current_function_decl = NULL;
   named_labels = NULL;
