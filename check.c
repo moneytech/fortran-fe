@@ -276,6 +276,32 @@ static try dim_check(g95_expr *dim, int n, int optional) {
 }
 
 
+/* dim_rank_check()-- If a DIM parameter is a constant, make sure that
+ * it is greater than zero and less than the rank of the given
+ * array. */
+
+static try dim_rank_check(g95_expr *dim, g95_expr *array) {
+g95_array_ref *ar;
+int rank;
+
+  if (dim->expr_type != EXPR_CONSTANT) return SUCCESS;
+
+  ar = g95_find_array_ref(array);
+  rank = array->rank;
+  if (ar->as->type == AS_ASSUMED_SIZE) rank--;
+
+  if (mpz_cmp_ui(dim->value.integer, 1) < 0 ||
+      mpz_cmp_ui(dim->value.integer, rank) > 0) {
+    g95_error("'dim' argument of '%s' intrinsic at %L is not a valid "
+	      "dimension index", &dim->where);
+
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
 /***** Check functions *****/
 
 try g95_check_abs(g95_expr *a) {
@@ -1089,6 +1115,17 @@ try g95_check_set_exponent(g95_expr *x, g95_expr *i) {
 
 
 try g95_check_shape(g95_expr *source) {
+g95_array_ref *ar;
+
+  if (source->rank == 0) return SUCCESS;
+
+  ar = g95_find_array_ref(source);
+
+  if (ar->type == AS_ASSUMED_SIZE) {
+    g95_error("'source' argument of 'shape' intrinsic at %L must not be "
+	      "an assumed size array", &source->where);
+    return FAILURE;
+  }
 
   return SUCCESS;
 }
@@ -1103,6 +1140,8 @@ try g95_check_size(g95_expr *array, g95_expr *dim) {
 
     if (kind_value_check(dim, 1, g95_default_integer_kind()) == FAILURE)
       return FAILURE;
+
+    if (dim_rank_check(dim, array) == FAILURE) return FAILURE;
   }
 
   return SUCCESS;

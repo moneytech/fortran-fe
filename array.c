@@ -50,7 +50,8 @@ int i;
   dest = g95_get_array_ref();
 
   dest->type = src->type;
-  dest->rank = src->rank;
+  dest->dimen = src->dimen;
+  dest->as = src->as;
 
   for(i=0; i<G95_MAX_DIMENSIONS; i++) {
     dest->start[i] = g95_copy_expr(src->start[i]);
@@ -77,7 +78,7 @@ int i;
     break;
 
   case AR_SECTION: 
-    for(i=0; i<ar->rank; i++) {
+    for(i=0; i<ar->dimen; i++) {
       if (ar->start[i] != NULL)
 	g95_show_expr(ar->start[i]);
 
@@ -91,14 +92,14 @@ int i;
 	g95_show_expr(ar->stride[i]);
       }
 
-      if (i != ar->rank-1) g95_status(" , ");
+      if (i != ar->dimen-1) g95_status(" , ");
     }
     break;
 
   case AR_ELEMENT:
-    for(i=0; i<ar->rank; i++) {
+    for(i=0; i<ar->dimen; i++) {
       g95_show_expr(ar->start[i]);
-      if (i != ar->rank - 1) g95_status(" , ");
+      if (i != ar->dimen - 1) g95_status(" , ");
     }
     break;
 
@@ -118,7 +119,7 @@ static match match_subscript(g95_array_ref *ar, int init) {
 match m;
 int i;
 
-  i = ar->rank;
+  i = ar->dimen;
 
   ar->c_where[i] = *g95_current_locus();
   ar->start[i] = ar->end[i] = ar->stride[i] = NULL;
@@ -185,13 +186,13 @@ match m;
 
   if (g95_match_char('(') != MATCH_YES) {
     ar->type = AR_FULL;
-    ar->rank = as->rank;
+    ar->dimen = 0;
     return MATCH_YES;
   }
 
   ar->type = AR_UNKNOWN;
 
-  for(ar->rank=0; ar->rank<G95_MAX_DIMENSIONS; ar->rank++) {
+  for(ar->dimen=0; ar->dimen<G95_MAX_DIMENSIONS; ar->dimen++) {
     m = match_subscript(ar, init);
     if (m == MATCH_ERROR) goto error;
 
@@ -210,7 +211,7 @@ error:
   return MATCH_ERROR;
 
 matched:
-  ar->rank++;
+  ar->dimen++;
 
   return MATCH_YES;
 }
@@ -1286,39 +1287,63 @@ int d;
 /* ref_dimen_size()-- Get the number of elements in an array section */
 
 static try ref_dimen_size(g95_array_ref *ar, int dimen, mpz_t *result) {
+mpz_t upper, lower;
+try t;
 
   switch(ar->dimen_type[dimen]) {
   case DIMEN_ELEMENT:
     mpz_init(*result); 
     mpz_set_ui(*result, 1);
+    t = SUCCESS;
     break;
 
   case DIMEN_VECTOR:
-    return g95_array_size(ar->start[dimen], result);    /* Recurse! */
+    t = g95_array_size(ar->start[dimen], result);    /* Recurse! */
+    break;
 
   case DIMEN_RANGE:
-    if (ar->start[dimen]->expr_type != EXPR_CONSTANT ||
-	ar->end[dimen]->expr_type != EXPR_CONSTANT ||
-	ar->stride[dimen]->expr_type != EXPR_CONSTANT) {
-      return FAILURE;
+    mpz_init(upper);
+    mpz_init(lower);
+    t = FAILURE;
+
+    if (ar->start[dimen] == NULL) {
+      if (ar->as->lower[dimen] == NULL) goto cleanup;
+      mpz_set(lower, ar->as->lower[dimen]->value.integer);
+    } else {
+      if (ar->start[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
+      mpz_set(lower, ar->start[dimen]->value.integer);
     }
 
+    if (ar->end[dimen] == NULL) {
+      if (ar->as->upper[dimen] == NULL) goto cleanup;
+      mpz_set(upper, ar->as->upper[dimen]->value.integer);
+    } else {
+      if (ar->end[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
+      mpz_set(upper, ar->end[dimen]->value.integer);
+    }
+
+    if (ar->stride[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
+
     mpz_init(*result);
-    mpz_sub(*result, ar->end[dimen]->value.integer,
-	    ar->start[dimen]->value.integer);
+    mpz_sub(*result, upper, lower);
     mpz_add(*result, *result, ar->stride[dimen]->value.integer);
     mpz_div(*result, *result, ar->stride[dimen]->value.integer); 
 
     /* Zero stride caught earlier */
 
     if (mpz_cmp_ui(*result, 0) < 0) mpz_set_ui(*result, 0);
-    break;
+    t = SUCCESS;
+
+  cleanup:
+    mpz_clear(upper);
+    mpz_clear(lower);
+    return t;
 
   default:
     g95_internal_error("size_from_section(): Bad dimen type");
   }
 
-  return SUCCESS;
+  return t;
 }
 
 
@@ -1328,7 +1353,7 @@ int d;
 
   mpz_init_set_ui(*result, 1);
 
-  for(d=0; d<ar->rank; d++) {
+  for(d=0; d<ar->dimen; d++) {
     if (ref_dimen_size(ar, d, &size) == FAILURE) {
       mpz_clear(*result);
       return FAILURE;
@@ -1389,3 +1414,51 @@ g95_ref *ref;
 done:
   return SUCCESS;
 }
+
+
+/* g95_array_ref_shape()-- Given an array reference, return the shape
+ * of the reference in an array of mpz_t integers. */
+
+try g95_array_ref_shape(g95_array_ref *ar, mpz_t *shape) {
+int d;
+
+  switch(ar->type) {
+  case AR_FULL:
+    for(d=0; d<ar->as->rank; d++)
+      if (spec_dimen_size(ar->as, d, &shape[d]) == FAILURE) goto cleanup;
+
+    return SUCCESS;
+
+  case AR_SECTION:
+    for(d=0; d<ar->dimen; d++)
+      if (ref_dimen_size(ar, d, &shape[d]) == FAILURE) goto cleanup;
+
+    return SUCCESS;
+
+  default:
+    break;
+  }
+
+ cleanup:
+  for(d--; d>=0; d--)
+    mpz_clear(shape[d]);
+
+  return FAILURE;
+}
+
+
+/* g95_find_array_ref()-- Given an array expression, find the array
+ * reference structure that characterizes the reference. */
+
+g95_array_ref *g95_find_array_ref(g95_expr *e) {
+g95_ref *ref;
+
+  for(ref=e->ref; ref; ref=ref->next)
+    if (ref->type == REF_ARRAY &&
+	(ref->u.ar.type == AR_FULL || ref->u.ar.type == AR_SECTION)) break;
+
+  if (ref == NULL) g95_internal_error("g95_find_array_ref(): No ref found");
+
+  return &ref->u.ar;
+}
+

@@ -589,7 +589,7 @@ extern g95_state_data *g95_state_stack;
 
 typedef struct g95_array_ref {
   ar_type type;
-  int rank;              /* # of components in the reference */
+  int dimen;                  /* # of components in the reference */
   locus where;
   g95_array_spec *as;
 
@@ -1425,6 +1425,8 @@ try g95_check_constructor(g95_expr *, try (*)(g95_expr *));
 g95_constructor *g95_copy_constructor(g95_constructor *src);
 g95_expr *g95_get_array_element(g95_expr *, int);
 try g95_array_size(g95_expr *, mpz_t *);
+try g95_array_ref_shape(g95_array_ref *, mpz_t *);
+g95_array_ref *g95_find_array_ref(g95_expr *);
 
 /* interface.c */
 

@@ -1156,7 +1156,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
   add_sym("shape", 0, 1, BT_INTEGER, di,
-	  g95_check_shape, NULL, g95_resolve_shape,
+	  g95_check_shape, g95_simplify_shape, g95_resolve_shape,
 	  src, BT_REAL, dr, 0, NULL);
 
   add_sym("sign", 1, 1, BT_REAL, dr,
@@ -1204,7 +1204,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("sinh");
 
   add_sym("size", 0, 1, BT_INTEGER, di,
-	  g95_check_size, NULL, NULL,
+	  g95_check_size, g95_simplify_size, NULL,
 	  ar, BT_REAL, dr, 0,   dm, BT_INTEGER, di, 1, NULL);
 
   add_sym("spacing", 1, 1, BT_REAL, dr,

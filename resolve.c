@@ -322,7 +322,13 @@ g95_expr *e;
   got_variable:
     e->expr_type = EXPR_VARIABLE;
     e->ts = sym->ts;
-    if (sym->as != NULL) e->rank = sym->as->rank;
+    if (sym->as != NULL) {
+      e->rank = sym->as->rank;
+      e->ref = g95_get_ref();
+      e->ref->type = REF_ARRAY;
+      e->ref->u.ar.type = AR_FULL;
+      e->ref->u.ar.as = sym->as;
+    }
   }
 
   return SUCCESS;
@@ -1014,9 +1020,9 @@ int i;
   if (ar->type == AR_FULL) return SUCCESS;
 
   as = ar->as; 
-  if (as->rank != ar->rank) {
-    g95_error("Array reference at %L is of rank %d but specified as rank %d",
-              &ar->where, ar->rank, as->rank);
+  if (as->rank != ar->dimen) {
+    g95_error("Rank mismatch in array reference at %L (%d/%d)",
+	      &ar->where, ar->dimen, as->rank);
     return FAILURE;
   }
 
@@ -1058,7 +1064,7 @@ g95_typespec ts;
 static try resolve_array_ref(g95_array_ref *ar) {
 int i;
 
-  for(i=0; i<ar->rank; i++) {
+  for(i=0; i<ar->dimen; i++) {
     if (resolve_index(ar->start[i]) == FAILURE) return FAILURE;
     if (resolve_index(ar->end[i]) == FAILURE) return FAILURE;
     if (resolve_index(ar->stride[i]) == FAILURE) return FAILURE;
@@ -1084,7 +1090,7 @@ int i;
 
   if (ar->type == AR_UNKNOWN) {
     ar->type = AR_ELEMENT;
-    for(i=0; i<ar->rank; i++)
+    for(i=0; i<ar->dimen; i++)
       if (ar->dimen_type[i] == DIMEN_RANGE ||
 	  ar->dimen_type[i] == DIMEN_VECTOR) {
 	ar->type = AR_SECTION;
@@ -1199,14 +1205,14 @@ int i, rank;
     if (ref->type != REF_ARRAY) continue;
 
     if (ref->u.ar.type == AR_FULL) {
-      rank = ref->u.ar.rank;
+      rank = ref->u.ar.as->rank;
       break;
     }
 
     if (ref->u.ar.type == AR_SECTION) {/* Figure out the rank of the section */
       if (rank != 0) g95_internal_error("expression_rank(): Two array specs");
 
-      for(i=0; i<ref->u.ar.rank; i++)
+      for(i=0; i<ref->u.ar.dimen; i++)
 	if (ref->u.ar.dimen_type[i] == DIMEN_RANGE ||
 	    ref->u.ar.dimen_type[i] == DIMEN_VECTOR) rank++;
 

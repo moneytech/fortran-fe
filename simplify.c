@@ -2794,6 +2794,83 @@ unsigned long exp2;
 }
 
 
+g95_expr *g95_simplify_shape(g95_expr *source) {
+mpz_t shape[G95_MAX_DIMENSIONS];
+g95_constructor *head, *tail;
+g95_array_ref *ar;
+g95_expr *result;
+int n, size;
+
+  if (source->rank == 0)
+    size = 0;
+  else {
+    ar = g95_find_array_ref(source);
+    if (g95_array_ref_shape(ar, shape) == FAILURE) return NULL;
+    size = ar->dimen;
+  }
+
+  head = tail = NULL;
+
+  for(n=0; n<size; n++) {
+    if (head == NULL)
+      head = tail = g95_get_constructor();
+    else {
+      tail->next = g95_get_constructor();
+      tail = tail->next;
+    }
+
+    tail->expr = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+    tail->expr->where = source->where;
+
+    mpz_set(tail->expr->value.integer, shape[n]);
+  }
+
+  for(n=0; n<size; n++)
+    mpz_clear(shape[n]);
+
+  result = g95_get_expr();
+  result->ts.type = BT_INTEGER;
+  result->ts.kind = g95_default_integer_kind();
+
+  result->expr_type = EXPR_ARRAY;
+  result->rank = 1;
+  result->value.constructor = head;
+  result->where = source->where;
+
+  return result;
+}
+
+
+g95_expr *g95_simplify_size(g95_expr *array, g95_expr *dim) {
+mpz_t shape[G95_MAX_DIMENSIONS];
+g95_array_ref *ar;
+g95_expr *result;
+int n, d;
+
+  if (dim == NULL) {
+    if (g95_array_size(array, &shape[0]) == FAILURE) return NULL;
+    n = 1;
+    d = 1;
+  } else {
+    if (dim->expr_type != EXPR_CONSTANT) return NULL;
+    d = mpz_get_ui(dim->value.integer);
+    ar = g95_find_array_ref(array);
+    if (g95_array_ref_shape(ar, shape) == FAILURE) return NULL;
+    n = ar->dimen;
+  }
+
+  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+  result->where = array->where;
+
+  mpz_set(result->value.integer, shape[d-1]);
+
+  for(d=0; d<n; d++)
+    mpz_clear(shape[d]);
+
+  return result;
+}
+
+
 g95_expr *g95_simplify_sign(g95_expr *x, g95_expr *y) {
 g95_expr *absv, *result;
 mpz_t sgnz;
