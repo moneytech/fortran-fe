@@ -817,8 +817,6 @@ static try check_index(g95_expr *i, g95_expr *j, g95_expr *k) {
 
 }
 
-/* ifix and idint are relatives of int */
-
 static try check_int(g95_expr *x, g95_expr *kind) {
 
   if (!g95_numeric_ts(&x->ts)) {
@@ -834,38 +832,6 @@ static try check_int(g95_expr *x, g95_expr *kind) {
 
   return SUCCESS;
 }
-
-static try check_ifix(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (x->ts.kind != g95_default_real_kind()) {
-    kind_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-static try check_idint(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (x->ts.kind != g95_default_double_kind()) {
-    kind_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-/* end of ints */
 
 
 static try check_ior(g95_expr *i, g95_expr *j) {
@@ -2134,10 +2100,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym("int",   0, BT_INTEGER, di, g95_simplify_int, check_int,
 	  a, BT_REAL, dr, 0, knd,   BT_INTEGER, di, 1, NULL);
 
-  add_sym("ifix",  0, BT_INTEGER, di, g95_simplify_ifix, check_ifix,
+  add_sym("ifix",  0, BT_INTEGER, di, g95_simplify_ifix, NULL,
 	  a, BT_REAL, dr, 0, NULL);
 
-  add_sym("idint", 0, BT_INTEGER, di, g95_simplify_idint, check_idint,
+  add_sym("idint", 0, BT_INTEGER, di, g95_simplify_idint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
 
   add_sym("ior", 0, BT_INTEGER, di, g95_simplify_ior, check_ior,

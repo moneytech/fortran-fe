@@ -41,7 +41,7 @@ g95_expr g95_bad_expr;
 
 
 /* Note that 'simplification' is not just transforming expressions.
- * For functions that are not simplified at compile-time like asin(),
+ * For functions that are not simplified at compile time,
  * range checking is done if possible.
  *
  * The return convention is that each simplification function returns:
@@ -51,9 +51,8 @@ g95_expr g95_bad_expr;
  *   be a part of the new expression.  Use g95_copy_expr() if
  *   necessary.
  *
- *   NULL pointer indicating that no simplifcation was possible and
- *   the original expression should remain intact.  For example,
- *   sqrt(1.0).
+ *   NULL pointer indicating that no simplification was possible and
+ *   the original expression should remain intact. 
  *
  *   An expression pointer to g95_bad_expr (a static placeholder)
  *   indicating that some error has prevented simplification.  For
@@ -183,15 +182,7 @@ g95_expr *result;
 
   mpz_abs(result->value.integer, e->value.integer);
 
-  if (g95_check_integer_range(result->value.integer, result->ts.kind)
-      != ARITH_OK) {
-    g95_error("Result of ABS() overflows its kind at %L", &e->where);
-
-    g95_free_expr(result);
-    return &g95_bad_expr;
-  }
-
-  return result;
+  return range_check(result, "IABS");
 }
 
 
@@ -540,6 +531,7 @@ mpf_t term;
     if ( mpf_cmp_ui(x->value.real,0) == 0 ) {
       mpf_clear(term);
       g95_error("If first argument of ATAN2 %L is zero, the second argument must not be zero", &x->where);
+      g95_free_expr(result);
       return &g95_bad_expr;
     }
     else if ( mpf_cmp_si(x->value.real,0) < 0 ) {
@@ -935,6 +927,7 @@ double ln2, absval, rhuge;
     /* Overflow if magnitude of x is greater than C long int huge times ln2. */
       else {
         g95_error("Argument of EXP at %L too large",&x->where);
+        g95_free_expr(result);
         return &g95_bad_expr;
       }
     }
@@ -954,6 +947,7 @@ double ln2, absval, rhuge;
       }
       else {
         g95_error("Real part of argument of EXP at %L too large",&x->where);
+        g95_free_expr(result);
         return &g95_bad_expr;
       }
     }
@@ -1260,9 +1254,6 @@ int *bits;
   k = g95_validate_kind(BT_INTEGER, x->ts.kind);
   if ( k == -1 ) g95_internal_error("In g95_simplify_ibits: bad kind");
 
-  result = g95_constant_result(x->ts.type, x->ts.kind);
-  result->where = x->where;
-
   bitsize = g95_integer_kinds[k].bit_size;
 
   if (pos+len > bitsize) {
@@ -1270,6 +1261,9 @@ int *bits;
 	      "at %L", &y->where);
     return &g95_bad_expr;
   }
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where;
 
   bits = g95_getmem(bitsize*sizeof(int));
 
@@ -1501,6 +1495,7 @@ int kind;
 
   default:
     g95_error("Argument of INT at %L is not a valid type", &e->where);
+    g95_free_expr(result);
     return &g95_bad_expr;
   }
 
@@ -1560,13 +1555,13 @@ g95_expr *result;
 
 g95_expr *g95_simplify_ishft(g95_expr *e, g95_expr *s) {
 g95_expr *result;
-int shift, isize, k;
+int shift, ashift, isize, k;
 long e_int;
 
   if (e->expr_type != EXPR_CONSTANT || s->expr_type != EXPR_CONSTANT)  
     return NULL;
 
-  if (g95_extract_int(s, &shift) != NULL || shift < 0 ) {
+  if (g95_extract_int(s, &shift) != NULL) {
     g95_error("Invalid second argument of ISHFT at %L", &s->where);
     return &g95_bad_expr;
   }
@@ -1576,8 +1571,17 @@ long e_int;
 
   isize = g95_integer_kinds[k].bit_size;
 
-  if (shift > isize) {
-    g95_error("Second argument of ISHFT exceeds bit size at %L", &s->where);
+  if ( shift >= 0 ) ashift = shift;
+  else ashift = -shift;
+
+  if (ashift > isize) {
+    g95_error("Magnitude of second argument of ISHFT exceeds bit size at %L", &s->where);
+    return &g95_bad_expr;
+  }
+
+  e_int = mpz_get_si(e->value.integer);
+  if (e_int > INT_MAX || e_int < INT_MIN) {
+    g95_internal_error("ISHFT: unable to extract integer");
     return &g95_bad_expr;
   }
 
@@ -1589,16 +1593,10 @@ long e_int;
     return range_check(result,"ISHFT");
   }
 
-  e_int = mpz_get_si(e->value.integer);
-  if (e_int > INT_MAX || e_int < INT_MIN) {
-    g95_internal_error("ISHFT: unable to extract integer");
-    return &g95_bad_expr;
-  }
-
   if (shift > 0)
     mpz_set_si(result->value.integer, e_int << shift);
   else
-    mpz_set_si(result->value.integer, e_int >> shift);
+    mpz_set_si(result->value.integer, e_int >> ashift);
 
   return range_check(result, "ISHFT");
 }
@@ -1606,13 +1604,13 @@ long e_int;
 
 g95_expr *g95_simplify_ishftc(g95_expr *e, g95_expr *s, g95_expr *sz) {
 g95_expr *result;
-int shift, isize, delta, k;
+int shift, ashift, isize, delta, k;
 int i, *bits;
 
   if (e->expr_type != EXPR_CONSTANT || s->expr_type != EXPR_CONSTANT)  
     return NULL;
 
-  if (g95_extract_int(s, &shift) != NULL || shift < 0) {
+  if (g95_extract_int(s, &shift) != NULL) {
     g95_error("Invalid second argument of ISHFTC at %L", &s->where);
     return &g95_bad_expr;
   }
@@ -1628,8 +1626,11 @@ int i, *bits;
   } else
     isize = g95_integer_kinds[k].bit_size;
 
-  if (shift > isize) {
-    g95_error("Second argument of ISHFTC exceeds bit size at %L", &s->where);
+  if ( shift >= 0 ) ashift = shift;
+  else ashift = -shift;
+
+  if (ashift > isize) {
+    g95_error("Magnitude of second argument of ISHFTC exceeds third argument at %L", &s->where);
     return &g95_bad_expr;
   }
 
@@ -1641,7 +1642,7 @@ int i, *bits;
   for(i=0; i<isize; i++)
     bits[i] = mpz_tstbit(e->value.integer,i);
 
-  delta = isize-shift;
+  delta = isize-ashift;
 
   if (shift == 0) {
     mpz_set(result->value.integer,e->value.integer);
@@ -1665,14 +1666,14 @@ int i, *bits;
   } 
 
   else {
-    for(i=shift; i<isize; i++) {
-      if (bits[i] == 0) mpz_clrbit(result->value.integer, i-shift);
-      if (bits[i] == 1) mpz_setbit(result->value.integer, i-shift);
-    }
-
-    for(i=0; i<shift; i++) {
+    for(i=0; i<ashift; i++) {
       if (bits[i] == 0) mpz_clrbit(result->value.integer, i+delta);
       if (bits[i] == 1) mpz_setbit(result->value.integer, i+delta);
+    }
+
+    for(i=ashift; i<isize; i++) {
+      if (bits[i] == 0) mpz_clrbit(result->value.integer, i+shift);
+      if (bits[i] == 1) mpz_setbit(result->value.integer, i+shift);
     }
 
     g95_free(bits);
@@ -1819,6 +1820,7 @@ mpf_t xr,xi;
     if (mpf_cmp(x->value.real, mpf_zero) <= 0) {
       g95_error("Argument of LOG at %L cannot be less than or equal to zero",
 		&x->where);
+      g95_free_expr(result);
       return &g95_bad_expr;
     }
 
@@ -1830,6 +1832,7 @@ mpf_t xr,xi;
 	(mpf_cmp(x->value.complex.i, mpf_zero) == 0)) {
       g95_error("Complex argument of LOG at %L cannot be zero",
 		&x->where);
+      g95_free_expr(result);
       return &g95_bad_expr;
     }
 
@@ -1863,23 +1866,16 @@ g95_expr *result;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
+  if (mpf_cmp(x->value.real, mpf_zero) <= 0) {
+    g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
+              &x->where);
+    return &g95_bad_expr;
+  }
+
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
 
-  switch(x->ts.type) {
-  case BT_REAL:
-    if (mpf_cmp(x->value.real, mpf_zero) <= 0) {
-      g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
-                &x->where);
-      return &g95_bad_expr;
-    }
-
-    common_logarithm(&x->value.real,&result->value.real);
-    break;
-
-  default:
-    g95_internal_error("g95_simplify_max: bad type");
-  }
+  common_logarithm(&x->value.real,&result->value.real);
 
   return range_check(result,"LOG10");
 }
@@ -2243,6 +2239,7 @@ mpf_t quot, iquot, term;
     if (g95_compare_expr(p, integer_zero) == 0) {
       /* Result is processor-dependent */
       g95_error("Second argument MOD at %L is zero", &a->where);
+      g95_free_expr(result);
       return &g95_bad_expr;
     }
     mpz_tdiv_r(result->value.integer, a->value.integer, p->value.integer);
@@ -2253,6 +2250,7 @@ mpf_t quot, iquot, term;
       /* Result is processor-dependent */
 
       g95_error("Second argument of MOD at %L is zero", &p->where);
+      g95_free_expr(result);
       return &g95_bad_expr;
     }
 
@@ -2278,7 +2276,6 @@ mpf_t quot, iquot, term;
 }
 
 
-
 g95_expr *g95_simplify_modulo(g95_expr *a, g95_expr *p) {
 g95_expr *result;
 mpf_t quot, iquot, term;
@@ -2294,6 +2291,7 @@ mpf_t quot, iquot, term;
     if (g95_compare_expr(p, integer_zero) == 0) {
       /* Result is processor-dependent */
       g95_error("Second argument MODULO at %L is zero", &a->where);
+      g95_free_expr(result);
       return &g95_bad_expr;
     }
     mpz_fdiv_r(result->value.integer, a->value.integer, p->value.integer);
@@ -2304,6 +2302,7 @@ mpf_t quot, iquot, term;
     if (g95_compare_expr(p, real_zero) == 0) {
       /* Result is processor-dependent */
       g95_error("Second argument of MODULO at %L is zero", &p->where);
+      g95_free_expr(result);
       return &g95_bad_expr;
     }
 
@@ -3029,6 +3028,7 @@ int sgn;
 
   default:
     g95_internal_error("Bad type in g95_simplify_sign");
+    g95_free_expr(result);
     return &g95_bad_expr;
   }
 
@@ -3241,6 +3241,7 @@ mpf_t ac, ad, s, t, w;
 			 &e->where);
       mpf_clear(s);  mpf_clear(t); mpf_clear(ac); 
       mpf_clear(ad); mpf_clear(w);
+      g95_free_expr(result);
       return &g95_bad_expr;
     }
 
@@ -3254,12 +3255,14 @@ mpf_t ac, ad, s, t, w;
 
   default:
     g95_internal_error("invalid argument of SQRT at %L", &e->where);
+    g95_free_expr(result);
     return &g95_bad_expr;
   }
 
   return range_check(result,"SQRT");
 
  negative_arg:
+  g95_free_expr(result);
   g95_error("Argument of SQRT at %L has a negative value", &e->where);
   return &g95_bad_expr;
 }
@@ -3289,6 +3292,7 @@ int i;
     mpf_clear(mpf_sin);
     mpf_clear(mpf_cos);
     mpf_clear(mag_cos);
+    g95_free_expr(result);
     return &g95_bad_expr;
   }
   else if ( mpf_cmp(mag_cos,g95_real_kinds[i].tiny) < 0 ) {
@@ -3296,6 +3300,7 @@ int i;
     mpf_clear(mpf_sin);
     mpf_clear(mpf_cos);
     mpf_clear(mag_cos);
+    g95_free_expr(result);
     return &g95_bad_expr;
   }
   else {
