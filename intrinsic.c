@@ -2361,18 +2361,14 @@ int knd1, knd2;
 /* simplify_selected_int_kind */
 static try simplify_selected_int_kind(g95_expr *e) {
 
-/* This isnt even a skeleton */
-  return SUCCESS;
-
-} /* end simplify_selected_int_kind */
+  return g95_simplify_selected_int_kind(e);
+}
 
 
 /* simplify_selected_real_kind */
 static try simplify_selected_real_kind(g95_expr *e) {
 
-  g95_replace_expr(e, g95_int_expr(g95_default_real_kind()));
-
-  return SUCCESS;
+  return g95_simplify_selected_real_kind(e);
 }
 
 
