@@ -152,6 +152,7 @@ normal:
 
 static int get_proc_name(const char *name, g95_symbol **result) {
 g95_symtree *st;
+g95_symbol *sym;
 int rc;
 
   if (g95_current_ns->parent == NULL)
@@ -163,7 +164,16 @@ int rc;
   /* Deal with ENTRY problem */
 
   st = g95_new_symtree(g95_current_ns, name);
-  st->sym = *result;
+
+  sym = *result;
+  st->sym = sym;
+
+  /* See if the procedure should be a module procedure */
+
+  if (sym->ns->proc_name != NULL &&
+      sym->ns->proc_name->attr.flavor == FL_MODULE &&
+      sym->attr.proc != PROC_MODULE &&
+      g95_add_procedure(&sym->attr, PROC_MODULE, NULL) == FAILURE) rc = 2;
 
   return rc;
 }

@@ -1307,9 +1307,8 @@ int i, rank;
 
     if (ref->ar.type == AR_SECTION) { /* Figure out the rank of the section */
       for(i=0; i<ref->ar.rank; i++)
-	if ((ref->ar.start[i] == NULL && ref->ar.end[i] == NULL) ||
-	    (ref->ar.start[i] != NULL && ref->ar.end[i] != NULL) ||
-	    ref->ar.start[i]->rank != 0) rank++;
+	if (ref->ar.dimen_type[i] == DIMEN_RANGE ||
+	    ref->ar.dimen_type[i] == DIMEN_VECTOR) rank++;
 
       break;
     }
