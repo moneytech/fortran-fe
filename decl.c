@@ -287,6 +287,24 @@ g95_component *c;
   if (c->as != NULL) c->dimension = 1;
   *as = NULL;
 
+  /* Check array components */
+
+  if (!c->dimension) return SUCCESS;
+
+  if (c->pointer) {
+    if (c->as->type != AS_DEFERRED){
+      g95_error("Pointer array component of structure at %C "
+		"must have a deferred shape");
+      return FAILURE;
+    }
+  } else {
+    if (c->as->type != AS_EXPLICIT) {
+      g95_error("Array component of structure at %C must have an explicit "
+		"shape");
+      return FAILURE;
+    }
+  }
+
   return SUCCESS;
 }
 
