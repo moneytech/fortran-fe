@@ -677,12 +677,10 @@ g95_expr *result;
 
   switch (x->ts.type) {
   case BT_INTEGER: 
-    if (mpz_cmp(x->value.integer, y->value.integer) > 0) {
+    if (mpz_cmp(x->value.integer, y->value.integer) > 0)
       mpz_sub(result->value.integer, x->value.integer, y->value.integer);
-    }
-    else {
+    else
       mpz_set(result->value.integer, mpz_zero);
-    }
 
     break;
 
@@ -708,7 +706,7 @@ int kx, ky;
 
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL;
 
-  if ( y == NULL ) {
+  if (y == NULL) {
     g95_error("Second argument of DPROD missing at %L", &x->where);
     return &g95_bad_expr;
   }
@@ -717,7 +715,7 @@ int kx, ky;
   ky = g95_validate_kind(y->ts.type, y->ts.kind);
   if ( kx != g95_default_real_kind() || ky != g95_default_real_kind() ) {
     g95_error("Arguments of DPROD at %L must be of default real kind",
-		    x->where);
+	      x->where);
   }
 
   mult1 = g95_real2real(x, g95_default_double_kind());
@@ -729,7 +727,6 @@ int kx, ky;
   g95_free_expr(mult2);
 
   return range_check(result, "DPROD");
-
 }
 
 
@@ -760,7 +757,7 @@ g95_expr *result;
   if (g95_option.pedantic == 1) 
     g95_warning("Evaluation of exp function at %L for constant parameter is an extension", x->where);
 
-  result=g95_constant_result(BT_REAL,g95_default_real_kind());
+  result = g95_constant_result(BT_REAL,g95_default_real_kind());
   result->where = x->where;
 
   switch (x->ts.type) {
@@ -814,6 +811,16 @@ mpf_t i2, absv, ln2, lnx;
 
   return range_check(result,"EXPONENT");
 
+}
+
+
+g95_expr *g95_simplify_float(g95_expr *a) {
+g95_expr *result;
+
+  if (a->expr_type != EXPR_CONSTANT) return NULL; 
+
+  result = g95_int2real(a, g95_default_real_kind());
+  return range_check(result, "FLOAT");
 }
 
 
@@ -1380,26 +1387,23 @@ long e_int, new_int;
 
   result = g95_copy_expr(e);
 
-  if ( shift == 0 ) {
-    return result;
-  }
-  else {
-    e_int = mpz_get_si(e->value.integer);
-    if (e_int > INT_MAX || e_int < INT_MIN) {
-      g95_internal_error("ISHFT: unable to extract integer");
-      return &g95_bad_expr;
-    }
-    else if ( shift > 0 ) {
-      new_int = e_int << shift;
-      mpz_set_si(result->value.integer, new_int);
-      return range_check(result,"ISHFT");
-    }
-    else
-      new_int = e_int >> shift;
-      mpz_set_si(result->value.integer, new_int);
-      return range_check(result,"ISHFT");
+  if (shift == 0) return result;
+
+  e_int = mpz_get_si(e->value.integer);
+  if (e_int > INT_MAX || e_int < INT_MIN) {
+    g95_internal_error("ISHFT: unable to extract integer");
+    return &g95_bad_expr;
   }
 
+  if (shift > 0) {
+    new_int = e_int << shift;
+    mpz_set_si(result->value.integer, new_int);
+    return range_check(result,"ISHFT");
+  }
+
+  new_int = e_int >> shift;
+  mpz_set_si(result->value.integer, new_int);
+  return range_check(result,"ISHFT");
 }
 
 
@@ -1440,10 +1444,6 @@ int *bits;
   }
 
   bits = g95_getmem(isize*sizeof(int));
-
-  if (bits == NULL) {
-    g95_internal_error("ISHFTC: Unable to allocate memory");
-  }
 
   for ( i=0; i<isize; ++i ) {
     bits[i] = mpz_tstbit(e->value.integer,i);
@@ -1558,13 +1558,14 @@ int tv;
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0 ) {
+  if (a->value.character.length == 0 && b->value.character.length == 0) {
     return g95_logical_expr( 0, &a->where);
   }
 
-  if ( strcmp(a->value.character.string, b->value.character.string) > 0 )
+  if (strcmp(a->value.character.string, b->value.character.string) > 0)
     tv = 1;
-  else tv = 0;
+  else
+    tv = 0;
 
   return g95_logical_expr( tv, &a->where);
 }
@@ -1576,13 +1577,13 @@ int tv;
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0 ) {
+  if (a->value.character.length == 0 && b->value.character.length == 0)
     return g95_logical_expr( 1, &a->where);
-  }
 
-  if ( strcmp(a->value.character.string, b->value.character.string) <= 0 )
+  if (strcmp(a->value.character.string, b->value.character.string) <= 0)
     tv = 1;
-  else tv = 0;
+  else
+    tv = 0;
 
   return g95_logical_expr( tv, &a->where);
 }
@@ -1594,13 +1595,13 @@ int tv;
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0 ) {
+  if (a->value.character.length == 0 && b->value.character.length == 0)
     return g95_logical_expr( 0, &a->where);
-  }
 
-  if ( strcmp(a->value.character.string, b->value.character.string) < 0 )
+  if (strcmp(a->value.character.string, b->value.character.string) < 0)
     tv = 1;
-  else tv = 0;
+  else
+    tv = 0;
 
   return g95_logical_expr( tv, &a->where);
 }
@@ -1684,38 +1685,39 @@ int my_kind;
     arg = arg->next;
   }
 
-  if ( x->ts.type == BT_INTEGER ) {
+  switch(x->ts.type) {
+  case BT_INTEGER:
     mpz_init_set(max_val, x->value.integer);
     my_type = BT_INTEGER;
     my_kind = x->ts.kind;
-  }
-  else if ( x->ts.type == BT_REAL ) {
+    break;
+
+  case BT_REAL:
     mpf_init_set(rmax_val, x->value.real);
     my_type = BT_REAL;
     my_kind = x->ts.kind;
-  }
-  else {
+    break;
+
+  default:
     g95_internal_error("g95_simplify_max: bad type");
-    return &g95_bad_expr;
   }
 
-  while ( arg != NULL ) {
-    y=arg->expr;
-    if ( y->expr_type != EXPR_CONSTANT ) {
-      x=y;
-      arg=arg->next;
-    }
-    else {
-      if ( my_type == BT_INTEGER ) {
-        if ( mpz_cmp(y->value.integer, max_val) > 0 ) 
+  while(arg != NULL) {
+    y = arg->expr;
+    if (y->expr_type != EXPR_CONSTANT) {
+      x = y;
+      arg = arg->next;
+    } else {
+      if (my_type == BT_INTEGER) {
+        if (mpz_cmp(y->value.integer, max_val) > 0)
        	  mpz_set(max_val, y->value.integer);
       }
-      if ( my_type == BT_REAL ) {
-        if ( mpf_cmp(x->value.real, rmax_val) > 0 )
+      if (my_type == BT_REAL) {
+        if (mpf_cmp(x->value.real, rmax_val) > 0)
  	  mpf_set(rmax_val, y->value.real);
       }
-      x=y;
-      arg=arg->next;
+      x = y;
+      arg = arg->next;
     }
   }
 
@@ -1778,7 +1780,6 @@ int i, kind;
   g95_free_expr(r);
 
   return result;
-
 }
 
 
@@ -1857,7 +1858,7 @@ int my_kind;
   x   = arg->expr;
   arg = arg->next;
 
-  if ( x->expr_type != EXPR_CONSTANT ) { /* Skip nonconstant argument */
+  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
     x   = arg->expr;
     arg = arg->next;
   }
@@ -2032,11 +2033,12 @@ mpf_t quot, iquot, term;
     return NULL;
 
   switch (a->ts.type) {
-    	case BT_INTEGER:
-	    	if (p->ts.type != BT_INTEGER ) {
-	     	        g95_error("Type of arguments of MOD at %L must agree",
-  				&a->where);
-			return &g95_bad_expr;
+  case BT_INTEGER:
+    if (p->ts.type != BT_INTEGER ) {
+      g95_error("Type of arguments of MOD at %L must agree",
+		&a->where);
+      return &g95_bad_expr;
+
     		}
     		else {
 	      	  if (g95_compare_expr(p, integer_zero) != 0) {
@@ -2694,6 +2696,21 @@ g95_expr *g95_simplify_sinh(g95_expr *e) {
 }
 
 
+/* simplify_sngl()-- The argument is always a double precision real
+ * that is converted to single precision.  TODO: Rounding! */
+
+g95_expr *g95_simplify_sngl(g95_expr *a) {
+g95_expr *result;
+
+  if (a->expr_type != EXPR_CONSTANT) return NULL;
+
+  result = g95_constant_result(BT_REAL, g95_default_double_kind());
+  mpf_init_set(result->value.real, a->value.real);
+
+  return range_check(result, "SNGL");
+}
+
+
 /* simplify_spacing */
 g95_expr *g95_simplify_spacing(g95_expr *x) {
 g95_expr *result;
@@ -2737,8 +2754,7 @@ int i, p;
   if ( diff >= 0 ) {
     exp2 = (unsigned) diff;
     mpf_mul_2exp(result->value.real,i1,exp2);
-  }
-  else {
+  } else {
     diff = -diff;
     exp2 = (unsigned) diff;
     mpf_div_2exp(result->value.real,i1,exp2);

@@ -245,19 +245,6 @@ static try check_epsilon(g95_expr *x) {
 }
 
 
-static try check_float(g95_expr *a, g95_expr *kind) {
-
-  if (a->ts.type != BT_INTEGER || a->ts.kind != g95_default_integer_kind())
-    return FAILURE;
-
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
-    return FAILURE;
-
-  return SUCCESS;
-}
-
-
 static try check_huge(g95_expr *x) {
 
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
@@ -400,7 +387,8 @@ static try check_real(g95_expr *a, g95_expr *kind) {
 
   if (!g95_numeric_ts(&a->ts)) return FAILURE;
 
-  if (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)
+  if (kind != NULL && (kind->ts.type != BT_INTEGER ||
+		       kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
   return SUCCESS;
@@ -410,18 +398,6 @@ static try check_real(g95_expr *a, g95_expr *kind) {
 static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
 
   if (p == NULL && r == NULL) return FAILURE;
-
-  return SUCCESS;
-}
-
-
-static try check_sngl(g95_expr *a, g95_expr *kind) {
-
-  if (a->ts.type != BT_REAL || a->ts.kind != g95_default_double_kind())
-    return FAILURE;
-
-  if (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)
-    return FAILURE;
 
   return SUCCESS;
 }
@@ -1039,11 +1015,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("real",  1, BT_REAL, dr, g95_simplify_real, check_real,
 	  a, BT_INTEGER, di, 0, knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("float", 1, BT_REAL, dr, g95_simplify_real, check_float,
-	  a, BT_INTEGER, di, 0, knd, BT_INTEGER, di, 1, NULL);
+  add_sym("float", 1, BT_REAL, dr, g95_simplify_float, NULL,
+	  a, BT_INTEGER, di, 0, NULL);
 
-  add_sym("sngl",  1, BT_REAL, dr, g95_simplify_real, check_sngl,
-	  a, BT_REAL,    dd, 0, knd, BT_INTEGER, di, 1, NULL);
+  add_sym("sngl",  1, BT_REAL, dr, g95_simplify_sngl, NULL,
+	  a, BT_REAL,    dd, 0, NULL);
 
   add_sym("repeat", 1, BT_CHARACTER, dc, g95_simplify_repeat, NULL,
 	  stg, BT_CHARACTER, dc, 0, n, BT_INTEGER, di, 0, NULL);
