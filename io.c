@@ -911,7 +911,7 @@ match m;
   if (m == MATCH_YES) goto next;
   if (m == MATCH_ERROR) goto cleanup;
 
-  if (g95_match_symbol(&sym) == MATCH_YES && sym->namelist != NULL) {
+  if (g95_match_symbol(&sym) == MATCH_YES && sym->attr.flavor != FL_NAMELIST) {
     dt->namelist = sym;
     goto next;
   }
