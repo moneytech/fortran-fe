@@ -1796,7 +1796,8 @@ static void write_true_name(g95_symbol *sym) {
 
 static void write_symtree(g95_symtree *st) {
 
-  if (st->sym->serial == -1 || st->sym->serial >= visible_num) return;
+  if (st->sym->serial == -1 || st->sym->serial >= visible_num ||
+      check_unique_name(st->name)) return;
 
   mio_lparen();
   write_atom(ATOM_NAME, st->name);
