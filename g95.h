@@ -1004,6 +1004,8 @@ void g95_done_2(void);
 /* options.c */
 
 void g95_display_help(void);
+int g95_parse_arg(int argc, char *argv[]);
+void g95_init_options(void);
 
 /* iresolve.c */
 
@@ -1015,9 +1017,6 @@ __attribute__ ((format (printf, 1, 2)))
 
 void g95_iresolve_init_1(void);
 void g95_iresolve_done_1(void);
-
-int g95_parse_arg(int argc, char *argv[]);
-void g95_init_options(void);
 
 /* error.c */
 
@@ -1266,6 +1265,9 @@ int g95_specific_intrinsic(char *);
 int g95_intrinsic_name(char *, int);
 g95_intrinsic_sym *g95_find_function(char *);
 
+match g95_intrinsic_func_interface(g95_expr *, int);
+match g95_intrinsic_sub_interface(g95_code *, int);
+
 /* simplify.c */
 
 void g95_simplify_init_1(void);
@@ -1319,6 +1321,7 @@ match g95_match_common(void);
 match g95_match_block_data(void);
 void g95_free_namelist(g95_namelist *);
 match g95_match_namelist(void);
+match g95_match_module(void);
 void g95_free_equiv(g95_equiv *);
 match g95_match_equivalence(void);
 match g95_match_st_function(void);
@@ -1366,16 +1369,15 @@ match g95_match_target(void);
 match g95_match_rvalue(g95_expr **);
 match g95_match_variable(g95_expr **, int);
 match g95_match_actual_arglist(int, g95_actual_arglist **);
-void g95_free_actual_arglist(g95_actual_arglist *);
 int g95_next_string_char(char);
 match g95_match_literal_constant(g95_expr **, int);
 symbol_attribute g95_variable_attr(g95_expr *, g95_typespec *);
 symbol_attribute g95_expr_attr(g95_expr *);
-void g95_show_actual_arglist(g95_actual_arglist *);
-match g95_match_init_expr(g95_expr **);
 
 /* expr.c */
 
+void g95_show_actual_arglist(g95_actual_arglist *);
+void g95_free_actual_arglist(g95_actual_arglist *);
 g95_actual_arglist *g95_copy_actual_arglist(g95_actual_arglist *);
 char *g95_extract_int(g95_expr *, int *);
 
@@ -1394,6 +1396,7 @@ g95_code *g95_build_call(char *, ...);
 mpz_t *g95_copy_shape(mpz_t *, int);
 g95_expr *g95_copy_expr(g95_expr *);
 
+match g95_match_init_expr(g95_expr **);
 try g95_specification_expr(g95_expr *);
 void g95_show_expr(g95_expr *);
 
@@ -1504,11 +1507,6 @@ match g95_match_read(void);
 match g95_match_write(void);
 match g95_match_print(void);
 
-/* intrinsic.c */
-
-match g95_intrinsic_func_interface(g95_expr *, int);
-match g95_intrinsic_sub_interface(g95_code *, int);
-
 /* format.c */
 
 void g95_check_format_string(g95_expr *);
@@ -1523,13 +1521,12 @@ match g95_match_expr(g95_expr **);
 
 void g95_module_init_2(void);
 void g95_module_done_2(void);
-match g95_match_module(void);
 match g95_match_use(void);
 void g95_dump_module(char *, int);
 void g95_use_module(void);
 
 #ifdef IN_GCC
-/* code.c */
+/* trans.c */
 
 void g95_generate_code(g95_namespace *);
 void g95_generate_module_code(g95_namespace *);
