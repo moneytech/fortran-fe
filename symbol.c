@@ -264,7 +264,8 @@ int i;
 
   if (ns->default_type[i].type == BT_UNKNOWN) {
     if (error_flag)
-      g95_error("Symbol '%s' at %C has no IMPLICIT type", sym->name);
+      g95_error("Symbol '%s' at %L has no IMPLICIT type", sym->name,
+		&sym->declared_at);
 
     return FAILURE;
   }
