@@ -872,7 +872,7 @@ extern g95_file *g95_current_file;
 
 /* misc.c */
 
-void *g95_getmem(int);
+void *g95_getmem(size_t);
 void g95_free(void *);
 void g95_clear_ts(g95_typespec *);
 FILE *g95_open_included_file(const char *);

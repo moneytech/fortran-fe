@@ -32,7 +32,7 @@ extern const char g95_compile_date[];
 /* g95_getmem()-- Get a block of memory.  Many callers assume that the
  * memory we return is zeroed. */
 
-void *g95_getmem(int n) {
+void *g95_getmem(size_t n) {
 void *p;
 
   p = calloc(n, 1);
