@@ -373,6 +373,8 @@ g95_expr lvalue;
 
 /******************** Symbol attribute stuff *********************/
 
+/* Get rid of this copy, use version in modules.c only */
+
 static mstring flavors[] = {
   minit("UNKNOWN",     FL_UNKNOWN),      minit("PROGRAM",     FL_PROGRAM),
   minit("BLOCK-DATA",  FL_BLOCK_DATA),   minit("MODULE",      FL_MODULE),

@@ -45,8 +45,10 @@ static g95_use_rename *g95_rename_list;
 static int only_flag;
 
 
-static FILE *input;
+static FILE *module_fp;
 static int module_line, module_column;
+static enum { IO_INPUT, IO_OUTPUT } iomode;
+
 
 
 /* g95_free_rename()-- Free the rename list left behind by a USE
@@ -161,7 +163,7 @@ static char *current_module, *atom_string, atom_name[MAX_ATOM_SIZE];
 
 /* bad_module()-- Report problems with a module.  Error reporting is
  * not very elaborate, since this sorts of errors shouldn't really
- * happen. */
+ * happen.  This subroutine never returns.  */
 
 static void bad_module(char *message) {
 
@@ -176,7 +178,7 @@ static void set_module_locus(module_locus *m) {
 
   module_column = m->column;
   module_line = m->line;
-  fsetpos(input, &m->pos);
+  fsetpos(module_fp, &m->pos);
 }
 
 
@@ -187,7 +189,7 @@ static void get_module_locus(module_locus *m) {
 
   m->column = module_column;
   m->line = module_line;
-  fgetpos(input, &m->pos);
+  fgetpos(module_fp, &m->pos);
 }
 
 
@@ -197,7 +199,7 @@ static void get_module_locus(module_locus *m) {
 static int module_char(void) {
 int c;
 
-  c = fgetc(input);
+  c = fgetc(module_fp);
 
   if (c == '\n') {
     module_line++;
@@ -330,6 +332,497 @@ int c;
   parse_name(c);
   return ATOM_NAME;
 }
+
+
+/* require_atom()-- Read the next atom from the input, requiring that
+ * it be a particular kind */
+
+static void require_atom(atom_type type) {
+module_locus m;
+char *p;
+
+  get_module_locus(&m); 
+
+  if (parse_atom() != type) {
+    switch(type) {
+    case ATOM_NAME:     p = "Expected name";               break;
+    case ATOM_LPAREN:   p = "Expected left parenthesis";   break;
+    case ATOM_RPAREN:   p = "Expected right parenthesis";  break;
+    case ATOM_INTEGER:  p = "Expected integer";            break;
+    case ATOM_STRING:   p = "Expected string";             break;
+    case ATOM_EOF:      p = "Expected end of file";        break;
+    }
+
+    set_module_locus(&m);
+    bad_module(p);
+  }
+}
+
+
+/* find_enum()-- Given a pointer to an mstring array, require that
+ * the current input be one of the strings in the array.  We return
+ * the enum value. */
+
+static int find_enum(mstring *m) {
+char msg[100];
+int i;
+
+  i = g95_string2code(m, atom_name);
+  if (i < 0) {
+    strcat(msg, "Expected one of ");
+    for(i=0; i<3; i++) {
+      strcat(msg, m->string);
+
+      m++;
+      if (m->string == NULL) break;
+      strcat(msg, ", ");
+    }
+
+    if (m->string != NULL) strcat(msg, ", ...");
+    bad_module(msg);
+  }
+
+  return i;
+}
+
+
+
+/* Module output subroutines */
+
+
+/* write_char()-- Output a character to a module file */
+
+static void write_char(char out) {
+
+  if (fputc(out, module_fp) == EOF) bad_module("I/O error");
+
+  if (out == '\n')
+    module_column = 1;
+  else {
+    module_column++;
+    module_line++;
+  }
+}
+
+
+/* write_atom()-- Write an atom to a module.  The line wrapping isn't
+ * perfect, but it should work most of the time.  This isn't that big
+ * of a deal, since the file really isn't meant to be read by people
+ * anyway. */
+
+static void write_atom(atom_type type, void *v) {
+char *p, buffer[20];
+int len;
+
+  switch(type) {
+  case ATOM_STRING:
+  case ATOM_NAME:
+    p = v;
+    break;
+
+  case ATOM_LPAREN:
+    p = "(";
+    break;
+
+  case ATOM_RPAREN:
+    p = ")";
+    break;
+
+  case ATOM_INTEGER:
+    sprintf(buffer, "%d", *((int *) v));
+    p = buffer;
+    break;
+
+  case ATOM_EOF:
+    break;
+  }
+
+  len = strlen(p);
+
+  if (type != ATOM_RPAREN) {
+    if (module_column + len > 72)
+      write_char('\n');
+    else
+      write_char(' ');
+  }
+
+  if (type == ATOM_STRING) write_char('\'');
+
+  while(*p) {
+    if (type == ATOM_STRING && *p == '\'') write_char('\'');
+    write_char(*p++);
+  }
+
+  if (type == ATOM_STRING) write_char('\'');
+}
+
+
+
+/***************** Mid-level I/O subroutines *****************/
+
+/* These subroutines let their caller read or write atoms without
+ * caring about which of the two is actually happening.  This lets a
+ * subroutine concentrate on the actual format of the data being written. */
+
+static void mio_expr(g95_expr **);
+
+
+/* mio_name()-- Read or write an enumerated value.  On writing, we
+ * return the input value for the convenience of callers.  We avoid
+ * using an integer pointer because enums are sometimes inside bitfields. */
+
+static int mio_name(int t, mstring *m) {
+
+  if (iomode == IO_OUTPUT)
+    write_atom(ATOM_NAME, g95_code2string(m, t));
+  else {
+    require_atom(ATOM_NAME);
+    t = find_enum(m);
+  }
+
+  return t;
+}
+
+
+static void mio_lparen(void) {
+
+  if (iomode == IO_OUTPUT)
+    write_atom(ATOM_LPAREN, NULL);
+  else
+    require_atom(ATOM_LPAREN);
+}
+
+
+static void mio_rparen(void) {
+
+  if (iomode == IO_OUTPUT)
+    write_atom(ATOM_RPAREN, NULL);
+  else
+    require_atom(ATOM_RPAREN);
+}
+
+
+static void mio_integer(int *ip) {
+
+  if (iomode == IO_OUTPUT)
+    write_atom(ATOM_INTEGER, ip);
+  else {
+    require_atom(ATOM_INTEGER);
+    *ip = atom_int;
+  }
+}
+
+
+/* mio_allocated_string()-- Read or write a character pointer that
+ * points to a string on the heap */
+
+static void mio_allocated_string(char **sp) {
+
+  if (iomode == IO_OUTPUT)
+    write_atom(ATOM_STRING, *sp);
+  else {
+    require_atom(ATOM_STRING);
+    *sp = atom_string;
+  }
+}
+
+
+/* mio_internal_string()-- Read or write a string that is in static
+ * memory or inside of some already-allocated structure */
+
+static void mio_internal_string(char *string) {
+
+  if (iomode == IO_OUTPUT)
+    write_atom(ATOM_STRING, string);
+  else {
+    require_atom(ATOM_STRING);
+    strcpy(string, atom_string);
+  }
+}
+
+
+
+
+enum { AB_ALLOCATABLE, AB_DIMENSION, AB_EXTERNAL, AB_INTRINSIC, AB_OPTIONAL,
+       AB_POINTER, AB_PRIVATE, AB_PUBLIC, AB_SAVE, AB_TARGET, AB_DUMMY,
+       AB_COMMON, AB_RESULT, AB_ENTRY, AB_DATA, AB_IN_NAMELIST,
+       AB_IN_COMMON, AB_SAVED_COMMON, AB_FUNCTION, AB_SUBROUTINE,
+       AB_SEQUENCE, AB_ELEMENTAL, AB_PURE, AB_RECURSIVE
+} attribute_bits;
+
+
+static mstring flavors[] = {
+  minit("UNKNOWN",     FL_UNKNOWN),      minit("PROGRAM",     FL_PROGRAM),
+  minit("BLOCK-DATA",  FL_BLOCK_DATA),   minit("MODULE",      FL_MODULE),
+  minit("VARIABLE",    FL_VARIABLE),     minit("PARAMETER",   FL_PARAMETER),
+  minit("LABEL",       FL_LABEL),        minit("ST-FUNCTION", FL_ST_FUNCTION),
+  minit("MODULE-PROC", FL_MODULE_PROC),  minit("DUMMY-PROC",  FL_DUMMY_PROC),
+  minit("PROCEDURE",   FL_PROCEDURE),    minit("DERIVED",     FL_DERIVED),
+  minit("NAMELIST",    FL_NAMELIST),     minit("GENERIC",     FL_GENERIC),
+  minit(NULL, -1) },
+
+intents[] = {
+  minit("UNKNOWN", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
+  minit("OUT", INTENT_OUT),          minit("INOUT", INTENT_INOUT),
+  minit(NULL, -1)
+},
+
+scopes[] = {
+  minit("UNKNOWN",    SCOPE_UNKNOWN),    minit("EXTERNAL",   SCOPE_EXTERNAL),
+  minit("INTERNAL",   SCOPE_INTERNAL),   minit("INTRINSIC",  SCOPE_INTRINSIC),
+  minit(NULL, -1)
+},
+
+attr_bits[] = {
+  minit("ALLOCATABLE", AB_ALLOCATABLE), minit("DIMENSION",    AB_DIMENSION),
+  minit("EXTERNAL",    AB_EXTERNAL),    minit("INTRINSIC",    AB_INTRINSIC),
+  minit("OPTIONAL",    AB_OPTIONAL),    minit("POINTER",      AB_POINTER),
+  minit("PRIVATE",     AB_PRIVATE),     minit("PUBLIC",       AB_PUBLIC),
+  minit("SAVE",        AB_SAVE),        minit("TARGET",       AB_TARGET),
+  minit("DUMMY",       AB_DUMMY),       minit("COMMON",       AB_COMMON),
+  minit("RESULT",      AB_RESULT),      minit("ENTRY",        AB_ENTRY),
+  minit("DATA",        AB_DATA),        minit("IN_NAMELIST",  AB_IN_NAMELIST),
+  minit("IN_COMMON",   AB_IN_COMMON),   minit("SAVED_COMMON", AB_SAVED_COMMON),
+  minit("FUNCTION",    AB_FUNCTION),    minit("SUBROUTINE",   AB_SUBROUTINE),
+  minit("SEQUENCE",    AB_SEQUENCE),    minit("ELEMENTAL",    AB_ELEMENTAL),
+  minit("PURE",        AB_PURE),        minit("RECURSIVE",    AB_RECURSIVE),
+  minit(NULL, -1)
+};
+
+
+/* mio_symbol_attribute()-- Symbol attributes are stored in list with
+ * the first three elements being the enumerated fields, while the
+ * remaining elements (if any) indicate the individual attribute bits */
+
+void mio_symbol_attribute(symbol_attribute *attr) {
+atom_type t;
+
+  mio_lparen();
+
+  attr->flavor = mio_name(attr->flavor, flavors);
+  attr->intent = mio_name(attr->intent, intents);
+  attr->scope = mio_name(attr->scope, scopes);
+
+  if (iomode == IO_INPUT) {
+    if (attr->allocatable)   mio_name(AB_ALLOCATABLE, attr_bits);
+    if (attr->dimension)     mio_name(AB_DIMENSION, attr_bits);
+    if (attr->external)      mio_name(AB_EXTERNAL, attr_bits);
+    if (attr->intrinsic)     mio_name(AB_INTRINSIC, attr_bits);
+    if (attr->optional)      mio_name(AB_OPTIONAL, attr_bits);
+    if (attr->pointer)       mio_name(AB_POINTER, attr_bits);
+    if (attr->private)       mio_name(AB_PRIVATE, attr_bits);
+    if (attr->public)        mio_name(AB_PUBLIC, attr_bits);
+    if (attr->save)          mio_name(AB_SAVE, attr_bits);
+    if (attr->target)        mio_name(AB_TARGET, attr_bits);
+    if (attr->dummy)         mio_name(AB_DUMMY, attr_bits);
+    if (attr->common)        mio_name(AB_COMMON, attr_bits);
+    if (attr->result)        mio_name(AB_RESULT, attr_bits);
+    if (attr->entry)         mio_name(AB_ENTRY, attr_bits);
+    
+    if (attr->data)          mio_name(AB_DATA, attr_bits);
+    if (attr->in_namelist)   mio_name(AB_IN_NAMELIST, attr_bits);
+    if (attr->in_common)     mio_name(AB_IN_COMMON, attr_bits);
+    if (attr->saved_common)  mio_name(AB_SAVED_COMMON, attr_bits);
+
+    if (attr->function)      mio_name(AB_FUNCTION, attr_bits);
+    if (attr->subroutine)    mio_name(AB_SUBROUTINE, attr_bits);
+
+    if (attr->sequence)      mio_name(AB_SEQUENCE, attr_bits);
+    if (attr->elemental)     mio_name(AB_ELEMENTAL, attr_bits);
+    if (attr->pure)          mio_name(AB_PURE, attr_bits);
+    if (attr->recursive)     mio_name(AB_RECURSIVE, attr_bits);
+
+    mio_rparen();
+
+  } else {
+
+    for(;;) {
+      t = parse_atom();
+      if (t == ATOM_RPAREN) break;
+      if (t != ATOM_NAME) bad_module("Expected attribute bit name");
+
+      switch(find_enum(attr_bits)) {
+      case AB_ALLOCATABLE:   attr->allocatable = 1;   break;
+      case AB_DIMENSION:     attr->dimension = 1;     break;
+      case AB_EXTERNAL:      attr->external = 1;      break;
+      case AB_INTRINSIC:     attr->intrinsic = 1;     break;
+      case AB_OPTIONAL:      attr->optional = 1;      break;
+      case AB_POINTER:       attr->pointer = 1;       break;
+      case AB_PRIVATE:       attr->private = 1;       break;
+      case AB_PUBLIC:        attr->public = 1;        break;
+      case AB_SAVE:          attr->save = 1;          break;
+      case AB_TARGET:        attr->target = 1;        break;
+      case AB_DUMMY:         attr->dummy = 1;         break;
+      case AB_COMMON:        attr->common = 1;        break;
+      case AB_RESULT:        attr->result = 1;        break;
+      case AB_ENTRY:         attr->entry = 1;         break;
+      case AB_DATA:          attr->data = 1;          break;
+      case AB_IN_NAMELIST:   attr->in_namelist = 1;   break;
+      case AB_IN_COMMON:     attr->in_common = 1;     break;
+      case AB_SAVED_COMMON:  attr->saved_common = 1;  break;
+      case AB_FUNCTION:      attr->function = 1;      break;
+      case AB_SUBROUTINE:    attr->subroutine = 1;    break;
+      case AB_SEQUENCE:      attr->sequence = 1;      break;
+      case AB_ELEMENTAL:     attr->elemental = 1;     break;
+      case AB_PURE:          attr->pure = 1;          break;
+      case AB_RECURSIVE:     attr->recursive = 1;     break;
+      }
+    }
+  }
+}
+
+
+
+
+/* BT_UNKNOWN has been omitted from this list on purpose-- it should
+ * never appear in an expression. */
+
+static mstring bt_types[] = {
+  minit("INTEGER",    BT_INTEGER),      minit("REAL",       BT_REAL),
+  minit("COMPLEX",    BT_COMPLEX),      minit("LOGICAL",    BT_LOGICAL),
+  minit("CHARACTER",  BT_CHARACTER),    minit("DERIVED",    BT_DERIVED),
+  minit("PROCEDURE",  BT_PROCEDURE),    minit(NULL, -1)
+};
+
+
+static void mio_typespec(g95_typespec *ts) {
+
+  mio_lparen();
+  
+  ts->type = mio_name(ts->type, bt_types);
+
+  mio_integer(&ts->kind);
+  
+  /* Store symbol pointers */
+
+  /* mio_expr(&ts->charlen); */
+
+  mio_rparen();
+}
+
+
+
+static mstring array_spec_types[] = {
+  minit("EXPLICIT", AS_EXPLICIT),   minit("ASSUMED_SHAPE", AS_ASSUMED_SHAPE),
+  minit("DEFERRED", AS_DEFERRED),   minit("ASSUMED_SIZE",  AS_ASSUMED_SIZE),
+  minit(NULL, -1)
+};
+
+
+static void mio_array_spec(g95_array_spec *as) {
+int i;
+
+  mio_lparen();
+
+  mio_integer(&as->rank);
+  as->type = mio_name(as->type, array_spec_types);
+
+  for(i=0; i<as->rank; i++) {
+    mio_expr(&as->shape[i].lower);
+    mio_expr(&as->shape[i].upper);
+  }
+
+  mio_rparen();
+}
+
+
+static void mio_component(g95_component *c) {
+
+  mio_lparen();
+
+  mio_internal_string(c->name);
+  mio_typespec(&c->ts);
+  mio_array_spec(&c->as);
+  mio_symbol_attribute(&c->attr);
+
+  /* locus?? */
+
+  mio_expr(&c->initializer);
+  mio_rparen();
+}
+
+
+
+
+static mstring expr_types[] = {
+  minit("OP",         EXPR_OP),         minit("FUNCTION",   EXPR_FUNCTION),
+  minit("CONSTANT",   EXPR_CONSTANT),   minit("VARIABLE",   EXPR_VARIABLE),
+  minit("SUBSTRING",  EXPR_SUBSTRING),  minit("STRUCTURE",  EXPR_STRUCTURE),
+  minit("ARRAY",      EXPR_ARRAY),      minit(NULL, -1)
+},
+
+/* INTRINSIC_ASSIGN is missing because it is used as an index for
+ * generic operators, not in expressions.  INTRINSIC_USER is also
+ * replaced by the correct function name by the time we see it. */
+
+intrinsics[] = {
+  minit("UPLUS",  INTRINSIC_UPLUS),  minit("UMINUS",  INTRINSIC_UMINUS),
+  minit("PLUS",   INTRINSIC_PLUS),   minit("MINUS",   INTRINSIC_MINUS),
+  minit("TIMES",  INTRINSIC_TIMES),  minit("DIVIDE",  INTRINSIC_DIVIDE),
+  minit("POWER",  INTRINSIC_POWER),  minit("CONCAT",  INTRINSIC_CONCAT),
+  minit("AND",    INTRINSIC_AND),    minit("OR",      INTRINSIC_OR),
+  minit("EQV",    INTRINSIC_EQV),    minit("NEQV",    INTRINSIC_NEQV),
+  minit("EQ",     INTRINSIC_EQ),     minit("NE",      INTRINSIC_NE),
+  minit("GT",     INTRINSIC_GT),     minit("GE",      INTRINSIC_GE),
+  minit("LT",     INTRINSIC_LT),     minit("LE",      INTRINSIC_LE),
+  minit("NOT",    INTRINSIC_NOT),    minit(NULL, -1)
+};
+
+
+/* mio_expr()-- Read and write expressions.  The form "()" is allowed
+ * to indicate a NULL expression */
+
+static void mio_expr(g95_expr **ep) {
+atom_type t;
+g95_expr *e;
+
+  mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    if (*ep == NULL) {
+      mio_rparen();
+      return;
+    }
+
+    e = *ep;
+    mio_name(e->expr_type, expr_types);
+
+  } else {
+    t = parse_atom();
+    if (t == ATOM_RPAREN) {
+      *ep = NULL;
+      return;
+    }
+
+    if (t != ATOM_NAME) bad_module("Expected expression type");
+
+    e = *ep;
+    e->expr_type = find_enum(expr_types);
+  }
+
+  e->expr_type = mio_name(e->expr_type, expr_types);
+
+  mio_typespec(&e->ts);
+
+  mio_integer(&e->rank);
+
+  switch(e->expr_type) {
+
+  case EXPR_OP:
+  case EXPR_FUNCTION:
+  case EXPR_CONSTANT:
+  case EXPR_VARIABLE:
+  case EXPR_SUBSTRING:
+  case EXPR_STRUCTURE:
+  case EXPR_ARRAY:
+
+    break;
+  }
+
+
+  /* more */
+}
+
 
 
 
