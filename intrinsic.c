@@ -556,7 +556,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("aimag");
 
   add_sym("aint", 1, 1, BT_REAL, dr,
-	  g95_check_a_kind, g95_simplify_aint, g95_resolve_aint,
+	  g95_check_a_xkind, g95_simplify_aint, g95_resolve_aint,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("dint", 1, 1, BT_REAL, dd,
@@ -578,7 +578,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("allocated");
 
   add_sym("anint", 1, 1, BT_REAL, dr,
-	  g95_check_a_kind, g95_simplify_anint, g95_resolve_anint,
+	  g95_check_a_xkind, g95_simplify_anint, g95_resolve_anint,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("dnint", 1, 1, BT_REAL, dd,
@@ -642,7 +642,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("btest");
 
   add_sym("ceiling", 1, 1, BT_INTEGER, di,
-	  g95_check_a_kind, g95_simplify_ceiling, g95_resolve_ceiling,
+	  g95_check_a_ikind, g95_simplify_ceiling, g95_resolve_ceiling,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   make_generic("ceiling");
@@ -802,7 +802,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("exponent");
 
   add_sym("floor", 1, 1, BT_INTEGER, di,
-	  g95_check_a_kind, g95_simplify_floor, g95_resolve_floor,
+	  g95_check_a_ikind, g95_simplify_floor, g95_resolve_floor,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   make_generic("floor");
@@ -1135,7 +1135,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("nearest");
 
   add_sym("nint", 1, 1, BT_INTEGER, di,
-	  g95_check_a_kind, g95_simplify_nint, g95_resolve_nint,
+	  g95_check_a_ikind, g95_simplify_nint, g95_resolve_nint,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("idnint", 1, 1, BT_INTEGER, di,

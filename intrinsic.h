@@ -26,7 +26,8 @@ extern g95_expr g95_bad_expr;
 
 /* Check functions for intrinsic functions */
 
-try g95_check_a_kind(g95_expr *, g95_expr *);
+try g95_check_a_ikind(g95_expr *, g95_expr *);
+try g95_check_a_xkind(g95_expr *, g95_expr *);
 try g95_check_a_p(g95_expr *, g95_expr *);
 
 try g95_check_abs(g95_expr *);

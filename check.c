@@ -297,17 +297,32 @@ int rank;
 
 /***** Check functions *****/
 
-/* g95_check_a_kind()-- Check subroutine suitable for aint, anint,
- * ceiling, floor and nint. */
+/* check_a_kind()-- Check subroutine suitable for intrinsics 
+ * taking a real argument and a kind argument for the result. */
 
-try g95_check_a_kind(g95_expr *a, g95_expr *kind) {
+static try check_a_kind(g95_expr *a, g95_expr *kind, bt type) {
 
   if (type_check(a, 0, BT_REAL) == FAILURE) return FAILURE;
-  if (kind_check(kind, 1, BT_REAL) == FAILURE) return FAILURE;
+  if (kind_check(kind, 1, type) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
 
+/* g95_check_a_ikind()-- Check subroutine suitable for ceiling,
+ * floor and nint. */
+
+try g95_check_a_ikind(g95_expr *a, g95_expr *kind) {
+
+  return check_a_kind(a, kind, BT_INTEGER);
+}
+
+/* g95_check_a_xkind()-- Check subroutine suitable for aint,
+ * anint. */
+
+try g95_check_a_xkind(g95_expr *a, g95_expr *kind) {
+
+  return check_a_kind(a, kind, BT_REAL);
+}
 
 try g95_check_abs(g95_expr *a) {
 
@@ -342,7 +357,7 @@ try g95_check_allocated(g95_expr *array) {
 }
 
 
-/* Common check function where the first arugment must be real or
+/* Common check function where the first argument must be real or
  * integer and the second argument must be the same as the first. */
 
 try g95_check_a_p(g95_expr *a, g95_expr *p) {
