@@ -1146,6 +1146,7 @@ match m;
   }
 
   sym = primary->symbol;
+  primary->ts = sym->ts;
 
   if (sym->ts.type != BT_DERIVED ||
       g95_match(" %%") != MATCH_YES) goto check_substring;
@@ -1187,7 +1188,7 @@ match m;
   }
 
 check_substring:
-  if (sym->ts.type == BT_CHARACTER) {
+  if (primary->ts.type == BT_CHARACTER) {
     switch(g95_match_substring(&substring)) {
     case MATCH_YES:
       if (tail == NULL) 
