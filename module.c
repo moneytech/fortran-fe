@@ -793,6 +793,31 @@ static mstring bt_types[] = {
 };
 
 
+static void mio_charlen(g95_charlen **clp) {
+g95_charlen *cl;
+
+  mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    cl = *clp;
+    if (cl != NULL) mio_expr(&cl->length);
+  } else {
+
+    if (peek_atom() != ATOM_RPAREN) {
+      cl = g95_get_charlen();
+      mio_expr(&cl->length);
+
+      *clp = cl;
+
+      cl->next = g95_current_ns->cl_list;
+      g95_current_ns->cl_list = cl;
+    }
+  }
+
+  mio_rparen();
+}
+
+
 static void mio_typespec(g95_typespec *ts) {
 
   mio_lparen();
@@ -804,13 +829,10 @@ static void mio_typespec(g95_typespec *ts) {
   else
     mio_integer(&ts->kind);
 
-  /* Store symbol pointers */
-
-  /* mio_expr(&ts->charlen); */
+  mio_charlen(&ts->cl);
 
   mio_rparen();
 }
-
 
 
 static mstring array_spec_types[] = {

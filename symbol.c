@@ -1104,12 +1104,14 @@ void g95_show_components(g95_symbol *sym) {
 g95_component *c;
 
   for(c=sym->components; c; c=c->next) {
-    g95_status("(%s", c->name);
+    g95_status("(%s ", c->name);
     g95_show_typespec(&c->ts);
     if (c->pointer) g95_status(" POINTER");
     if (c->dimension) g95_status(" DIMENSION");
+    g95_status_char(' ');
     g95_show_array_spec(c->as);
     g95_status(")");
+    if (c->next != NULL) g95_status_char(' ');
   }
 }
 

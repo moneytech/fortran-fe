@@ -277,7 +277,7 @@ typedef struct {
  *
  * These structures form a singly linked list within the current
  * namespace and are deallocated with the namespace.  It is possible to
- * end up with g95_charlen structure that have nothing pointing to them. */
+ * end up with g95_charlen structures that have nothing pointing to them. */
 
 typedef struct g95_charlen {
   struct g95_expr *length;
