@@ -1607,7 +1607,7 @@ done:
 
 /* g95_get_namespace()-- Allocate a new namespace structure.  */
 
-g95_namespace *g95_get_namespace(void) {
+g95_namespace *g95_get_namespace(g95_namespace *parent) {
 g95_namespace *ns;
 g95_typespec *ts;
 int i;
@@ -1616,6 +1616,7 @@ int i;
   ns->sym_root = NULL;
   ns->uop_root = NULL;
   ns->default_access = ACCESS_UNKNOWN;
+  ns->parent = parent;
 
   for(i=0; i<G95_INTRINSIC_OPS; i++)
     ns->operator_access[i] = ACCESS_UNKNOWN;
@@ -2147,7 +2148,7 @@ int i;
 
 void g95_symbol_init_2(void) {
 
-  g95_current_ns = g95_get_namespace();
+  g95_current_ns = g95_get_namespace(NULL);
 }
 
 

@@ -1018,8 +1018,7 @@ int seen_body;
   current_state = COMP_NONE;
 
 loop:
-  g95_current_ns = g95_get_namespace();
-  g95_current_ns->parent = current_interface.ns;
+  g95_current_ns = g95_get_namespace(current_interface.ns);
 
   st = next_statement();
   switch(st) {
@@ -1634,9 +1633,8 @@ g95_symbol *sym;
   parent_ns = g95_current_ns;
 
   do {
-    g95_current_ns = g95_get_namespace();
+    g95_current_ns = g95_get_namespace(parent_ns);
 
-    g95_current_ns->parent = parent_ns;
     g95_current_ns->sibling = parent_ns->contained;
     parent_ns->contained = g95_current_ns;
 

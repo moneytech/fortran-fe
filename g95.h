@@ -1222,7 +1222,7 @@ g95_st_label *g95_new_internal_label(void);
 void g95_define_st_label(g95_st_label *, g95_sl_type, locus *);
 try g95_reference_st_label(g95_st_label *, g95_sl_type);
 
-g95_namespace *g95_get_namespace(void);
+g95_namespace *g95_get_namespace(g95_namespace *);
 int g95_compare_symtree(g95_symtree *, g95_symtree *);
 g95_symtree *g95_new_symtree(g95_symtree **, char *);
 g95_symtree *g95_find_symtree(g95_symtree *, char *);

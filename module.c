@@ -2065,7 +2065,7 @@ pointer_info *p;
   if (p->type == P_UNKNOWN) p->type = P_NAMESPACE;
 
   if (iomode == IO_INPUT && p->integer != 0 && p->u.pointer == NULL) {
-    ns = g95_get_namespace();
+    ns = g95_get_namespace(NULL);
     associate_integer_pointer(p, ns);
   }
 }
@@ -2240,7 +2240,7 @@ g95_symbol *sym;
       /* Create an interface namespace if necessary.  These are the
        * namespaces that hold the formal parameters of module procedures. */
 
-      ns = g95_get_namespace();
+      ns = g95_get_namespace(NULL);
       associate_integer_pointer(q, ns);
 
       ns->sibling = g95_current_ns->contained;
