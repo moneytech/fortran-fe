@@ -48,17 +48,17 @@ g95_symbol *sym;
 }
 
 
-/* g95_resolve_formal_arglist()-- Resolve types of formal argument
- * lists.  These have to be done early so that the formal argument
- * lists of module procedures can be copied to the containing module
- * before the individual procedures are resolved individually.  We
- * also resolve argument lists of procedures in interface blocks
- * because they are self-contained scoping units.
+/* resolve_formal_arglist()-- Resolve types of formal argument lists.
+ * These have to be done early so that the formal argument lists of
+ * module procedures can be copied to the containing module before the
+ * individual procedures are resolved individually.  We also resolve
+ * argument lists of procedures in interface blocks because they are
+ * self-contained scoping units.
  *
  * Since a dummy argument cannot be a non-dummy procedure, the only
  * resort left for untyped names are the IMPLICIT types. */
 
-void g95_resolve_formal_arglist(g95_formal_arglist *f) {
+static void resolve_formal_arglist(g95_formal_arglist *f) {
 g95_symbol *sym;
 
   for(; f; f=f->next) {
@@ -82,43 +82,37 @@ g95_symbol *sym;
       }
     }
 
+    g95_resolve_array_spec(sym->as);
+
     /* If the flavor is unknown at this point, it has to be a variable.
      * A procedure specification would have already set the type */
 
     if (sym->attr.flavor == FL_UNKNOWN)
       g95_add_flavor(&sym->attr, FL_VARIABLE, &sym->declared_at);
 
-    if (sym->formal != NULL) g95_resolve_formal_arglist(sym->formal);
+    if (sym->formal != NULL) resolve_formal_arglist(sym->formal);
   }
 }
 
 
-/* resolve_entry_arglists()-- Recursive function to seek out ENTRY
- * symbols and resolve their formal argument lists. */
+/* find_arglists()-- Work function called when searching for symbols
+ * that have argument lists associated with them. */
 
-static void resolve_entry_arglists(g95_symbol *sym) {
+static void find_arglists(g95_symbol *sym) {
 
-  if (sym->attr.entry) g95_resolve_formal_arglist(sym->formal);
+  if (sym->formal == NULL) return;
+  resolve_formal_arglist(sym->formal);
 }
 
 
 /* resolve_formal_arglists()-- Given a namespace, resolve all formal
- * argument lists within the namespace.  The most obvious is the name
- * of the procedure.  The argument lists of all the ENTRY symbols must
- * also be processed. */
+ * argument lists within the namespace. */
 
 static void resolve_formal_arglists(g95_namespace *ns) {
 
   if (ns == NULL) return;
 
-  if (ns->proc_name != NULL) g95_resolve_formal_arglist(ns->proc_name->formal);
-
-  g95_traverse_ns(ns, resolve_entry_arglists);
-
-  /* Recursively resolve child namespaces */
-
-  for(ns=ns->contained; ns; ns=ns->sibling)
-    resolve_formal_arglists(ns);
+  g95_traverse_ns(ns, find_arglists);
 }
 
 

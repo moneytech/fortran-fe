@@ -1097,7 +1097,6 @@ loop:
 
   seen_body = 1;
 
-  g95_resolve_formal_arglist(proc->formal);
   g95_add_interface(prog_unit);
 
   pop_state();
