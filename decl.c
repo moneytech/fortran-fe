@@ -933,7 +933,7 @@ match m;
   m = g95_match_type_spec(&current_ts, 1, 1);
   if (m != MATCH_YES) return m;
 
-  if (current_ts.type == BT_DERIVED) {
+  if (current_ts.type == BT_DERIVED && g95_current_state() != COMP_DERIVED) {
     sym = g95_use_derived(current_ts.derived);
 
     if (sym == NULL) {
