@@ -1392,24 +1392,48 @@ g95_expr *g95_simplify_kind(g95_expr *e) {
 }
 
 
-g95_expr *g95_simplify_len_trim(g95_expr *e) {
-g95_expr *arg;
+g95_expr *g95_simplify_len(g95_expr *e) {
+g95_expr *result;
 
-  return NULL; 
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-/* Type checking */
-
-  arg = FIRST_ARG(e);
-
-  if (arg->ts.type != BT_CHARACTER ) {
-    g95_warning("Argument of LEN_TRIM at %L must be character",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (e->ts.type != BT_CHARACTER ) {
+    g95_error("Argument of LEN at %L must be character", &e->where);
+    return &g95_bad_expr;
   }
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+  mpz_set_si(result->value.integer,e->value.character.length);
+  return result;
+}
 
-  //  return SUCCESS;
+
+g95_expr *g95_simplify_len_trim(g95_expr *e) {
+g95_expr *result;
+int count=0, len, lentrim;
+int i;
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  if (e->ts.type != BT_CHARACTER ) {
+    g95_error("Argument of LEN_TRIM at %L must be character", &e->where);
+    return &g95_bad_expr;
+  }
+
+  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+
+  len = e->value.character.length;
+
+  for (i=1; i<=len; ++i) {
+    if (e->value.character.string[len-i] == ' ') ++count;
+    else break; 
+  }
+
+  lentrim = len-count;
+
+  mpz_set_si(result->value.integer,lentrim);
+  return result;
+
 }
 
 /* FIXME */

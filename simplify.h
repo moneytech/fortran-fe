@@ -63,6 +63,7 @@ g95_expr *g95_simplify_ior(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_ishft(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_ishftc(g95_expr *, g95_expr *, g95_expr *);
 g95_expr *g95_simplify_kind(g95_expr *);
+g95_expr *g95_simplify_len(g95_expr *);
 g95_expr *g95_simplify_len_trim(g95_expr *);
 g95_expr *g95_simplify_lge(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_lgt(g95_expr *, g95_expr *);

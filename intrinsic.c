@@ -761,7 +761,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("lbound", 1, BT_INTEGER, di, NULL, not_ready,
 	  ar, BT_REAL, dr, 0, dm, BT_INTEGER, di, 1, NULL);
 
-  add_sym("len", 1, BT_INTEGER, di, NULL, NULL,
+  add_sym("len", 1, BT_INTEGER, di, g95_simplify_len, NULL,
 	  stg, BT_CHARACTER, dc, 0, NULL);
 
   add_sym("len_trim", 0, BT_INTEGER, di, g95_simplify_len_trim, NULL,
