@@ -1141,6 +1141,7 @@ void g95_intrinsic_init_1(void);
 void g95_intrinsic_done_1(void);
 
 try g95_convert_type(g95_expr *, g95_typespec *, int);
+int g95_generic_intrinsic(char *);
 extern g95_namespace *g95_instrinics;
 
 /* simplify.c */
