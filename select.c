@@ -234,8 +234,8 @@ overlap:
   return FAILURE;  
 }
 
-
-/* traverse_tree -- visits root, then left, then right (RLN).
+#if 0
+/* traverse_tree() -- visits root, then left, then right (RLN).
  * This is a first step towards generating code for CHARACTER cases. */
 
 static void traverse_tree(g95_case *tree, int depth) {
@@ -246,7 +246,7 @@ static void traverse_tree(g95_case *tree, int depth) {
   traverse_tree(tree->link[0], depth + 1);
   traverse_tree(tree->link[1], depth + 1);
 }
-
+#endif
 
 /* free_case()-- Free a single case structure */
 
