@@ -120,7 +120,7 @@ void g95_resolve_abs(g95_expr *f, g95_expr *a) {
   if (f->ts.type == BT_COMPLEX) f->ts.type = BT_REAL;
 
   f->value.function.name =
-    g95_get_string("__abs_%c%d", g95_type_letter(a->ts.type), a->ts.kind);
+    g95_get_string(PREFIX "abs_%c%d", g95_type_letter(a->ts.type), a->ts.kind);
 }
 
 
@@ -128,7 +128,8 @@ void g95_resolve_acos(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__acos_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "acos_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
@@ -137,7 +138,8 @@ void g95_resolve_aimag(g95_expr *f, g95_expr *x) {
   f->ts.type = BT_REAL;
   f->ts.kind = x->ts.kind;
   f->value.function.name =
-    g95_get_string("__aimag_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "aimag_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
@@ -148,8 +150,8 @@ void g95_resolve_aint(g95_expr *f, g95_expr *a, g95_expr *kind) {
     : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
-    g95_get_string("__aint_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
-		   a->ts.kind);
+    g95_get_string(PREFIX "aint_%d_%c%d", f->ts.kind,
+		   g95_type_letter(a->ts.type), a->ts.kind);
 }
 
 
@@ -160,7 +162,7 @@ void g95_resolve_all(g95_expr *f, g95_expr *mask, g95_expr *dim) {
   if (dim != NULL && mask->rank != 1) f->rank = mask->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__all_%c%d", g95_type_letter(mask->ts.type),
+    g95_get_string(PREFIX "all_%c%d", g95_type_letter(mask->ts.type),
                    mask->ts.kind);
 }
 
@@ -172,8 +174,8 @@ void g95_resolve_anint(g95_expr *f, g95_expr *a, g95_expr *kind) {
     : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
-    g95_get_string("__anint_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
-		   a->ts.kind);
+    g95_get_string(PREFIX "anint_%d_%c%d", f->ts.kind,
+		   g95_type_letter(a->ts.type), a->ts.kind);
 }
 
 
@@ -184,7 +186,7 @@ void g95_resolve_any(g95_expr *f, g95_expr *mask, g95_expr *dim) {
   if (dim != NULL && mask->rank != 1) f->rank = mask->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__any_%c%d", g95_type_letter(mask->ts.type),
+    g95_get_string(PREFIX "any_%c%d", g95_type_letter(mask->ts.type),
                    mask->ts.kind);
 }
 
@@ -193,7 +195,8 @@ void g95_resolve_asin(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__asin_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "asin_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
@@ -201,7 +204,8 @@ void g95_resolve_atan(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__atan_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "atan_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
@@ -209,7 +213,8 @@ void g95_resolve_atan2(g95_expr *f, g95_expr *x, g95_expr *y) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__atan2_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "atan2_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
@@ -218,7 +223,7 @@ void g95_resolve_btest(g95_expr *f, g95_expr *i, g95_expr *pos) {
   f->ts.type = BT_LOGICAL;
   f->ts.kind = g95_default_logical_kind();
 
-  f->value.function.name = g95_get_string("__btest_%d_%d", i->ts.kind,
+  f->value.function.name = g95_get_string(PREFIX "btest_%d_%d", i->ts.kind,
 					  pos->ts.kind);
 }
 
@@ -230,7 +235,7 @@ void g95_resolve_ceiling(g95_expr *f, g95_expr *a, g95_expr *kind) {
     : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
-    g95_get_string("__ceiling_%d_%c%d", f->ts.kind,
+    g95_get_string(PREFIX "ceiling_%d_%c%d", f->ts.kind,
 		   g95_type_letter(a->ts.type), a->ts.kind);
 }
 
@@ -242,8 +247,8 @@ void g95_resolve_char(g95_expr *f, g95_expr *a, g95_expr *kind) {
     : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
-    g95_get_string("__char_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
-		   a->ts.kind);
+    g95_get_string(PREFIX "char_%d_%c%d", f->ts.kind,
+		   g95_type_letter(a->ts.type), a->ts.kind);
 }
 
 
@@ -255,11 +260,11 @@ void g95_resolve_cmplx(g95_expr *f, g95_expr *x, g95_expr *y, g95_expr *kind) {
 
   if (y == NULL)
     f->value.function.name =
-      g95_get_string("__cmplx0_%d_%c%d", f->ts.kind,
+      g95_get_string(PREFIX "cmplx0_%d_%c%d", f->ts.kind,
 		     g95_type_letter(x->ts.type), x->ts.kind);
   else
     f->value.function.name =
-      g95_get_string("__cmplx1_%d_%c%d_%c%d", f->ts.kind,
+      g95_get_string(PREFIX "cmplx1_%d_%c%d_%c%d", f->ts.kind,
 		     g95_type_letter(x->ts.type), x->ts.kind,
 		     g95_type_letter(y->ts.type), y->ts.kind);
 }
@@ -268,7 +273,7 @@ void g95_resolve_cmplx(g95_expr *f, g95_expr *x, g95_expr *y, g95_expr *kind) {
 void g95_resolve_conjg(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
-  f->value.function.name = g95_get_string("__conjg_%d", x->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "conjg_%d", x->ts.kind);
 }
 
 
@@ -276,7 +281,7 @@ void g95_resolve_cos(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__cos_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "cos_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -284,7 +289,8 @@ void g95_resolve_cosh(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__cosh_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "cosh_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
@@ -296,14 +302,14 @@ void g95_resolve_count(g95_expr *f, g95_expr *mask, g95_expr *dim) {
   if (dim != NULL) f->rank = mask->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__count_%d_%c%d", f->ts.kind,
+    g95_get_string(PREFIX "count_%d_%c%d", f->ts.kind,
                    g95_type_letter(mask->ts.type), mask->ts.kind);
 }
 
 
 void g95_resolve_cshift(g95_expr *f, g95_expr *array, g95_expr *shift,
 			g95_expr *dim) {
-static char cshift0[] = "__cshift0", cshift1[] = "__cshift1";
+static char cshift0[] = PREFIX "cshift0", cshift1[] = PREFIX "cshift1";
 
   f->ts = array->ts;
   f->rank = array->rank;
@@ -321,7 +327,8 @@ void g95_resolve_dble(g95_expr *f, g95_expr *a) {
   f->ts.type = BT_REAL;
   f->ts.kind = g95_default_double_kind();
   f->value.function.name =
-    g95_get_string("__dble_%c%d", g95_type_letter(a->ts.type), a->ts.kind);
+    g95_get_string(PREFIX "dble_%c%d", g95_type_letter(a->ts.type),
+		   a->ts.kind);
 }
 
 
@@ -329,7 +336,7 @@ void g95_resolve_dim(g95_expr *f, g95_expr *x, g95_expr *y) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__dim_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "dim_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -350,7 +357,7 @@ g95_expr temp;
   }
 
   f->value.function.name =
-    g95_get_string("__dot_product_%c%d", g95_type_letter(f->ts.type),
+    g95_get_string(PREFIX "dot_product_%c%d", g95_type_letter(f->ts.type),
 		   f->ts.kind);
 }
 
@@ -362,7 +369,7 @@ void g95_resolve_eoshift(g95_expr *f, g95_expr *array, g95_expr *shift,
   f->rank = array->rank;
 
   f->value.function.name =
-    g95_get_string("__eoshift_%c%d", g95_type_letter(array->ts.type),
+    g95_get_string(PREFIX "eoshift_%c%d", g95_type_letter(array->ts.type),
 		   array->ts.kind);
 }
 
@@ -371,7 +378,7 @@ void g95_resolve_exp(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__exp_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "exp_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -380,7 +387,7 @@ void g95_resolve_exponent(g95_expr *f, g95_expr *x) {
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
 
-  f->value.function.name = g95_get_string("__exponent_%d", x->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "exponent_%d", x->ts.kind);
 }
 
 
@@ -391,29 +398,29 @@ void g95_resolve_floor(g95_expr *f, g95_expr *a, g95_expr *kind) {
     : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
-    g95_get_string("__floor%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
-		   a->ts.kind);
+    g95_get_string(PREFIX "floor%d_%c%d", f->ts.kind,
+		   g95_type_letter(a->ts.type), a->ts.kind);
 }
 
 
 void g95_resolve_fraction(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
-  f->value.function.name = g95_get_string("__fraction_%d", x->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "fraction_%d", x->ts.kind);
 }
 
 
 void g95_resolve_iand(g95_expr *f, g95_expr *i, g95_expr *j) {
 
   f->ts = i->ts;
-  f->value.function.name = g95_get_string("__iand_%d", i->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "iand_%d", i->ts.kind);
 }
 
 
 void g95_resolve_ibclr(g95_expr *f, g95_expr *i, g95_expr *pos) {
 
   f->ts = i->ts;
-  f->value.function.name = g95_get_string("__ibclr_%d", i->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "ibclr_%d", i->ts.kind);
 }
 
 
@@ -421,14 +428,14 @@ void g95_resolve_ibits(g95_expr *f, g95_expr *i, g95_expr *pos,
 		       g95_expr *len) {
 
   f->ts = i->ts;
-  f->value.function.name = g95_get_string("__ibits_%d", i->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "ibits_%d", i->ts.kind);
 }
 
 
 void g95_resolve_ibset(g95_expr *f, g95_expr *i, g95_expr *pos) {
 
   f->ts = i->ts;
-  f->value.function.name = g95_get_string("__ibset_%d", i->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "ibset_%d", i->ts.kind);
 }
 
 
@@ -437,7 +444,7 @@ void g95_resolve_ichar(g95_expr *f, g95_expr *c) {
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
 
-  f->value.function.name = g95_get_string("__ichar_%d", c->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "ichar_%d", c->ts.kind);
 }
 
 
@@ -449,14 +456,14 @@ void g95_resolve_idnint(g95_expr *f, g95_expr *a) {
 void g95_resolve_ieor(g95_expr *f, g95_expr *i, g95_expr *j) {
 
   f->ts = i->ts;
-  f->value.function.name = g95_get_string("__ieor_%d", i->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "ieor_%d", i->ts.kind);
 }
 
 
 void g95_resolve_ior(g95_expr *f, g95_expr *i, g95_expr *j) {
 
   f->ts = i->ts;
-  f->value.function.name = g95_get_string("__ior_%d", i->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "ior_%d", i->ts.kind);
 }
 
 
@@ -467,8 +474,8 @@ void g95_resolve_int(g95_expr *f, g95_expr *a, g95_expr *kind) {
     : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
-    g95_get_string("__int_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
-		   a->ts.kind);
+    g95_get_string(PREFIX "int_%d_%c%d", f->ts.kind,
+		   g95_type_letter(a->ts.type), a->ts.kind);
 }
 
 
@@ -476,7 +483,7 @@ void g95_resolve_ishft(g95_expr *f, g95_expr *i, g95_expr *shift) {
 
   f->ts = i->ts;
   f->value.function.name =
-    g95_get_string("__ishft_%d_%d", i->ts.kind, shift->ts.kind);
+    g95_get_string(PREFIX "ishft_%d_%d", i->ts.kind, shift->ts.kind);
 }
 
 
@@ -488,12 +495,13 @@ int s_kind;
 
   f->ts = i->ts;
   f->value.function.name =
-    g95_get_string("__ishftc_%d_%d_%d", i->ts.kind, shift->ts.kind, s_kind);
+    g95_get_string(PREFIX "ishftc_%d_%d_%d", i->ts.kind, shift->ts.kind,
+		   s_kind);
 }
 
 
 void g95_resolve_lbound(g95_expr *f, g95_expr *array, g95_expr *dim) {
-static char lbound0[] = "__lbound0", lbound1[] = "__lbound1";
+static char lbound0[] = PREFIX "lbound0", lbound1[] = PREFIX "lbound1";
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
@@ -511,7 +519,7 @@ void g95_resolve_len(g95_expr *f, g95_expr *string) {
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = g95_get_string("__len_%d", string->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "len_%d", string->ts.kind);
 }
 
 
@@ -519,7 +527,8 @@ void g95_resolve_len_trim(g95_expr *f, g95_expr *string) {
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = g95_get_string("__len_trim%d", string->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "len_trim%d",
+					  string->ts.kind);
 }
 
 
@@ -527,7 +536,7 @@ void g95_resolve_log(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__log_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "log_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -535,7 +544,8 @@ void g95_resolve_log10(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__log10_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "log10_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
@@ -547,7 +557,7 @@ void g95_resolve_logical(g95_expr *f, g95_expr *a, g95_expr *kind) {
   f->rank = a->rank;
 
   f->value.function.name =
-    g95_get_string("__logical_%d_%c%d", f->ts.kind,
+    g95_get_string(PREFIX "logical_%d_%c%d", f->ts.kind,
 		   g95_type_letter(a->ts.type), a->ts.kind);
 }
 
@@ -571,7 +581,8 @@ g95_expr temp;
   f->rank = (a->rank == 2 && b->rank == 2) ? 2 : 1;
 
   f->value.function.name =
-    g95_get_string("__matmul_%c%d", g95_type_letter(f->ts.type), f->ts.kind);
+    g95_get_string(PREFIX "matmul_%c%d", g95_type_letter(f->ts.type),
+		   f->ts.kind);
 }
 
 
@@ -579,7 +590,8 @@ void g95_resolve_max(g95_expr *f, g95_expr *a1) {
 
   f->ts = a1->ts;
   f->value.function.name =
-    g95_get_string("__max_%c%d", g95_type_letter(a1->ts.type), a1->ts.kind);
+    g95_get_string(PREFIX "max_%c%d", g95_type_letter(a1->ts.type),
+		   a1->ts.kind);
 }
 
 
@@ -596,7 +608,7 @@ char *name;
 
   name = mask ? "mmaxloc" : "maxloc";
   f->value.function.name =
-    g95_get_string("__%s%d_%d_%c%d", name, dim != NULL, f->ts.kind,
+    g95_get_string(PREFIX "%s%d_%d_%c%d", name, dim != NULL, f->ts.kind,
                    g95_type_letter(array->ts.type), array->ts.kind);
 }
 
@@ -610,7 +622,7 @@ void g95_resolve_maxval(g95_expr *f, g95_expr *array, g95_expr *dim,
     f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__%s_%c%d", mask ? "mmaxval" : "maxval",
+    g95_get_string(PREFIX "%s_%c%d", mask ? "mmaxval" : "maxval",
                    g95_type_letter(array->ts.type), array->ts.kind);
 }
 
@@ -620,7 +632,7 @@ void g95_resolve_merge(g95_expr *f, g95_expr *tsource, g95_expr *fsource,
 
   f->ts = tsource->ts;
   f->value.function.name =
-    g95_get_string("__merge_%c%d", g95_type_letter(tsource->ts.type),
+    g95_get_string(PREFIX "merge_%c%d", g95_type_letter(tsource->ts.type),
 		   tsource->ts.kind);
 }
 
@@ -629,7 +641,8 @@ void g95_resolve_min(g95_expr *f, g95_expr *a1) {
 
   f->ts = a1->ts;
   f->value.function.name =
-    g95_get_string("__min_%c%d", g95_type_letter(a1->ts.type), a1->ts.kind);
+    g95_get_string(PREFIX "min_%c%d", g95_type_letter(a1->ts.type),
+		   a1->ts.kind);
 }
 
 
@@ -646,7 +659,7 @@ char *name;
 
   name = mask ? "mminloc" : "minloc";
   f->value.function.name =
-    g95_get_string("__%s%d_%d_%c%d", name, dim != NULL, f->ts.kind,
+    g95_get_string(PREFIX "%s%d_%d_%c%d", name, dim != NULL, f->ts.kind,
                    g95_type_letter(array->ts.type), array->ts.kind);
 }
 
@@ -659,7 +672,7 @@ void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
     f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__%s_%c%d", mask ? "mminval" : "minval",
+    g95_get_string(PREFIX "%s_%c%d", mask ? "mminval" : "minval",
                    g95_type_letter(array->ts.type), array->ts.kind);
 }
 
@@ -668,7 +681,7 @@ void g95_resolve_mod(g95_expr *f, g95_expr *a, g95_expr *p) {
 
   f->ts = a->ts;
   f->value.function.name =
-    g95_get_string("__mod_%c%d", g95_type_letter(a->ts.type), a->ts.kind);
+    g95_get_string(PREFIX "mod_%c%d", g95_type_letter(a->ts.type), a->ts.kind);
 }
 
 
@@ -676,7 +689,8 @@ void g95_resolve_modulo(g95_expr *f, g95_expr *a, g95_expr *p) {
 
   f->ts = a->ts;
   f->value.function.name =
-    g95_get_string("__modulo_%c%d", g95_type_letter(a->ts.type), a->ts.kind);
+    g95_get_string(PREFIX "modulo_%c%d", g95_type_letter(a->ts.type),
+		   a->ts.kind);
 }
 
 
@@ -687,14 +701,14 @@ void g95_resolve_nint(g95_expr *f, g95_expr *a, g95_expr *kind) {
     : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
-    g95_get_string("__nint_%d_%d", f->ts.kind, a->ts.kind);
+    g95_get_string(PREFIX "nint_%d_%d", f->ts.kind, a->ts.kind);
 }
 
 
 void g95_resolve_not(g95_expr *f, g95_expr *i) {
 
   f->ts = i->ts;
-  f->value.function.name = g95_get_string("__not_%d", i->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "not_%d", i->ts.kind);
 }
 
 
@@ -705,7 +719,7 @@ void g95_resolve_pack(g95_expr *f, g95_expr *array, g95_expr *mask,
   f->rank = 1;
 
   f->value.function.name =
-    g95_get_string("__pack_%c%d", g95_type_letter(array->ts.type),
+    g95_get_string(PREFIX "pack_%c%d", g95_type_letter(array->ts.type),
 		   array->ts.kind);
 }
 
@@ -718,7 +732,7 @@ void g95_resolve_product(g95_expr *f, g95_expr *array, g95_expr *dim,
   if (dim != NULL && array->rank != 1) f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__%s_%c%d", mask ? "mproduct" : "product",
+    g95_get_string(PREFIX "%s_%c%d", mask ? "mproduct" : "product",
                    g95_type_letter(array->ts.type), array->ts.kind);
 }
 
@@ -734,8 +748,8 @@ void g95_resolve_real(g95_expr *f, g95_expr *a, g95_expr *kind) {
       a->ts.kind : g95_default_real_kind();
 
   f->value.function.name =
-    g95_get_string("__real_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
-		   a->ts.kind);
+    g95_get_string(PREFIX "real_%d_%c%d", f->ts.kind,
+		   g95_type_letter(a->ts.type), a->ts.kind);
 }
 
 
@@ -743,13 +757,13 @@ void g95_resolve_repeat(g95_expr *f, g95_expr *string, g95_expr *ncopies) {
 
   f->ts.type = BT_CHARACTER;
   f->ts.kind = string->ts.kind;
-  f->value.function.name = g95_get_string("__repeat_%d", string->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "repeat_%d", string->ts.kind);
 }
 
 
 void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
-static char reshape0[] = "__reshape";
+static char reshape0[] = PREFIX "reshape";
 mpz_t rank;
 int kind;
 
@@ -768,7 +782,7 @@ int kind;
   case 8:
     /* case 16: */
     f->value.function.name =
-      g95_get_string("__reshape_%d", source->ts.kind);
+      g95_get_string(PREFIX "reshape_%d", source->ts.kind);
     break;
       
   default:
@@ -782,14 +796,14 @@ int kind;
 void g95_resolve_rrspacing(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
-  f->value.function.name = g95_get_string("__rrspacing_%d", x->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "rrspacing_%d", x->ts.kind);
 }
 
 
 void g95_resolve_scale(g95_expr *f, g95_expr *x, g95_expr *y) {
 
   f->ts = x->ts;
-  f->value.function.name = g95_get_string("__scale_%d_%d", x->ts.kind,
+  f->value.function.name = g95_get_string(PREFIX "scale_%d_%d", x->ts.kind,
 					  x->ts.kind);
 }
 
@@ -799,7 +813,7 @@ void g95_resolve_scan(g95_expr *f, g95_expr *string, g95_expr *set,
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = g95_get_string("__scan_%d", string->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "scan_%d", string->ts.kind);
 }
 
 
@@ -807,16 +821,16 @@ void g95_resolve_set_exponent(g95_expr *f, g95_expr *x, g95_expr *i) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__set_exponent_%d_%d", x->ts.kind, i->ts.kind);
+    g95_get_string(PREFIX "set_exponent_%d_%d", x->ts.kind, i->ts.kind);
 }
 
 
 void g95_resolve_shape(g95_expr *f, g95_expr * array) {
 
-    f->ts.type = BT_INTEGER;
-    f->ts.kind = g95_default_integer_kind();
-    f->rank = 1;
-    f->value.function.name = g95_get_string("__shape_%d", f->ts.kind);
+  f->ts.type = BT_INTEGER;
+  f->ts.kind = g95_default_integer_kind();
+  f->rank = 1;
+  f->value.function.name = g95_get_string(PREFIX "shape_%d", f->ts.kind);
 }
 
 
@@ -824,7 +838,8 @@ void g95_resolve_sign(g95_expr *f, g95_expr *a, g95_expr *b) {
 
   f->ts = a->ts;
   f->value.function.name =
-    g95_get_string("__sign_%c%d", g95_type_letter(a->ts.type), a->ts.kind);
+    g95_get_string(PREFIX "sign_%c%d", g95_type_letter(a->ts.type),
+		   a->ts.kind);
 }
 
 
@@ -832,7 +847,7 @@ void g95_resolve_sin(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__sin_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "sin_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -840,25 +855,26 @@ void g95_resolve_sinh(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__sinh_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "sinh_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
 void g95_resolve_spacing(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
-  f->value.function.name = g95_get_string("__spacing_%d", x->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "spacing_%d", x->ts.kind);
 }
 
 
 void g95_resolve_spread(g95_expr *f, g95_expr *source, g95_expr *dim,
-			                            g95_expr *ncopies) {
+			g95_expr *ncopies) {
 
   f->ts.type = source->ts.type;
   f->ts.kind = source->ts.kind;
   f->rank = source->rank + 1;
   f->value.function.name =
-    g95_get_string("__spread_%c%d", g95_type_letter(source->ts.type),
+    g95_get_string(PREFIX "spread_%c%d", g95_type_letter(source->ts.type),
 		   source->ts.kind);
 }
 
@@ -867,7 +883,8 @@ void g95_resolve_sqrt(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__sqrt_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "sqrt_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
@@ -879,7 +896,7 @@ void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
   if (dim != NULL && array->rank != 1) f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__%s_%c%d", mask ? "msum" : "sum",
+    g95_get_string(PREFIX "%s_%c%d", mask ? "msum" : "sum",
                    g95_type_letter(array->ts.type), array->ts.kind);
 }
 
@@ -888,7 +905,7 @@ void g95_resolve_tan(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__tan_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "tan_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -896,13 +913,14 @@ void g95_resolve_tanh(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
-    g95_get_string("__tanh_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+    g95_get_string(PREFIX "tanh_%c%d", g95_type_letter(x->ts.type),
+		   x->ts.kind);
 }
 
 
 void g95_resolve_transfer(g95_expr *f, g95_expr *source, g95_expr *mold,
 			                                 g95_expr *size) {
-static char transfer0[] = "__transfer0", transfer1[] = "__transfer1";
+static char transfer0[] = PREFIX "transfer0", transfer1[] = PREFIX "transfer1";
 
   f->ts = mold->ts;
 
@@ -922,7 +940,7 @@ void g95_resolve_transpose(g95_expr *f, g95_expr *matrix) {
   f->rank = 2;
 
   f->value.function.name =
-    g95_get_string("__transpose_%c%d", g95_type_letter(matrix->ts.type),
+    g95_get_string(PREFIX "transpose_%c%d", g95_type_letter(matrix->ts.type),
 		   matrix->ts.kind);
 }
 
@@ -931,12 +949,12 @@ void g95_resolve_trim(g95_expr *f, g95_expr *string) {
 
   f->ts.type = BT_CHARACTER;
   f->ts.kind = string->ts.kind;
-  f->value.function.name = g95_get_string("__trim_%d", string->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "trim_%d", string->ts.kind);
 }
 
 
 void g95_resolve_ubound(g95_expr *f, g95_expr *array, g95_expr *dim) {
-static char ubound0[] = "__ubound0", ubound1[] = "__ubound1";
+static char ubound0[] = PREFIX "ubound0", ubound1[] = PREFIX "ubound1";
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
@@ -958,7 +976,7 @@ void g95_resolve_unpack(g95_expr *f, g95_expr *vector, g95_expr *mask,
   f->rank = mask->rank;
 
   f->value.function.name =
-    g95_get_string("__unpack_%c%d", g95_type_letter(vector->ts.type),
+    g95_get_string(PREFIX "unpack_%c%d", g95_type_letter(vector->ts.type),
 		   vector->ts.kind);
 }
 
@@ -968,7 +986,7 @@ void g95_resolve_verify(g95_expr *f, g95_expr *string, g95_expr *set,
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = g95_get_string("__verify_%d", string->ts.kind);
+  f->value.function.name = g95_get_string(PREFIX "verify_%d", string->ts.kind);
 }
 
 
@@ -976,7 +994,7 @@ void g95_resolve_verify(g95_expr *f, g95_expr *string, g95_expr *set,
 
 void g95_resolve_cpu_time(g95_code *c) {
 
-  c->sub_name = g95_get_string("_gfor_cpu_time_%d",
+  c->sub_name = g95_get_string(PREFIX "cpu_time_%d",
 			       c->ext.actual->expr->ts.kind);
 }
 
@@ -987,7 +1005,7 @@ int kind;
   kind = c->ext.actual->expr->ts.kind;
 
   c->sub_name = g95_get_string((c->ext.actual->expr->rank == 0) ?
-			       "_gfor_random_%d" : "_gfor_arandom_%d", kind);
+			       PREFIX "random_%d" : PREFIX "arandom_%d", kind);
 }
 
 
