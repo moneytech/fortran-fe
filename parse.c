@@ -172,7 +172,7 @@ int c;
       match("end file", g95_match_endfile, ST_END_FILE);
       match("exit", g95_match_exit, ST_EXIT);
       match("else", g95_match_else, ST_ELSE);
-      match("elsewhere", g95_match_elsewhere, ST_ELSEWHERE);
+      match("else where", g95_match_elsewhere, ST_ELSEWHERE);
       match("else if", g95_match_elseif, ST_ELSEIF);
 
       if (g95_match_end(&st) == MATCH_YES) return st;
