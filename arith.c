@@ -33,11 +33,12 @@ Boston, MA 02111-1307, USA.  */
  * the second entry of the real structure is the default double kind. */
 
 g95_integer_info g95_integer_kinds[] = {
-    { 4, "2147483647", 9 },   /* Default kind is first */
-    { 8, "9223372036854775807", 18 },
-    { 2, "32767", 4 }, 
-    { 1, "127", 2 },
-    { 0, NULL, 0 } };
+    { 4, "2147483647",          32, 9  },   /* Default kind is first */
+    { 8, "9223372036854775807", 64, 18 },
+    { 2, "32767",               16, 4  }, 
+    { 1, "127",                 8,  2  },
+    { 0, NULL, 0 }
+};
 
 g95_real_info g95_real_kinds[] = {
     /*   max = 2**(128) - 2**(104),  eps = 2**(-149)           */
@@ -79,6 +80,7 @@ int i;
 
     mpz_init(g95_integer_kinds[i].minval);
     mpz_neg(g95_integer_kinds[i].minval, g95_integer_kinds[i].maxval);
+    mpz_sub_ui(g95_integer_kinds[i].minval, g95_integer_kinds[i].minval, 1);
   }
 
   mpf_set_default_prec(G95_REAL_BITS);

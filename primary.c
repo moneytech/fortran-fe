@@ -613,7 +613,6 @@ int i, kind;
  * constant that is a symbolic constant. */
 
 static match match_sym_complex_part(g95_expr **result) {
-g95_typespec target;
 g95_symbol *sym;
 g95_expr *e;
 match m;
@@ -640,18 +639,17 @@ match m;
 
   switch(e->ts.type) {
   case BT_REAL:
+    e = g95_copy_expr(sym->value);
     break;
 
   case BT_COMPLEX:
-    target.type = BT_REAL;
-    target.kind = e->ts.kind;
-    g95_convert_type(e, &target, 2);
+    e = g95_complex2real(sym->value, sym->value->ts.kind);
+    if (e == NULL) goto error;
     break;
 
   case BT_INTEGER:
-    target.type = BT_REAL;
-    target.kind = g95_default_real_kind();
-    g95_convert_type(e, &target, 2);
+    e = g95_int2real(sym->value, g95_default_real_kind());
+    if (e == NULL) goto error;
     break;
 
   default:
@@ -659,8 +657,11 @@ match m;
   }
 
   *result = e;     /* e is a scalar, real, constant expression */
-
   return MATCH_YES;
+
+error:
+  g95_error("Error converting PARAMETER constant in complex constant at %C");
+  return MATCH_ERROR;
 }
 
 

@@ -34,6 +34,8 @@ Boston, MA 02111-1307, USA.  */
 
 static char *lib_name;                /* Override a library name */
 
+extern g95_integer_info g95_integer_kinds[];
+extern g95_real_info g95_real_kinds[];
 extern g95_expr g95_bad_expr;
 
 /* If a validation of an intrinsic symbol/interface fails for some
@@ -60,7 +62,7 @@ typedef struct intrinsic_sym {
   int elemental;
 
   g95_expr *(*simplify)();
-  try (*check_function)(g95_actual_arglist *);
+  try (*check_function)();
   struct intrinsic_sym *specific, *next;
 
 } intrinsic_sym;
@@ -71,13 +73,6 @@ static intrinsic_arg *next_arg;
 
 static int nfunc, nsub, nargs, nconv, sizing;
 
-#define FIRST_ARG(e) (e->value.function.actual->expr)
-#define SECOND_ARG(e) (e->value.function.actual->next->expr)
-#define THIRD_ARG(e) (e->value.function.actual->next->next->expr)
-
-#define FIRST_CHECK_ARG(e) (e->expr)
-#define SECOND_CHECK_ARG(e) (e->next->expr)
-#define THIRD_CHECK_ARG(e) (e->next->next->expr)
 
 /* intrinsic_error()-- write an error message into static memory in
  * case a caller is interested in why something failed. */
@@ -145,273 +140,187 @@ int i;
 }
 
 
-/* conv_null()-- Null conversion, does nothing */
+/* convert_constant()-- Master function to convert one constant to
+ * another.  While this is used as a simplification function, it
+ * requires the destination type and kind information with is supplied
+ * by a special case in do_simplify(). */
 
-static g95_expr *conv_null(g95_expr *e) { return g95_copy_expr(e); }
-
-static g95_expr *conv_r_i(g95_expr *e) {
+static g95_expr *convert_constant(g95_expr *e, bt type, int kind) {
 g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  result = g95_real2int(e, g95_default_integer_kind());
-  if (result == NULL) return &g95_bad_expr;
+  switch(e->ts.type) {
+  case BT_INTEGER:
+    switch(type) {
+    case BT_INTEGER:  result = g95_int2int(e, kind);          break;
+    case BT_REAL:     result = g95_int2real(e, kind);         break;
+    case BT_COMPLEX:  result = g95_int2complex(e, kind);      break;
+    default: goto oops;
+    }
+    break;
+
+  case BT_REAL:
+    switch(type) {
+    case BT_INTEGER:  result = g95_real2int(e, kind);         break;
+    case BT_REAL:     result = g95_real2real(e, kind);        break;
+    case BT_COMPLEX:  result = g95_real2complex(e, kind);     break;
+    default: goto oops;
+    }
+    break;
+
+  case BT_COMPLEX:
+    switch(type) {
+    case BT_INTEGER:  result = g95_complex2int(e, kind);      break;
+    case BT_REAL:     result = g95_complex2real(e, kind);     break;
+    case BT_COMPLEX:  result = g95_complex2complex(e, kind);  break;
+
+    default: goto oops;
+    }
+    break;
+
+  default: oops:
+    g95_internal_error("convert_constant(): Unexpected type");
+  }
+
+  if (result == NULL) result = &g95_bad_expr;
   return result;
 }
 
-
-static g95_expr *conv_z_i(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_complex2int(e, g95_default_integer_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_i_r(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_int2real(e, g95_default_real_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_z_r(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_complex2real(e, g95_default_real_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-
-static g95_expr *conv_d_r(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_real2real(e, g95_default_integer_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_i_d(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_int2real(e, g95_default_double_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_r_d(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_real2real(e, g95_default_double_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_z_d(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_complex2real(e, g95_default_double_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_i_z(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_int2complex(e, g95_default_complex_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_r_z(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-  result = g95_real2complex(e, g95_default_complex_kind());
-  if (result == NULL) return &g95_bad_expr;
-
-  return result;
-}
-
-
-static g95_expr *conv_dz_z(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_complex2complex(e, g95_default_complex_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_i_dz(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_int2complex(e, g95_default_double_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
-
-
-static g95_expr *conv_r_dz(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-  result = g95_real2complex(e, g95_default_double_kind());
-  if (result == NULL) return &g95_bad_expr;
-
-  return result;
-}
-
-
-static g95_expr *conv_z_dz(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_complex2complex(e, g95_default_double_kind());
-  if (result == NULL) return &g95_bad_expr;
-  return result;
-}
 
 
 /***** Check functions *****/
 
+static try check_bit_size(g95_expr *x) {
 
-/* check_real() */
-static try check_real(g95_actual_arglist *arg) {
-g95_expr *first, *second;
-intrinsic_sym *sym;
-g95_typespec ts;
-int kind;
+  if (x->ts.type != BT_INTEGER) return FAILURE;
 
-/* Check the arguments to a REAL subroutine call.  If
- * the argument list is correct, we resolve it to one of the conv_?_r
- * functions. */
+  return SUCCESS;
+}
 
-  first = FIRST_CHECK_ARG(arg);
-  second = SECOND_CHECK_ARG(arg);
 
-  if (second == NULL) {
-    if (first->ts.type == BT_COMPLEX)
-      kind = first->ts.kind;
-    else
-      kind = g95_default_real_kind();
+static try check_dim(g95_expr *x, g95_expr *y) {
 
-  } else {
-    if (g95_extract_int(second, &kind) != NULL ||
-	g95_validate_kind(BT_REAL, kind) == -1) {
-      intrinsic_error("KIND argument of REAL intrinsic at %L requires "
-		      "a constant integer kind value");
-      return FAILURE;
+  if ((x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) ||
+      (y->ts.type != BT_INTEGER && y->ts.type != BT_REAL) ||
+      x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_epsilon(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_huge(g95_expr *x) {
+
+  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_kind(g95_expr *x) {
+
+  if (x->ts.type == BT_DERIVED) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_precision(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_radix(g95_expr *x) {
+
+  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_range(g95_expr *x) {
+
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_real(g95_expr *a, g95_expr *kind) {
+
+  if (!g95_numeric_ts(&a->ts)) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
+
+  if (p == NULL && r == NULL) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_tiny(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+
+/* do_check()-- Interface to the check functions.  We break apart an
+ * argument list and call the proper check function rather than
+ * forcing each function to manipulate the argument list */
+
+static try do_check(intrinsic_sym *specific, g95_actual_arglist *arg) {
+g95_expr *a1, *a2, *a3, *a4;
+try t;
+ 
+  a1 = arg->expr;
+  arg = arg->next;
+
+  if (arg == NULL)
+    t = (*specific->check_function)(a1);
+  else {
+    a2 = arg->expr;
+    arg = arg->next;
+
+    if (arg == NULL)
+      t = (*specific->check_function)(a1, a2);
+    else {
+      a3 = arg->expr;
+      arg = arg->next;
+      
+      if (arg == NULL)
+	t = (*specific->check_function)(a1, a2, a3);
+      else {
+	a4 = arg->expr;
+	arg = arg->next;
+
+	if (arg == NULL)
+	  t = (*specific->check_function)(a1, a2, a3, a4);
+	else {
+	  g95_internal_error("do_check(): Too many args");
+	}
+      }
     }
   }
 
-/* Now that we have the destination kind, figure out which function
- * this one resolves to. */
-
-  ts.type = BT_REAL;
-  ts.kind = kind;
-
-  sym = find_conv(&first->ts, &ts);
-  if (sym == NULL)
-    g95_internal_error("Can't find internal conversion for REAL(), "
-		       "%s(%d) to %s(%d)", 
-		       g95_typename(first->ts.type), first->ts.kind, 
-		       g95_typename(ts.type), ts.kind);
-
-  lib_name = sym->lib_name;
-
-  return SUCCESS;
-}
-
-
-static try check_kind_intrinsic(g95_actual_arglist *arg) {
-g95_expr *first; 
-
-  first = FIRST_CHECK_ARG(arg);
-  if (first == NULL)
-    return FAILURE;
-
-  if (first->ts.type == BT_DERIVED) {
-    intrinsic_error("X argument to KIND intrinsic must be of intrinsic type");
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-static try check_selected_int_kind(g95_actual_arglist *arg) {
-g95_expr *first; 
-
-  first = FIRST_CHECK_ARG(arg);
-  if (first == NULL) 
-    return FAILURE;
-
-  if (first->ts.type != BT_INTEGER) {
-    intrinsic_error("KIND argument of SELECTED_INT_KIND intrinsic at %L "
-		    "requires an integer value");
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-static try check_selected_real_kind(g95_actual_arglist *arg) {
-g95_expr *first, *second;
-
-  first = FIRST_CHECK_ARG(arg);
-  second = SECOND_CHECK_ARG(arg);
-
-  if (first == NULL)
-    return FAILURE;
-
-  if (first->ts.type != BT_INTEGER) {
-    intrinsic_error("P argument of SELECTED_REAL_KIND intrinsic at %L "
-		    "requires an integer value");
-    return FAILURE;
-  }
-
-  if (second != NULL) {
-    if (second->ts.type != BT_INTEGER) {
-      intrinsic_error("R argument of SELECTED_REAL_KIND intrinsic at %L "
-		      "requires an integer value");
-      return FAILURE;
-    }
-  }
-
-  return SUCCESS;
+  return t;
 }
 
 
@@ -435,7 +344,7 @@ g95_expr *first, *second;
 
 static void add_sym(char *name, int elemental, bt type, int kind,
 		    g95_expr *(*simplify)(),
-		    try (*cfunction)(g95_actual_arglist *), ...) {
+		    try (*cfunction)(), ...) {
 int optional, first_flag;
 va_list argp;
 
@@ -670,7 +579,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("atan2");
 
 /* KAH Takes integer scalar or array */
-  add_sym("bit_size", 1, BT_INTEGER, di, g95_simplify_bit_size, not_ready,
+  add_sym("bit_size", 1, BT_INTEGER, di, g95_simplify_bit_size, check_bit_size,
 	  i, BT_INTEGER, di, 0, NULL);
 
   add_sym("btest", 0, BT_LOGICAL, dl, g95_simplify_btest, NULL,
@@ -715,7 +624,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("digits", 1, BT_INTEGER, di, NULL, not_ready,
 	  x, BT_REAL, dr, 0, NULL);
 
-  add_sym("dim",  0, BT_REAL,    dr, g95_simplify_dim, NULL,
+  add_sym("dim",  0, BT_REAL,    dr, g95_simplify_dim, check_dim,
 	  x, BT_REAL,    dr, 0, y, BT_REAL,    dr, 0, NULL);
   add_sym("idim", 0, BT_INTEGER, di, g95_simplify_dim, NULL,
 	  x, BT_INTEGER, di, 0, y, BT_INTEGER, di, 0, NULL);
@@ -738,18 +647,16 @@ int di, dr, dd, dl, dc, dz;
 
 /* KAH Takes and returns real scalar or array */
 
-  add_sym("epsilon", 1, BT_REAL, dr, g95_simplify_epsilon, NULL,
+  add_sym("epsilon", 1, BT_REAL, dr, g95_simplify_epsilon, check_epsilon,
 	  x, BT_REAL, dr, 0, NULL);
-				     		             
-  add_sym("epsilon", 1, BT_REAL, dd, g95_simplify_epsilon, NULL,
-	  x, BT_REAL, dd, 0, NULL);
-
-  make_generic("epsilon");   /* Needs check function */
 
   add_sym("exp",  0, BT_REAL,    dr, g95_simplify_exp, NULL,
 	  x, BT_REAL, dr, 0, NULL);
+
   add_sym("dexp", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,    dd, 0, NULL);
+
   add_sym("cexp", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX, dz, 0, NULL);
+
   make_generic("exp");
 
   add_sym("exponent", 0, BT_INTEGER, di, g95_simplify_exponent, NULL,
@@ -761,19 +668,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym("fraction", 0, BT_REAL, dr, g95_simplify_fraction, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
-  /* the HUGE intrinsic really isn't generic, but we create versions
-   * for each type and kind that it can take. */
-
-  add_sym("huge", 1, BT_REAL, dr, g95_simplify_huge, NULL, x, BT_REAL, dr, 0,
-	  NULL);
-
-  add_sym("huge", 1, BT_REAL, dd, g95_simplify_huge, NULL, x, BT_REAL, dd, 0,
-	  NULL);
-
-  add_sym("huge", 1, BT_INTEGER, di, g95_simplify_huge, NULL,
-	  x, BT_INTEGER, di, 0,  NULL);
-
-  make_generic("huge");  /* Needs check function */
+  add_sym("huge", 1, BT_REAL, dr, g95_simplify_huge, check_huge,
+	  x, BT_REAL, dr, 0,  NULL);
 
   add_sym("iachar", 0, BT_INTEGER, di, g95_simplify_iachar, NULL,
 	  c, BT_CHARACTER, dc, 0, NULL);
@@ -821,8 +717,8 @@ int di, dr, dd, dl, dc, dz;
 
 /* KAH Input can be any type, or an array of any type */
 
-  add_sym("kind", 1, BT_INTEGER, di, g95_simplify_kind,
-	  check_kind_intrinsic, x, BT_REAL, dr, 0, NULL);
+  add_sym("kind", 1, BT_INTEGER, di, g95_simplify_kind, check_kind,
+	  x, BT_REAL, dr, 0, NULL);
 
 /* KAH Array input, output can be an array */
   add_sym("lbound", 1, BT_INTEGER, di, NULL, not_ready,
@@ -972,19 +868,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym("pack", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  msk, BT_LOGICAL, dl, 0, v, BT_REAL, dr, 1, NULL);
 
-  add_sym("precision",1, BT_INTEGER, di, g95_simplify_precision, NULL,
-	  x, BT_REAL, dr, 0, NULL);
-
-  add_sym("precision",1, BT_INTEGER, di, g95_simplify_precision, NULL,
-	  x, BT_REAL, dd, 0, NULL);
-
-  add_sym("precision",1, BT_INTEGER, di, g95_simplify_precision, NULL,
-	  x, BT_COMPLEX, dr, 0, NULL);
-
-  add_sym("precision",1, BT_INTEGER, di, g95_simplify_precision, NULL,
-	  x, BT_COMPLEX, dd, 0, NULL);
-
-  make_generic("precision");  /* Needs check function */
+  add_sym("precision",1, BT_INTEGER, di, g95_simplify_precision,
+	  check_precision,  x, BT_UNKNOWN, 0, 0, NULL);
 
 /* KAH Takes any type, including pointer */
   add_sym("present", 1, BT_LOGICAL, dl, NULL, not_ready,
@@ -997,44 +882,18 @@ int di, dr, dd, dl, dc, dz;
   add_sym("product", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("radix", 1, BT_INTEGER, di, g95_simplify_radix, NULL,
-	  x, BT_INTEGER, di, 0, NULL);
+  add_sym("radix", 1, BT_INTEGER, di, g95_simplify_radix, check_radix,
+	  x, BT_UNKNOWN, 0, 0, NULL);
 
-  add_sym("radix", 1, BT_INTEGER, di, g95_simplify_radix, NULL,
+  add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, check_range,
 	  x, BT_REAL, dr, 0, NULL);
-
-  add_sym("radix", 1, BT_INTEGER, di, g95_simplify_radix, NULL,
-	  x, BT_REAL, dd, 0, NULL);
-
-  make_generic("radix");   /* Needs check function */
-
-
-  add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, NULL,
-	  x, BT_REAL, dr, 0, NULL);
-
-  add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, NULL,
-	  x, BT_INTEGER, dr, 0, NULL);
-
-  add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, NULL,
-	  x, BT_REAL, dr, 0, NULL);
-
-  add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, NULL,
-	  x, BT_REAL, dd, 0, NULL);
-
-  add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, NULL,
-	  x, BT_COMPLEX, dr, 0, NULL);
-
-  add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, NULL,
-	  x, BT_COMPLEX, dd, 0, NULL);
-
-  make_generic("range");   /* Needs check function */
-
 
   add_sym("real",  0, BT_REAL, dr, g95_simplify_real, check_real,
 	  a, BT_INTEGER, di, 0, knd, BT_INTEGER, di, 1, NULL);
-  add_sym("float", 0, BT_REAL, dr, g95_simplify_real, NULL,
+  add_sym("float", 0, BT_REAL, dr, g95_simplify_real, check_real,
 	  a, BT_INTEGER, di, 0, NULL);
-  add_sym("sngl",  0, BT_REAL, dr, NULL, NULL, a, BT_REAL,    dd, 0, NULL);
+  add_sym("sngl",  0, BT_REAL, dr, g95_simplify_real, check_real,
+	  a, BT_REAL,    dd, 0, NULL);
   make_generic("real");
 
   add_sym("repeat", 1, BT_CHARACTER, dc, NULL, NULL,
@@ -1056,7 +915,7 @@ int di, dr, dd, dl, dc, dz;
 	  bck, BT_LOGICAL, dl, 1, NULL);
 
   add_sym("selected_int_kind", 1, BT_INTEGER, di,
-	  g95_simplify_selected_int_kind, check_selected_int_kind,
+	  g95_simplify_selected_int_kind, NULL,
 	  r, BT_INTEGER, di, 0, NULL);
 
   add_sym("selected_real_kind", 1, BT_INTEGER, di,
@@ -1124,7 +983,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("tanh");
 
 /* KAH Input may be scalar or array */
-  add_sym("tiny", 1, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);
+  add_sym("tiny", 1, BT_REAL, dr, NULL, check_tiny, x, BT_REAL, dr, 0, NULL);
 
 /* KAH Array function */
   add_sym("transfer", 1, BT_REAL, dr, NULL, not_ready, src, BT_REAL, dr, 0,
@@ -1209,9 +1068,11 @@ intrinsic_sym *sym;
     return;
   }
 
+  g95_clear_ts(&from);
   from.type = from_type;
   from.kind = from_kind;
 
+  g95_clear_ts(&to);
   to.type = to_type;
   to.kind = to_kind;
 
@@ -1220,51 +1081,64 @@ intrinsic_sym *sym;
   strcpy(sym->name, conv_name(&from, &to));
   strcpy(sym->lib_name, sym->name);
   sym->simplify = simplify;
+  sym->elemental = 1;
+  sym->ts = to;
 
   nconv++;
 }
 
 
 /* add_conversions()-- Create intrinsic_sym nodes for all intrinsic
- * conversion functions. */
+ * conversion functions by looping over the kind tables. */
 
 static void add_conversions(void) {
-int dr, di, dz, dd;
+int i, j;
 
-  di = g95_default_integer_kind();
-  dr = g95_default_real_kind(); 
-  dd = g95_default_double_kind();
-  dz = g95_default_complex_kind();
+  /* Integer-Integer conversions */
 
-  add_conv(BT_INTEGER, di,  BT_INTEGER, di,  conv_null);
-  add_conv(BT_REAL,    dr,  BT_INTEGER, di,  conv_r_i);
-  add_conv(BT_REAL,    dd,  BT_INTEGER, di,  conv_r_i);
-  add_conv(BT_COMPLEX, dz,  BT_INTEGER, di,  conv_z_i);
-  add_conv(BT_COMPLEX, dd,  BT_INTEGER, di,  conv_z_i);
+  for(i=0; g95_integer_kinds[i].kind != 0; i++)
+    for(j=0; g95_integer_kinds[j].kind != 0; j++) {
+      if (i == j) continue;
 
-  add_conv(BT_INTEGER, di,  BT_REAL,    dr,  conv_i_r);
-  add_conv(BT_REAL,    dr,  BT_REAL,    dr,  conv_null);
-  add_conv(BT_REAL,    dd,  BT_REAL,    dr,  conv_d_r);
-  add_conv(BT_COMPLEX, dz,  BT_REAL,    dr,  conv_z_r);
-  add_conv(BT_COMPLEX, dd,  BT_REAL,    dr,  conv_z_r);
+      add_conv(BT_INTEGER, g95_integer_kinds[i].kind,
+	       BT_INTEGER, g95_integer_kinds[j].kind, convert_constant);
+    }
 
-  add_conv(BT_INTEGER, di,  BT_REAL,    dd,  conv_i_d);
-  add_conv(BT_REAL,    dr,  BT_REAL,    dd,  conv_r_d);
-  add_conv(BT_REAL,    dd,  BT_REAL,    dd,  conv_null);
-  add_conv(BT_COMPLEX, dz,  BT_REAL,    dd,  conv_z_d);
-  add_conv(BT_COMPLEX, dd,  BT_REAL,    dd,  conv_z_d);
+  /* Integer-Real/Complex conversions */
 
-  add_conv(BT_INTEGER, di,  BT_COMPLEX, dz,  conv_i_z);
-  add_conv(BT_REAL,    dr,  BT_COMPLEX, dz,  conv_r_z);
-  add_conv(BT_REAL,    dd,  BT_COMPLEX, dz,  conv_r_z);
-  add_conv(BT_COMPLEX, dz,  BT_COMPLEX, dz,  conv_null);
-  add_conv(BT_COMPLEX, dz,  BT_COMPLEX, dz,  conv_dz_z);
+  for(i=0; g95_integer_kinds[i].kind != 0; i++)
+    for(j=0; g95_real_kinds[j].kind != 0; j++) {
+      add_conv(BT_INTEGER, g95_integer_kinds[i].kind,
+	       BT_REAL,    g95_real_kinds[j].kind, convert_constant);
 
-  add_conv(BT_INTEGER, di,  BT_COMPLEX, dd,  conv_i_dz);
-  add_conv(BT_REAL,    dr,  BT_COMPLEX, dd,  conv_r_dz);
-  add_conv(BT_REAL,    dd,  BT_COMPLEX, dd,  conv_r_dz);
-  add_conv(BT_COMPLEX, dz,  BT_COMPLEX, dd,  conv_z_dz);
-  add_conv(BT_COMPLEX, dz,  BT_COMPLEX, dd,  conv_null);
+      add_conv(BT_REAL,    g95_real_kinds[j].kind,
+	       BT_INTEGER, g95_integer_kinds[i].kind, convert_constant);
+
+      add_conv(BT_INTEGER, g95_integer_kinds[i].kind,
+	       BT_COMPLEX, g95_real_kinds[j].kind, convert_constant);
+
+      add_conv(BT_COMPLEX, g95_real_kinds[j].kind,
+	       BT_INTEGER, g95_integer_kinds[i].kind, convert_constant);
+    }
+
+  /* Real/Complex - Real/Complex conversions */
+
+  for(i=0; g95_real_kinds[i].kind != 0; i++)
+    for(j=0; g95_real_kinds[j].kind != 0; j++) {
+      if (i != j) {
+	add_conv(BT_REAL, g95_real_kinds[i].kind,
+		 BT_REAL, g95_real_kinds[j].kind, convert_constant);
+
+	add_conv(BT_COMPLEX, g95_real_kinds[i].kind,
+		 BT_COMPLEX, g95_real_kinds[j].kind, convert_constant);
+      }
+
+      add_conv(BT_REAL,    g95_real_kinds[i].kind,
+	       BT_COMPLEX, g95_real_kinds[j].kind, convert_constant);
+
+      add_conv(BT_COMPLEX, g95_real_kinds[i].kind,
+	       BT_REAL,    g95_real_kinds[j].kind, convert_constant);
+    }
 }
 
 
@@ -1485,6 +1359,11 @@ g95_actual_arglist *arg;
   a1 = arg->expr;
   arg = arg->next;
 
+  if (specific->simplify == convert_constant) {
+    result = convert_constant(a1, specific->ts.type, specific->ts.kind);
+    goto finish;
+  }
+
   /* TODO: Warn if -pedantic and initialization expression and arg
    * types not integer or character */
 
@@ -1550,7 +1429,7 @@ try t;
     t = check_arglist(ap, specific);
     if (t == SUCCESS) expr->ts = specific->ts;
   } else
-    t = (specific->check_function)(*ap);
+    t = do_check(specific, *ap);
 
   return t;
 }
@@ -1611,7 +1490,7 @@ char *name;
     return FAILURE;
   }
 
-  if (isym->check_function != NULL) return isym->check_function(*argp);
+  if (isym->check_function != NULL) return do_check(isym, *argp);
 
   return check_arglist(argp, isym);
 }
@@ -1642,7 +1521,6 @@ intrinsic_sym *sym;
 /* g95_convert_type()-- Tries to convert an expression (in place) from
  * one type to another.  The eflag control the behavior on error.
  * The possible values are:
- *   0    Don't generate any errors
  *   1    Generate a g95_error()
  *   2    Generate a g95_internal_error() 
  */
@@ -1670,31 +1548,28 @@ g95_expr *new;
   g95_free(new);
   expr->ts = *ts;
 
-  if (FIRST_ARG(expr)->expr_type == EXPR_CONSTANT) { /* Simplify constant */
-    if (do_simplify(sym, expr) == FAILURE) goto bad;
-    return SUCCESS;
+  if (expr->value.function.actual->expr->expr_type == EXPR_CONSTANT &&
+      do_simplify(sym, expr) == FAILURE) {
+
+    if (eflag == 2) goto bad;
+    return FAILURE;   /* Error already generated in do_simplify() */
   }
 
   return SUCCESS;  
 
 bad:
-  switch(eflag) {
-  case 0:
-    break;
-
-  case 1:
+  if (eflag == 1) {
     g95_error("Can't convert %s(%d) to %s(%d) at %L",
 	      g95_typename(expr->ts.type), expr->ts.kind,
 	      g95_typename(ts->type), ts->kind,
 	      &expr->where);
-    break;
-
-  default:
-    g95_internal_error("Can't convert %s(%d) to %s(%d) at %L",
-		       g95_typename(expr->ts.type), expr->ts.kind,
-		       g95_typename(ts->type), ts->kind,
-		       &expr->where);
+    return FAILURE;
   }
+
+  g95_internal_error("Can't convert %s(%d) to %s(%d) at %L",
+		     g95_typename(expr->ts.type), expr->ts.kind,
+		     g95_typename(ts->type), ts->kind,
+		     &expr->where);
 
   return FAILURE;
 }

@@ -621,7 +621,7 @@ typedef struct g95_expr {
 typedef struct {
   int kind;
   char *max;
-  int range;
+  int bit_size, range;
   mpz_t maxval, minval;
 } g95_integer_info;
 
