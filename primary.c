@@ -1277,6 +1277,7 @@ cleanup:
  * function, etc. */
 
 match g95_match_rvalue(g95_expr **result) {
+g95_actual_arglist *actual_arglist;
 g95_symbol *sym;
 locus where;
 g95_expr *e;
@@ -1331,15 +1332,17 @@ match m;
 
   case FL_ST_FUNCTION:
   function0:
-    e = g95_get_expr();
-    e->symbol = sym;
-
-    m = g95_match_actual_arglist(0, &e->value.function.actual, NULL);
+    m = g95_match_actual_arglist(0, &actual_arglist, NULL);
     if (m == MATCH_NO) {
-      if (sym->attr.flavor == FL_ST_FUNCTION)
+      if (sym->attr.flavor == FL_ST_FUNCTION) {
 	g95_error("Statement function '%s' requires argument list at %C",
 		  sym->name);
-      else {
+
+	m = MATCH_ERROR;
+	break;
+      } else {
+	e = g95_get_expr();
+	e->symbol = sym;
 	e->expr_type = EXPR_VARIABLE;
 	e->ts.type = BT_PROCEDURE;
 	m = MATCH_YES;
@@ -1352,18 +1355,20 @@ match m;
       break;
     }
 
+    e = g95_get_expr();
+    e->symbol = sym;
+    e->expr_type = EXPR_FUNCTION;
+    e->value.function.actual = actual_arglist;
+
     if (!sym->attr.function && g95_add_function(&sym->attr, NULL) == FAILURE) {
       m = MATCH_ERROR;
       break;
     }
 
-    e->expr_type = EXPR_FUNCTION;
     m = MATCH_YES;
     break;
 
   case FL_UNKNOWN:
-    e = g95_get_expr();
-    e->symbol = sym;
 
 /* If the symbol has a dimension attribute, the expression is a variable */
 
@@ -1373,6 +1378,8 @@ match m;
 	break;
       }
 
+      e = g95_get_expr();
+      e->symbol = sym;
       e->expr_type = EXPR_VARIABLE;
       m = match_varspec(e);
       break;
@@ -1384,6 +1391,8 @@ match m;
 
     g95_gobble_whitespace();
     if (g95_peek_char() != '(') {   /* Assume a scalar variable */
+      e = g95_get_expr();
+      e->symbol = sym;
       e->expr_type = EXPR_VARIABLE;
 
       if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) {
@@ -1396,10 +1405,13 @@ match m;
       break;
     }
 
-    /* See if this could possibly be a substring reference of a name
-     * that we're not sure is a variable yet. */
+/* See if this could possibly be a substring reference of a name that
+ * we're not sure is a variable yet. */
 
-    if ((e->ts.type == BT_UNKNOWN || e->ts.type == BT_CHARACTER) &&
+    e = g95_get_expr();
+    e->symbol = sym;
+
+    if ((sym->ts.type == BT_UNKNOWN || sym->ts.type == BT_CHARACTER) &&
 	g95_match_substring(&e->ref) == MATCH_YES) {
 
       e->expr_type = EXPR_VARIABLE;
@@ -1421,7 +1433,7 @@ match m;
       break;
     }
 
-    /* Give up, assume we have a function */
+/* Give up, assume we have a function */
 
     e->expr_type = EXPR_FUNCTION;
 

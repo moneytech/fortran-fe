@@ -742,18 +742,22 @@ try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
 
 try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 
-  if (attr->flavor == FL_UNKNOWN) {
-    attr->flavor = f;
-    return SUCCESS;
+  if (attr->flavor != FL_UNKNOWN) {
+    if (loc == NULL) loc = g95_current_locus();
+
+    g95_error("%s attribute conflicts with %s attribute at %L",
+	      g95_code2string(flavors, attr->flavor),
+	      g95_code2string(flavors, f), loc);
+
+    return FAILURE;
   }
 
-  if (loc == NULL) loc = g95_current_locus();
+  attr->flavor = f;
 
-  g95_error("%s attribute conflicts with %s attribute at %L",
-	    g95_code2string(flavors, attr->flavor),
-	    g95_code2string(flavors, f), loc);
+/* Statement functions are always functions */
+  if (f == FL_ST_FUNCTION) attr->function = 1;
 
-  return FAILURE;
+  return check_conflict(attr, loc);
 }
 
 try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *loc) {
