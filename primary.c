@@ -469,6 +469,53 @@ int c;
 }
 
 
+/* match_charkind_name()-- Special case of g95_match_name() that
+ * matches a parameter kind name before a string constant.  This takes
+ * case of the weird but legal case of: weird case of:
+ *             kind_____'string'
+ *
+ * where kind____ is a parameter. g95_match_name() will happily slurp
+ * up all the underscores, which leads to problems.  If we return
+ * MATCH_YES, the parse pointer points to the final underscore, which
+ * is not part of the name.  We never return MATCH_ERROR-- errors in
+ * the name will be detected later. */
+
+static match match_charkind_name(char *name) {
+locus old_loc;
+char c, peek;
+int len;
+
+  g95_gobble_whitespace(); 
+  c = g95_next_char();
+  if (!isalpha(c)) return MATCH_NO;
+
+  *name++ = c;
+  len = 1;
+
+  for(;;) {
+    old_loc = *g95_current_locus();
+    c = g95_next_char();
+
+    if (c == '_') {
+      peek = g95_peek_char();
+      
+      if (peek == '\'' || peek == '\"') {
+	g95_set_locus(&old_loc);
+	*name = '\0';
+	return MATCH_YES;
+      }
+    }
+
+    if (!isalnum(c) && c != '_' && g95_option.dollar && c != '$') break;
+
+    *name++ = c;
+    if (++len > G95_MAX_SYMBOL_LEN) break;
+  }
+
+  return MATCH_NO;
+}
+
+
 /* match_string_constant()-- See if the current input matches a
  * character constant.  Lots of contortions have to be done to match
  * the kind parameter which comes before the actual string.  The main
@@ -509,7 +556,7 @@ match m;
   } else {
     g95_set_locus(&old_locus);
 
-    m = g95_match_name(name);
+    m = match_charkind_name(name);
     if (m != MATCH_YES) goto no_match;
 
     if (g95_find_symbol(name, NULL, 1, &sym) || sym == NULL ||
