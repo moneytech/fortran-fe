@@ -245,6 +245,15 @@ static try check_kind(g95_expr *x) {
 }
 
 
+static try check_modulo(g95_expr *a, g95_expr *p) {
+
+  if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL) ||
+      a->ts.type != p->ts.type || a->ts.kind != p->ts.kind) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_precision(g95_expr *x) {
 
   if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) return FAILURE;
@@ -872,7 +881,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL,    dd, 0, p, BT_REAL,    dd, 0, NULL);
   make_generic("mod");
 
-  add_sym("modulo", 0, BT_REAL, di, g95_simplify_modulo, NULL,
+  add_sym("modulo", 0, BT_REAL, di, g95_simplify_modulo, check_modulo,
 	  a, BT_REAL, di, 0, p, BT_REAL, di, 0, NULL);
 
   add_sym("nearest", 0, BT_REAL, dr, g95_simplify_nearest, NULL,
