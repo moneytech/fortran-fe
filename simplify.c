@@ -832,9 +832,13 @@ int i;
 
 g95_expr *g95_simplify_exp(g95_expr *x) {
 g95_expr *re, *result;
-mpf_t neg, overflow;
+double absval, rhuge;
+int i;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
@@ -847,27 +851,26 @@ mpf_t neg, overflow;
     exponential(&re->value.real,&result->value.real);
     break;
   case BT_REAL: 
-    /* Overflow if magnitude of x is greater than about ln2*2^31 */
-    mpf_init_set_str(overflow,"1.488522e9",10);
-    if (mpf_cmp_ui(x->value.real,0) < 0) {
-      mpf_init(neg);
-      mpf_neg(neg,x->value.real);
-      if (mpf_cmp(neg,overflow) > 0) {
+    absval = mpf_get_d(x->value.real);
+    if ( absval < 0 ) absval = -absval;
+    rhuge  = mpz_get_d(g95_integer_kinds[0].huge);
+    if (absval > rhuge ) {
+      /* Underflow (set arg to zero) if x is negative and its magnitude is 
+         greater than the maximum C long int, because the exponential method 
+         will fail for such values */
+      if (mpf_cmp_ui(x->value.real,0) < 0 ) {
         if (g95_option.pedantic == 1) 
-	  g95_warning_now("Argument of EXP at %L too small, setting value to zero",&x->where);
-	mpf_set_ui(result->value.real,0);
-        mpf_clear(neg);
-        mpf_clear(overflow);
-	return result;
+            g95_warning_now("Argument of EXP at %L too small, setting value to zero",&x->where);
+        mpf_set_ui(result->value.real,0);
+        return result;
       }
-      mpf_clear(neg);
+    /* Overflow if magnitude of x is greater than C long int huge,
+       because the exponential function in arith.c fails for such values*/
+      else {
+        g95_error("Argument of EXP at %L too large",&x->where);
+        return &g95_bad_expr;
+      }
     }
-    else if (mpf_cmp(x->value.real, overflow) > 0) {
-      g95_error("Argument for initialization expression EXP at %L too large",&x->where);
-      mpf_clear(overflow);
-      return &g95_bad_expr;
-    }
-    mpf_clear(overflow);
     exponential(&x->value.real,&result->value.real);
     break;
   case BT_COMPLEX: 
@@ -877,7 +880,7 @@ mpf_t neg, overflow;
     g95_internal_error("in g95_simplify_exp(): Bad type");
   }
 
-  return result; 
+  return range_check(result, "EXP");
 
 }
 
