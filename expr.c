@@ -1020,16 +1020,17 @@ not_numeric:
 
 
 
-/* check_numeric_inquiry()-- Numeric inquiry functions are
- * specifically allowed to have variable arguments, which is an
- * exception to the normal requirement that an initialization function
- * have initialization arguments.  We head off this problem here.  */
+/* check_inquiry()-- Certain inquiry functions are specifically
+ * allowed to have variable arguments, which is an exception to the
+ * normal requirement that an initialization function have
+ * initialization arguments.  We head off this problem here.  */
 
-static try check_numeric_inquiry(g95_expr *e) {
+static try check_inquiry(g95_expr *e) {
 char *name;
 static char *inquiry_function[] = {
   "digits", "epsilon", "huge", "kind", "maxexponent", "minexponent",
-  "precision", "radix", "range", "tiny", "bit_size", NULL
+  "precision", "radix", "range", "tiny", "bit_size", "size", "shape",
+  "lbound", "ubound", NULL
 };
 
 int i;
@@ -1094,7 +1095,7 @@ try t;
   case EXPR_FUNCTION:
     t = SUCCESS;
 
-    if (check_numeric_inquiry(e) != SUCCESS) {
+    if (check_inquiry(e) != SUCCESS) {
       t = SUCCESS;
       for(ap=e->value.function.actual; ap; ap=ap->next)
 	if (check_init_expr(ap->expr) == FAILURE) {
@@ -1178,7 +1179,8 @@ try t;
   if (m != MATCH_YES) return m;
 
   g95_init_expr = 1;
-  t = check_init_expr(expr);
+  t = g95_resolve_expr(expr);
+  if (t == SUCCESS) t = check_init_expr(expr);
   g95_init_expr = 0;
 
   if (t == FAILURE) {
