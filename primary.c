@@ -1561,7 +1561,10 @@ match m;
   e = NULL;
   where = *g95_current_locus();
 
-  if (sym->attr.function && sym->result == sym) goto variable;
+  if (sym->attr.function && sym->result == sym &&
+      (g95_current_ns->proc_name == sym ||
+       (g95_current_ns->parent != NULL &&
+	g95_current_ns->parent->proc_name == sym))) goto variable;
 
   if (sym->attr.function || sym->attr.external || sym->attr.intrinsic)
     goto function0;
