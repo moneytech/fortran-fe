@@ -1,11 +1,11 @@
-The goal of the g95 project is to create a free, open source Fortran
-95 compiler. The code has been donated to the Free Software Foundation
+The goal of the g95 project is to create a free, open source Fortran 95
+compiler. The code has been donated to the Free Software Foundation
 for inclusion in GCC, the Gnu Compiler Collection.
 
 WARNING:
 
-G95 is still in an embryonic state. Perusing the g77 source, we
-estimate that about 200,000 lines of code will be necessary to
-implement g95. G95 is currently about 32,000 lines long, making it
-about version 0.16. The current g95 does nothing except print the
-contents of internal data structures.
+G95 is in a larval state. Perusing the g77 source, we estimate that
+about 200,000 lines of code will be necessary to implement g95.  G95
+is currently about 34,000 lines long, making it about version 0.17.
+The current g95 does nothing except print the contents of internal
+data structures.

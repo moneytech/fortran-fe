@@ -1275,8 +1275,6 @@ match m;
     sym->result = result;
   }
 
-  // if (g95_parent_procedure(sym, 0) == FAILURE) goto cleanup;
-
   return MATCH_YES;
 
 cleanup:
@@ -1290,11 +1288,14 @@ cleanup:
 
 match g95_match_entry(void) {
 g95_symbol *function, *result, *entry;
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_compile_state state;
 match m;
 
-  m = g95_match_symbol(&entry);
+  m = g95_match_name(name);
   if (m != MATCH_YES) return m;
+
+  if (get_proc_name(name, &entry)) return MATCH_ERROR;
 
   m = g95_match_formal_arglist(entry, 0);
   if (m != MATCH_YES) return MATCH_ERROR;
@@ -1305,8 +1306,7 @@ match m;
     if (g95_current_state() != COMP_SUBROUTINE) goto exec_construct;
 
     if (g95_add_entry(&entry->attr, NULL) == FAILURE ||
-	g95_add_subroutine(&entry->attr, NULL) == FAILURE ||
-	g95_parent_procedure(entry, 1) == FAILURE)
+	g95_add_subroutine(&entry->attr, NULL) == FAILURE)
       return MATCH_ERROR;
 
     break;
@@ -1336,8 +1336,6 @@ match m;
       g95_error("RESULT attribute required in ENTRY statement at %C");
       return MATCH_ERROR;
     }
-
-    // if (g95_parent_procedure(entry, 0) == FAILURE) return MATCH_ERROR;
 
     break;
 
@@ -1388,8 +1386,6 @@ match m;
     g95_syntax_error(ST_SUBROUTINE);
     return MATCH_ERROR;
   }
-
-  // if (g95_parent_procedure(sym, 1) == FAILURE) return MATCH_ERROR;
 
   return MATCH_YES;
 }

@@ -1389,7 +1389,6 @@ try g95_extend_expr(g95_expr *);
 void g95_free_formal_arglist(g95_formal_arglist *);
 try g95_extend_assign(g95_code *, g95_namespace *);
 try g95_add_interface(g95_symbol *sym);
-try g95_parent_procedure(g95_symbol *sym, int);
 
 /* select.c */
 
