@@ -1289,6 +1289,8 @@ match m;
   e = NULL;
   where = *g95_current_locus();
 
+  if (sym->attr.function) goto function0;
+
   switch(sym->attr.flavor) {
   case FL_VARIABLE:
     e = g95_get_expr();
@@ -1312,7 +1314,7 @@ match m;
 
 /* See if we have a function of some kind */
 
-  case FL_FUNCTION:
+  function0:
   case FL_ST_FUNCTION:
     e = g95_get_expr();
     e->symbol = sym;
@@ -1415,8 +1417,9 @@ match m;
 
     e->expr_type = EXPR_FUNCTION;
 
-    if (sym->attr.flavor != FL_FUNCTION &&
-	g95_add_flavor(&sym->attr, FL_FUNCTION, NULL) == FAILURE) {
+    if (sym->attr.function ||
+	g95_add_flavor(&sym->attr, FL_PROCEDURE, NULL) == FAILURE ||
+	g95_add_function(&sym->attr, NULL) == FAILURE) {
       m = MATCH_ERROR;
       break;
     }

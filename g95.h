@@ -164,9 +164,9 @@ typedef enum {
 /* Symbol flavors: these are all mutually exclusive.  */
 
 typedef enum {
-  FL_UNKNOWN=0, FL_PROGRAM, FL_SUBROUTINE, FL_FUNCTION, FL_MODULE,
-  FL_BLOCK_DATA, FL_VARIABLE, FL_PARAMETER, FL_DERIVED, FL_LABEL,
-  FL_ST_FUNCTION, FL_MODPROC, FL_NAMELIST, FL_OPERATOR
+  FL_UNKNOWN=0, FL_PROGRAM, FL_BLOCK_DATA, FL_MODULE, FL_VARIABLE,
+  FL_PARAMETER, FL_LABEL, FL_ST_FUNCTION, FL_MODULE_PROC, FL_DUMMY_PROC,
+  FL_PROCEDURE, FL_DERIVED, FL_NAMELIST, FL_GENERIC
 } sym_flavor;   /* 14 elements = 4 bits */
 
 
@@ -179,7 +179,7 @@ typedef enum {
 
 /************************* Structures *****************************/
 
-/* Symbol attribute structure.  It's 31 bits wide at the moment, so it
+/* Symbol attribute structure.  It's 32 bits wide at the moment, so it
  * should fit into a single int. */
 
 typedef struct {
@@ -188,11 +188,12 @@ typedef struct {
   unsigned allocatable:1, dimension:1, external:1,  intrinsic:1,
            optional:1,    pointer:1,   private:1,   public:1,
            save:1,        target:1,    dummy:1,     common:1,
-           generic:1,     result:1,    entry:1;
+           result:1,      entry:1;
 
   unsigned data:1;        /* Symbol is named in a DATA statement */
 
   unsigned in_namelist:1, in_common:1, saved_common:1;
+  unsigned function:1, subroutine:1;
 
 /* Function/subroutine attributes */
 
@@ -381,7 +382,7 @@ typedef struct g95_symbol {
  * symbol is a function or subroutine name.  If the symbol is a
  * generic name, the generic member points to the list of interfaces. */
 
-  struct g95_interface *interface, *generic;  
+  struct g95_interface *operator, *interface, *generic;
 
   struct g95_expr *value;           /* Parameter/Initializer value */
   g95_array_spec as;
@@ -930,9 +931,11 @@ try g95_add_sequence(symbol_attribute *, locus *);
 try g95_add_elemental(symbol_attribute *, locus *);
 try g95_add_pure(symbol_attribute *, locus *);
 try g95_add_recursive(symbol_attribute *, locus *);
+try g95_add_function(symbol_attribute *, locus *);
+try g95_add_subroutine(symbol_attribute *, locus *);
 
 try g95_add_flavor(symbol_attribute *, sym_flavor, locus *);
-try g95_add_entry(symbol_attribute *, sym_flavor, locus *);
+try g95_add_entry(symbol_attribute *, locus *);
 try g95_add_intent(symbol_attribute *, sym_intent, locus *);
 
 int g95_compare_attr(symbol_attribute *, symbol_attribute *);

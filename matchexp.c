@@ -68,7 +68,7 @@ int i;
 
   sym = g95_get_symbol(name, NULL);
 
-  if (def_flag == 0 && sym->attr.flavor != FL_OPERATOR) {
+  if (def_flag == 0 && sym->operator != NULL) {
     g95_error("Symbol '%s' at %C is not a defined unary operator", name);
     return MATCH_ERROR;
   }

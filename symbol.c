@@ -374,38 +374,25 @@ g95_expr lvalue;
 /******************** Symbol attribute stuff *********************/
 
 static mstring flavors[] = {
-  minit("UNKNOWN",             FL_UNKNOWN),
-  minit("PROGRAM",             FL_PROGRAM), 
-  minit("SUBROUTINE",          FL_SUBROUTINE),
-  minit("FUNCTION",            FL_FUNCTION),
-  minit("MODULE",              FL_MODULE),
-  minit("BLOCK-DATA",          FL_BLOCK_DATA),
-  minit("VARIABLE",            FL_VARIABLE),
-  minit("PARAMETER",           FL_PARAMETER),
-  minit("DERIVED",             FL_DERIVED),
-  minit("LABEL",               FL_LABEL),
-  minit("STATEMENT-FUNCTION",  FL_ST_FUNCTION),
-  minit("MODPROC",             FL_MODPROC),
-  minit("NAMELIST-GROUP",      FL_NAMELIST),
-  minit("OPERATOR",            FL_OPERATOR),
+  minit("UNKNOWN",     FL_UNKNOWN),      minit("PROGRAM",     FL_PROGRAM),
+  minit("BLOCK-DATA",  FL_BLOCK_DATA),   minit("MODULE",      FL_MODULE),
+  minit("VARIABLE",    FL_VARIABLE),     minit("PARAMETER",   FL_PARAMETER),
+  minit("LABEL",       FL_LABEL),        minit("ST-FUNCTION", FL_ST_FUNCTION),
+  minit("MODULE-PROC", FL_MODULE_PROC),  minit("DUMMY-PROC",  FL_DUMMY_PROC),
+  minit("PROCEDURE",   FL_PROCEDURE),    minit("DERIVED",     FL_DERIVED),
+  minit("NAMELIST",    FL_NAMELIST),     minit("GENERIC",     FL_GENERIC),
   minit(NULL, -1) },
 
 intents[] = {
-  minit("UNKNOWN", INTENT_UNKNOWN),
-  minit("IN", INTENT_IN),
-  minit("OUT", INTENT_OUT),
-  minit("INOUT", INTENT_INOUT),
+  minit("UNKNOWN", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
+  minit("OUT", INTENT_OUT),          minit("INOUT", INTENT_INOUT),
   minit(NULL, -1)
-#if 0
 },
 
 scopes[] = {
-  minit("UNKNOWN",    SCOPE_UNKNOWN),
-  minit("EXTERNAL",   SCOPE_EXTERNAL),
-  minit("INTERNAL",   SCOPE_INTERNAL),
-  minit("INTRINSIC",  SCOPE_INTRINSIC),
+  minit("UNKNOWN",    SCOPE_UNKNOWN),    minit("EXTERNAL",   SCOPE_EXTERNAL),
+  minit("INTERNAL",   SCOPE_INTERNAL),   minit("INTRINSIC",  SCOPE_INTRINSIC),
   minit(NULL, -1)
-#endif
 };
 
 
@@ -414,8 +401,9 @@ scopes[] = {
 
 void g95_show_attr(symbol_attribute *attr) {
 
-  g95_status("(%s %s", g95_code2string(flavors, attr->flavor),
-	     g95_code2string(intents, attr->intent));
+  g95_status("(%s %s %s", g95_code2string(flavors, attr->flavor),
+	     g95_code2string(intents, attr->intent),
+	     g95_code2string(scopes, attr->scope));
 
   if (attr->allocatable)  g95_status(" ALLOCATABLE");
   if (attr->dimension)    g95_status(" DIMENSION");
@@ -425,17 +413,20 @@ void g95_show_attr(symbol_attribute *attr) {
   if (attr->pointer)      g95_status(" POINTER");
   if (attr->private)      g95_status(" PRIVATE");
   if (attr->public)       g95_status(" PUBLIC");
-  if (attr->result)       g95_status(" RESULT");
   if (attr->save)         g95_status(" SAVE");
   if (attr->target)       g95_status(" TARGET");
+  if (attr->dummy)        g95_status(" DUMMY");
+  if (attr->common)       g95_status(" COMMON");
+  if (attr->result)       g95_status(" RESULT");
   if (attr->entry)        g95_status(" ENTRY");
 
-  if (attr->dummy)        g95_status(" DUMMY");
   if (attr->data)         g95_status(" DATA");
-  if (attr->common)       g95_status(" COMMON");
-  if (attr->in_common)    g95_status(" IN-COMMON");
   if (attr->in_namelist)  g95_status(" IN-NAMELIST");
-  if (attr->generic)      g95_status(" GENERIC");
+  if (attr->in_common)    g95_status(" IN-COMMON");
+  if (attr->saved_common) g95_status(" SAVED-COMMON");
+
+  if (attr->function)     g95_status(" FUNCTION");
+  if (attr->subroutine)   g95_status(" SUBROUTINE");
 
   if (attr->sequence)     g95_status(" SEQUENCE");
   if (attr->elemental)    g95_status(" ELEMENTAL");
@@ -516,7 +507,8 @@ static char *dummy = "DUMMY", *parameter = "PARAMETER", *save = "SAVE",
   }
 
   switch(attr->flavor) {
-  case FL_FUNCTION:
+  case FL_MODULE_PROC:
+  case FL_PROCEDURE:
     if (attr->result)    { a2 = result; goto conflict; }
     if (attr->in_common) { a2 = in_common; goto conflict; }
     break;
@@ -634,12 +626,6 @@ try g95_add_data(symbol_attribute *attr, locus *loc) {
   return check_conflict(attr, loc);
 }
 
-try g95_add_generic(symbol_attribute *attr, locus *loc) {
-
-  attr->generic = 1;
-  return check_conflict(attr, loc);
-}
-
 try g95_add_common(symbol_attribute *attr, locus *loc) {
 
   attr->common = 1;
@@ -686,6 +672,24 @@ try g95_add_recursive(symbol_attribute *attr, locus *loc) {
   return check_conflict(attr, loc);
 }
 
+try g95_add_entry(symbol_attribute *attr, locus *loc) {
+
+  attr->entry = 1;
+  return check_conflict(attr, loc);
+}
+
+try g95_add_function(symbol_attribute *attr, locus *loc) {
+
+  attr->function = 1;
+  return check_conflict(attr, loc);
+}
+
+try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
+
+  attr->subroutine = 1;
+  return check_conflict(attr, loc);
+}
+
 
 try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 
@@ -699,23 +703,6 @@ try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
   g95_error("%s attribute conflicts with %s attribute at %L",
 	    g95_code2string(flavors, attr->flavor),
 	    g95_code2string(flavors, f), loc);
-
-  return FAILURE;
-}
-
-
-try g95_add_entry(symbol_attribute *attr, sym_flavor f, locus *loc) {
-
-  if (attr->flavor == FL_UNKNOWN) {
-    attr->flavor = f;
-    attr->entry = 1;
-    return SUCCESS;
-  }
-
-  if (loc == NULL) loc = g95_current_locus();
-
-  g95_error("ENTRY attribute conflicts with %s attribute at %L",
-	    g95_code2string(flavors, attr->flavor), loc);
 
   return FAILURE;
 }
@@ -748,13 +735,15 @@ int g95_compare_attr(symbol_attribute *a1, symbol_attribute *a2) {
     a1->pointer == a2->pointer     && a1->private == a2->private &&
     a1->public == a2->public       && a1->save == a2->save &&
     a1->target == a2->target       && a1->dummy == a2->dummy &&
-    a1->data == a2->data           && a1->generic == a2->generic &&
-    a1->common == a2->common       && a1->in_common == a2->in_common &&
+    a1->common == a2->common       && a1->result == a2->result &&
+    a1->entry == a2->entry         && a1->data == a2->data &&
+    a1->in_namelist == a2->in_namelist &&
+    a1->in_common == a2->in_common && a1->saved_common == a2->saved_common && 
+    a1->function == a2->function   && a1->subroutine == a2->subroutine &&
     a1->sequence == a2->sequence   && a1->elemental == a2->elemental &&
     a1->pure == a2->pure           && a1->recursive == a2->recursive &&
     a1->intent == a2->intent       && a1->flavor == a2->flavor &&
-    a1->result == a2->result       && a1->in_namelist == a2->in_namelist &&
-    a1->saved_common == a2->saved_common && a1->entry == a2->entry;
+    a1->scope == a2->scope;
 }
 
 
@@ -770,24 +759,25 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->pointer = 0;
   attr->private = 0;
   attr->public = 0;
-  attr->result = 0;
   attr->save = 0;
-  attr->saved_common = 0;
   attr->target = 0;
-  attr->entry = 0;
-  
   attr->dummy = 0;
-  attr->data = 0;
-  attr->generic = 0;
   attr->common = 0;
-  attr->in_common = 0;
+  attr->result = 0;
+  attr->entry = 0;
+  attr->data = 0;
   attr->in_namelist = 0;
   
+  attr->in_common = 0;
+  attr->saved_common = 0;
+  attr->function = 0;
+  attr->subroutine = 0;
   attr->sequence = 0;
   attr->elemental = 0;
   attr->pure = 0;
   attr->recursive = 0;
 
+  attr->scope = SCOPE_UNKNOWN;
   attr->flavor = FL_UNKNOWN;
   attr->intent = INTENT_UNKNOWN;
 }
@@ -822,18 +812,20 @@ try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src, locus *loc) {
   if (src->pointer && g95_add_pointer(dest, loc) == FAILURE) goto fail;
   if (src->private && g95_add_private(dest, loc) == FAILURE) goto fail;
   if (src->public && g95_add_public(dest, loc) == FAILURE) goto fail;
-  if (src->result && g95_add_result(dest, loc) == FAILURE) goto fail;
   if (src->save && g95_add_save(dest, loc) == FAILURE) goto fail;
-  if (src->saved_common && g95_add_saved_common(dest, loc)==FAILURE) goto fail;
   if (src->target && g95_add_target(dest, loc) == FAILURE) goto fail;
+  if (src->dummy && g95_add_dummy(dest, loc) == FAILURE) goto fail;
+  if (src->common && g95_add_common(dest, loc) == FAILURE) goto fail;
+  if (src->result && g95_add_result(dest, loc) == FAILURE) goto fail;
   if (src->entry) dest->entry = 1;
 
-  if (src->dummy && g95_add_dummy(dest, loc) == FAILURE) goto fail;
   if (src->data && g95_add_data(dest, loc) == FAILURE) goto fail;
-  if (src->generic && g95_add_generic(dest, loc) == FAILURE) goto fail;
-  if (src->common && g95_add_common(dest, loc) == FAILURE) goto fail;
-  if (src->in_common && g95_add_in_common(dest, loc) == FAILURE) goto fail;
   if (src->in_namelist && g95_add_in_namelist(dest, loc) == FAILURE) goto fail;
+  if (src->in_common && g95_add_in_common(dest, loc) == FAILURE) goto fail;
+  if (src->saved_common && g95_add_saved_common(dest, loc)==FAILURE) goto fail;
+
+  if (src->function && g95_add_function(dest, loc) == FAILURE) goto fail;
+  if (src->subroutine && g95_add_subroutine(dest, loc) == FAILURE) goto fail;
 
   if (src->sequence && g95_add_sequence(dest, loc) == FAILURE) goto fail;
   if (src->elemental && g95_add_elemental(dest, loc) == FAILURE) goto fail;
@@ -1700,10 +1692,8 @@ g95_symbol *s;
 
   g95_show_attr(&sym->attr);
 
-  if ((sym->attr.flavor == FL_SUBROUTINE ||
-       sym->attr.flavor == FL_FUNCTION ||
-       sym->attr.entry) && sym->interface != NULL)
-    g95_show_formal_arglist(sym->interface->formal);
+  if ((sym->attr.function || sym->attr.subroutine || sym->attr.entry) &&
+      sym->interface != NULL) g95_show_formal_arglist(sym->interface->formal);
   else g95_status("()");
 
   g95_show_expr(sym->value);
@@ -1785,7 +1775,7 @@ sym_flavor flavor;
 
   flavor = sym->attr.flavor;
 
-  if (flavor != FL_FUNCTION && flavor != FL_VARIABLE &&
+  if (!sym->attr.function && flavor != FL_VARIABLE &&
       flavor != FL_PARAMETER && flavor != FL_ST_FUNCTION) return;
 
   g95_set_default_type(sym);
@@ -1807,7 +1797,7 @@ void g95_set_sym_defaults(g95_namespace *ns) {
 static void show_generics(g95_symbol *sym) {
 g95_interface *ip;
 
-  if (sym->attr.generic) {
+  if (sym->attr.flavor == FL_GENERIC) {
     g95_status("(%s", sym->name);
 
     for(ip=sym->generic; ip; ip=ip->next)

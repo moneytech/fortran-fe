@@ -1541,9 +1541,8 @@ int i;
   if (m == MATCH_NO) goto syntax;
   if (m != MATCH_YES) return m;
 
-  if (sym->attr.flavor != FL_SUBROUTINE &&
-      g95_add_flavor(&sym->attr, FL_SUBROUTINE, NULL) == FAILURE)
-    return MATCH_ERROR;
+  if (!sym->attr.subroutine &&
+      g95_add_subroutine(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
 
   if (g95_match_eos() != MATCH_YES) {
     m = g95_match_actual_arglist(1, &arglist, &head);

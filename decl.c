@@ -1121,7 +1121,7 @@ match m;
   }
 
   if (g95_current_state() == COMP_INTERFACE || current_attr.recursive) {
-    if (g95_add_flavor(&current_attr, FL_FUNCTION, NULL) == FAILURE ||
+    if (g95_add_function(&current_attr, NULL) == FAILURE ||
 	g95_missing_attr(&current_attr, NULL) == FAILURE) goto cleanup;
   } else {
     if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) goto cleanup;
@@ -1163,7 +1163,8 @@ match m;
   case COMP_SUBROUTINE:
     if (g95_current_state() != COMP_SUBROUTINE) goto exec_construct;
 
-    if (g95_add_entry(&entry->attr, FL_SUBROUTINE, NULL) == FAILURE)
+    if (g95_add_entry(&entry->attr, NULL) == FAILURE ||
+	g95_add_subroutine(&entry->attr, NULL) == FAILURE)
       return MATCH_ERROR;
 
     break;
@@ -1175,7 +1176,8 @@ match m;
     result = NULL;
 
     if (g95_match_eos() == MATCH_YES) {
-      if (g95_add_entry(&entry->attr, FL_VARIABLE, NULL) == FAILURE)
+      if (g95_add_entry(&entry->attr, NULL) == FAILURE ||
+	  g95_add_function(&entry->attr, NULL) == FAILURE)
 	return MATCH_ERROR;
 
     } else {
@@ -1184,7 +1186,8 @@ match m;
       if (m != MATCH_YES) return MATCH_ERROR;
 
       if (g95_add_result(&result->attr, NULL) == FAILURE ||
-	  g95_add_entry(&entry->attr, FL_FUNCTION, NULL) == FAILURE)
+	  g95_add_entry(&entry->attr, NULL) == FAILURE ||
+	  g95_add_function(&entry->attr, NULL) == FAILURE)
 	return MATCH_ERROR;
     }
 
@@ -1241,7 +1244,7 @@ match m;
 				current_interface.parent_ns : NULL);
   g95_new_block = sym;
 
-  if (g95_add_flavor(&sym->attr, FL_SUBROUTINE, NULL) == FAILURE) {
+  if (g95_add_subroutine(&sym->attr, NULL) == FAILURE) {
     m = MATCH_ERROR;
     goto error;
   }
@@ -1782,7 +1785,7 @@ match m;
     if (m == MATCH_NO) goto syntax;
     if (m != MATCH_YES) return MATCH_ERROR;
 
-    if (g95_add_flavor(&sym->attr, FL_MODPROC, NULL) == FAILURE)
+    if (g95_add_flavor(&sym->attr, FL_MODULE_PROC, NULL) == FAILURE)
       return MATCH_ERROR;
 
     if (g95_match_eos() == MATCH_YES) break;

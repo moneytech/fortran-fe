@@ -188,8 +188,7 @@ int i;
     if (m == MATCH_NO) g95_error("Syntax error in OPERATOR definition at %C");
     if (m != MATCH_YES) return MATCH_ERROR;
 
-    if (g95_add_flavor(&sym->attr, FL_OPERATOR, NULL) == FAILURE)
-      return MATCH_ERROR;
+    /* TODO: Fix parsing of generic operators */
 
     current_interface.type = INTERFACE_USER_OP;
     current_interface.generic = g95_new_block = sym;
@@ -198,7 +197,8 @@ int i;
   }
 
   if (g95_match(" %s%t", &sym) == MATCH_YES) { /* Generic interface */
-    if (g95_add_generic(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
+    if (g95_add_flavor(&sym->attr, FL_GENERIC, NULL) == FAILURE)
+      return MATCH_ERROR;
 
     current_interface.type = INTERFACE_GENERIC;
     current_interface.generic = g95_new_block = sym;
@@ -393,13 +393,13 @@ try t;
 
   case INTERFACE_INTRINSIC_OP:
     if (current_interface.op == INTRINSIC_ASSIGN) {
-      if (ip->sym->attr.flavor != FL_SUBROUTINE) {
+      if (!ip->sym->attr.subroutine) {
 	g95_error("Assignment operator interface at %C must be a SUBROUTINE");
 	t = FAILURE;
 	break;
       }
     } else {
-      if (ip->sym->attr.flavor != FL_FUNCTION) {
+      if (!ip->sym->attr.function) {
 	g95_error("Intrinsic operator interface at %C must be a FUNCTION");
 	t = FAILURE;
 	break;
