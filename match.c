@@ -2032,7 +2032,7 @@ match m;
   if (g95_add_procedure(&sym->attr, PROC_ST_FUNCTION, NULL) == FAILURE)
     goto undo_error;
 
-  if (g95_match_formal_arglist(sym, 1) != MATCH_YES) goto undo_error;
+  if (g95_match_formal_arglist(sym, 1, 0) != MATCH_YES) goto undo_error;
 
   m = g95_match(" = %e%t", &expr);
   if (m == MATCH_NO) goto undo_error;

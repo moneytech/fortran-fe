@@ -1113,7 +1113,8 @@ static try copy_prefix(symbol_attribute *dest, locus *where) {
 
 /* g95_match_formal_arglist()-- Match a formal argument list. */
 
-match g95_match_formal_arglist(g95_symbol *progname, int st_flag) {
+match g95_match_formal_arglist(g95_symbol *progname, int st_flag,
+			       int null_flag) {
 g95_formal_arglist *head, *tail, *p;
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
@@ -1122,7 +1123,7 @@ match m;
   head = tail = NULL;
 
   if (g95_match_char('(') != MATCH_YES) {
-    if (!st_flag) goto ok;
+    if (null_flag) goto ok;
     return MATCH_NO;
   }
 
@@ -1259,7 +1260,7 @@ match m;
   if (get_proc_name(name, &sym)) return MATCH_ERROR;
   g95_new_block = sym;
 
-  m = g95_match_formal_arglist(sym, 0);
+  m = g95_match_formal_arglist(sym, 0, 0);
   if (m == MATCH_NO)
     g95_error("Expected formal argument list in function definition at %C");
   if (m != MATCH_YES) goto cleanup;
@@ -1328,12 +1329,12 @@ match m;
 
   if (get_proc_name(name, &entry)) return MATCH_ERROR;
 
-  m = g95_match_formal_arglist(entry, 0);
-  if (m != MATCH_YES) return MATCH_ERROR;
-
   g95_enclosing_unit(&state);
   switch(state) {
   case COMP_SUBROUTINE:
+    m = g95_match_formal_arglist(entry, 0, 1);
+    if (m != MATCH_YES) return MATCH_ERROR;
+
     if (g95_current_state() != COMP_SUBROUTINE) goto exec_construct;
 
     if (g95_add_entry(&entry->attr, NULL) == FAILURE ||
@@ -1343,6 +1344,9 @@ match m;
     break;
 
   case COMP_FUNCTION:
+    m = g95_match_formal_arglist(entry, 0, 0);
+    if (m != MATCH_YES) return MATCH_ERROR;
+
     if (g95_current_state() != COMP_FUNCTION) goto exec_construct;
     function = g95_state_stack->sym;
 
@@ -1415,7 +1419,7 @@ match m;
 
   if (g95_add_subroutine(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
 
-  if (g95_match_formal_arglist(sym, 0) != MATCH_YES) return MATCH_ERROR;
+  if (g95_match_formal_arglist(sym, 0, 1) != MATCH_YES) return MATCH_ERROR;
 
   if (g95_match_eos() != MATCH_YES) {
     g95_syntax_error(ST_SUBROUTINE);

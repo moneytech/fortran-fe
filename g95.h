@@ -1321,7 +1321,7 @@ match g95_match_type_spec(g95_typespec *, int, int);
 
 match g95_match_end(g95_statement *);
 match g95_match_data_decl(void);
-match g95_match_formal_arglist(g95_symbol *, int);
+match g95_match_formal_arglist(g95_symbol *, int, int);
 match g95_match_function_decl(void);
 match g95_match_entry(void);
 match g95_match_subroutine(void);
