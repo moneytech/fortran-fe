@@ -1741,7 +1741,7 @@ static void mio_symbol(g95_symbol *sym) {
 
 /************************* Top level subroutines *************************/
 
-/* skip_list()-- Skip a list between balenced left and right parens. */
+/* skip_list()-- Skip a list between balanced left and right parens. */
 
 static void skip_list(void) {
 int level; 

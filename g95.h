@@ -261,7 +261,7 @@ typedef struct {
  * primary structure for holding lines.  A source file is stored in a
  * singly linked list of these structures.  Each structure holds an
  * integer number of lines.  The line[] member is actually an array of
- * pointers that point to the NUL-terminated lines.  This list grows
+ * pointers that point to the NULL-terminated lines.  This list grows
  * upwards, and the actual lines are stored at the top of the
  * structure and grow downward.  Each structure is packed with as many
  * lines as it can hold, then another linebuf is allocated.  */
@@ -451,7 +451,7 @@ typedef struct {
 /* Symbol nodes.  These are important things.  They are what the
  * standard refers to as "entities".  The possibly multiple names that
  * refer to the same entity are accomplished by a binary tree of
- * symtree structures that is balenced by the red-black method-- more
+ * symtree structures that is balanced by the red-black method-- more
  * than one symtree node can point to any given symbol. */
 
 typedef struct g95_symbol {
@@ -499,7 +499,7 @@ typedef struct g95_symbol {
 
 
 /* Within a namespace, symbols are pointed to by symtree nodes that
- * are linked together in a Red-Black balenced binary tree.  The tree
+ * are linked together in a Red-Black balanced binary tree.  The tree
  * information is not stored within a symbol structure because like
  * many other binary tree implementations, deleting a node can cause
  * other nodes to be moved around.  Since symbols can have lots of
@@ -515,7 +515,7 @@ typedef struct g95_symbol {
  *
  * The "key" of the red-black structures points to the symbol node
  * which contain the symbol name, which is the actual key used to
- * balence the tree.  The red-black code is due to Thomas Niemann. */
+ * balance the tree.  The red-black code is due to Thomas Niemann. */
 
 typedef struct g95_symtree {
   char name[G95_MAX_SYMBOL_LEN+1];
