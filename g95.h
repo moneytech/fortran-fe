@@ -838,6 +838,8 @@ void g95_status_char(char);
 try g95_open_status(char *);
 try g95_close_status(void);
 
+int g95_retcode(void);
+
 /* parse.c */
 
 try g95_find_state(g95_compile_state);

@@ -212,12 +212,12 @@ char *option;
 
   if (option[0] == '-') {
     g95_status("g95: Unrecognised option '%s'\n", option);
-    exit(0);
+    exit(3);
   }
 
   if (g95_option.source != NULL) {
     g95_status("g95: Second source file '%s' found\n", option);
-    exit(0);
+    exit(3);
   }
 
   g95_option.source = option;
@@ -262,8 +262,10 @@ int i;
 
   if (g95_new_file(g95_option.source, FORM_UNKNOWN) == SUCCESS)
     g95_parse_file();
+  else
+    return 3;
 
   g95_done_1();
 
-  return 0;
+  return g95_retcode();
 }

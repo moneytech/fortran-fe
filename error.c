@@ -455,7 +455,7 @@ va_list argp;
   error_print("Fatal Error:", format, argp);
   va_end(argp);
 
-  exit(-1);
+  exit(3);
 }
 
 
@@ -474,7 +474,7 @@ va_list argp;
   error_print("", format, argp);
   va_end(argp);
 
-  exit(-1);
+  exit(4);
 }
 
 
@@ -590,4 +590,15 @@ try g95_close_status(void) {
   status_out = NULL;
 
   return SUCCESS;
+}
+
+
+/* g95_retcode()-- Get a return code based on how many errors and
+ * warnings we've seen. */
+
+int g95_retcode(void) {
+
+  if (errors > 0) return 2;
+  if (warnings > 0) return 1;
+  return 0;
 }
