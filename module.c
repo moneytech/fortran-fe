@@ -81,7 +81,8 @@ typedef struct {
 } module_locus;
 
 
-typedef enum { P_UNKNOWN=0, P_OTHER, P_SYMBOL } pointer_t;
+typedef enum {
+  P_UNKNOWN=0, P_OTHER, P_NAMESPACE, P_COMPONENT, P_SYMBOL } pointer_t;
 
 /* The fixup structure lists pointers to pointers that have to be
  * updated when a pointer value becomes known. */
@@ -164,6 +165,8 @@ static void free_pi_tree(pointer_info *p) {
 
   if (p == NULL) return;
 
+  if (p->fixup != NULL) g95_internal_error("free_pi_tree(): Unresolved fixup");
+
   free_pi_tree(p->left);
   free_pi_tree(p->right);
 
@@ -218,7 +221,7 @@ pointer_info *p;
   p = g95_get_pointer_info();
   p->u.pointer = (char *) g95_current_ns;
   p->integer = 1;
-  p->type = P_OTHER;
+  p->type = P_NAMESPACE;
 
   g95_insert_bbt(&pi_root, p, compare);
 
@@ -296,6 +299,32 @@ int c;
 }
 
 
+/* fp2()-- Recursive function to find a pointer within a tree by brute
+ * force. */
+
+static pointer_info *fp2(pointer_info *p, char *target) {
+pointer_info *q;
+
+  if (p == NULL) return NULL; 
+
+  if (p->u.pointer == target) return p;
+
+  q = fp2(p->left, target);
+  if (q != NULL) return q;
+
+  return fp2(p->right, target);
+}
+
+
+/* find_pointer2()-- During reading, find a pointer_info node from the
+ * pointer value.  This amounts to a brute-force search. */
+
+static pointer_info *find_pointer2(void *p) {
+
+  return fp2(pi_root, p);
+}
+
+
 /* associate_integer_pointer()-- Call here during module reading when
  * we know what pointer to associate with an integer.  Any fixups that
  * exist are resolved at this time. */
@@ -333,7 +362,7 @@ char **cp;
 
   p = get_integer(integer);
 
-  if (p->u.pointer != NULL) {
+  if (p->integer == 0 || p->u.pointer != NULL) {
     cp = gp;
     *cp = p->u.pointer;
   } else {
@@ -1359,28 +1388,81 @@ int i;
 }
 
 
+/* mio_pointer_ref()-- Saves or restores a pointer.  The pointer is
+ * converted back and forth from an integer.  We return the
+ * pointer_info pointer so that the caller can take additional action
+ * based on the pointer type. */
+
+static pointer_info *mio_pointer_ref(void *gp) {
+pointer_info *p;
+
+  if (iomode == IO_OUTPUT) {
+    p = get_pointer(*((char **) gp));
+    write_atom(ATOM_INTEGER, &p->integer);
+  } else {
+    require_atom(ATOM_INTEGER);
+    p = add_fixup(atom_int, gp);
+  }
+
+  return p;
+}
+
+
+/* mio_component_ref()-- Save and load references to components that
+ * occur within expressions.  We have to describe these references by
+ * a number and by name.  The number is necessary for forward
+ * references during reading, and the name is necessary if the symbol
+ * already exists in the namespace and is not loaded again. */
+
 static void mio_component_ref(g95_component **cp, g95_symbol *sym) {
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_component *c;
+g95_component *q;
+pointer_info *p;
+
+  p = mio_pointer_ref(cp); 
+  if (p->type == P_UNKNOWN) p->type = P_COMPONENT;
 
   if (iomode == IO_OUTPUT)
     mio_internal_string((*cp)->name);
   else {
     mio_internal_string(name);
 
-    for(c=sym->components; c; c=c->next)
-      if (strcmp(c->name, name) == 0) break;
+    if (sym->components != NULL && p->u.pointer == NULL) {
+      /* Symbol already loaded, so search by name */
 
-    if (c == NULL) bad_module("mio_component_ref(): Can't find component");
+      for(q=sym->components; q; q=q->next)
+	if (strcmp(q->name, name) == 0) break;
 
-    *cp = c;
+      if (q == NULL)
+	g95_internal_error("mio_component_ref(): Component not found");
+
+      associate_integer_pointer(p, q);
+    }
+
+    /* Make sure this symbol will eventually be loaded */
+
+    p = find_pointer2(sym);
+    if (p->u.rsym.state == UNUSED) p->u.rsym.state = NEEDED;
   }
 }
 
 
 static void mio_component(g95_component *c) {
+pointer_info *p;
+int n;
 
   mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    p = get_pointer(c);
+    mio_integer(&p->integer);
+  } else {
+    mio_integer(&n);
+    p = get_integer(n);
+    associate_integer_pointer(p, c);
+  }
+
+  if (p->type == P_UNKNOWN) p->type = P_COMPONENT;
 
   mio_internal_string(c->name);
   mio_typespec(&c->ts);
@@ -1494,26 +1576,6 @@ g95_formal_arglist *f, *tail;
   }
 
   mio_rparen();
-}
-
-
-/* mio_pointer_ref()-- Saves or restores a pointer.  The pointer is
- * converted back and forth from an integer.  We return the
- * pointer_info pointer so that the caller can take additional action
- * based on the pointer type. */
-
-static pointer_info *mio_pointer_ref(void *gp) {
-pointer_info *p;
-
-  if (iomode == IO_OUTPUT) {
-    p = get_pointer(*((char **) gp));
-    write_atom(ATOM_INTEGER, &p->integer);
-  } else {
-    require_atom(ATOM_INTEGER);
-    p = add_fixup(atom_int, gp);
-  }
-
-  return p;
 }
 
 
@@ -1950,6 +2012,18 @@ static void mio_symbol_interface(char *name, char *module,
 }
 
 
+static void mio_namespace_ref(g95_namespace **ns) {
+pointer_info *p;
+
+  p = mio_pointer_ref(ns);
+
+  if (p->type == P_UNKNOWN) p->type = P_NAMESPACE;
+
+  if (iomode == IO_INPUT && p->integer != 0 && p->u.pointer == NULL)
+    associate_integer_pointer(p, g95_get_namespace());
+}
+
+
 /* mio_symbol()-- Unlike most other routines, the address of the
  * symbol node is already fixed on input and the name/module has
  * already been filled in. */
@@ -1961,7 +2035,7 @@ static void mio_symbol(g95_symbol *sym) {
   mio_symbol_attribute(&sym->attr);
   mio_typespec(&sym->ts);
 
-  mio_pointer_ref(&sym->formal_ns);
+  mio_namespace_ref(&sym->formal_ns);
 
   mio_symbol_ref(&sym->common_head);  /* Save/restore common block links */
   mio_symbol_ref(&sym->common_next);
