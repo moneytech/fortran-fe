@@ -442,6 +442,7 @@ typedef struct g95_symbol {
 typedef struct g95_symtree {
   char name[G95_MAX_SYMBOL_LEN+1];
   g95_symbol *sym;             /* Symbol associated with this node */
+  int serial;
 
   struct g95_symtree *left, *right, *parent;
   enum { BLACK, RED } color;   /* node color (BLACK, RED) */
@@ -985,7 +986,9 @@ try g95_reference_st_label(int, g95_sl_type);
 g95_namespace *g95_get_namespace(void);
 void g95_free_symbol(g95_symbol *);
 g95_symbol *g95_find_symbol(char *, g95_namespace *);
+g95_symbol *g95_find_local_symbol(char *, g95_namespace *);
 g95_symbol *g95_get_symbol(char *, g95_namespace *);
+g95_symbol *g95_get_local_symbol(char *, g95_namespace *);
 
 void g95_undo_symbols(void);
 void g95_commit_symbols(void);
@@ -995,6 +998,7 @@ void g95_symbol_init_2(void);
 void g95_symbol_done_2(void);
 void g95_show_symbol(g95_symbol *);
 
+void g95_traverse_symtree(g95_symtree *, void (*)(g95_symtree *));
 void g95_traverse_ns(g95_namespace *, void (*)(g95_symbol *));
 void g95_save_all(g95_namespace *);
 

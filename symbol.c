@@ -1148,7 +1148,7 @@ done:
 static g95_symbol *changed = NULL;
 
 #define NIL &sentinel           /* all leaves are sentinels */
-static g95_symtree sentinel = { { '\0' }, NULL, NIL, NIL, NIL, BLACK };
+static g95_symtree sentinel = { { '\0' }, NULL, 0, NIL, NIL, NIL, BLACK };
 
 #define CompLT(a,b) (strcmp(a,b) < 0)
 #define CompEQ(a,b) (strcmp(a,b) == 0)
@@ -1441,6 +1441,7 @@ g95_symtree *x, *y, *z;
 
   if (y != z) {  /* Copy non red/black information */
     z->sym = y->sym;
+    z->serial = y->serial;
     strcpy(z->name, y->name);
   }
 
@@ -1513,17 +1514,32 @@ g95_symbol *p;
 }
 
 
-/* g95_find_symbol()-- search for a symbol, returning NULL if we can't
- * find it */
+/* g95_find_local_symbol()-- Search for a symbol in a single namespace. */
 
-g95_symbol *g95_find_symbol(char *name, g95_namespace *ns) {
+g95_symbol *g95_find_local_symbol(char *name, g95_namespace *ns) {
 g95_symtree *t;
 
   if (ns == NULL) ns = g95_current_ns;
 
+  t = find_node(ns, name);
+  if (t != NULL) return t->sym;
+
+  return NULL;
+}
+
+
+/* g95_find_symbol()-- search for a symbol starting in the current
+ * namespace, restorting to any parent namespaces if necessary.
+ * Returns NULL if we can't find it */
+
+g95_symbol *g95_find_symbol(char *name, g95_namespace *ns) {
+g95_symbol *s;
+
+  if (ns == NULL) ns = g95_current_ns;
+
   do {
-    t = find_node(ns, name);
-    if (t != NULL) return t->sym;
+    s = g95_find_local_symbol(name, ns);
+    if (s != NULL) return s;
 
     ns = ns->parent;
   } while (ns != NULL);
@@ -1532,16 +1548,13 @@ g95_symtree *t;
 }
 
 
-/* g95_get_symbol()-- Given a name, search the current namespace on up
- * for the symbol.  If we don't find it anywhere, create the symbol in
- * the current space. */
 
-g95_symbol *g95_get_symbol(char *name, g95_namespace *ns) {
-g95_symbol *p;
 
-  if (ns == NULL) ns = g95_current_ns;
+/* mark_new_symbol()-- Take care of bookkeeping that lets us mark new
+ * symbols for possible undoing later. */
 
-  p = g95_find_symbol(name, ns);
+static g95_symbol *mark_new_symbol(g95_symbol *p, char *name,
+				   g95_namespace *ns) {
 
   if (p != NULL && p->mark == 0) {
     p->mark = 1;
@@ -1560,6 +1573,35 @@ g95_symbol *p;
     insert_node(ns, name)->sym = p;
   }
 
+  return p;
+}
+
+
+/* g95_get_symbol()-- Given a name, search the current namespace on up
+ * for the symbol.  If we don't find it anywhere, create the symbol in
+ * the current space. */
+
+g95_symbol *g95_get_symbol(char *name, g95_namespace *ns) {
+g95_symbol *p;
+
+  if (ns == NULL) ns = g95_current_ns;
+
+  p = g95_find_symbol(name, ns);
+  p = mark_new_symbol(p, name, ns);
+  return p;
+}
+
+
+/* get_local_symbol()-- Given a name, search the local namespace for
+ * the symbol, creating it if not found. */
+
+g95_symbol *get_local_symbol(char *name, g95_namespace *ns) {
+g95_symbol *p;
+
+  if (ns == NULL) ns = g95_current_ns;
+
+  p = g95_find_local_symbol(name, ns);
+  p = mark_new_symbol(p, name, ns);
   return p;
 }
 
@@ -1780,6 +1822,19 @@ g95_symbol *s;
   g95_show_components(sym);
 
   g95_status(")\n");
+}
+
+
+/* g95_traverse_symtree()-- Recursively traverse the symtree nodes. */
+
+void g95_traverse_symtree(g95_symtree *st, void (*func)(g95_symtree *)) {
+
+  if (st != NIL) {
+    (*func)(st);
+
+    g95_traverse_symtree(st->left, func);
+    g95_traverse_symtree(st->right, func);
+  }
 }
 
 

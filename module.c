@@ -49,6 +49,9 @@ static FILE *module_fp;
 static int module_line, module_column;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
 
+static int sym_num;
+static g95_symtree *name_index;
+
 
 
 /* g95_free_rename()-- Free the rename list left behind by a USE
@@ -1152,8 +1155,111 @@ g95_expr *e;
 
 
 
+/************************* Top level subroutines *************************/
 
 
+/* number_symbol()-- Worker function called by g95_traverse_symtree to
+ * assign a serial number to each symtree node within a namespace */
+
+static void number_symbol(g95_symtree *st) {
+
+  st->serial = sym_num++;
+}
+
+
+/* write_symtree()-- Write a symtree name on the output */
+
+static void write_symtree(g95_symtree *st) {
+
+  write_atom(ATOM_NAME, st->name);
+}
+
+
+
+
+
+
+
+static void read_ns(g95_namespace *ns) {
+int i, n;
+
+  require_atom(ATOM_INTEGER);
+  n = atom_int;
+
+  name_index = g95_getmem(n*sizeof(g95_symtree *));
+
+  for(i=0; i<n; i++) {
+    require_atom(ATOM_NAME);
+    //    name_index[i] = get_symbol(atom_name);
+  }
+
+  /* Read zero or more symbol definitions */
+
+  for(;;) {
+    if (peek_atom() == ATOM_RPAREN) break;
+    //    read_symbol();
+  }
+}
+
+
+
+
+
+static void write_symbol(g95_symtree *st) {
+
+
+}
+
+static void write_name(g95_symtree *st) {
+
+
+}
+
+
+
+static void write_ns(g95_namespace *ns) {
+
+  sym_num = 0;
+
+  g95_traverse_symtree(ns->root, number_symbol);
+
+  write_atom(ATOM_INTEGER, &sym_num);
+
+  g95_traverse_symtree(ns->root, write_name);  /* Traversal is in same order */
+
+
+/* Write symbols.  The only ordering issue I can think of at the
+ * moment is that structure definitions have to be written first in
+ * order to reconstruct a component reference in a g95_ref list.  It
+ * appears to be OK to write the structure references themselves in
+ * any order */
+
+  g95_traverse_symtree(ns->root, write_symbol);
+
+}
+
+
+/* mio_namespace()-- Read and write namespaces (modules).  This
+ * subroutine is unlike all of the other mio_* subroutines in that the
+ * reading mode updates an existing structure. */
+
+void mio_namespace(g95_namespace *ns) {
+g95_symtree *name_index_save;
+
+  name_index_save = name_index;
+  name_index = NULL;
+
+
+  mio_lparen();
+
+  /* The first task is to list the symbols we're about to spew */
+
+
+  mio_rparen();
+
+  if (name_index != NULL) g95_free(name_index);
+  name_index = name_index_save;
+}
 
 
 
