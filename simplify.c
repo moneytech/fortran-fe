@@ -2440,9 +2440,13 @@ g95_expr *e;
   e = g95_get_expr();
   e->where = source->where;
   e->expr_type = EXPR_ARRAY;
-  e->value.constructor = head;
-  e->ts = head->expr->ts;
+  e->value.constructor.head = head;
+  e->value.constructor.shape = g95_get_cons_shape (rank);
 
+  for(i=0; i<rank; i++)
+    mpz_init_set_ui(e->value.constructor.shape[i], shape[order[i]]);
+
+  e->ts = head->expr->ts;
   e->rank = rank;
 
   return e;

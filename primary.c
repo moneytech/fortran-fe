@@ -1499,7 +1499,7 @@ match m;
   e->ts.derived = sym;
   e->where = where;
 
-  e->value.constructor = head;
+  e->value.constructor.head = head;
 
   *result = e;
   return MATCH_YES;  

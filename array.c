@@ -562,10 +562,10 @@ g95_expr *result;
 void g95_append_constructor(g95_expr *base, g95_expr *new) {
 g95_constructor *c;
 
-  if (base->value.constructor == NULL)
-    base->value.constructor = c = g95_get_constructor();
+  if (base->value.constructor.head == NULL)
+    base->value.constructor.head = c = g95_get_constructor();
   else {
-    c = base->value.constructor;
+    c = base->value.constructor.head;
     while(c->next)
       c=c->next;
 
@@ -600,7 +600,7 @@ g95_constructor *next;
 
 
 /* check_duplicate_iterator()-- Given an expression node that might be an 
- * array constructor and a symbol, make sure than no iterators in this or
+ * array constructor and a symbol, make sure that no iterators in this or
  * child constructors use the symbol as an implied-DO iterator. 
  * Returns nonzero if a duplicate was found. */
 
@@ -611,7 +611,7 @@ g95_expr *e;
     e = c->expr;
 
     if (e->expr_type == EXPR_ARRAY &&
-	check_duplicate_iterator(e->value.constructor, master)) return 1;
+	check_duplicate_iterator(e->value.constructor.head, master)) return 1;
 
     if (c->iterator == NULL) continue;
 
@@ -689,7 +689,7 @@ int n;
   e = g95_get_expr();
   e->expr_type = EXPR_ARRAY;
   e->where = old_loc;
-  e->value.constructor = head;
+  e->value.constructor.head = head;
 
   p = g95_get_constructor();
   p->where = *g95_current_locus();
@@ -774,7 +774,7 @@ empty:
 
   expr->expr_type = EXPR_ARRAY;
 
-  expr->value.constructor = head;
+  expr->value.constructor.head = head;
   expr->where = where;
   expr->rank = 1;
 
@@ -838,7 +838,7 @@ g95_expr *e;
     e = c->expr;
 
     if (e->expr_type == EXPR_ARRAY) {
-      if (check_constructor_type(e->value.constructor) == FAILURE)
+      if (check_constructor_type(e->value.constructor.head) == FAILURE)
 	return FAILURE;
 
       continue;
@@ -861,7 +861,7 @@ try t;
   cons_state = CONS_START;
   g95_clear_ts(&constructor_ts);
 
-  t = check_constructor_type(e->value.constructor);
+  t = check_constructor_type(e->value.constructor.head);
   if (t == SUCCESS && e->ts.type == BT_UNKNOWN) e->ts = constructor_ts;
 
   return t;
@@ -920,7 +920,7 @@ try t;
     element.iterator = c->iterator;
 
     base = &element;
-    t = check_constructor(e->value.constructor, check_function);
+    t = check_constructor(e->value.constructor.head, check_function);
     base = element.previous;
 
     if (t == FAILURE) return FAILURE;
@@ -944,7 +944,7 @@ try t;
   base_save = base;
   base = NULL;
 
-  t = check_constructor(expr->value.constructor, check_function);
+  t = check_constructor(expr->value.constructor.head, check_function);
   base = base_save;
 
   return t;
@@ -1086,7 +1086,7 @@ try t;
   iter_stack = &frame;
 
   while(mpz_sgn(trip) > 0) {
-    if (expand_constructor(c->expr->value.constructor) == FAILURE)
+    if (expand_constructor(c->expr->value.constructor.head) == FAILURE)
       goto cleanup;
 
     mpz_add(frame.value, frame.value, step->value.integer);
@@ -1126,7 +1126,7 @@ g95_expr *e;
     e = c->expr;
 
     if (e->expr_type == EXPR_ARRAY) {
-      if (expand_constructor(e->value.constructor) == FAILURE) return FAILURE;
+      if (expand_constructor(e->value.constructor.head) == FAILURE) return FAILURE;
       continue;
     }
 
@@ -1158,13 +1158,13 @@ g95_expr *f;
 
   expand_work_function = expand;
 
-  if (expand_constructor(e->value.constructor) == FAILURE) {
+  if (expand_constructor(e->value.constructor.head) == FAILURE) {
     g95_free_constructor(new_head);
     return FAILURE;
   }
 
-  g95_free_constructor(e->value.constructor);
-  e->value.constructor = new_head;
+  g95_free_constructor(e->value.constructor.head);
+  e->value.constructor.head = new_head;
 
   return SUCCESS;
 }
@@ -1196,7 +1196,7 @@ int g95_constant_ac(g95_expr *e) {
   iter_stack = NULL;
   expand_work_function = constant_element;
 
-  if (expand_constructor(e->value.constructor) == FAILURE) return 0;
+  if (expand_constructor(e->value.constructor.head) == FAILURE) return 0;
 
   return 1;
 }
@@ -1229,7 +1229,7 @@ try t;
 try g95_resolve_array_constructor(g95_expr *expr) {
 try t;
 
-  t = resolve_array_list(expr->value.constructor);
+  t = resolve_array_list(expr->value.constructor.head);
   if (t == SUCCESS) t = g95_check_constructor_type(expr);
 
   return t;
@@ -1288,7 +1288,7 @@ g95_expr *g95_get_array_element(g95_expr *array, int element) {
 
   iter_stack = NULL;
 
-  if (expand_constructor(array->value.constructor) == FAILURE) return NULL;
+  if (expand_constructor(array->value.constructor.head) == FAILURE) return NULL;
 
   return extracted;
 }
@@ -1449,7 +1449,7 @@ try t;
     expand_work_function = count_elements;
     iter_stack = NULL;
 
-    t = expand_constructor(array->value.constructor);
+    t = expand_constructor(array->value.constructor.head);
     g95_suppress_error = flag;
 
     if (t == SUCCESS) mpz_init_set_ui(*result, count);

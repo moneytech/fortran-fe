@@ -704,11 +704,16 @@ typedef struct g95_expr {
       char *string;
     } character;
 
-    struct g95_constructor *constructor;
+    struct {
+      struct g95_constructor *head;
+      mpz_t *shape; /* For reshaped constructors.  */
+    } constructor;
   } value;
 
 } g95_expr;
 
+#define g95_get_cons_shape(rank) \
+    ((mpz_t *)g95_getmem(rank*sizeof(mpz_t)))
 
 /* Structures for information associated with different kinds of
  * numbers.  The first set of integer parameters define all there is
@@ -1383,6 +1388,7 @@ void g95_replace_expr(g95_expr *, g95_expr *);
 g95_expr *g95_int_expr(int);
 g95_expr *g95_logical_expr(int, locus *);
 g95_code *g95_build_call(char *, ...);
+mpz_t *g95_copy_cons_shape(mpz_t *, int);
 g95_expr *g95_copy_expr(g95_expr *);
 
 try g95_specification_expr(g95_expr *);

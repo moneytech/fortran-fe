@@ -1,4 +1,13 @@
 2002-09-19  Paul Brook  <paul@nowt.org>
+	
+	* trans-array.c (g95_get_array_cons_size): New Function.
+	(g95_con_ss_startstride): Handle Array constructors.
+	(g95_conv_loop_setup): Ditto.
+	(g95_conv_array_parameter): Ditto.
+	* tras-decl.c (g95_finish_var_decl): Make initializes variables
+	static.
+
+2002-09-19  Paul Brook  <paul@nowt.org>
 
 	* trans.c (g95_simple_fold_tmp): Detect variables inside
 	NON_LVALUE_EXPR.
@@ -8,7 +17,7 @@
 
 	* Make-lang.in (F95_ADDITIONAL_OBJS): Add tree-ssa-dce.o
 
-2002-09-14  Paul Brook <paul@nowt.org>
+2002-09-14  Paul Brook  <paul@nowt.org>
 
 	* trans.c (g95_create_module_variable): Move to trans-decl.c.
 	* trans-const.c (g95_conv_string_init): New Function.

@@ -1781,6 +1781,41 @@ char *p;
 }
 
 
+/* mio_cons_shape()-- Save and restore the shape of an array constructor. */
+
+static void mio_cons_shape (mpz_t **pshape, int rank) {
+mpz_t *shape;
+atom_type t;
+int n;
+
+  /* A NULL shape is represented by ().  */
+  mio_lparen ();
+
+  if (iomode == IO_OUTPUT) {
+    shape = *pshape;
+    if (!shape) {
+      mio_rparen();
+      return;
+    }
+  } else {
+    t = peek_atom();
+    if (t == ATOM_RPAREN) {
+      *pshape = NULL;
+      mio_rparen();
+      return;
+    }
+
+    shape = g95_get_cons_shape(rank);
+    *pshape = shape;
+  }
+
+  for(n=0; n<rank; n++)
+    mio_gmp_integer (&shape[n]);
+
+  mio_rparen();
+}
+
+
 static mstring expr_types[] = {
   minit("OP",         EXPR_OP),         minit("FUNCTION",   EXPR_FUNCTION),
   minit("CONSTANT",   EXPR_CONSTANT),   minit("VARIABLE",   EXPR_VARIABLE),
@@ -1914,7 +1949,8 @@ int flag;
     /* Fall through */
 
   case EXPR_ARRAY:
-    mio_constructor(&e->value.constructor);
+    mio_constructor(&e->value.constructor.head);
+    mio_cons_shape(&e->value.constructor.shape, e->rank);
     break;
 
   case EXPR_CONSTANT:

@@ -1566,8 +1566,8 @@ arith rc;
 
   rc = ARITH_OK;
 
-  head = op->value.constructor;
-  op->value.constructor = NULL;   /* Reuse the constructor */
+  head = op->value.constructor.head;
+  op->value.constructor.head = NULL;   /* Reuse the constructor */
 
   for(c=head; c; c=c->next) {
     rc = eval(c->expr, &r);
@@ -1581,7 +1581,11 @@ arith rc;
   else {
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
-    r->value.constructor = head;
+    r->value.constructor.head = head;
+    r->value.constructor.shape =
+      g95_copy_cons_shape(op->value.constructor.shape, op->rank);
+
+    op->value.constructor.shape = NULL;
     r->ts = head->expr->ts;
     r->where = op->where;
     r->rank = op->rank;
@@ -1601,8 +1605,8 @@ g95_constructor *c, *head;
 g95_expr *r;
 arith rc;
 
-  head = op1->value.constructor;   /* Re-use constructor list */ 
-  op1->value.constructor = NULL;
+  head = op1->value.constructor.head;   /* Re-use constructor list */
+  op1->value.constructor.head = NULL;
 
   rc = ARITH_OK;
 
@@ -1618,7 +1622,11 @@ arith rc;
   else {
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
-    r->value.constructor = head;
+    r->value.constructor.head = head;
+    r->value.constructor.shape =
+      g95_copy_cons_shape(op1->value.constructor.shape, op1->rank);
+
+    op1->value.constructor.shape = NULL;
     r->ts = head->expr->ts;
     r->where = op1->where;
     r->rank = op1->rank;
@@ -1636,8 +1644,8 @@ g95_constructor *c, *head;
 g95_expr *r;
 arith rc;
 
-  head = op2->value.constructor;   /* Re-use constructor list */ 
-  op2->value.constructor = NULL;
+  head = op2->value.constructor.head;   /* Re-use constructor list */
+  op2->value.constructor.head = NULL;
 
   rc = ARITH_OK;
 
@@ -1653,7 +1661,11 @@ arith rc;
   else {
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
-    r->value.constructor = head;
+    r->value.constructor.head = head;
+    r->value.constructor.shape =
+      g95_copy_cons_shape(op2->value.constructor.shape, op2->rank);
+
+    op2->value.constructor.shape = NULL;
     r->ts = head->expr->ts;
     r->where = op2->where;
     r->rank = op2->rank;
@@ -1672,11 +1684,11 @@ g95_constructor *c, *d, *head;
 g95_expr *r;
 arith rc;
 
-  head = op1->value.constructor;   /* Re-use constructor list */ 
-  op1->value.constructor = NULL;
+  head = op1->value.constructor.head;   /* Re-use constructor list */
+  op1->value.constructor.head = NULL;
 
   rc = ARITH_OK;
-  d = op2->value.constructor;
+  d = op2->value.constructor.head;
 
   for(c=head; c; c=c->next, d=d->next) {
     if (d == NULL) {
@@ -1697,7 +1709,11 @@ arith rc;
   else {
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
-    r->value.constructor = head;
+    r->value.constructor.head = head;
+    r->value.constructor.shape =
+      g95_copy_cons_shape(op1->value.constructor.shape, op1->rank);
+
+    op1->value.constructor.shape = NULL;
     r->ts = head->expr->ts;
     r->where = op1->where;
     r->rank = op1->rank;

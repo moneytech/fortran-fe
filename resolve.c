@@ -233,7 +233,7 @@ g95_component *comp;
 try t;
 
   t = SUCCESS;
-  cons = expr->value.constructor;
+  cons = expr->value.constructor.head;
   comp = expr->symbol->components;
 
   for(; comp; comp=comp->next, cons=cons->next) {

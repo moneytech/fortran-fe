@@ -799,7 +799,7 @@ g95_trans_array_constructor_value (tree * phead, tree * ptail, tree type,
         {
           /* Array constructors can be nested.  */
           g95_trans_array_constructor_value (&body, &body_tail, type, pointer,
-              c->expr->value.constructor, poffset, offsetvar);
+              c->expr->value.constructor.head, poffset, offsetvar);
         }
       else
         {
@@ -810,6 +810,8 @@ g95_trans_array_constructor_value (tree * phead, tree * ptail, tree type,
           n = 0;
           while (p && ! (p->iterator || p->expr->expr_type != EXPR_CONSTANT))
             {
+              if (p->expr->rank > 0)
+                g95_todo_error ("Array expressions in constructors");
               p = p->next;
               n++;
             }
@@ -928,6 +930,65 @@ g95_trans_array_constructor_value (tree * phead, tree * ptail, tree type,
     }
 }
 
+/* Get the size of an expression.  Returns -1 if the size isn't constant.
+   Implied do loops with non-constant bounds are tricky because we must only
+   evaluate the bounds once.  */
+static void
+g95_get_array_cons_size (mpz_t *size, g95_constructor * c)
+{
+  g95_iterator *i;
+  mpz_t val;
+  mpz_t len;
+
+  mpz_set_ui (*size, 0);
+  mpz_init (len);
+  mpz_init (val);
+
+  for (; c; c = c->next)
+    {
+      if (c->expr->expr_type == EXPR_ARRAY)
+        {
+          g95_get_array_cons_size (&len, c->expr->value.constructor.head);
+          if (mpz_sgn (len) < 0)
+            {
+              mpz_set (*size, len);
+              mpz_clear (len);
+              mpz_clear (val);
+              return;
+            }
+        }
+      else
+        {
+          if (c->expr->rank > 0)
+            g95_todo_error ("Array expressions in constructors");
+          mpz_set_ui (len, 1);
+        }
+
+      if (c->iterator)
+        {
+          i = c->iterator;
+
+          if (i->start->expr_type != EXPR_CONSTANT
+              || i->end->expr_type != EXPR_CONSTANT
+              || i->step->expr_type != EXPR_CONSTANT)
+            {
+              mpz_set_si (*size, -1);
+              mpz_clear (len);
+              mpz_clear (val);
+              return;
+            }
+
+          mpz_add (val, i->end->value.integer, i->start->value.integer);
+          mpz_tdiv_q (val, val, i->step->value.integer);
+          mpz_add_ui (val, val, 1);
+          mpz_mul (len, len, val);
+        }
+      mpz_add (*size, *size, len);
+    }
+  mpz_clear (len);
+  mpz_clear (val);
+}
+
 /* Array constructors are handled by constructing a temporary, then using that
    within the scalarization loop.  This is not optimal, seems by far the
    simplest method.  */
@@ -936,9 +997,9 @@ g95_trans_array_constructor (g95_loopinfo * loop, g95_ss * ss)
 {
   tree offset;
   tree offsetvar;
-  tree type;
   tree desc;
   tree size;
+  tree type;
 
   if (ss->expr->ts.type == BT_CHARACTER)
     g95_todo_error ("Character string array constructors");
@@ -951,13 +1012,15 @@ g95_trans_array_constructor (g95_loopinfo * loop, g95_ss * ss)
   offsetvar = create_tmp_alias_var (g95_array_index_type, "offset");
   TREE_USED (offsetvar) = 0;
   g95_trans_array_constructor_value (&loop->pre, &loop->pre_tail, type,
-      ss->data.info.data, ss->expr->value.constructor, &offset, &offsetvar);
+      ss->data.info.data, ss->expr->value.constructor.head, &offset,
+      &offsetvar);
 
   if (TREE_USED (offsetvar))
     pushdecl (offsetvar);
   else
     assert (INTEGER_CST_P (offset));
-
+#if 0
+  /* Disable bound checking for now cos it's probably broken.  */
   if (flag_bounds_check)
     {
       tree tmp;
@@ -969,6 +1032,7 @@ g95_trans_array_constructor (g95_loopinfo * loop, g95_ss * ss)
       g95_trans_runtime_check (tmp, g95_strconst_bounds,
                                &loop->pre, &loop->pre_tail);
     }
+#endif
 }
 
 /* Add the pre and post chains for all the scalar expressions in a SS chain
@@ -1908,17 +1972,30 @@ g95_conv_ss_startstride (g95_loopinfo * loop)
 
   loop->dimen = 0;
   /* Determine the rank of the loop.  */
-  for (ss = loop->ss; ss != g95_ss_terminator; ss = ss->loop_chain)
+  for (ss = loop->ss;
+       ss != g95_ss_terminator && loop->dimen == 0;
+       ss = ss->loop_chain)
     {
-      if (ss->type == G95_SS_SECTION)
+      switch (ss->type)
         {
+        case G95_SS_SECTION:
           loop->dimen = ss->data.info.dimen;
+          break;
+
+        case G95_SS_CONSTRUCTOR:
+          loop->dimen = ss->data.info.dimen;
+          break;
+
+        case G95_SS_FUNCTION:
+          break;
+
+        default:
           break;
         }
     }
 
   if (loop->dimen == 0)
-    internal_error ("Unable to determine rank of expression");
+    g95_todo_error ("Unable to determine rank of expression");
 
 
   /* loop over all the SS in the chain.  */
@@ -1931,8 +2008,14 @@ g95_conv_ss_startstride (g95_loopinfo * loop)
           g95_conv_ss_descriptor (loop, ss);
 
           for (n = 0; n < ss->data.info.dimen; n++)
+            g95_conv_section_startstride (loop, ss, n);
+          break;
+
+        case G95_SS_CONSTRUCTOR:
+          for (n = 0; n < ss->data.info.dimen; n++)
             {
-              g95_conv_section_startstride (loop, ss, n);
+              ss->data.info.start[n] = integer_zero_node;
+              ss->data.info.stride[n] = integer_one_node;
             }
           break;
 
@@ -2559,7 +2642,10 @@ g95_conv_loop_setup (g95_loopinfo * loop)
   tree var;
   tree len;
   g95_ss *loopspec[G95_MAX_DIMENSIONS];
+  mpz_t *cshape;
+  mpz_t i;
 
+  mpz_init (i);
   for (n = 0; n < loop->dimen; n++)
     {
       loopspec[n] = NULL;
@@ -2567,10 +2653,36 @@ g95_conv_loop_setup (g95_loopinfo * loop)
          loop for this dimension.  We try to pick the simplest term.  */
       for (ss = loop->ss ; ss != g95_ss_terminator ; ss = ss->loop_chain)
         {
+          if (ss->type == G95_SS_CONSTRUCTOR)
+            {
+              if (ss->expr->value.constructor.shape)
+                {
+                  /* The frontend has worked out the size for us.  */
+                  loopspec[n] = ss;
+                }
+              else
+                {
+                  /* Try to figure out the size of the constructior.  */
+                  g95_get_array_cons_size (&i,
+                      ss->expr->value.constructor.head);
+                  /* A negative value meens we failed. */
+                  if (mpz_sgn (i) > 0)
+                    {
+                      mpz_sub_ui (i, i, 1);
+                      loop->to[n] =
+                        g95_conv_mpz_to_tree (i, g95_array_index_kind);
+                      loopspec[n] = ss;
+                    }
+                }
+              continue;
+            }
+
+          /* We don't know how to handle functions yet.  */
           if (ss->type != G95_SS_SECTION)
             continue;
 
           info = &ss->data.info;
+
           if (loopspec[n])
             specinfo = &loopspec[n]->data.info;
           else
@@ -2578,6 +2690,7 @@ g95_conv_loop_setup (g95_loopinfo * loop)
           info = &ss->data.info;
 
           /* Criteria for choosing a loop specifier (most important first):
+              array constructor
               stride of one
               known stride
               known lower bound
@@ -2585,30 +2698,56 @@ g95_conv_loop_setup (g95_loopinfo * loop)
            */
           if (! specinfo)
             loopspec[n] = ss;
-          else if (integer_onep (info->stride[n])
-                    && ! integer_onep (specinfo->stride[n]))
-            loopspec[n] = ss;
-          else if (INTEGER_CST_P (info->stride[n])
-                    && ! INTEGER_CST_P (specinfo->stride[n]))
-            loopspec[n] = ss;
-          else if (INTEGER_CST_P (info->start[n])
-                    && ! INTEGER_CST_P (specinfo->start[n]))
-            loopspec[n] = ss;
-/* We don't work out the upper bound.
-          else if (INTEGER_CST_P (info->finish[n])
-                    && ! INTEGER_CST_P (specinfo->finish[n]))
-            loopspec[n] = ss;*/
+          else if (loopspec[n]->type != G95_SS_CONSTRUCTOR)
+            {
+              if (integer_onep (info->stride[n])
+                        && ! integer_onep (specinfo->stride[n]))
+                loopspec[n] = ss;
+              else if (INTEGER_CST_P (info->stride[n])
+                        && ! INTEGER_CST_P (specinfo->stride[n]))
+                loopspec[n] = ss;
+              else if (INTEGER_CST_P (info->start[n])
+                        && ! INTEGER_CST_P (specinfo->start[n]))
+                loopspec[n] = ss;
+              /* We don't work out the upper bound.
+              else if (INTEGER_CST_P (info->finish[n])
+                        && ! INTEGER_CST_P (specinfo->finish[n]))
+                loopspec[n] = ss;*/
+            }
         }
 
       if (! loopspec[n])
-        internal_error ("Unable to find scalarization loop specifier");
+        g95_todo_error ("Unable to find scalarization loop specifier");
 
       info = &loopspec[n]->data.info;
 
       /* Set the extents of this range.  */
       loop->from[n] = info->start[n];
-      loop->to[n] = g95_conv_section_upper_bound (loopspec[n], n, &loop->pre,
-                                                  &loop->pre_tail, NULL);
+      switch (loopspec[n]->type)
+        {
+        case G95_SS_CONSTRUCTOR:
+          cshape = loopspec[n]->expr->value.constructor.shape;
+          if (cshape)
+            {
+              mpz_set (i, cshape[n]);
+              mpz_sub_ui (i, i, 1);
+              loop->to[n] = g95_conv_mpz_to_tree (i, g95_array_index_kind);
+            }
+          else
+            {
+              assert (info->dimen == 1);
+              assert (loop->to[n]);
+            }
+          break;
+
+        case G95_SS_SECTION:
+          loop->to[n] = g95_conv_section_upper_bound (loopspec[n], n,
+              &loop->pre, &loop->pre_tail, NULL);
+          break;
+
+        default:
+          abort ();
+        }
       info->delta[n] = integer_zero_node;
 
       if (! integer_onep(info->stride[n]))
@@ -2653,6 +2792,8 @@ g95_conv_loop_setup (g95_loopinfo * loop)
 
   for (n = 0; n < loop->temp_dim; n++)
     loopspec[loop->order[n]] = NULL;
+
+  mpz_clear (i);
 
   /* For array parameters we don't have loop variables, so don't calculate the
      translations.  */
@@ -2959,14 +3100,13 @@ g95_trans_auto_array_allocation (tree descriptor, g95_symbol * sym)
   tree tail;
   tree len;
   g95_array_spec *as;
-  int dynamic;
 
   if (sym->attr.use_assoc)
     internal_error ("Use associated local array???");
 
   assert (! sym->attr.pointer || sym->attr.allocatable);
 
-  if (TREE_STATIC (descriptor))
+  if (TREE_STATIC (descriptor) || sym->attr.use_assoc)
     {
       assert (G95_DESCRIPTOR_TYPE_P (TREE_TYPE (descriptor)));
       offset = g95_build_array_initializer (sym);
@@ -2998,7 +3138,6 @@ g95_trans_auto_array_allocation (tree descriptor, g95_symbol * sym)
   g95_start_stmt();
   head = tail = NULL_TREE;
 
-  assert (! (sym->attr.save || sym->attr.use_assoc));
   as = sym->as;
 
   if (sym->ts.type == BT_CHARACTER)
@@ -3733,27 +3872,26 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
     g95_todo_error ("Character string array actual parameters");
 
   g95_init_loopinfo (&loop);
-  /* Find the first array section.  */
-  secss = ss;
-  while (secss != g95_ss_terminator
-         && secss->type != G95_SS_SECTION)
-    secss = secss->next;
-
-  /* TODO: Passing function array return values and array constructors as
-     actual parameters.  */
-  if (secss == g95_ss_terminator)
-    g95_todo_error ("scalarization failure: unable to determine shape of array parameter");
 
   ss = g95_reverse_ss (ss);
 
   /* Associate the SS with the loop.  */
   g95_add_ss_to_loop (&loop, ss);
 
-  /* If we have a single array section, we can pass it directly.  If we have an
-     expression or vector subscripts we need to copy it into a temporary.  */
+  /* TODO: Pass constant array constructors without a temporary.  */
+  /* If we have a linear array section, we can pass it directly.  Otherwise
+     we need to copy it into a temporary.  */
   if (expr->expr_type == EXPR_VARIABLE)
     {
       g95_ss *vss;
+
+      /* Find the SS for the array section.  */
+      secss = ss;
+      while (secss != g95_ss_terminator
+          && secss->type != G95_SS_SECTION)
+        secss = secss->next;
+
+      assert (secss != g95_ss_terminator);
 
       need_tmp = 0;
       for (n = 0; n < secss->data.info.dimen; n++)
@@ -3764,7 +3902,10 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
         }
     }
   else
-    need_tmp = 1;
+    {
+      need_tmp = 1;
+      secss = NULL;
+    }
 
   /* Tell the scalarizer not to bother creating loop varliables, etc.  */
   if (! need_tmp)
@@ -3796,6 +3937,7 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
       g95_se lse;
       g95_se rse;
 
+      /* TODO: Optimize passing function return values.  */
       g95_mark_ss_chain_used (loop.temp_ss, 1);
       g95_mark_ss_chain_used (ss, 1);
       g95_start_scalarized_body (&loop);
@@ -3893,6 +4035,7 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
           /* Otherwise make a copy of the descriptor and point it at
              the section we want.  The loop variable limits will be the limits
              of the section.  */
+          assert (secss && secss != g95_ss_terminator);
           parmtype = g95_get_element_type (type);
           parmtype = g95_get_array_type_bounds (parmtype, loop.dimen,
                                                loop.from, loop.to);
@@ -4043,13 +4186,17 @@ g95_trans_deferred_array (g95_symbol * sym, tree body)
   if (sym->attr.dummy)
     return body;
 
-  if (sym->attr.save)
-    return body;
-
   g95_get_backend_locus (&loc);
   g95_set_backend_locus (&sym->declared_at);
-  /* Get the descriptor type.  */
   descriptor = sym->backend_decl;
+
+  if (TREE_STATIC (descriptor))
+    {
+      g95_todo_error ("static deferred shape array");
+      return body;
+    }
+
+  /* Get the descriptor type.  */
   type = TREE_TYPE (sym->backend_decl);
   assert (G95_DESCRIPTOR_TYPE_P (type));
 
@@ -4061,7 +4208,7 @@ g95_trans_deferred_array (g95_symbol * sym, tree body)
 
   g95_set_backend_locus (&loc);
   /* Allocatable arrays need to be freed when they go out of scope.  */
-  if (sym->attr.allocatable && ! sym->attr.save)
+  if (sym->attr.allocatable)
     {
       g95_start_stmt ();
 
@@ -4362,11 +4509,15 @@ static g95_ss *
 g95_walk_array_constructor (g95_ss * ss, g95_expr * expr)
 {
   g95_ss *newss;
+  int n;
 
   newss = g95_get_ss ();
   newss->type = G95_SS_CONSTRUCTOR;
   newss->expr = expr;
   newss->next = ss;
+  newss->data.info.dimen = expr->rank;
+  for (n = 0; n < expr->rank; n++)
+    newss->data.info.dim[n] = n;
 
   return newss;
 }

@@ -137,6 +137,18 @@ int i;
 }
 
 
+static void free_cons_shape(mpz_t *shape, int rank) {
+int n;
+
+  if (shape == NULL) return;
+
+  for(n=0; n<rank; n++)
+    mpz_clear(shape[n]);
+
+  g95_free(shape);
+}
+
+
 /* g95_free_expr0()-- Workhorse function for g95_free_expr() that
  * frees everything beneath an expression node, but not the node
  * itself.  This is useful when we want to simplify a node and replace
@@ -187,7 +199,9 @@ static void g95_free_expr0(g95_expr *e) {
 
   case EXPR_ARRAY:
   case EXPR_STRUCTURE:
-    g95_free_constructor(e->value.constructor);
+    g95_free_constructor(e->value.constructor.head);
+    if (e->value.constructor.shape)
+      free_cons_shape(e->value.constructor.shape, e->rank);
     break;
 
   case EXPR_SUBSTRING:
@@ -287,6 +301,23 @@ g95_ref *dest;
 }
 
 
+/* g95_copy_cons_shape()-- Copy the shape of a constructor */
+
+mpz_t *g95_copy_cons_shape(mpz_t *shape, int rank) {
+mpz_t *new_shape;
+int n;
+
+  if (shape == NULL) return NULL;
+
+  new_shape = g95_get_cons_shape(rank);
+
+  for(n=0; n<rank; n++)
+    mpz_init_set(new_shape[n], shape[n]);
+
+  return new_shape;
+}
+
+
 /* g95_copy_expr()-- Given an expression pointer, return a copy of the
  * expression.  This subroutine is recursive. */
 
@@ -370,7 +401,10 @@ char *s;
 
   case EXPR_STRUCTURE:
   case EXPR_ARRAY:
-    q->value.constructor = g95_copy_constructor(p->value.constructor);
+    q->value.constructor.head =
+      g95_copy_constructor(p->value.constructor.head);
+    q->value.constructor.shape =
+      g95_copy_cons_shape(p->value.constructor.shape, p->rank);
     break;
 
   case EXPR_NULL:
@@ -648,7 +682,7 @@ int rv;
 
   case EXPR_STRUCTURE:
     rv = 0;
-    for(c=e->value.constructor; c; c=c->next)
+    for(c=e->value.constructor.head; c; c=c->next)
       if (!g95_is_constant_expr(c->expr)) break;
 
     if (c == NULL) rv = 1;
@@ -862,7 +896,7 @@ g95_actual_arglist *ap;
 
   case EXPR_STRUCTURE:
   case EXPR_ARRAY:
-    if (simplify_constructor(p->value.constructor, type) == FAILURE)
+    if (simplify_constructor(p->value.constructor.head, type) == FAILURE)
       return FAILURE;
 
     if (type == 1 && p->expr_type == EXPR_ARRAY &&
@@ -1467,13 +1501,13 @@ int i;
 
   case EXPR_STRUCTURE:
     g95_status("%s(", p->symbol->name);
-    show_constructor(p->value.constructor);
+    show_constructor(p->value.constructor.head);
     g95_status_char(')');
     break;
 
   case EXPR_ARRAY:
     g95_status("(/ ");
-    show_constructor(p->value.constructor);
+    show_constructor(p->value.constructor.head);
     g95_status(" /)");
 
     show_ref(p->ref);

@@ -19,7 +19,7 @@ along with GNU G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-/* be-function.c -- handling of backend function declarations, etc */
+/* trans-decl.c -- Handling of backend function and variable decls, etc */
 
 #include "config.h"
 #include "system.h"
@@ -322,7 +322,8 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
       TREE_STATIC (decl) = 1;
     }
 
-  if (sym->attr.save)
+  if ((sym->attr.save || sym->attr.data || sym->value)
+      && ! sym->attr.use_assoc)
     TREE_STATIC (decl) = 1;
 }
 
@@ -824,7 +825,6 @@ g95_build_function_decl (g95_symbol * sym)
                     TREE_USED (length) = 1;
                   G95_DECL_STRING_LENGTH (parm) = length;
                 }
-              //parm = pushdecl (parm);
               g95_finish_decl (parm, NULL_TREE);
 
               f->sym->backend_decl=parm;
