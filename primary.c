@@ -1078,7 +1078,7 @@ match m;
   if (m != MATCH_YES) return MATCH_NO;
 
   if (g95_match(" :") != MATCH_YES) {
-    m = g95_match(" %e", &start);
+    m = g95_match_expr(&start);
     if (m != MATCH_YES) {
       m = MATCH_NO;
       goto cleanup;
@@ -1089,7 +1089,7 @@ match m;
   }
 
   if (g95_match(" )") != MATCH_YES) {
-    m = g95_match(" %e", &end);
+    m = g95_match_expr(&end);
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
 
@@ -1201,9 +1201,6 @@ check_substring:
       break;
 
     case MATCH_ERROR:
-      g95_free_expr(substring->start);
-      g95_free_expr(substring->end);
-      g95_free(substring);
       return MATCH_ERROR;
     }
   }
