@@ -687,6 +687,8 @@ typedef struct {
 
 } g95_logical_info;
 
+extern g95_logical_info g95_logical_kinds[];
+
 typedef struct {
   int kind, radix, digits, min_exponent, max_exponent;
 

@@ -1392,6 +1392,16 @@ int i, j;
       add_conv(BT_COMPLEX, g95_real_kinds[i].kind,
 	       BT_REAL,    g95_real_kinds[j].kind, convert_constant);
     }
+
+  /* Logical/Logical kind conversion */
+
+  for(i=0; g95_logical_kinds[i].kind; i++)
+    for(j=0; g95_logical_kinds[j].kind; j++) {
+      if (i == j) continue;
+
+      add_conv(BT_LOGICAL, g95_real_kinds[i].kind,
+	       BT_LOGICAL, g95_real_kinds[j].kind, convert_constant);
+    }
 }
 
 
