@@ -409,20 +409,29 @@ static mstring operators_out[] = {
 
 match g95_match_iterator(g95_iterator *iter) {
 g95_expr *var, *e1, *e2, *e3;
+locus start;
 match m;
 
-  m = g95_match(" %e =", &var);
+  start = *g95_current_locus();
+
+  m = g95_match_variable(&var, 0);
   if (m != MATCH_YES) return MATCH_NO;
+
+  if (g95_match_char('=') != MATCH_YES) {
+    g95_set_locus(&start);
+    return MATCH_NO;
+  }
 
   e1 = e2 = e3 = NULL;
 
-  if (var->expr_type != EXPR_VARIABLE) {
-    g95_error("Loop variable expected for DO loop at %C");
+  if (var->ref != NULL) {
+    g95_error("Loop variable at %C cannot be a sub-component");
     goto cleanup;
   }
 
-  if (var->ref != NULL) {
-    g95_error("Loop variable at %C must be a scalar variable");
+  if (var->symbol->attr.intent == INTENT_IN) {
+    g95_error("Loop variable '%s' at %C cannot be INTENT(IN)",
+	      var->symbol->name);
     goto cleanup;
   }
 
@@ -1377,6 +1386,12 @@ match m;
     if (m == MATCH_YES) break;
   }
 
+  if (stat != NULL && stat->symbol->attr.intent == INTENT_IN) {
+    g95_error("STAT variable '%s' of ALLOCATE statement at %C cannot be "
+	      "INTENT(IN)", stat->symbol->name);
+    goto cleanup;
+  }
+
   if (g95_match(" )%t") != MATCH_YES) goto syntax;
 
   new_st.op = EXEC_ALLOCATE;
@@ -1478,6 +1493,12 @@ match m;
     m = g95_match(" stat = %v", &stat);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_YES) break;
+  }
+
+  if (stat != NULL && stat->symbol->attr.intent == INTENT_IN) {
+    g95_error("STAT variable '%s' of DEALLOCATE statement at %C cannot be "
+	      "INTENT(IN)", stat->symbol->name);
+    goto cleanup;
   }
 
   if (g95_match(" )%t") != MATCH_YES) goto syntax;

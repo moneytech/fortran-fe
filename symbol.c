@@ -281,15 +281,19 @@ int i;
 
 
 /* g95_check_assign()-- Given an assignable expression and an
- * arbitrary expression, make sure that the assignment can take place.
- *
- * If the root symbol associated with the variable has no type, then
- * we try to give it the default type. */
+ * arbitrary expression, make sure that the assignment can take
+ * place. */
 
 try g95_check_assign(g95_expr *lvalue, g95_expr *rvalue) {
 g95_symbol *sym;
 
-  sym = lvalue->symbol; 
+  sym = lvalue->symbol;
+
+  if (sym->attr.intent == INTENT_IN) {
+    g95_error("Can't assign to INTENT(IN) variable '%s' at %L",
+	      sym->name, &lvalue->where);
+    return FAILURE;
+  }
 
   if (lvalue->ts.type == BT_DERIVED && rvalue->ts.type == BT_DERIVED &&
       lvalue->ts.derived != rvalue->ts.derived) {

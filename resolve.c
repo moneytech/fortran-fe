@@ -549,7 +549,9 @@ g95_expr *e;
 
 
 /* resolve_function()-- Resolve a function call, which means resolving
- * the arguments, then figuring out which entity the name refers to. */
+ * the arguments, then figuring out which entity the name refers to.
+ * TODO: Check procedure arguments so that an INTENT(IN) isn't passed
+ * to INTENT(OUT) or INTENT(INOUT).  */
 
 static try resolve_function(g95_expr *expr) {
 try t;

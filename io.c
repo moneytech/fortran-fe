@@ -111,6 +111,12 @@ match m;
     return MATCH_ERROR;
   }
 
+  if (result->symbol->attr.intent == INTENT_IN) {
+    g95_error("Variable tag cannot be INTENT(IN) at %C");
+    g95_free_expr(result);
+    return MATCH_ERROR;
+  }
+
   *v = result;
   return MATCH_YES;
 }
@@ -535,6 +541,24 @@ conflict:
 }
 
 
+/* check_namelist()-- Traverse a namelist that is part of a READ
+ * statement to make sure that none of the variables in the namelist
+ * are INTENT(IN).  Returns nonzero if we find such a variable */
+
+static int check_namelist(g95_symbol *sym) {
+g95_namelist *p;
+
+  for(p=sym->namelist; p; p=p->next)
+    if (p->sym->attr.intent == INTENT_IN) {
+      g95_error("Symbol '%s' in namelist '%s' is INTENT(IN) at %C",
+		p->sym->name, sym->name);
+      return 1;
+    }
+
+  return 0;
+}
+
+
 /* match_dt_element()-- Match a single data transfer element */
 
 static match match_dt_element(io_kind k, g95_dt *dt) {
@@ -563,6 +587,8 @@ match m;
     }
 
     dt->namelist = sym;
+    if (k == M_READ && check_namelist(sym)) return MATCH_ERROR;
+
     return MATCH_YES;
   }
 
@@ -609,21 +635,25 @@ g95_expr *e;
   resolve_tag(&tag_format, dt->format_expr);
   resolve_tag(&tag_rec, dt->rec);
   resolve_tag(&tag_advance, dt->advance);
-
-  e = dt->io_unit;
-  if (g95_resolve_expr(e) == SUCCESS) {
-    if (e->ts.type != BT_INTEGER &&
-	(e->ts.type != BT_CHARACTER || e->expr_type != EXPR_VARIABLE))
-      g95_error("UNIT specification at %L must be INTEGER expression or "
-		"CHARACTER variable", &e->where);
-  }
-
   resolve_tag(&tag_iostat, dt->iostat);
   resolve_tag(&tag_size, dt->size);
+
+  e = dt->io_unit;
+  if (g95_resolve_expr(e) == SUCCESS &&
+      (e->ts.type != BT_INTEGER &&
+       (e->ts.type != BT_CHARACTER || e->expr_type != EXPR_VARIABLE))) {
+    g95_error("UNIT specification at %L must be an INTEGER expression or a "
+	      "CHARACTER variable", &e->where);
+    return;
+  }
 
 /* Sanity checks on data transfer statements */
 
   if (e->ts.type == BT_CHARACTER) {
+    if (e->symbol->attr.intent == INTENT_IN)
+      g95_error("Internal file '%s' at %L is INTENT(IN)",
+		e->symbol->name, &e->where);
+
     if (dt->rec != NULL)
       g95_error("REC tag at %L is incompatible with internal file",
 		&dt->rec->where);
@@ -826,6 +856,8 @@ static match match_io_element(io_kind k, g95_code **c) {
 g95_expr *expr;
 match m;
 
+  expr = NULL; 
+
   m = match_io_iterator(k, c);
   if (m == MATCH_YES) return MATCH_YES;
 
@@ -838,7 +870,18 @@ match m;
 				 io_kind_name(k));
   }
 
-  if (m != MATCH_YES) return MATCH_ERROR;
+  if (m == MATCH_YES && k == M_READ &&
+      expr->symbol->attr.intent == INTENT_IN) {
+
+    g95_error("Variable '%s' in input list at %C cannot be INTENT(IN)",
+	      expr->symbol->name);
+    m = MATCH_ERROR;
+  }
+
+  if (m != MATCH_YES) {
+    g95_free_expr(expr);
+    return MATCH_ERROR;
+  }
 
   *c = gen_io_pointer(expr);
   return MATCH_YES;
@@ -925,6 +968,7 @@ match m;
 
   if (g95_match_symbol(&sym) == MATCH_YES && sym->attr.flavor == FL_NAMELIST) {
     dt->namelist = sym;
+    if (k == M_READ && check_namelist(sym)) goto cleanup;
     goto next;
   }
 
@@ -948,7 +992,7 @@ loop:
 
 get_io_list:
   if (!comma_flag) g95_match_char(',');
-     /* Optional leading comma (non-standard) */
+    /* Optional leading comma (non-standard) */
 
   io_code = NULL;
   if (g95_match_eos() != MATCH_YES) {
@@ -965,8 +1009,10 @@ get_io_list:
 
   term = g95_build_call(&io_done, NULL);
 
-  if (io_code == NULL) io_code = term;
-  else g95_append_code(io_code, term);
+  if (io_code == NULL)
+    io_code = term;
+  else
+    g95_append_code(io_code, term);
 
 /* A full IO statement has been matched */
 

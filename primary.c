@@ -1779,8 +1779,9 @@ match m;
 
 /* g95_match_variable()-- Match a variable, ie something that can be
  * assigned to.  This starts as a symbol, can be a structure component
- * or an array reference.  It cannot be a function.  If the symbol has
- * not been previously seen, we assume it is a variable. */
+ * or an array reference.  It can be a function if the function
+ * doesn't have a separate RESULT variable.  If the symbol has not
+ * been previously seen, we assume it is a variable. */
 
 match g95_match_variable(g95_expr **result, int equiv_flag) {
 g95_symbol *sym;
