@@ -1,10 +1,11 @@
-CC=gcc
-CFLAGS=-c -g -pedantic -Wall -Wwrite-strings
-GMPDIR=gmp
-LDFLAGS=-g
-LIBS=-lgmp
-RM=rm -f
 
+CC=@CC@
+CFLAGS=@CFLAGS@
+CPPFLAGS=@CPPFLAGS@
+LDFLAGS=@LDFLAGS@
+LIBS=@LIBS@
+
+RM=rm -f
 EXE=g95
 
 OBJS=module.o matchexp.o format.o io.o scanner.o error.o parse.o expr.o \
@@ -13,17 +14,11 @@ OBJS=module.o matchexp.o format.o io.o scanner.o error.o parse.o expr.o \
 
 g95: $(OBJS) date.c
 	@$(CC) -c date.c
-	$(CC) $(LDFLAGS) -o $@ date.o $(OBJS) -L$(GMPDIR)/.libs $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ date.o $(OBJS) $(LIBS)
 	@rm date.o
 
-intrinsic.o: intrinsic.c simplify.h g95.h
-	$(CC) $(CFLAGS) -I$(GMPDIR) intrinsic.c
-
-simplify.o: simplify.c simplify.h g95.h
-	$(CC) $(CFLAGS) -I$(GMPDIR) simplify.c
-
 %.o: %.c g95.h
-	$(CC) $(CFLAGS) -I$(GMPDIR) $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) $<
 
 clean:
 	$(RM) $(EXE) *.o

@@ -1,0 +1,58 @@
+
+AC_INIT(g95.h)
+
+AC_CANONICAL_HOST
+AC_PROG_CC
+
+CPPFLAGS=
+LDFLAGS=-g
+LIBS=-lgmp
+
+AC_ARG_WITH(gmp-dir, [--with-gmp-dir=PATH       Specify directory for the GMP library])
+
+if test ! -z "$with_gmp_dir" ; then
+   CPPFLAGS="-I$with_gmp_dir $CPPFLAGS"
+
+   AC_MSG_CHECKING(for GMP library)
+
+   if test -f $with_gmp_dir/.libs/libgmp.a ; then
+     LDFLAGS="-L$with_gmp_dir/.libs $LDFLAGS"
+     AC_MSG_RESULT([Ok, found in $with_gmp_dir/.libs])
+
+# Test suite stores the library relative to the host type
+
+   elif test -f $with_gmp_dir/$host/libgmp.a ; then
+     LDFLAGS="-L$with_gmp_dir/$host $LDFLAGS"
+     AC_MSG_RESULT([Ok, found in $with_gmp_dir/$host])
+
+   else
+     AC_MSG_RESULT([Can't find in $with_gmp_dir])
+   fi
+fi
+
+AC_CHECK_HEADER(gmp.h,, AC_MSG_ERROR(gmp.h not found))
+
+# Try to link against libgmp
+
+AC_MSG_CHECKING(linking with gmp library)
+
+AC_TRY_RUN([
+#include "gmp.h"
+int main() { mpf_t n; mpf_init(n); return 0; }
+], [AC_MSG_RESULT(ok)], AC_ERROR(Can't link with libgmp),
+    AC_ERROR(Can't Cross Compile))
+
+# Make sure we have version 3 or greater of GMP.
+
+AC_MSG_CHECKING(version of gmp library)
+
+AC_TRY_RUN([
+#include "gmp.h"
+int main() { return __GNU_MP_VERSION < 3; }
+], [ AC_MSG_RESULT(ok) ], AC_ERROR(Need version 3.0 or later of GMP), AC_ERROR())
+
+
+CFLAGS="-c -g -pedantic -Wall -Wwrite-strings"
+
+AC_OUTPUT(Makefile)
+
