@@ -21,7 +21,7 @@ The patch changes gcc's configure.in, so cd to '$GCC_SRC/gcc' and run
 'autoconf' to get a new configure script.
 
 cd to $GCC_SRC and Configure GCC as normal with the arguments:
---enable-languages=c,f95 --with-gmp-dir=<top level GMP directory>
+--enable-languages=c,f95 --with-gmp-dir=<top level GMP directory> --disable-shared
 Don't use the G95 configure system.
 
 Configure and build the runtime library in g95/runtime.  This leaves
