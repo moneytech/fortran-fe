@@ -35,22 +35,6 @@ typedef struct case_tree {
 case_tree;
 
 
-/* compare_case_expr() -- compare two expressions of of types
- * that are allowed in the eval-expr of a select case block */
-
-static int compare_case_expr(g95_expr *e1, g95_expr *e2) {
-  switch(e1->ts.type) {
-    case BT_INTEGER:   return g95_compare_expr(e1,e2);
-    case BT_CHARACTER: return g95_compare_string(e1,e2,NULL);
-    case BT_LOGICAL:   return (e1->value.logical - e2->value.logical);
-    default:
-      g95_internal_error("Expression at %L cannot be a case expression",
-                          &e1->where);
-      return 0;
-  }
-}
-
-
 /* compare_cases() -- helper function for overlap checker.
  * determines interval overlaps for CASEs. Return <0 if op1 < op2,
  * 0 for overlap, >0 for op1 > op2. 
@@ -58,8 +42,8 @@ static int compare_case_expr(g95_expr *e1, g95_expr *e2) {
 
 static int compare_cases(g95_case *op1, g95_case *op2) {
 
-  if (compare_case_expr(op1->high,op2->low) < 0) return -1;
-  if (compare_case_expr(op1->low,op2->high) > 0) return 1;
+  if (g95_compare_expr(op1->high, op2->low) < 0) return -1;
+  if (g95_compare_expr(op1->low, op2->high) > 0) return 1;
   return 0;
 }
 
@@ -118,9 +102,9 @@ int i;
       while(p->link[i] != NULL) 
         p = p->link[i];
       if (i == 0) {
-        if (compare_case_expr(cp->high,p->low) >= 0) goto overlap;
+        if (g95_compare_expr(cp->high,p->low) >= 0) goto overlap;
       } else {
-        if (compare_case_expr(cp->low,p->high) <= 0) goto overlap;
+        if (g95_compare_expr(cp->low,p->high) <= 0) goto overlap;
       }
     }
 
@@ -543,7 +527,7 @@ try t;
       }      
  
       if (cp->low != NULL && cp->high != NULL && cp->low != cp->high) {
-        if (compare_case_expr(cp->low,cp->high) > 0) {
+        if (g95_compare_expr(cp->low, cp->high) > 0) {
           g95_warning("Range specification at %L can never be matched;\n\t "
                       "first expression greater than second expression",
                       &cp->high->where);
