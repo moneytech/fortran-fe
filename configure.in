@@ -1,5 +1,5 @@
 AC_INIT(g95.h)
-AM_INIT_AUTOMAKE(g95, 0.17)
+AM_INIT_AUTOMAKE(g95, 0.18)
 AM_CONFIG_HEADER(config.h)
 
 #############################################################################
@@ -52,7 +52,7 @@ if test "$ok" = "yes"; then
 	# Add more compiler warnings if we are using gcc:
 	# ($GCC is set to "yes" by AC_PROG_CC if we are using gcc.)
 	if test "$GCC" = "yes"; then
-        	CFLAGS="$CFLAGS -pedantic -Wall -Wwrite-strings"
+        	CFLAGS="$CFLAGS -pedantic -Wall"
 	fi
 
         AC_DEFINE(G95_DEBUG,1,[Define to turn on debugging checks.])

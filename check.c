@@ -233,7 +233,16 @@ char *message;
 
 static try variable_check(g95_expr *e, int n) {
 
-  if (e->expr_type == EXPR_VARIABLE) return SUCCESS;
+  if ((e->expr_type == EXPR_VARIABLE &&
+       e->symbol->attr.flavor != FL_PARAMETER) ||
+      (e->expr_type == EXPR_FUNCTION && e->symbol->result == e->symbol))
+    return SUCCESS;
+
+  if (e->expr_type == EXPR_VARIABLE && e->symbol->attr.intent == INTENT_IN) {
+    g95_error("'%s' argument of '%s' intrinsic at %L cannot be INTENT(IN)",
+	      g95_current_intrinsic_arg[n], g95_current_intrinsic, &e->where);
+    return FAILURE;
+  }
 
   must_be(e, n, "a variable");
 
@@ -1201,27 +1210,44 @@ try g95_check_x(g95_expr *x) {
 /************* Check functions for intrinsic subroutines *************/
 
 
+try g95_check_cpu_time(g95_expr *time) {
+
+  if (scalar_check(time, 0) == FAILURE) return FAILURE;
+
+  if (type_check(time, 0, BT_REAL) == FAILURE) return FAILURE;
+
+  if (variable_check(time, 0) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 try g95_check_date_and_time(g95_expr *date, g95_expr *time,
 			    g95_expr *zone, g95_expr *values) {
 
   if (date != NULL) {
     if (type_check(date, 0, BT_CHARACTER) == FAILURE) return FAILURE;
     if (scalar_check(date, 0) == FAILURE) return FAILURE;
+    if (variable_check(date, 0) == FAILURE) return FAILURE;
   }
 
   if (time != NULL) {
     if (type_check(time, 1, BT_CHARACTER) == FAILURE) return FAILURE;
     if (scalar_check(time, 1) == FAILURE) return FAILURE;
+    if (variable_check(time, 1) == FAILURE) return FAILURE;
   }
 
   if (zone != NULL) {
     if (type_check(zone, 2, BT_CHARACTER) == FAILURE) return FAILURE;
     if (scalar_check(zone, 2) == FAILURE) return FAILURE;
+    if (variable_check(zone, 2) == FAILURE) return FAILURE;
   }
 
   if (values != NULL) {
     if (type_check(values, 3, BT_INTEGER) == FAILURE) return FAILURE;
-    if (scalar_check(values, 3) == FAILURE) return FAILURE;
+    if (array_check(values, 3) == FAILURE) return FAILURE;
+    if (rank_check(values, 3, 1) == FAILURE) return FAILURE;
+    if (variable_check(values, 3) == FAILURE) return FAILURE;
   }
 
   return SUCCESS;
@@ -1232,11 +1258,14 @@ try g95_check_mvbits(g95_expr *from, g95_expr *frompos, g95_expr *len,
 		     g95_expr *to, g95_expr *topos) {
 
   if (type_check(from, 0, BT_INTEGER) == FAILURE) return FAILURE;
+
   if (type_check(frompos, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   if (type_check(len, 2, BT_INTEGER) == FAILURE) return FAILURE;
 
   if (same_type_check(from, 0, to, 3) == FAILURE) return FAILURE;
+
+  if (variable_check(to, 3) == FAILURE) return FAILURE;
 
   if (type_check(topos, 4, BT_INTEGER) == FAILURE) return FAILURE;
 
@@ -1244,40 +1273,50 @@ try g95_check_mvbits(g95_expr *from, g95_expr *frompos, g95_expr *len,
 }
 
 
-try g95_check_random_number(g95_expr *size, g95_expr *put, g95_expr *get) {
-
-  if (scalar_check(size, 0) == FAILURE) return FAILURE;
-
-  if (type_check(size, 0, BT_INTEGER) == FAILURE) return FAILURE;
-
-  if (kind_value_check(size, 0, g95_default_integer_kind()) == FAILURE)
-    return FAILURE;
-
-
-  if (scalar_check(put, 1) == FAILURE) return FAILURE;
-
-  if (type_check(put, 1, BT_INTEGER) == FAILURE) return FAILURE;
-
-  if (kind_value_check(put, 1, g95_default_integer_kind()) == FAILURE)
-    return FAILURE;
-
-
-  if (scalar_check(get, 2) == FAILURE) return FAILURE;
-
-  if (type_check(get, 2, BT_INTEGER) == FAILURE) return FAILURE;
-
-  if (kind_value_check(get, 2, g95_default_integer_kind()) == FAILURE)
-    return FAILURE;
-
-  return SUCCESS;
-}
-
-
-try g95_check_random_seed(g95_expr *harvest) {
+try g95_check_random_number(g95_expr *harvest) {
 
   if (type_check(harvest, 0, BT_REAL) == FAILURE) return FAILURE;
 
+  if (variable_check(harvest, 0) == FAILURE) return FAILURE;
+
   return SUCCESS;
 }
 
 
+try g95_check_random_seed(g95_expr *size, g95_expr *put, g95_expr *get) {
+
+  if (size != NULL) {
+    if (scalar_check(size, 0) == FAILURE) return FAILURE;
+
+    if (type_check(size, 0, BT_INTEGER) == FAILURE) return FAILURE;
+
+    if (variable_check(size, 0) == FAILURE) return FAILURE;
+
+    if (kind_value_check(size, 0, g95_default_integer_kind()) == FAILURE)
+      return FAILURE;
+  }
+
+  if (put != NULL) {
+    if (array_check(put, 1) == FAILURE) return FAILURE;
+    if (rank_check(put, 1, 1) == FAILURE) return FAILURE;
+
+    if (type_check(put, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+    if (kind_value_check(put, 1, g95_default_integer_kind()) == FAILURE)
+      return FAILURE;
+  }
+
+  if (get != NULL) {
+    if (array_check(get, 2) == FAILURE) return FAILURE;
+    if (rank_check(get, 2, 1) == FAILURE) return FAILURE;
+
+    if (type_check(get, 2, BT_INTEGER) == FAILURE) return FAILURE;
+
+    if (variable_check(get, 2) == FAILURE) return FAILURE;
+
+    if (kind_value_check(get, 2, g95_default_integer_kind()) == FAILURE)
+      return FAILURE;
+  }
+
+  return SUCCESS;
+}

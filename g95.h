@@ -642,7 +642,7 @@ typedef struct g95_intrinsic_arg {
 
 typedef struct g95_intrinsic_sym {
   char name[G95_MAX_SYMBOL_LEN+1], lib_name[G95_MAX_SYMBOL_LEN+1];
-  g95_intrinsic_arg *arg;
+  g95_intrinsic_arg *formal;
   g95_typespec ts;
   int elemental, generic, specific, actual_ok;
 
@@ -874,6 +874,7 @@ typedef struct g95_code {
   int here, label, label2, label3;
   g95_symbol *sym;
   g95_expr *expr, *expr2;
+  char *sub_name;
 
   union {
     g95_actual_arglist *arglist;
@@ -1360,7 +1361,7 @@ void g95_free_expr(g95_expr *);
 void g95_replace_expr(g95_expr *, g95_expr *);
 g95_expr *g95_int_expr(int);
 g95_expr *g95_logical_expr(int, locus *);
-g95_code *g95_build_call(g95_symbol *, ...);
+g95_code *g95_build_call(char *, ...);
 void g95_free_array_shape(g95_array_shape *);
 g95_array_shape *g95_copy_array_shape(g95_array_shape *p);
 g95_expr *g95_copy_expr(g95_expr *);

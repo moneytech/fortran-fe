@@ -263,7 +263,7 @@ g95_dt *dt;
     break;
 
   case EXEC_CALL:
-    g95_status("CALL %s ", c->sym->name);
+    g95_status("CALL %s ", c->sub_name);
     g95_show_actual_arglist(c->ext.arglist);
     break;
 

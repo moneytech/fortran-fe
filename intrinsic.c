@@ -325,7 +325,7 @@ va_list argp;
       next_arg++;
 
       if (first_flag)
-	next_sym->arg = next_arg;
+	next_sym->formal = next_arg;
       else
 	(next_arg-1)->next = next_arg;
 
@@ -1312,7 +1312,7 @@ int di, dr, dc;
   dc = g95_default_character_kind();
 
   add_sym("cpu_time", 0, 1, BT_UNKNOWN, 0,
-	  NULL, NULL, NULL,
+	  g95_check_cpu_time, NULL, NULL,
 	  tm, BT_REAL, dr, 0, NULL);
 
   add_sym("date_and_time", 0, 1, BT_UNKNOWN, 0,
@@ -1634,7 +1634,7 @@ g95_actual_arglist *actual;
 g95_intrinsic_arg *formal;
 int i;
 
-  formal = sym->arg;
+  formal = sym->formal;
   actual = *ap;
 
   i = 0;
@@ -1825,6 +1825,26 @@ g95_actual_arglist *arg;
 }
 
 
+/* init_arglist()-- Initialize the g95_current_intrinsic_arg[] array
+ * for the benefit of error messages.  This subroutine returns FAILURE
+ * if a subroutine has more than MAX_INTRINSIC_ARGS, in which case the
+ * actual argument list cannot match any intrinsic. */
+
+static void init_arglist(g95_intrinsic_sym *isym) {
+g95_intrinsic_arg *formal;
+int i;
+
+  g95_current_intrinsic = isym->name;
+
+  i = 0; 
+  for(formal=isym->formal; formal; formal=formal->next) {
+    if (i >= MAX_INTRINSIC_ARGS)
+      g95_internal_error("init_arglist(): too many arguments");
+    g95_current_intrinsic_arg[i++] = formal->name;
+  }
+}
+
+
 /* check_specific()-- Given a pointer to an intrinsic symbol and an
  * expression consisting of a function call, see if the function call
  * is consistent with the intrinsic's formal argument list.  Return
@@ -1833,8 +1853,7 @@ g95_actual_arglist *arg;
 static try check_specific(g95_intrinsic_sym *specific, g95_expr *expr,
 			  int error_flag) {
 g95_actual_arglist *arg, **ap;
-g95_intrinsic_arg *formal;
-int i, r;
+int r;
 try t;
 
   ap = &expr->value.function.actual;
@@ -1847,16 +1866,10 @@ try t;
       specific->check == g95_check_min_max_double)
     return (*specific->check)(*ap);
 
-  i = 0; 
-  for(formal=specific->arg; formal; formal=formal->next) {
-    if (i >= MAX_INTRINSIC_ARGS)
-      g95_internal_error("check_arglist(): MAX_INTRINSICS_ARGS too small");
+  init_arglist(specific);
 
-    g95_current_intrinsic_arg[i++] = formal->name;
-  }
-
-  if (sort_actual(specific->name, ap, specific->arg, &expr->where) == FAILURE)
-    return FAILURE;
+  if (sort_actual(specific->name, ap, specific->formal,
+		  &expr->where) == FAILURE) return FAILURE;
 
   if (specific->check == NULL) {
     t = check_arglist(ap, specific, error_flag);
@@ -1929,7 +1942,6 @@ int flag;
     return MATCH_NO;
   }
 
-  g95_current_intrinsic = isym->name;
   g95_current_intrinsic_where = &expr->where;
 
 /* Bypass the generic list for min and max */
@@ -1988,23 +2000,30 @@ got_specific:
  * to an intrinsic subroutine */
 
 try g95_intrinsic_sub_interface(g95_code *c) {
-g95_actual_arglist **argp;
 g95_intrinsic_sym *isym;
 char *name;
 
   name = c->sym->name;
-  argp = (g95_actual_arglist **) &c->ext;
 
   isym = find_subroutine(name);
   if (isym == NULL) {
-    g95_error("The subroutine '%s' at %L is not a valid intrinsic", name,
-	      &c->loc);
+    g95_error("Subroutine '%s' at %L is not a valid intrinsic", name, &c->loc);
     return FAILURE;
   }
 
-  if (isym->check != NULL) return do_check(isym, *argp);
+  init_arglist(isym);
 
-  return check_arglist(argp, isym, 1);
+  if (sort_actual(name, &c->ext.arglist, isym->formal, &c->loc) == FAILURE)
+    return FAILURE;
+
+  if (isym->check != NULL) {
+    if (do_check(isym, c->ext.arglist) == FAILURE) return FAILURE;
+  } else {
+    if (check_arglist(&c->ext.arglist, isym, 1) == FAILURE) return FAILURE;
+  }
+
+  c->sub_name = isym->lib_name;
+  return SUCCESS;
 }
 
 
@@ -2075,4 +2094,3 @@ bad:
 
   return FAILURE;
 }
-

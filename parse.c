@@ -997,21 +997,19 @@ g95_compile_state new_state, current_state;
 g95_symbol *prog_unit, *sym, *proc;
 g95_interface_info save;
 g95_state_data s1, s2;
-g95_statement st=0;
+g95_statement st;
 int seen_body;
 
   accept_statement(ST_INTERFACE);
 
+  current_interface.ns = g95_current_ns;
   save = current_interface;
 
   sym = (current_interface.type == INTERFACE_GENERIC ||
 	 current_interface.type == INTERFACE_USER_OP) ? g95_new_block : NULL;
 
   push_state(&s1, COMP_INTERFACE, sym);
-
   seen_body = 0;
-  current_interface.ns = g95_current_ns;
-
   current_state = COMP_NONE;
 
 loop:
@@ -1097,6 +1095,7 @@ loop:
 
   seen_body = 1;
 
+  current_interface = save;
   g95_add_interface(prog_unit);
 
   pop_state();
@@ -1104,7 +1103,6 @@ loop:
 
 done:
   if (!seen_body) g95_error("INTERFACE block at %C is empty");
-  current_interface = save;
 
   pop_state();
 }

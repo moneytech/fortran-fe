@@ -452,7 +452,7 @@ g95_expr *p;
  * are a set of expression pointers (terminated by NULL) that compose
  * the actual arugment list. */
 
-g95_code *g95_build_call(g95_symbol *subr, ...) {
+g95_code *g95_build_call(char *sub_name, ...) {
 g95_actual_arglist *tail;
 g95_expr *expr;
 va_list argp;
@@ -461,11 +461,11 @@ g95_code *c;
   c = g95_get_code();
 
   c->op = EXEC_CALL;
-  c->sym = subr;
+  c->sub_name = sub_name;
 
   tail = NULL;
 
-  va_start(argp, subr);
+  va_start(argp, sub_name);
 
   for(;;) {
     expr = va_arg(argp, g95_expr *);

@@ -96,11 +96,12 @@ try g95_check_x(g95_expr *);
 
 /* intrinsic subroutines */
 
+try g95_check_cpu_time(g95_expr *);
 try g95_check_date_and_time(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 try g95_check_mvbits(g95_expr *, g95_expr *, g95_expr *, g95_expr *,
 		     g95_expr *);
-try g95_check_random_number(g95_expr *, g95_expr *, g95_expr *);
-try g95_check_random_seed(g95_expr *);
+try g95_check_random_number(g95_expr *);
+try g95_check_random_seed(g95_expr *, g95_expr *, g95_expr *);
 
 /* Prototypes for the simplification functions */
 

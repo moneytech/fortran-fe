@@ -767,14 +767,6 @@ const char *name;
 }
 
 
-static g95_symbol io_integer = { "_io_integer" },
-  io_real = { "_io_real" }, 
-  io_logical = { "_io_logical" },
-  io_character = { "_io_character" },
-  io_complex = { "_io_complex" },
-  io_done = { "_io_done" },
-  io_unknown = { "_io_unknown" };
-
 /* gen_io_pointer()-- Given an expression, generate code structure(s)
  * that call the IO library with a pointer(s) to the correct thing. 
  * This possibly generates a store to a temporary */
@@ -784,30 +776,30 @@ g95_code *c;
 
   switch(e->ts.type) {
   case BT_UNKNOWN:
-    c = g95_build_call(&io_unknown, e, NULL);
+    c = g95_build_call("_io_unknown", e, NULL);
     break;
 
   case BT_INTEGER:
-    c = g95_build_call(&io_integer, e, NULL);
+    c = g95_build_call("_io_integer", e, NULL);
     break;
 
   case BT_REAL:
-    c = g95_build_call(&io_real, e, NULL);
+    c = g95_build_call("_io_real", e, NULL);
     break;
 
   case BT_LOGICAL:
-    c = g95_build_call(&io_logical, e, NULL);
+    c = g95_build_call("_io_logical", e, NULL);
     break;
 
   case BT_CHARACTER:
-    c = g95_build_call(&io_character, e, NULL);
+    c = g95_build_call("_io_character", e, NULL);
     break;
 
 /* We can't just call io_real twice here because complex numbers
  * require special formatting for list-directed IO */
 
   case BT_COMPLEX:
-    c = g95_build_call(&io_complex, e, NULL);
+    c = g95_build_call("_io_complex", e, NULL);
     break;
 
   case BT_DERIVED:
@@ -818,7 +810,7 @@ g95_code *c;
      * list, calling the various subroutines with the base+offset for
      * each member. */
 
-    c = g95_build_call(&io_unknown, e, NULL);
+    c = g95_build_call("_io_unknown", e, NULL);
     break;
 
   default:
@@ -1057,7 +1049,7 @@ get_io_list:
     if (m == MATCH_NO) goto syntax;
   }
 
-  term = g95_build_call(&io_done, NULL);
+  term = g95_build_call("_io_done", NULL);
 
   if (io_code == NULL)
     io_code = term;

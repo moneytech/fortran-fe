@@ -244,182 +244,6 @@ char *name;
 }
 
 
-/* resolve_generic()-- Resolve a procedure call known to be generic.
- * Section 14.1.2.4.1. */
-
-static match resolve_generic0(g95_expr *expr, g95_symbol *sym) {
-g95_symbol *s;
-
-  if (sym->attr.generic) {
-    s = g95_search_interface(sym->generic, 0, expr->value.function.actual);
-    if (s != NULL) {
-      expr->value.function.name = s->name;
-      expr->value.function.esym = s;
-      expr->ts = s->ts;
-      if (s->as != NULL) expr->rank = s->as->rank;
-      return MATCH_YES;
-    }
-
-    /* TODO: Need to search for elemental references in generic interface */
-  }
-
-  if (sym->attr.intrinsic) return g95_intrinsic_func_interface(expr, 0);
-
-  return MATCH_NO;
-}
-
-
-static try resolve_generic(g95_expr *expr) {
-g95_symbol *sym;
-match m;
-
-  sym = expr->symbol;
-
-  m = resolve_generic0(expr, sym);
-  if (m == MATCH_YES) return SUCCESS;
-  if (m == MATCH_ERROR) return FAILURE;
-
-  if (sym->ns->parent != NULL) {
-    g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
-    if (sym != NULL) {
-      m = resolve_generic0(expr, sym);
-      if (m == MATCH_YES) return SUCCESS;
-      if (m == MATCH_ERROR) return FAILURE;
-    }
-  }
-
-  /* Last ditch attempt */
-
-  if (!g95_generic_intrinsic(expr->symbol->name)) {
-    g95_error("Generic function '%s' at %L is not a generic intrinsic "
-	      "function", expr->symbol->name, &expr->where);
-    return FAILURE;
-  }
-
-  m = g95_intrinsic_func_interface(expr, 0);
-  if (m == MATCH_YES) return SUCCESS;
-  if (m == MATCH_NO)
-    g95_error("Generic function '%s' at %L is not consistent with a specific "
-	      "intrinsic interface", expr->symbol->name, &expr->where);
-
-  return FAILURE;
-}
-
-
-/* resolve_specific()-- Resolve a procedure call known to be specific */
-
-static match resolve_specific0(g95_symbol *sym, g95_expr *expr) {
-match m;
-
-  if (sym->attr.external || sym->attr.interface) {
-    if (sym->attr.dummy) {
-      sym->attr.proc = PROC_DUMMY;
-      goto found;
-    }
-
-    sym->attr.proc = PROC_EXTERNAL;
-    goto found;
-  }
-
-  if (sym->attr.proc == PROC_MODULE || sym->attr.proc == PROC_ST_FUNCTION ||
-      sym->attr.proc == PROC_INTERNAL) goto found;
-
-  if (sym->attr.intrinsic) {
-    m = g95_intrinsic_func_interface(expr, 1);
-    if (m == MATCH_YES) return MATCH_YES;
-    if (m == MATCH_NO)
-      g95_error("Symbol '%s' at %L is INTRINSIC but is not compatible with "
-		"an intrinsic", sym->name, &expr->where);
-      
-    return MATCH_ERROR;
-  }
-
-  return MATCH_NO;
-
-found:
-  expr->ts = sym->ts;
-  expr->value.function.name = sym->name;
-  expr->value.function.esym = sym;
-  if (sym->as != NULL) expr->rank = sym->as->rank;
-
-  return MATCH_YES;
-}
-
-
-static try resolve_specific(g95_expr *expr) {
-g95_symbol *sym;
-match m;
-
-  sym = expr->symbol;
-
-  m = resolve_specific0(sym, expr);
-  if (m == MATCH_YES) return SUCCESS;
-  if (m == MATCH_ERROR) return FAILURE;
-
-  g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
-
-  if (sym != NULL) {
-    m = resolve_specific0(sym, expr);
-    if (m == MATCH_YES) return SUCCESS;
-    if (m == MATCH_ERROR) return FAILURE;
-  }
-
-  g95_error("Unable to resolve the specific function '%s' at %L",
-	    expr->symbol->name, &expr->where);
-
-  return SUCCESS;
-}
-
-
-/* resolve_unknown()-- Resolve a procedure call not known to be
- * generic nor specific */
-
-static try resolve_unknown(g95_expr *expr) {
-g95_symbol *sym;
-g95_typespec ts;
-
-  sym = expr->symbol; 
-
-  if (sym->attr.dummy) {
-    sym->attr.proc = PROC_DUMMY;
-    expr->value.function.name = sym->name;
-    goto set_type;
-  }
-
-  /* See if we have an intrinsic function reference */
-
-  if (g95_intrinsic_name(sym->name, 0)) {
-    if (g95_intrinsic_func_interface(expr, 1) == MATCH_YES) return SUCCESS;
-    return FAILURE;
-  }
-
-  /* The reference is to an external name */
-
-  sym->attr.proc = PROC_EXTERNAL;
-  expr->value.function.name = sym->name;
-  if (sym->as != NULL) expr->rank = sym->as->rank;
-
-  /* Type of the expression is either the type of the symbol or the
-   * default type of the symbol */
-
- set_type:
-  if (sym->ts.type != BT_UNKNOWN)
-    expr->ts = sym->ts;
-  else {
-    ts = sym->ns->default_type[sym->name[0] - 'a'];
-
-    if (ts.type == BT_UNKNOWN) {
-      g95_error("Function '%s' at %L has no implicit type",
-		sym->name, &expr->where);
-      return FAILURE;
-    } else
-      expr->ts = ts;
-  }
-
-  return SUCCESS;
-}
-
-
 /* was_declared()-- Returns 0 if a symbol was not declared with a type
  * or attriute declaration statement, nonzero otherwise. */
 
@@ -505,6 +329,184 @@ g95_expr *e;
 }
 
 
+/************* Function resolution *************/
+
+/* resolve_generic_f0()-- Resolve a function call known to be generic.
+ * Section 14.1.2.4.1. */
+
+static match resolve_generic_f0(g95_expr *expr, g95_symbol *sym) {
+g95_symbol *s;
+
+  if (sym->attr.generic) {
+    s = g95_search_interface(sym->generic, 0, expr->value.function.actual);
+    if (s != NULL) {
+      expr->value.function.name = s->name;
+      expr->value.function.esym = s;
+      expr->ts = s->ts;
+      if (s->as != NULL) expr->rank = s->as->rank;
+      return MATCH_YES;
+    }
+
+    /* TODO: Need to search for elemental references in generic interface */
+  }
+
+  if (sym->attr.intrinsic) return g95_intrinsic_func_interface(expr, 0);
+
+  return MATCH_NO;
+}
+
+
+static try resolve_generic_f(g95_expr *expr) {
+g95_symbol *sym;
+match m;
+
+  sym = expr->symbol;
+
+  m = resolve_generic_f0(expr, sym);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_ERROR) return FAILURE;
+
+  if (sym->ns->parent != NULL) {
+    g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+    if (sym != NULL) {
+      m = resolve_generic_f0(expr, sym);
+      if (m == MATCH_YES) return SUCCESS;
+      if (m == MATCH_ERROR) return FAILURE;
+    }
+  }
+
+  /* Last ditch attempt */
+
+  if (!g95_generic_intrinsic(expr->symbol->name)) {
+    g95_error("Generic function '%s' at %L is not an intrinsic function",
+	      expr->symbol->name, &expr->where);
+    return FAILURE;
+  }
+
+  m = g95_intrinsic_func_interface(expr, 0);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_NO)
+    g95_error("Generic function '%s' at %L is not consistent with a specific "
+	      "intrinsic interface", expr->symbol->name, &expr->where);
+
+  return FAILURE;
+}
+
+
+/* resolve_specific_f0()-- Resolve a function call known to be specific */
+
+static match resolve_specific_f0(g95_symbol *sym, g95_expr *expr) {
+match m;
+
+  if (sym->attr.external || sym->attr.interface) {
+    if (sym->attr.dummy) {
+      sym->attr.proc = PROC_DUMMY;
+      goto found;
+    }
+
+    sym->attr.proc = PROC_EXTERNAL;
+    goto found;
+  }
+
+  if (sym->attr.proc == PROC_MODULE || sym->attr.proc == PROC_ST_FUNCTION ||
+      sym->attr.proc == PROC_INTERNAL) goto found;
+
+  if (sym->attr.intrinsic) {
+    m = g95_intrinsic_func_interface(expr, 1);
+    if (m == MATCH_YES) return MATCH_YES;
+    if (m == MATCH_NO)
+      g95_error("Symbol '%s' at %L is INTRINSIC but is not compatible with "
+		"an intrinsic", sym->name, &expr->where);
+      
+    return MATCH_ERROR;
+  }
+
+  return MATCH_NO;
+
+found:
+  expr->ts = sym->ts;
+  expr->value.function.name = sym->name;
+  expr->value.function.esym = sym;
+  if (sym->as != NULL) expr->rank = sym->as->rank;
+
+  return MATCH_YES;
+}
+
+
+static try resolve_specific_f(g95_expr *expr) {
+g95_symbol *sym;
+match m;
+
+  sym = expr->symbol;
+
+  m = resolve_specific_f0(sym, expr);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_ERROR) return FAILURE;
+
+  g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+
+  if (sym != NULL) {
+    m = resolve_specific_f0(sym, expr);
+    if (m == MATCH_YES) return SUCCESS;
+    if (m == MATCH_ERROR) return FAILURE;
+  }
+
+  g95_error("Unable to resolve the specific function '%s' at %L",
+	    expr->symbol->name, &expr->where);
+
+  return SUCCESS;
+}
+
+
+/* resolve_unknown_f()-- Resolve a procedure call not known to be
+ * generic nor specific */
+
+static try resolve_unknown_f(g95_expr *expr) {
+g95_symbol *sym;
+g95_typespec ts;
+
+  sym = expr->symbol; 
+
+  if (sym->attr.dummy) {
+    sym->attr.proc = PROC_DUMMY;
+    expr->value.function.name = sym->name;
+    goto set_type;
+  }
+
+  /* See if we have an intrinsic function reference */
+
+  if (g95_intrinsic_name(sym->name, 0)) {
+    if (g95_intrinsic_func_interface(expr, 1) == MATCH_YES) return SUCCESS;
+    return FAILURE;
+  }
+
+  /* The reference is to an external name */
+
+  sym->attr.proc = PROC_EXTERNAL;
+  expr->value.function.name = sym->name;
+  if (sym->as != NULL) expr->rank = sym->as->rank;
+
+  /* Type of the expression is either the type of the symbol or the
+   * default type of the symbol */
+
+ set_type:
+  if (sym->ts.type != BT_UNKNOWN)
+    expr->ts = sym->ts;
+  else {
+    ts = sym->ns->default_type[sym->name[0] - 'a'];
+
+    if (ts.type == BT_UNKNOWN) {
+      g95_error("Function '%s' at %L has no implicit type",
+		sym->name, &expr->where);
+      return FAILURE;
+    } else
+      expr->ts = ts;
+  }
+
+  return SUCCESS;
+}
+
+
 /* resolve_function()-- Resolve a function call, which means resolving
  * the arguments, then figuring out which entity the name refers to.
  * TODO: Check procedure arguments so that an INTENT(IN) isn't passed
@@ -524,9 +526,18 @@ try t;
   } else {     /* Apply the rules of section 14.1.2 */
 
     switch(procedure_kind(expr->symbol)) {
-    case PTYPE_GENERIC:   t = resolve_generic(expr);   break;
-    case PTYPE_SPECIFIC:  t = resolve_specific(expr);  break;
-    case PTYPE_UNKNOWN:   t = resolve_unknown(expr);   break;
+    case PTYPE_GENERIC:
+      t = resolve_generic_f(expr);
+      break;
+
+    case PTYPE_SPECIFIC:
+      t = resolve_specific_f(expr);
+      break;
+
+    case PTYPE_UNKNOWN:
+      t = resolve_unknown_f(expr);
+      break;
+
     default:
       g95_internal_error("resolve_function(): bad function type");
     }
@@ -542,6 +553,185 @@ try t;
        (expr->value.function.isym != NULL &&
 	expr->value.function.isym->elemental)))
     expr->rank = expr->value.function.actual->expr->rank;
+
+  return t;
+}
+
+
+/************* Subroutine resolution *************/
+
+static match resolve_generic_s0(g95_code *c, g95_symbol *sym) {
+g95_symbol *s;
+
+  if (sym->attr.generic) {
+    s = g95_search_interface(sym->generic, 1, c->ext.arglist);
+    if (s != NULL) {
+      c->sub_name = s->name;
+      return MATCH_YES;
+    }
+
+    /* TODO: Need to search for elemental references in generic interface */
+  }
+
+  if (sym->attr.intrinsic) return g95_intrinsic_sub_interface(c);
+
+  return MATCH_NO;
+}
+
+
+static try resolve_generic_s(g95_code *c) {
+g95_symbol *sym;
+match m;
+
+  sym = c->sym;
+
+  m = resolve_generic_s0(c, sym);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_ERROR) return FAILURE;
+
+  if (sym->ns->parent != NULL) {
+    g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+    if (sym != NULL) {
+      m = resolve_generic_s0(c, sym);
+      if (m == MATCH_YES) return SUCCESS;
+      if (m == MATCH_ERROR) return FAILURE;
+    }
+  }
+
+  /* Last ditch attempt */
+
+  if (!g95_generic_intrinsic(sym->name)) {
+    g95_error("Generic subroutine '%s' at %L is not an intrinsic subroutine",
+	      sym->name, &c->loc);
+    return FAILURE;
+  }
+
+  m = g95_intrinsic_sub_interface(c);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_NO)
+    g95_error("Generic function '%s' at %L is not consistent with a specific "
+	      "intrinsic interface", sym->name, &c->loc);
+
+  return FAILURE;
+}
+
+
+/* resolve_specific_s0()-- Resolve a subroutine call known to be specific */
+
+static match resolve_specific_s0(g95_code *c, g95_symbol *sym) {
+match m;
+
+  if (sym->attr.external || sym->attr.interface) {
+    if (sym->attr.dummy) {
+      sym->attr.proc = PROC_DUMMY;
+      goto found;
+    }
+
+    sym->attr.proc = PROC_EXTERNAL;
+    goto found;
+  }
+
+  if (sym->attr.proc == PROC_MODULE || sym->attr.proc == PROC_INTERNAL)
+    goto found;
+
+  if (sym->attr.intrinsic) {
+    m = g95_intrinsic_sub_interface(c);
+    if (m == MATCH_YES) return MATCH_YES;
+    if (m == MATCH_NO)
+      g95_error("Symbol '%s' at %L is INTRINSIC but is not compatible with "
+		"an intrinsic", sym->name, &c->loc);
+      
+    return MATCH_ERROR;
+  }
+
+  return MATCH_NO;
+
+found:
+  c->sub_name = sym->name;
+  return MATCH_YES;
+}
+
+
+static try resolve_specific_s(g95_code *c) {
+g95_symbol *sym;
+match m;
+
+  sym = c->sym;
+
+  m = resolve_specific_s0(c, sym);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_ERROR) return FAILURE;
+
+  g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+
+  if (sym != NULL) {
+    m = resolve_specific_s0(c, sym);
+    if (m == MATCH_YES) return SUCCESS;
+    if (m == MATCH_ERROR) return FAILURE;
+  }
+
+  g95_error("Unable to resolve the specific subroutine '%s' at %L",
+	    sym->name, &c->loc);
+
+  return SUCCESS;
+}
+
+
+/* resolve_unknown_s()-- Resolve a subroutine call not known to be
+ * generic nor specific */
+
+static try resolve_unknown_s(g95_code *c) {
+g95_symbol *sym;
+
+  sym = c->sym;
+
+  if (sym->attr.dummy) {
+    sym->attr.proc = PROC_DUMMY;
+    c->sub_name = sym->name;
+    return SUCCESS;
+  }
+
+  /* See if we have an intrinsic function reference */
+
+  if (g95_intrinsic_name(sym->name, 1)) {
+    if (g95_intrinsic_sub_interface(c) == MATCH_YES) return SUCCESS;
+    return FAILURE;
+  }
+
+  /* The reference is to an external name */
+
+  c->sub_name = sym->name;
+  return SUCCESS;
+}
+
+
+/* resolve_call()-- Resolve a subroutine call.  Although it was
+ * tempting to use the same code for functions, subroutines and
+ * functions are stored differently and this makes things awkward. */
+
+static try resolve_call(g95_code *c) {
+try t;
+
+  if (resolve_actual_arglist(c->ext.arglist) == FAILURE) return FAILURE;
+
+  if (c->sub_name != NULL) return SUCCESS;
+
+  switch(procedure_kind(c->sym)) {
+  case PTYPE_GENERIC:
+    t = resolve_generic_s(c);
+    break;
+
+  case PTYPE_SPECIFIC:
+    t = resolve_specific_s(c);
+    break;
+
+  case PTYPE_UNKNOWN:
+    t = resolve_unknown_s(c);
+    break;
+
+  default:
+    g95_internal_error("resolve_subroutine(): bad function type");
+  }
 
   return t;
 }
@@ -1067,14 +1257,6 @@ try t;
 }
 
 
-/* resolve_call()-- Resolve a subroutine call.  More here later. */
-
-static try resolve_call(g95_symbol *sym, g95_actual_arglist *arg) {
-
-  return resolve_actual_arglist(arg);
-}
-
-
 /* g95_resolve_iterator()-- Resolve the expressions in an iterator
  * structure and require that they all be of integer type. */
 
@@ -1242,7 +1424,7 @@ try t;
       break;
 
     case EXEC_CALL:
-      resolve_call(code->sym, code->ext.arglist);
+      resolve_call(code);
       break;
 
     case EXEC_SELECT:
