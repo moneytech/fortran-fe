@@ -633,10 +633,11 @@ int i;
   if (as->rank != 0) {
     g95_status(" %s ", g95_code2string(array_specs, as->type));
 
-    for(i=0; i<2*as->rank; i++) {
+    for(i=0; i<as->rank; i++) {
       g95_show_expr(as->shape[i].lower);
       g95_status_char(' ');
       g95_show_expr(as->shape[i].upper);
+      g95_status_char(' ');
     }
   }
 
