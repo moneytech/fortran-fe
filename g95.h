@@ -650,7 +650,7 @@ typedef struct {
 } g95_integer_info;
 
 typedef struct {
-  int kind, radix, digits, bit_size;
+  int kind, bit_size;
 
 } g95_logical_info;
 

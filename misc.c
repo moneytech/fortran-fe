@@ -359,6 +359,11 @@ int i;
     return 1;
   }
 
+  if (strcmp(option, "-l1") == 0) {
+    g95_option.l1 = 1;
+    return 1;
+  }
+
   if (option[0] == '-' && option[1] == 'I') {
     if (option[2] != '\0') {
       add_path(&g95_option.include_dirs, &option[2]);
@@ -427,6 +432,7 @@ static void init_options(void) {
   g95_option.i8 = 0;
   g95_option.q_kind = g95_default_double_kind();
   g95_option.r8 = 0;
+  g95_option.l1 = g95_default_logical_kind();
 }
 
 
