@@ -274,17 +274,19 @@ g95_component *dt1, *dt2;
 /* Compare derived types.  Both types must have the SEQUENCE attribute
  * to be equal */
 
-  if (ts1->derived->attr.sequence == 0 || ts2->derived->attr.sequence == 0)
-    return 0;
+  if (ts1->derived == ts2->derived) return 1;
 
   dt1 = ts1->derived->components;
   dt2 = ts2->derived->components;
 
+  if (dt1 == dt2) return 1;
+
+  if (ts1->derived->attr.sequence == 0 || ts2->derived->attr.sequence == 0)
+    return 0;
+
 /* Since subtypes of SEQUENCE types must be SEQUENCE types as well, a
  * simple test can speed things up.  Otherwise, lots of things have to
  * match. */
-
-  if (dt1 == dt2) return 1;
 
   for(;;) {
     if (strcmp(dt1->name, dt2->name) != 0) return 0;

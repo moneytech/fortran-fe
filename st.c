@@ -413,6 +413,14 @@ static void resolve_symbol(g95_symbol *sym) {
     return;
   }
 
+  /* Make sure the types of derived parameters are consistent.  This
+   * type checking is deferred until resolution because the type may
+   * refer to a derived type from the host. */
+
+  if (sym->attr.flavor == FL_PARAMETER && sym->ts.type == BT_DERIVED &&
+      !g95_compare_types(&sym->ts, &sym->value->ts))
+    g95_error("Incompatible derived type in PARAMETER at %L",
+	      &sym->value->where);
 }
 
 

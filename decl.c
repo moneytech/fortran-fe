@@ -217,7 +217,11 @@ g95_expr *init;
       return FAILURE;
     }
   } else {
-    if (g95_check_assign_symbol(sym, init) == FAILURE) return FAILURE;
+
+    /* Checking a derived type parameter has to be put off until later. */
+
+    if (sym->ts.type != BT_DERIVED && init->ts.type != BT_DERIVED &&
+	g95_check_assign_symbol(sym, init) == FAILURE) return FAILURE;
 
     sym->value = init;
     *initp = NULL;

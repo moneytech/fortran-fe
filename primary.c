@@ -1396,11 +1396,14 @@ static match match_structure_constructor(g95_symbol *sym, g95_expr **result) {
 g95_constructor *head, *tail;
 g95_component *comp;
 g95_expr *e;
+locus where;
 match m;
 
   head = tail = NULL;
 
   if (g95_match(" (") != MATCH_YES) goto syntax;
+
+  where = *g95_current_locus();
 
   g95_find_component(sym, NULL);
 
@@ -1441,6 +1444,7 @@ match m;
 
   e->ts.type = BT_DERIVED;
   e->ts.derived = sym;
+  e->where = where;
 
   e->value.constructor = head;
 
