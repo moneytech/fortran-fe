@@ -704,8 +704,8 @@ attr_bits[] = {
 /* mio_symbol_attribute()-- Symbol attributes are stored in list with
  * the first three elements being the enumerated fields, while the
  * remaining elements (if any) indicate the individual attribute bits.
- * PUBLIC and PRIVATE attributes are not saved-- they control what
- * symbols are exported when a module is written. */
+ * The access field is not saved-- it controls what symbols are
+ * exported when a module is written. */
 
 void mio_symbol_attribute(symbol_attribute *attr) {
 atom_type t;
@@ -988,15 +988,9 @@ void mio_namespace(g95_namespace *ns) {
 
 
   mio_rparen();
-
 }
 
 
-
-static void mio_interface(g95_symbol **p) {
-
-
-}
 
 
 /* mio_symbol_ref()-- Saves a *reference* to a symbol.  An entity's
@@ -1337,8 +1331,12 @@ static void mio_symbol(g95_symbol *sym) {
   mio_symbol_attribute(&sym->attr);
   mio_typespec(&sym->ts);
 
-  mio_interface(&sym->operator);
-  mio_interface(&sym->generic);
+  mio_symbol_ref(&sym->operator);     /* Save/restore interface links */
+  mio_symbol_ref(&sym->generic);
+  mio_symbol_ref(&sym->next_if);
+
+  mio_symbol_ref(&sym->common_head);  /* Save/restore common block links */
+  mio_symbol_ref(&sym->common_next);
 
   mio_expr(&sym->value);
   mio_array_spec(&sym->as);
@@ -1534,7 +1532,11 @@ static void find_writables(g95_symbol *sym) {
   case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
   case FL_PROCEDURE:    case FL_DERIVED:     case FL_NAMELIST:
   case FL_GENERIC:
-    if (sym->attr.private == 0) sym->serial = sym_num++;
+    if (sym->attr.access == ACCESS_PUBLIC ||
+	(g95_current_ns->default_access != ACCESS_PRIVATE &&
+	 sym->attr.access == ACCESS_UNKNOWN))
+      sym->serial = sym_num++;
+
     break;
   }
 }

@@ -95,7 +95,7 @@ typedef enum { INTENT_UNKNOWN=0, INTENT_IN, INTENT_OUT, INTENT_INOUT
 
 /* Access types */
 
-typedef enum { ACCESS_PUBLIC, ACCESS_PRIVATE
+typedef enum { ACCESS_PUBLIC=1, ACCESS_PRIVATE, ACCESS_UNKNOWN
 } g95_access;
 
 /* Array types */
@@ -193,9 +193,8 @@ typedef struct {
 
 /* Variable attributes */
   unsigned allocatable:1, dimension:1, external:1,  intrinsic:1,
-           optional:1,    pointer:1,   private:1,   public:1,
-           save:1,        target:1,    dummy:1,     common:1,
-           result:1,      entry:1;
+           optional:1,    pointer:1,   save:1,      target:1,
+           dummy:1,       common:1,    result:1,    entry:1;
 
   unsigned data:1,        /* Symbol is named in a DATA statement */
            use_assoc:1;   /* Symbol has been use-associated */
@@ -209,6 +208,7 @@ typedef struct {
 
 /* Mutually exclusive multibit attributes */
 
+  g95_access access:2;
   sym_intent intent:2;
   sym_flavor flavor:4;
   sym_scope scope:2;
@@ -398,7 +398,8 @@ typedef struct g95_symbol {
  * generic name, the generic member points to the list of interfaces. */
 
   struct g95_symbol *operator, *generic, *next_if;
-  struct g95_namespace *interface_ns;
+  g95_access operator_access;
+
   g95_formal_arglist *formal;
   struct g95_namespace *formal_ns;
 
@@ -465,7 +466,7 @@ typedef struct g95_namespace {
   struct g95_code *code;
   g95_symbol *blank_common;
   struct g95_equiv *equiv;
-  g95_access default_access;
+  g95_access default_access, operator_access[G95_INTRINSIC_OPS];
 
   g95_st_label *st_labels;
   struct g95_data *data;
@@ -942,8 +943,6 @@ try g95_add_external(symbol_attribute *, locus *);
 try g95_add_intrinsic(symbol_attribute *, locus *);
 try g95_add_optional(symbol_attribute *, locus *);
 try g95_add_pointer(symbol_attribute *, locus *);
-try g95_add_private(symbol_attribute *, locus *);
-try g95_add_public(symbol_attribute *, locus *);
 try g95_add_result(symbol_attribute *, locus *);
 try g95_add_save(symbol_attribute *, locus *);
 try g95_add_saved_common(symbol_attribute *, locus *);
@@ -961,6 +960,7 @@ try g95_add_recursive(symbol_attribute *, locus *);
 try g95_add_function(symbol_attribute *, locus *);
 try g95_add_subroutine(symbol_attribute *, locus *);
 
+try g95_add_access(symbol_attribute *, g95_access, locus *);
 try g95_add_flavor(symbol_attribute *, sym_flavor, locus *);
 try g95_add_entry(symbol_attribute *, locus *);
 try g95_add_intent(symbol_attribute *, sym_intent, locus *);
@@ -1179,6 +1179,7 @@ g95_constructor *g95_copy_constructor(g95_constructor *src);
 
 /* interface.c */
 
+match g95_match_generic_spec(interface_type *, char *, int *);
 match g95_match_interface(void);
 match g95_match_end_interface(void);
 void g95_start_interface(void);

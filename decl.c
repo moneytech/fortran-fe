@@ -815,11 +815,11 @@ try t;
       break;
 
     case DECL_PRIVATE:
-      t = g95_add_private(&current_attr, &seen_at[d]);
+      t = g95_add_access(&current_attr, ACCESS_PRIVATE, &seen_at[d]);
       break;
 
     case DECL_PUBLIC:
-      t = g95_add_public(&current_attr, &seen_at[d]);
+      t = g95_add_access(&current_attr, ACCESS_PUBLIC, &seen_at[d]);
       break;
 
     case DECL_SAVE:
@@ -1593,21 +1593,61 @@ match g95_match_target(void) {
 
 
 /* access_attr_decl()-- match the list of entities being specified in
- * a PUBLIC or PRIVATE statement.  TODO: generic specs here */
+ * a PUBLIC or PRIVATE statement. */
 
 static match access_attr_decl(g95_statement st) {
+char name[G95_MAX_SYMBOL_LEN+1];
+interface_type type;
 g95_symbol *sym;
+int operator;
 match m;
 
   g95_match(" ::");
 
   for(;;) {
-    m = g95_match(" %s", &sym);
+    m = g95_match_generic_spec(&type, name, &operator);
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) return MATCH_ERROR;
 
-    if (((st == ST_PUBLIC) ? g95_add_public(&sym->attr, NULL)
-	: g95_add_private(&sym->attr, NULL)) == FAILURE) return MATCH_ERROR;
+    switch(type) {
+    case INTERFACE_NAMELESS:
+      goto syntax;
+
+    case INTERFACE_GENERIC:
+      if (g95_get_symbol(name, NULL, 0, &sym)) goto done;
+
+      if (g95_add_access(&sym->attr,
+			 (st == ST_PUBLIC) ? ACCESS_PUBLIC : ACCESS_PRIVATE,
+			 NULL) == FAILURE) return MATCH_ERROR;
+
+      break;
+
+    case INTERFACE_INTRINSIC_OP:
+      if (g95_current_ns->operator_access[operator] == ACCESS_UNKNOWN) {
+	g95_current_ns->operator_access[operator] =
+	  (st == ST_PUBLIC) ? ACCESS_PUBLIC : ACCESS_PRIVATE;
+      } else {
+	g95_error("Access specification of the %s operator at %C has "
+		  "already been specified", g95_op2string(operator));
+	goto done;
+      }
+
+      break;
+
+    case INTERFACE_USER_OP:
+      if (g95_get_symbol(name, NULL, 0, &sym)) goto done;
+
+      if (sym->operator_access == ACCESS_UNKNOWN) {
+	sym->operator_access =
+	  (st == ST_PUBLIC) ? ACCESS_PUBLIC : ACCESS_PRIVATE;
+      } else {
+	g95_error("Access specification of the .%s. operator at %C has "
+		  "already been specified", sym->name);
+	goto done;
+      }
+
+      break;
+    }
 
     if (g95_match(" ,") == MATCH_NO) break;
   }
@@ -1617,6 +1657,8 @@ match m;
 
 syntax:
   g95_syntax_error(st);
+
+done:
   return MATCH_ERROR;
 }
 
@@ -1860,7 +1902,8 @@ loop:
       return MATCH_ERROR;
     }
 
-    if (g95_add_private(&attr, NULL) == FAILURE) return MATCH_ERROR;
+    if (g95_add_access(&attr, ACCESS_PRIVATE, NULL) == FAILURE)
+      return MATCH_ERROR;
     goto loop;
   }
 
@@ -1870,11 +1913,12 @@ loop:
       return MATCH_ERROR;
     }
 
-    if (g95_add_public(&attr, NULL) == FAILURE) return MATCH_ERROR;
+    if (g95_add_access(&attr, ACCESS_PUBLIC, NULL) == FAILURE)
+      return MATCH_ERROR;
     goto loop;
   }
 
-  if (g95_match(" ::") != MATCH_YES && (attr.public || attr.private)) {
+  if (g95_match(" ::") != MATCH_YES && attr.access != ACCESS_UNKNOWN) {
     g95_error("Expected :: in TYPE definition at %C");
     return MATCH_ERROR;
   }
@@ -1886,7 +1930,8 @@ loop:
  * 'double precision' type doesn't get past the name matcher */
 
   if (strcmp(name, "integer") == 0   || strcmp(name, "real") == 0 ||
-      strcmp(name, "character") == 0 || strcmp(name, "logical") == 0) {
+      strcmp(name, "character") == 0 || strcmp(name, "logical") == 0 ||
+      strcmp(name, "complex") == 0) {
     g95_error("Type name '%s' at %C cannot be the same as an intrinsic type",
 	      name);
     return MATCH_ERROR;

@@ -1121,10 +1121,19 @@ loop:
       break;
 
     case ST_PUBLIC:  case ST_PRIVATE:
-      if (g95_current_state() != COMP_MODULE)
-	g95_error("%s statement must appear in a MODULE");
-      else
-	g95_current_ns->default_access = (st == ST_PUBLIC)
+      if (g95_current_state() != COMP_MODULE) {
+	g95_error("%s statement must appear in a MODULE",
+		  g95_ascii_statement(st));
+	break;
+      }
+
+      if (g95_current_ns->default_access != ACCESS_UNKNOWN) {
+	g95_error("%s statement at %C follows another accessibility "
+		  "specification", g95_ascii_statement(st));
+	break;
+      }
+
+      g95_current_ns->default_access = (st == ST_PUBLIC)
 	  ? ACCESS_PUBLIC : ACCESS_PRIVATE;
 
       break;

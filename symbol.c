@@ -395,7 +395,15 @@ scopes[] = {
   minit("UNKNOWN",    SCOPE_UNKNOWN),    minit("EXTERNAL",   SCOPE_EXTERNAL),
   minit("INTERNAL",   SCOPE_INTERNAL),   minit("INTRINSIC",  SCOPE_INTRINSIC),
   minit(NULL, -1)
+},
+
+accessibility[] = {
+  minit("UNKNOWN", ACCESS_UNKNOWN),   minit("PUBLIC", ACCESS_PUBLIC),
+  minit("PRIVATE", ACCESS_PRIVATE),   minit(NULL, -1)
 };
+
+
+
 
 
 /* g95_show_attr()-- Show symbol attributes.  The flavor and intent
@@ -403,9 +411,10 @@ scopes[] = {
 
 void g95_show_attr(symbol_attribute *attr) {
 
-  g95_status("(%s %s %s", g95_code2string(flavors, attr->flavor),
+  g95_status("(%s %s %s %s", g95_code2string(flavors, attr->flavor),
 	     g95_code2string(intents, attr->intent),
-	     g95_code2string(scopes, attr->scope));
+	     g95_code2string(scopes, attr->scope),
+	     g95_code2string(accessibility, attr->access));
 
   if (attr->allocatable)  g95_status(" ALLOCATABLE");
   if (attr->dimension)    g95_status(" DIMENSION");
@@ -413,8 +422,6 @@ void g95_show_attr(symbol_attribute *attr) {
   if (attr->intrinsic)    g95_status(" INTRINSIC");
   if (attr->optional)     g95_status(" OPTIONAL");
   if (attr->pointer)      g95_status(" POINTER");
-  if (attr->private)      g95_status(" PRIVATE");
-  if (attr->public)       g95_status(" PUBLIC");
   if (attr->save)         g95_status(" SAVE");
   if (attr->target)       g95_status(" TARGET");
   if (attr->dummy)        g95_status(" DUMMY");
@@ -470,8 +477,8 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
     if (attr->allocatable) a1 = allocatable;
     if (attr->external) a1 = external;
     if (attr->optional) a1 = optional;
-    if (attr->private) a1 = private;
-    if (attr->public) a1 = public;
+    if (attr->access == ACCESS_PRIVATE) a1 = private;
+    if (attr->access == ACCESS_PUBLIC) a1 = public;
     if (attr->intent != INTENT_UNKNOWN) a1 = intent;
 
     if (a1 != NULL) {
@@ -654,20 +661,6 @@ try g95_add_pointer(symbol_attribute *attr, locus *loc) {
   return check_conflict(attr, loc);
 }
 
-/* No checks for use-association in public and private statements */
-
-try g95_add_private(symbol_attribute *attr, locus *loc) {
-
-  attr->private = 1;
-  return check_conflict(attr, loc);
-}
-
-try g95_add_public(symbol_attribute *attr, locus *loc) {
-
-  attr->public = 1;
-  return check_conflict(attr, loc);
-}
-
 try g95_add_result(symbol_attribute *attr, locus *loc) {
 
   if (check_used(attr, loc)) return FAILURE;
@@ -835,7 +828,7 @@ try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *loc) {
 
   if (attr->intent == INTENT_UNKNOWN) {
     attr->intent = intent;
-    return SUCCESS;
+    return check_conflict(attr, loc);
   }
 
   if (loc == NULL) loc = g95_current_locus();
@@ -847,6 +840,22 @@ try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *loc) {
   return FAILURE;
 }
 
+/* No checks for use-association in public and private statements */
+
+try g95_add_access(symbol_attribute *attr, g95_access access, locus *loc) {
+
+  if (attr->access == ACCESS_UNKNOWN) {
+    attr->access = access;
+    return check_conflict(attr, loc);
+  }
+
+  if (loc == NULL) loc = g95_current_locus();
+  g95_error("ACCESS specification at %L was already specified", loc);
+
+  return FAILURE;
+}
+
+
 
 /* g95_compare_attr()-- Compares two attributes */
 
@@ -855,8 +864,7 @@ int g95_compare_attr(symbol_attribute *a1, symbol_attribute *a2) {
   return a1->allocatable == a2->allocatable &&
     a1->dimension == a2->dimension && a1->external == a2->external &&
     a1->intrinsic == a2->intrinsic && a1->optional == a2->optional &&
-    a1->pointer == a2->pointer     && a1->private == a2->private &&
-    a1->public == a2->public       && a1->save == a2->save &&
+    a1->pointer == a2->pointer     && a1->save == a2->save &&
     a1->target == a2->target       && a1->dummy == a2->dummy &&
     a1->common == a2->common       && a1->result == a2->result &&
     a1->entry == a2->entry         && a1->data == a2->data &&
@@ -866,7 +874,7 @@ int g95_compare_attr(symbol_attribute *a1, symbol_attribute *a2) {
     a1->sequence == a2->sequence   && a1->elemental == a2->elemental &&
     a1->pure == a2->pure           && a1->recursive == a2->recursive &&
     a1->intent == a2->intent       && a1->flavor == a2->flavor &&
-    a1->scope == a2->scope;
+    a1->scope == a2->scope && a1->access == a2->access;
 }
 
 
@@ -880,8 +888,6 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->intrinsic = 0;
   attr->optional = 0;
   attr->pointer = 0;
-  attr->private = 0;
-  attr->public = 0;
   attr->save = 0;
   attr->target = 0;
   attr->dummy = 0;
@@ -903,6 +909,7 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->scope = SCOPE_UNKNOWN;
   attr->flavor = FL_UNKNOWN;
   attr->intent = INTENT_UNKNOWN;
+  attr->access = ACCESS_UNKNOWN;
 }
 
 
@@ -931,8 +938,6 @@ try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src, locus *loc) {
   if (src->dimension && g95_add_dimension(dest, loc) == FAILURE) goto fail;
   if (src->optional && g95_add_optional(dest, loc) == FAILURE) goto fail;
   if (src->pointer && g95_add_pointer(dest, loc) == FAILURE) goto fail;
-  if (src->private && g95_add_private(dest, loc) == FAILURE) goto fail;
-  if (src->public && g95_add_public(dest, loc) == FAILURE) goto fail;
   if (src->save && g95_add_save(dest, loc) == FAILURE) goto fail;
   if (src->target && g95_add_target(dest, loc) == FAILURE) goto fail;
   if (src->dummy && g95_add_dummy(dest, loc) == FAILURE) goto fail;
@@ -958,6 +963,9 @@ try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src, locus *loc) {
 
   if (src->intent != INTENT_UNKNOWN &&
       g95_add_intent(dest, src->intent, loc) == FAILURE) goto fail;
+
+  if (src->access != ACCESS_UNKNOWN &&
+      g95_add_access(dest, src->access, loc) == FAILURE) goto fail;
 
   if (g95_missing_attr(dest, loc) == FAILURE) goto fail;
 
@@ -1229,6 +1237,9 @@ int i;
   ns = g95_getmem(sizeof(g95_namespace));
   ns->root = NIL;
   ns->default_access = ACCESS_PUBLIC;
+
+  for(i=0; i<G95_INTRINSIC_OPS; i++)
+    ns->operator_access[i] = ACCESS_UNKNOWN;
 
 /* Initialize default types */
 
@@ -1587,6 +1598,8 @@ g95_symbol *p;
 
   p->declared_at = *g95_current_locus();
 
+  p->operator_access = ACCESS_UNKNOWN;
+
   if (strlen(name) > G95_MAX_SYMBOL_LEN)
     g95_internal_error("new_symbol(): Symbol name too long");
   strcpy(p->name, name);
@@ -1752,6 +1765,7 @@ g95_symbol *p, *q, *old;
 
     p->generic = old->generic;
     p->operator = old->operator;
+    p->operator_access = old->operator_access;
 
     if (p->namelist != NULL && old->namelist == NULL) {
       g95_free_namelist(p->namelist);
