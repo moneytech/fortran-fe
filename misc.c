@@ -26,6 +26,7 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 
 g95_option_t g95_option;
+extern char g95_compile_date[];
 
 
 /* g95_getmem()-- Get a block of memory.  Many callers assume that the
@@ -238,7 +239,7 @@ void g95_done_2(void) {
 static void display_help(void) {
 
   g95_status("GNU Fortran 95 Compiler (C) 2000 Free Software Foundation\n"
-    "Compiled " __DATE__ " " __TIME__ "\n\n"
+    "Compiled %s\n\n"
     "Usage: g95 [options] file\n"
     "Options:\n"
     "  --help                  Display this information\n"
@@ -256,7 +257,8 @@ static void display_help(void) {
     "  -M[directory]           put generated module files in directory,\n"
     "                          search there for modules\n"
     "\n"
-    "See http://g95.sourceforge.net for more information.\n");
+    "See http://g95.sourceforge.net for more information.\n",
+         g95_compile_date);
 
   exit(0);
 }
