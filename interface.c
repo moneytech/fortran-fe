@@ -625,6 +625,41 @@ g95_interface **head, *intr;
 }
 
 
+/* g95_free_formal_arglist()-- Gets rid of a formal argument list.  We
+ * do not free symbols.  Symbols are freed when a namespace is freed. */
+
+void g95_free_formal_arglist(g95_formal_arglist *p) {
+g95_formal_arglist *q;
+
+  for(; p; p=q) {
+    q = p->next;
+    g95_free(p);
+  }
+}
+
+
+/* copy_formal()-- Copy a formal argument list */
+
+static g95_formal_arglist *copy_formal(g95_formal_arglist *source) {
+g95_formal_arglist *head, *tail;
+
+  head = tail = NULL;
+
+  for(; source; source=source->next) {
+    if (head == NULL)
+      head = tail = g95_get_formal_arglist();
+    else {
+      tail->next = g95_get_formal_arglist();
+      tail = tail->next;
+    }
+
+    tail->sym = source->sym;
+  }
+
+  return head;
+}
+
+
 /* find_modproc()-- Work function for g95_parent_procedure(). */
 
 static g95_symbol *module_procedure;
@@ -690,6 +725,8 @@ g95_symbol *m;
 /* At this point, we've made the module procedure a FUNCTION or a
  * SUBROUTINE.  We now need to find the generic procedure(s) that have
  * this particular procedure and update the function/subroutine bits */
+
+  m->formal = copy_formal(sym->formal);
 
   module_procedure = m;
   modproc_return = SUCCESS;

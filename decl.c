@@ -1035,19 +1035,6 @@ loop:
 }
 
 
-/* g95_free_formal_arglist()-- Gets rid of a formal argument list.  We
- * do not free symbols.  Symbols are freed when a namespace is freed. */
-
-void g95_free_formal_arglist(g95_formal_arglist *p) {
-g95_formal_arglist *q;
-
-  for(; p; p=q) {
-    q = p->next;
-    g95_free(p);
-  }
-}
-
-
 /* g95_match_formal_arglist()-- Match a formal argument list. */
 
 match g95_match_formal_arglist(g95_symbol *progname, int st_flag) {
@@ -1075,7 +1062,7 @@ match m;
       if (g95_get_symbol(name, NULL, 0, &sym)) goto cleanup;
     }
 
-    p = g95_getmem(sizeof(g95_formal_arglist));
+    p = g95_get_formal_arglist();
 
     if (head == NULL)
       head = tail = p;

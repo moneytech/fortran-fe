@@ -2109,7 +2109,7 @@ g95_symbol *s;
     g95_show_components(sym);
   }
 
-  if (sym->attr.function || sym->attr.subroutine || sym->attr.entry) {
+  if (sym->formal) {
     show_indent();
     g95_status("Formal arglist:");
 

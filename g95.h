@@ -351,6 +351,8 @@ typedef struct g95_formal_arglist {
   struct g95_formal_arglist *next;
 } g95_formal_arglist;
 
+#define g95_get_formal_arglist() g95_getmem(sizeof(g95_formal_arglist))
+
 
 /* The g95_actual_arglist structure is for actual arguments */
 
@@ -1144,7 +1146,7 @@ void g95_intrinsic_done_1(void);
 try g95_convert_type(g95_expr *, g95_typespec *, int);
 int g95_generic_intrinsic(char *);
 int g95_specific_intrinsic(char *);
-extern g95_namespace *g95_instrinics;
+int g95_intrinsic_name(char *, int);
 
 /* simplify.c */
 
@@ -1220,7 +1222,6 @@ match g95_match_type_spec(g95_typespec *, int, int);
 
 match g95_match_end(g95_statement *);
 match g95_match_data_decl(void);
-void g95_free_formal_arglist(g95_formal_arglist *);
 match g95_match_formal_arglist(g95_symbol *, int);
 match g95_match_function_decl(void);
 match g95_match_entry(void);
@@ -1341,6 +1342,7 @@ int g95_compare_types(g95_typespec *, g95_typespec *);
 try g95_check_interface(g95_interface *, g95_symbol *);
 g95_symbol *g95_search_interface(g95_interface *, g95_actual_arglist *);
 try g95_extend_expr(g95_expr *);
+void g95_free_formal_arglist(g95_formal_arglist *);
 void g95_add_interface(g95_symbol *sym);
 try g95_parent_procedure(g95_symbol *sym, int);
 

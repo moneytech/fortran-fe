@@ -1926,15 +1926,16 @@ intrinsic_sym *sym;
 }
 
 
-/* g95_intrinsic_subroutine()-- Given a string, figure out if it is
- * the name of an intrinsic subroutine.  There are no generic
+/* g95_intrinsic_name()-- Given a string, figure out if it is the name
+ * of an intrinsic subroutine or function.  There are no generic
  * intrinsic subroutines, they are all specific. */
 
-int g95_intrinsic_subroutine(char *name) {
+int g95_intrinsic_name(char *name, int subroutine_flag) {
 
-  return find_subroutine(name) != NULL;
+  return subroutine_flag ?
+    find_subroutine(name) != NULL :
+    find_function(name) != NULL;
 }
-
 
 /* make_generic()-- Collect a set of intrinsic functions into a
  * generic collection.  The first argument is the name of the generic

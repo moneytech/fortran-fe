@@ -968,7 +968,7 @@ match m;
     if (sym != NULL) {
       m = resolve_generic0(expr, sym);
       if (m == MATCH_YES) return SUCCESS;
-      if (m == MATCH_NO) return FAILURE;
+      if (m == MATCH_ERROR) return FAILURE;
     }
   }
 
@@ -1058,11 +1058,9 @@ g95_symbol *sym;
     return SUCCESS;
   }
 
-  /* The standard specifies that the test be that the name be the name
-   * of an intrinsic function.  Querying for specific function names
-   * amounts to the same thing. */
+  /* See if we have an intrinsic function reference */
 
-  if (g95_specific_intrinsic(sym->name) && 
+  if (g95_intrinsic_name(sym->name, 0) && 
       g95_intrinsic_func_interface(expr, 0) == MATCH_YES)
     return SUCCESS;
 
@@ -1093,7 +1091,10 @@ try t;
   if (t == FAILURE) return FAILURE;
 
 /* See if function is already resolved */
-  if (expr->value.function.name != NULL) return SUCCESS;
+  if (expr->value.function.name != NULL) {
+    if (expr->ts.type == BT_UNKNOWN) expr->ts = expr->symbol->ts;
+    return SUCCESS;
+  }
 
 /* Apply the rules of section 14.1.2 */
 
