@@ -38,7 +38,7 @@ Boston, MA 02111-1307, USA.  */
  *   ( <Interface info for UMINUS> )
  *   ...
  * )
- * ( <Symbol Number (not in order)>
+ * ( <Symbol Number (in no particular order)>
  *   <True name of symbol>
  *   <Module name of symbol>
  *   ( <symbol information> )
@@ -1156,103 +1156,33 @@ g95_actual_arglist *a, *tail;
 }
 
 
-
-/* mio_formal_namespace()-- Read and write a namespace associated with
- * a formal argument list.  These generally won't be that large.  We
- * save symbols that are type definitions and dummy parameters.  Dummy
- * parameters that reference host associated names are saved and
- * restored as such.  */
-
-static void mio_formal_namespace(g95_symbol *sym) {
-
-  if (iomode == IO_OUTPUT) {
-
-
-  } else {
-
-
-  }
-}
-
-
-
-/* mio_formal_ns_name()-- Read and write a list of names within the
- * namespace.  This is necessary because derived type symbols can
- * point to themselves. */
-
-static void mio_formal_ns_names(g95_symbol *sym) {
-
-#if 0
-  if (iomode == IO_OUTPUT) {
-    g95_traverse_ns(sym->formal_ns) 
-  }
-#endif
-
-}
-
-
-
-/* mio_formal_arglist()-- Read and write formal argument lists.
- * Symbols associated with formal argument lists are never part of the
- * namespace being saved or loaded, so we can't just reference them as
- * symbol numbers like other symbols.  Rather, we have to expand such
- * symbols.
- *
- * The real difficuly is with derived types.  If an argument type is
- * defined by host association, we have to retain the association on
- * reloading the module.  If not, we have to actually expand the type
- * definition so that correct matching can occur if the type is a
- * SEQUENCE type.
- *
- * If there is nothing to be saved or loaded, we just have "()".  The
- * formal list contains three lists-- a list containing the symbol
- * names, a list containing the information for each symbols stored in
- * the namespace, followed by a third list containing the names in the
- * argument list.  This function is mutually recursive with
- * mio_formal_namespace(). */
+/* mio_formal_arglist()-- Read and write formal argument lists. */
 
 static void mio_formal_arglist(g95_symbol *sym) {
 g95_formal_arglist *f, *tail;
-g95_symbol *s;
 
   mio_lparen();
 
   if (iomode == IO_OUTPUT) {
-    if (sym->formal == NULL) goto done;
-
-    mio_formal_ns_names(sym);
-    mio_formal_namespace(sym);
-
-    mio_lparen();
     for(f=sym->formal; f; f=f->next)
-      write_atom(ATOM_STRING, f->sym->name);
-    mio_rparen();
+      mio_symbol_ref(&f->sym);
 
   } else {
-    if (peek_atom() != ATOM_LPAREN) goto done;
+    sym->formal = tail = NULL;
 
-    mio_formal_namespace(sym);
-    tail = NULL;
-
-    mio_lparen();
-    
     while(peek_atom() != ATOM_RPAREN) {
-      require_atom(ATOM_STRING);
-
-      if (g95_find_symbol(atom_string, sym->formal_ns, 0, &s))
-	bad_module("mio_formal_arglist(): Formal argument not found");
-
       f = g95_get_formal_arglist();
-      f->sym = s;
+      mio_symbol_ref(&f->sym);
 
       if (sym->formal == NULL)
 	sym->formal = tail = f;
       else
 	tail->next = f;
+
+      tail = f;
     }
   }
 
- done:
   mio_rparen();
 }
 
@@ -1651,6 +1581,7 @@ static void mio_symbol(g95_symbol *sym) {
 
   mio_symbol_ref(&sym->common_head);  /* Save/restore common block links */
   mio_symbol_ref(&sym->common_next);
+
   mio_formal_arglist(sym);
 
   mio_expr(&sym->value);
@@ -1668,8 +1599,6 @@ static void mio_symbol(g95_symbol *sym) {
 
   mio_symbol_ref(&sym->common_head);
   mio_symbol_ref(&sym->common_next);
-
-  /* Save/restore namespaces */
 
   mio_rparen();
 }
@@ -1720,16 +1649,13 @@ int level;
 
 
 static void read_namespace(g95_namespace *ns) {
-int i, flag, sym_save, ambiguous, symbol;
-symbol_info *sym_table_save, *info;
 module_locus operator_interfaces;
 char name[G95_MAX_SYMBOL_LEN+1];
+int i, flag, ambiguous, symbol;
 g95_interface *head, *tail;
+symbol_info *info;
 g95_use_rename *u;
 g95_symtree *st;
-
-  sym_table_save = sym_table; 
-  sym_save = sym_num;
 
   mio_integer(&sym_num);
 
@@ -1740,19 +1666,21 @@ g95_symtree *st;
 
   mio_lparen();
 
-  for(i=0; peek_atom()!=ATOM_RPAREN; i++) {
+  while(peek_atom()!=ATOM_RPAREN) {
     require_atom(ATOM_INTEGER);
     if (atom_int < 0 || atom_int > sym_num)
       bad_module("Symbol number out of range");
 
-    info = &sym_table[atom_int];
+    info = sym_table + atom_int;
     info->state = UNUSED;
 
     mio_internal_string(info->true_name);
     mio_internal_string(info->module);
 
-    get_module_locus(&info->where);
+    info->sym = g95_new_symbol(info->true_name, ns);
+    strcpy(info->sym->module, info->module);
 
+    get_module_locus(&info->where);
     skip_list();
 
     /* See if the symbol has already been loaded by a previous module.
@@ -1796,7 +1724,7 @@ g95_symtree *st;
     if (symbol < 0 || symbol >= sym_num)
       bad_module("Symbol number out of range");
 
-    /* See what we need to do with this name */
+    /* See what we need to do with this name. */
 
     u = find_use_name(name);
     if (u != NULL) u->found = 1;
@@ -1809,8 +1737,7 @@ g95_symtree *st;
     st = g95_find_symtree(ns, name);
 
     if (st != NULL) {
-      if (st->sym != info->sym)
-	st->ambiguous = 1;
+      if (st->sym != info->sym) st->ambiguous = 1;
     } else {
 
       st = check_unique_name(name) ? get_unique_symtree(ns) :
@@ -1929,9 +1856,6 @@ g95_symtree *st;
   }
 
   g95_free(sym_table);
-
-  sym_table = sym_table_save;
-  sym_num = sym_save;
 }
 
 
@@ -1971,12 +1895,18 @@ static void write_symbol(g95_symbol *sym) {
   symbol_written[sym->serial] = 1;
 
   mio_integer(&sym->serial);
+
   mio_internal_string(sym->name);
   mio_internal_string(sym->module);
   mio_symbol(sym);
   write_char('\n');
-}
 
+  /* Writing the formal argument list caused the symbols of the list
+   * to be marked as referenced.  If they are in another namespace, we
+   * recurse there to write them. */
+
+  if (sym->formal_ns != NULL) g95_traverse_ns(sym->formal_ns, write_symbol);
+}
 
 
 static void write_symtree(g95_symtree *st) {
@@ -2002,6 +1932,8 @@ static void count_symbols(g95_symbol *sym) {
   sym_num++;
   sym->serial = -1;
   if (sym->module[0] == '\0') strcpy(sym->module, module_name);
+
+  if (sym->formal_ns != NULL) g95_traverse_ns(sym->formal_ns, count_symbols);
 }
 
 
@@ -2010,6 +1942,7 @@ module_locus m1, m2;
 int i;
 
   sym_num = 0;
+
   g95_traverse_ns(ns, count_symbols);
 
   mio_integer(&sym_num);
@@ -2040,7 +1973,7 @@ int i;
    * writing one symbol will cause another to need to be written, so
    * we keep looping until we do a full traversal without writing any
    * symbols.  The reading algorithm doesn't care what order the
-   * symbol appear in. */
+   * symbols appear in. */
 
   mio_lparen();
   get_module_locus(&m1);
@@ -2049,7 +1982,7 @@ int i;
     g95_traverse_ns(ns, write_symbol);
 
     get_module_locus(&m2);
-    if (m1.pos == m2.pos) break;
+    if (m1.line == m2.line && m1.column == m2.column) break;
     m1 = m2;
   }
 
@@ -2087,7 +2020,8 @@ char filename[PATH_MAX];
     g95_fatal_error("Can't open module file '%s' for writing: %s", 
 		    filename, strerror(errno));
 
-  fputs("G95 Module: Do not edit\n\n", module_fp);
+  fputs("G95 Module: If you edit this, you'll get what you deserve.\n\n",
+	module_fp);
 
   iomode = IO_OUTPUT;
   strcpy(module_name, name);
