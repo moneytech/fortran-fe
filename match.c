@@ -996,6 +996,11 @@ match m;
     goto done;
   }
 
+  m = g95_match_st_label(&label);
+  if (m == MATCH_ERROR) goto cleanup;
+
+  g95_match_char(',');
+
   if (g95_match("% ") != MATCH_YES) return MATCH_NO;
 
 /* See if we have a DO WHILE */
@@ -1012,12 +1017,10 @@ match m;
   g95_set_locus(&old_loc);
 
   g95_match_label();    /* This won't error */
-  g95_match(" do ");     /* This will work */
+  g95_match(" do ");    /* This will work */
 
-  m = g95_match_st_label(&label);
-  if (m == MATCH_ERROR) goto cleanup;
-
-  g95_match_char(',');      /* Optional comma */
+  g95_match_st_label(&label);  /* Can't error out */
+  g95_match_char(',');         /* Optional comma */
 
   m = g95_match_iterator(&iter);
   if (m == MATCH_NO) return MATCH_NO;
