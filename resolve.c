@@ -1,5 +1,5 @@
 /* Perform type resolution on the various stuctures.
-   Copyright (C) 2001-2 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GNU G95.
