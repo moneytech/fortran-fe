@@ -617,8 +617,7 @@ g95_interface **head, *intr;
 
 
 
-
-/* find_modproc()-- Work function for g95_check_parent_modproc() */
+/* find_modproc()-- Work function for g95_parent_procedure(). */
 
 static g95_symbol *module_procedure;
 static try modproc_return;
@@ -643,25 +642,35 @@ g95_interface *ip;
 }
 
 
-/* g95_check_parent_modproc()-- Given a symbol that is the name of a
- * subroutine or a function contained in a module, check to see if the
- * name is a module procedure in the module.  If so, we update the
- * parent symbol to reflect whether the symbol is a function or a
- * subroutine. */
+/* g95_parent_procedure()-- Given a symbol that is the name of a
+ * subroutine or a function contained in a module, make the necessary
+ * changes in the module namespace.  If the symbol is a module
+ * procedure, we can decide if the generic name and other specific
+ * functions are subroutines or functions. */
 
-try g95_check_parent_modproc(g95_symbol *sym, int sub_flag) {
+try g95_parent_procedure(g95_symbol *sym, int sub_flag) {
 g95_symbol *m;
 
-  if (g95_state_stack->state != COMP_CONTAINS) return SUCCESS;
+  /* Non-internal Function or subroutine statements */
 
-  if (g95_state_stack->previous->state != COMP_MODULE) return SUCCESS;
+  if (g95_state_stack->state == COMP_CONTAINS &&
+      g95_state_stack->previous->state == COMP_MODULE) goto ok;
 
-  if (g95_find_symbol(sym->name, g95_current_ns->parent, 0, &m))
-    return SUCCESS;
+  /* Entry statements */
 
-  if (m == NULL) return SUCCESS;
+  if ((g95_state_stack->state == COMP_SUBROUTINE ||
+       g95_state_stack->state == COMP_FUNCTION) &&
+      g95_state_stack->previous != NULL &&
+      g95_state_stack->previous->state == COMP_CONTAINS &&
+      g95_state_stack->previous->previous->state == COMP_MODULE) goto ok;
 
-  if (m->attr.flavor != FL_MODULE_PROC) return SUCCESS;
+  return SUCCESS;
+
+ ok:
+  if (g95_get_symbol(sym->name, g95_current_ns->parent, 0, &m)) return FAILURE;
+
+  if (m->attr.flavor != FL_MODULE_PROC && m->attr.flavor != FL_PROCEDURE &&
+      g95_add_flavor(&m->attr, FL_PROCEDURE, NULL) == FAILURE) return FAILURE;
 
   if (sub_flag) {
     if (g95_add_subroutine(&m->attr, NULL) == FAILURE) return FAILURE;

@@ -1254,7 +1254,7 @@ int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
 try g95_check_interface(g95_interface *, g95_symbol *);
 try g95_extend_expr(g95_expr *);
 void g95_add_interface(g95_symbol *sym);
-try g95_check_parent_modproc(g95_symbol *sym, int);
+try g95_parent_procedure(g95_symbol *sym, int);
 
 /* select.c */
 

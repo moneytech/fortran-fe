@@ -1163,7 +1163,7 @@ match m;
   else
     result->ts = current_ts;
 
-  if (g95_check_parent_modproc(sym, 0) == FAILURE) goto cleanup;
+  if (g95_parent_procedure(sym, 0) == FAILURE) goto cleanup;
 
   return MATCH_YES;
 
@@ -1193,7 +1193,8 @@ match m;
     if (g95_current_state() != COMP_SUBROUTINE) goto exec_construct;
 
     if (g95_add_entry(&entry->attr, NULL) == FAILURE ||
-	g95_add_subroutine(&entry->attr, NULL) == FAILURE)
+	g95_add_subroutine(&entry->attr, NULL) == FAILURE ||
+	g95_parent_procedure(entry, 1) == FAILURE)
       return MATCH_ERROR;
 
     break;
@@ -1224,6 +1225,8 @@ match m;
       g95_error("RESULT attribute required in ENTRY statement at %C");
       return MATCH_ERROR;
     }
+
+    if (g95_parent_procedure(entry, 0) == FAILURE) return MATCH_ERROR;
 
     break;
 
@@ -1283,7 +1286,7 @@ match m;
   m = g95_match_eos();
   if (m != MATCH_YES) goto error;
 
-  if (g95_check_parent_modproc(sym, 1) == FAILURE) goto error;
+  if (g95_parent_procedure(sym, 1) == FAILURE) goto error;
 
   return MATCH_YES;
 
