@@ -1733,7 +1733,26 @@ g95_interface *intr;
   for(intr=sym->generic; intr; intr=intr->next)
     if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
 
-  if (sym->attr.flavor == FL_DERIVED) save_derived(sym->components);
+/* Save components if this is a derived type.  If the symbol is of a
+ * derived type, save that type. */
+
+  switch(sym->attr.flavor) {
+  case FL_DERIVED:
+    save_derived(sym->components);
+    break;
+
+  case FL_VARIABLE:     case FL_PARAMETER:  case FL_ST_FUNCTION:
+  case FL_MODULE_PROC:  case FL_GENERIC:
+    if (sym->ts.type != BT_DERIVED || sym->ts.derived->serial != -1) break;
+
+    sym->ts.derived->serial = sym_num++;
+    save_derived(sym->ts.derived->components);
+
+    break;
+
+  default:
+    break;
+  }
 }
 
 
