@@ -1,3 +1,7 @@
+2002-09-02  Steven Bosscher <s.bosscher@student.tudelft.nl>
+
+	* Make-lang.in: Add options.c to F95_PARSER_OBJS
+
 2002-09-02  Paul Brook  <paul@nowt.org>
 
 	* g95_generate_code: Clear the attr for __fortran_main.
