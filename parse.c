@@ -1625,7 +1625,7 @@ int close_flag;
 static void parse_progunit(g95_statement);
 
 static void parse_contained(int module) {
-g95_namespace *parent_ns;
+g95_namespace *ns, *parent_ns;
 g95_state_data s1, s2;
 g95_statement st;
 g95_symbol *sym;
@@ -1635,7 +1635,10 @@ g95_symbol *sym;
 
   do {
     g95_current_ns = g95_get_namespace();
+
     g95_current_ns->parent = parent_ns;
+    g95_current_ns->sibling = parent_ns->contained;
+    parent_ns->contained = g95_current_ns;
 
     st = next_statement();
 
@@ -1646,9 +1649,6 @@ g95_symbol *sym;
     case ST_FUNCTION:
     case ST_SUBROUTINE:
       accept_statement(st);
-
-      g95_current_ns->sibling = parent_ns->contained;
-      parent_ns->contained = g95_current_ns;
 
       push_state(&s2, (st == ST_FUNCTION) ? COMP_FUNCTION : COMP_SUBROUTINE,
 		 g95_new_block);
@@ -1697,9 +1697,15 @@ g95_symbol *sym;
   } while(st != ST_END_FUNCTION && st != ST_END_SUBROUTINE &&
 	  st != ST_END_MODULE   && st != ST_END_PROGRAM);
 
-  g95_free_namespace(g95_current_ns);
+  /* The first namespace in the list is guaranteed to not have
+   * anything (worthwhile) in it. */
 
   g95_current_ns = parent_ns;
+
+  ns = g95_current_ns->contained;
+  g95_current_ns->contained = ns->sibling;
+  g95_free_namespace(ns);
+
   pop_state();
 }
 
