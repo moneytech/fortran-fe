@@ -306,4 +306,4 @@ void g95_resolve_random_number(g95_code *);
 extern int g95_intrinsic_extension;
 extern char *g95_current_intrinsic,
   *g95_current_intrinsic_arg[MAX_INTRINSIC_ARGS];
-extern locus *g95_current_intrinsic_where;
+extern g95_locus *g95_current_intrinsic_where;

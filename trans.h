@@ -127,8 +127,7 @@ void g95_start_block(stmtblock_t *);
 
 tree g95_finish_block(stmtblock_t *);
 
-void g95_set_backend_locus(locus *);
-void g95_get_backend_locus(locus *);
+void g95_set_backend_locus(g95_locus *);
 void g95_save_expr(g95_se *);
 
 tree g95_trans_assignment(g95_expr *, g95_expr *);
@@ -142,7 +141,10 @@ void g95_call_temp_free(stmtblock_t *, tree);
 
 void g95_conv_array_ref(g95_se *, g95_array_ref *, g95_typespec *, int);
 void g95_fix_dummy_array(g95_symbol *);
+tree g95_get_adesc_esize(tree);
 tree g95_adesc_base(tree);
+tree g95_transfer_result(stmtblock_t *, tree, tree, tree);
+void g95_nullify_array_pointer(stmtblock_t *, tree);
 void g95_temp_array_descriptor(g95_se *, variable_info *, tree, tree);
 void g95_set_section_info(g95_se *, int, tree);
 
@@ -152,6 +154,7 @@ void g95_array_argument(g95_se *, g95_actual_arglist *);
 void g95_init_array_types(void);
 tree g95_get_array_desc(int);
 tree g95_get_array_storage(variable_info *);
+tree g95_build_desc_constructor(int);
 void g95_init_array_desc(variable_info *, tree, tree);
 
 /* trans-types.c */
@@ -186,9 +189,8 @@ tree g95_get_extern_function_decl(g95_symbol *);
 tree g95_get_function_decl(g95_symbol *);
 tree g95_build_function_call(tree, tree);
 tree g95_build_label_decl(tree);
-tree g95_get_fake_result_decl(g95_symbol *);
 tree g95_get_return_label(void);
-void g95_build_builtin_function_decls(void);
+void g95_build_builtin_decls(void);
 void g95_generate_procedure(g95_namespace *);
 void g95_generate_procedure_variables(g95_namespace *);
 
@@ -201,11 +203,12 @@ int g95_stack_variable(tree);
 /* trans-intrinsic.c */
 
 void g95_dim(g95_se *, tree, tree);
+void g95_conv_intrinsic_function(g95_se *, g95_expr *);
+tree g95_conv_intrinsic_subroutine(g95_code *);
 
 /* trans-expr.c */
 
 tree g95_trans_pointer_assign(g95_code *);
-void g95_conv_intrinsic_function(g95_se *, g95_expr *);
 int g95_is_intrinsic_libcall(g95_expr *);
 void g95_conv_function_call(g95_se *, g95_symbol *, g95_actual_arglist *);
 tree g95_trans_arglist(g95_actual_arglist *, g95_se *);
@@ -259,14 +262,14 @@ tree g95_data_initializer(int);
 int g95_element_number(g95_array_ref *, g95_array_spec *);
 void g95_trans_common(g95_namespace *);
 
-
-
 tree g95_conv_mpz_to_tree(mpz_t, int);
-void g95_set_error_locus(stmtblock_t *, locus *);
+void g95_set_error_locus(stmtblock_t *, g95_locus *);
 tree g95_add_field(tree stype, char *name, tree type);
 tree g95_conv_array_ubound(tree, int);
 tree g95_conv_array_lbound(tree, int);
 void g95_trans_data(g95_namespace *);
+void g95_init_common(g95_namespace *);
+
 
 enum {
   F95_INT1_TYPE,

@@ -65,354 +65,520 @@ interface as usual, but the link to the namespace is NULL and the
 formal argument list points to symbols within the same namespace as
 the program unit name.
 
-*/          
-          
+*/ 
+ 
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
-   
+
 #include "g95.h"
-
-
+    
+    
 /* The current_interface structure holds information about the
  * interface currently being parsed.  This structure is saved and
  * restored during recursive interfaces. */        
         
-g95_interface_info current_interface;       
-static int compare_interfaces(g95_symbol *, g95_symbol *, int);    
-    
-typedef struct {    
-  g95_formal_arglist *f;      
-  g95_actual_arglist *a; 
-} argpair;          
-          
+g95_interface_info current_interface;         
+static int compare_interfaces(g95_symbol *, g95_symbol *, int);      
+      
+typedef struct {       
+  g95_formal_arglist *f;
+  g95_actual_arglist *a;       
+} argpair;     
+     
 typedef struct {         
-  int flag;        
-  g95_symbol *sym;     
-} arginfo;  
+  int flag;      
+  g95_symbol *sym;          
+} arginfo;         
+         
+         
   
   
+/* g95_compare_types()-- Compare two typespecs, recursively if
+ * necessary. */   
+   
+int g95_compare_types(g95_typespec *ts1, g95_typespec *ts2) {       
+g95_component *dt1, *dt2; 
+ 
+  if (ts1->type != ts2->type) return 0;       
+  if (ts1->type != BT_DERIVED) return (ts1->kind == ts2->kind);
+
+/* Compare derived types. */       
+       
+  if (ts1->derived == ts2->derived) return 1;  
+  
+/* Special case for comparing derived types across namespaces.  If the
+ * true names and module names are the same and the module name is
+ * nonnull, then they are equal. */       
+       
+  if (strcmp(ts1->derived->name, ts2->derived->name) == 0 &&        
+      ts1->derived->module[0] != '\0' && 
+      strcmp(ts1->derived->module, ts2->derived->module) == 0) return 1;      
+      
+/* Compare type via the rules of the standard.  Both types must have
+ * the SEQUENCE attribute to be equal */         
+         
+  if (strcmp(ts1->derived->name, ts2->derived->name)) return 0;      
+      
+  dt1 = ts1->derived->components;    
+  dt2 = ts2->derived->components; 
+ 
+  if (ts1->derived->attr.sequence == 0 || ts2->derived->attr.sequence == 0)      
+    return 0;       
+       
+/* Since subtypes of SEQUENCE types must be SEQUENCE types as well, a
+ * simple test can speed things up.  Otherwise, lots of things have to
+ * match. */  
+  
+  for(;;) {          
+    if (strcmp(dt1->name, dt2->name) != 0) return 0;     
+     
+    if (dt1->pointer != dt2->pointer) return 0;    
+    
+    if (dt1->dimension != dt2->dimension) return 0;  
+  
+    if (dt1->dimension && g95_compare_array_spec(dt1->as, dt2->as) == 0)
+      return 0;
+
+    if (g95_compare_types(&dt1->ts, &dt2->ts) == 0) return 0;      
+      
+    dt1 = dt1->next;
+    dt2 = dt2->next;   
+   
+    if (dt1 == NULL && dt2 == NULL) break;        
+    if (dt1 == NULL || dt1 == NULL) return 0;  
+  }
+
+  return 1;          
+}        
+        
+        
+         
+         
+/* check_interface0()-- Given a pointer to an interface pointer,
+ * remove duplicate interfaces and make sure that all symbols are
+ * either functions or subroutines.  Returns nonzero if something goes
+ * wrong. */   
+   
+static int check_interface0(g95_interface *f, char *interface_name) {   
+g95_interface *t, *qlast;  
+  
+  /* Make sure all symbols in the interface have been defined as
+   * functions or subroutines. */        
+        
+  for(; f; f=f->next) 
+    if (!f->sym->attr.function && !f->sym->attr.subroutine) {         
+      g95_error("Procedure '%s' in %s at %L is neither function nor "      
+		"subroutine", f->sym->name, interface_name,        
+		&f->sym->declared_at);   
+      return 1;     
+    }       
+       
+  /* Remove duplicate interfaces in this interface list */ 
+ 
+  for(; f; f=f->next) {  
+    qlast = f;      
+      
+    for(t=f->next; t;) { 
+      if (f->sym != t->sym) {   
+	qlast = t;          
+	t = t->next;      
+      
+      } else {           /* Duplicate interface */     
+	qlast->next = t->next;  
+	g95_free(t);        
+	t = qlast->next;          
+      }         
+    }      
+  }    
+    
+  return 0;   
+}       
+       
+       
      
      
+/* fold_unary()-- Change the operators unary plus and minus into
+ * binary plus and minus respectively, leaving the rest unchanged.  */  
+  
+static int fold_unary(int operator) {       
+       
+  switch(operator) {          
+  case INTRINSIC_UPLUS:   operator = INTRINSIC_PLUS;   break;  
+  case INTRINSIC_UMINUS:  operator = INTRINSIC_MINUS;  break;     
+  default: break;
+  } 
+ 
+  return operator;      
+}   
+   
+   
+       
+       
+static int symbol_rank(g95_symbol *sym) {    
+    
+  return (sym->as == NULL) ? 0 : sym->as->rank; 
+}    
+    
+    
+
+
+/* g95_match_end_interface()-- Match the different sort of
+ * generic-specs that can be present after the END INTERFACE itself. */         
+         
+match g95_match_end_interface(void) {         
+char n[G95_MAX_SYMBOL_LEN+1];  
+interface_type typ;       
+int oper;          
+match d;   
+   
+  d = g95_match_space();          
+          
+  if (g95_match_generic_spec(&typ, n, &oper) == MATCH_ERROR)       
+    return MATCH_ERROR;  
+  
+  if (g95_match_eos() != MATCH_YES ||     
+      (typ != INTERFACE_NAMELESS && d != MATCH_YES)) {      
+    g95_syntax_error(ST_END_INTERFACE);       
+    return MATCH_ERROR;       
+  }         
+         
+  d = MATCH_YES;
+
+  switch(current_interface.type) { 
+  case INTERFACE_NAMELESS: 
+    if (typ != current_interface.type) {     
+      g95_error("Expected a nameless interface at %C"); 
+      d = MATCH_ERROR;         
+    }    
+    
+    break;
+
+  case INTERFACE_INTRINSIC_OP:   
+    if (typ != current_interface.type || oper != current_interface.op) {        
+        
+      if (current_interface.op == INTRINSIC_ASSIGN)   
+	g95_error("Expected 'END INTERFACE ASSIGNMENT (=)' at %C");     
+      else       
+	g95_error("Expecting 'END INTERFACE OPERATOR (%s)' at %C",  
+		  g95_op2string(current_interface.op));  
+  
+      d = MATCH_ERROR;       
+    }       
+       
+    break;     
+     
+  case INTERFACE_USER_OP:      
+  /* Comparing the symbol node names is OK because only use-associated
+   * symbols can be renamed */    
+    
+    if (typ != current_interface.type ||  
+	strcmp(current_interface.sym->name, n) != 0) {        
+      g95_error("Expecting 'END INTERFACE OPERATOR (.%s.)' at %C",  
+		current_interface.sym->name);  
+      d = MATCH_ERROR;          
+    }          
+          
+    break;         
+         
+  case INTERFACE_GENERIC:      
+    if (typ != current_interface.type ||          
+	strcmp(current_interface.sym->name, n) != 0) {
+      g95_error("Expecting 'END INTERFACE %s' at %C",     
+		current_interface.sym->name); 
+      d = MATCH_ERROR;   
+    }    
+    
+    break;        
+  }      
+      
+  return d;         
+}  
+  
+  
+         
+         
+/* check_interface1()-- Check lists of interfaces to make sure that no
+ * two interfaces are ambiguous.  Duplicate interfaces (from the same
+ * symbol) are OK here. */       
+       
+static int check_interface1(g95_interface *l, g95_interface *j,        
+			    int generic_flag, char *interface_name) {        
+        
+  for(; l; l=l->next)  
+    for(; j; j=j->next) {    
+      if (l->sym == j->sym) continue;   /* Duplicates OK here */         
+         
+      if (strcmp(l->sym->name, j->sym->name) == 0 &&  
+	  strcmp(l->sym->module, j->sym->module) == 0) continue;  
+  
+      if (compare_interfaces(l->sym, j->sym, generic_flag)) {  
+	g95_error("Ambiguous interfaces '%s' and '%s' in %s at %L",        
+		  l->sym->name, j->sym->name, interface_name, &l->where);   
+	return 1;      
+      } 
+    }      
+      
+  return 0;        
+}      
+      
+      
+         
+         
+/* check_new_interface()-- Make sure that the interface just parsed is
+ * not already present in the given interface list.  Ambiguity isn't
+ * checked yet since module procedures can be present without
+ * interfaces.  */         
+         
+static try check_new_interface(g95_interface *bottom, g95_symbol *n1) {          
+g95_interface *ifp;
+
+  for(ifp=bottom; ifp; ifp=ifp->next) {        
+    if (ifp->sym == n1) {  
+      g95_error("Entity '%s' at %C is already present in the interface",        
+		n1->name);   
+      return FAILURE;      
+    }        
+  }
+
+  return SUCCESS;         
+}       
+       
+       
+ 
+ 
+/* find_keyword_arg()-- Given a formal argument list and a keyword
+ * name, search the list for that keyword.  Returns the correct symbol
+ * node if found, NULL if not found. */
+
+static g95_symbol *find_keyword_arg(char *nam, g95_formal_arglist *y) {
+
+  for(; y; y=y->next)   
+    if (strcmp(y->sym->name, nam) == 0) return y->sym;     
+     
+  return NULL;    
+}        
+        
+        
+          
+          
+/* check_operator_interface()-- Given an operator interface and the
+ * operator, make sure that all interfaces for that operator are legal. */         
+         
+static void check_operator_interface(g95_interface *intf, int operator) {         
+g95_formal_arglist *frm;   
+sym_intent b, w;       
+g95_symbol *sym;       
+bt s, a;  
+int arg;  
+  
+  if (intf == NULL) return;    
+   
+  arg = 0;      
+  s = a = BT_UNKNOWN;         
+  b = w = INTENT_UNKNOWN;
+
+  for(frm=intf->sym->formal; frm; frm=frm->next) {     
+    sym = frm->sym;   
+   
+    if (arg == 0) { s = sym->ts.type; b = sym->attr.intent; }        
+    if (arg == 1) { a = sym->ts.type; w = sym->attr.intent; }          
+    arg++;       
+  }     
+     
+  if (arg == 0 || arg > 2) goto num_args;      
+      
+  sym = intf->sym;          
+          
+  if (operator == INTRINSIC_ASSIGN) {     
+    if (!sym->attr.subroutine) {       
+      g95_error("Assignment operator interface at %L must be a SUBROUTINE",    
+		&intf->where);     
+      return;      
+    }        
+  } else {      
+    if (!sym->attr.function) {      
+      g95_error("Intrinsic operator interface at %L must be a FUNCTION", 
+		&intf->where);  
+      return;        
+    }       
+  }         
+         
+  switch(operator) {     
+  case INTRINSIC_PLUS:     /* Numeric unary or binary */      
+  case INTRINSIC_MINUS:   
+    if ((arg == 1) &&        
+	(s == BT_INTEGER || s == BT_REAL || s == BT_COMPLEX))   
+      goto bad_repl;    
+    
+    if ((arg == 2) &&
+	(s == BT_INTEGER || s == BT_REAL || s == BT_COMPLEX) &&   
+	(a == BT_INTEGER || a == BT_REAL || a == BT_COMPLEX))  
+      goto bad_repl;      
+      
+    break;   
+   
+  case INTRINSIC_POWER:    /* Binary numeric */        
+  case INTRINSIC_TIMES:        
+  case INTRINSIC_DIVIDE:          
+          
+  case INTRINSIC_EQ:
+  case INTRINSIC_NE:  
+    if (arg == 1) goto num_args; 
+ 
+    if ((s == BT_INTEGER || s == BT_REAL || s == BT_COMPLEX) &&     
+	(a == BT_INTEGER || a == BT_REAL || a == BT_COMPLEX))     
+      goto bad_repl;          
+          
+    break;      
+      
+  case INTRINSIC_GE:  /* Binary numeric operators that do not support */    
+  case INTRINSIC_LE:  /* complex numbers */      
+  case INTRINSIC_LT:       
+  case INTRINSIC_GT:    
+    if (arg == 1) goto num_args; 
+ 
+    if ((s == BT_INTEGER || s == BT_REAL) &&        
+	(a == BT_INTEGER || a == BT_REAL)) goto bad_repl;     
+     
+    break; 
+ 
+  case INTRINSIC_OR:       /* Binary logical */          
+  case INTRINSIC_AND:   
+  case INTRINSIC_EQV: 
+  case INTRINSIC_NEQV:
+    if (arg == 1) goto num_args;     
+    if (s == BT_LOGICAL && a == BT_LOGICAL) goto bad_repl;    
+    break; 
+ 
+  case INTRINSIC_NOT:      /* Unary logical */    
+    if (arg != 1) goto num_args;    
+    if (s == BT_LOGICAL) goto bad_repl;       
+    break;     
+     
+  case INTRINSIC_CONCAT:   /* Binary string */   
+    if (arg != 2) goto num_args;    
+    if (s == BT_CHARACTER && a == BT_CHARACTER) goto bad_repl;         
+    break;     
+     
+  case INTRINSIC_ASSIGN:   /* Class by itself */     
+    if (arg != 2) goto num_args;    
+    break;     
+  }         
+         
+  /* Check intents on operator interfaces */       
+       
+  if (operator == INTRINSIC_ASSIGN) {  
+    if (b != INTENT_OUT && b != INTENT_INOUT)
+      g95_error("First argument of defined assignment at %L must be "          
+		"INTENT(IN) or INTENT(INOUT)", &intf->where);     
+     
+    if (w != INTENT_IN) 
+      g95_error("Second argument of defined assignment at %L must be "    
+		"INTENT(IN)", &intf->where);      
+  } else {      
+    if (b != INTENT_IN)        
+      g95_error("First argument of operator interface at %L must be "  
+		"INTENT(IN)", &intf->where);
+
+    if (arg == 2 && w != INTENT_IN)          
+      g95_error("Second argument of operator interface at %L must be "          
+		"INTENT(IN)", &intf->where);       
+  }   
+   
+  return;    
+    
+ bad_repl:      
+  g95_error("Operator interface at %L conflicts with intrinsic interface", 
+	    &intf->where);       
+  return;       
+       
+ num_args:       
+  g95_error("Operator interface at %L has the wrong number of arguments",        
+	    &intf->where);       
+  return;
+}    
+    
+    
+      
+      
+static void check_uop_interfaces(g95_user_op *uop) { 
+char interface_name[100];      
+g95_user_op *uop2; 
+g95_namespace *n;         
+         
+  sprintf(interface_name, "operator interface '%s'", uop->name);       
+  if (check_interface0(uop->operator, interface_name)) return;  
+  
+  for(n=g95_current_ns; n; n=n->parent) { 
+    uop2 = g95_find_uop(uop->name, n);          
+    if (uop2 == NULL) continue;   
+   
+    check_interface1(uop->operator, uop2->operator, 0, interface_name);
+  }       
+}      
+      
+      
+ 
+ 
 /* pair_cmp()-- qsort comparison function with the following order:
  *  - p->a->expr == NULL
  *  - p->a->expr->type != EXPR_VARIABLE
  *  - growing p->a->expr->symbol
- */    
-    
-static int pair_cmp(const void *q, const void *p2){ 
-const g95_actual_arglist *y, *d;        
-        
-  /* *p1 and *p2 are elements of the to-be-sorted array */         
-  y = ((const argpair *) q)->a;     
-  d = ((const argpair *) p2)->a;          
-          
-  if (y->u.expr == NULL) return (d->u.expr == NULL) ? 0 : -1 ;   
+ */     
+     
+static int pair_cmp(const void *b, const void *q){          
+const g95_actual_arglist *i, *k;         
+         
+  /* *p1 and *p2 are elements of the to-be-sorted array */  
+  i = ((const argpair *) b)->a;    
+  k = ((const argpair *) q)->a;     
+     
+  if (i->u.expr == NULL) return (k->u.expr == NULL) ? 0 : -1 ;   
    
-  if (d->u.expr == NULL) return 1;   
-   
-  if (y->u.expr->type != EXPR_VARIABLE) {         
-    if (d->u.expr->type != EXPR_VARIABLE) return 0;    
-    return -1; 
-  }        
-        
-  if (d->u.expr->type != EXPR_VARIABLE) return 1;       
-       
-  return y->u.expr->symbol < d->u.expr->symbol;          
-}     
-     
-     
-
-
-/* check_operator_interface()-- Given an operator interface and the
- * operator, make sure that all interfaces for that operator are legal. */     
-     
-static void check_operator_interface(g95_interface *inter, int op1) {   
-g95_formal_arglist *form;      
-sym_intent i, d;   
-g95_symbol *sym;
-bt r, o;       
-int argu;       
-       
-  if (inter == NULL) return;     
-    
-  argu = 0;          
-  r = o = BT_UNKNOWN;    
-  i = d = INTENT_UNKNOWN;          
-          
-  for(form=inter->sym->formal; form; form=form->next) {  
-    sym = form->sym;      
-      
-    if (argu == 0) { r = sym->ts.type; i = sym->attr.intent; }      
-    if (argu == 1) { o = sym->ts.type; d = sym->attr.intent; }      
-    argu++;      
-  }   
-   
-  if (argu == 0 || argu > 2) goto num_args; 
- 
-  sym = inter->sym;      
-      
-  if (op1 == INTRINSIC_ASSIGN) {   
-    if (!sym->attr.subroutine) {  
-      g95_error("Assignment operator interface at %L must be a SUBROUTINE",
-		&inter->where);      
-      return;  
-    }          
-  } else {          
-    if (!sym->attr.function) {          
-      g95_error("Intrinsic operator interface at %L must be a FUNCTION",         
-		&inter->where);    
-      return;  
-    }         
-  }        
-        
-  switch(op1) {    
-  case INTRINSIC_PLUS:     /* Numeric unary or binary */     
-  case INTRINSIC_MINUS:       
-    if ((argu == 1) &&   
-	(r == BT_INTEGER || r == BT_REAL || r == BT_COMPLEX)) 
-      goto bad_repl;    
-    
-    if ((argu == 2) &&    
-	(r == BT_INTEGER || r == BT_REAL || r == BT_COMPLEX) &&  
-	(o == BT_INTEGER || o == BT_REAL || o == BT_COMPLEX))   
-      goto bad_repl;      
-      
-    break;     
-     
-  case INTRINSIC_POWER:    /* Binary numeric */  
-  case INTRINSIC_TIMES:   
-  case INTRINSIC_DIVIDE:          
-          
-  case INTRINSIC_EQ:
-  case INTRINSIC_NE:    
-    if (argu == 1) goto num_args;
-
-    if ((r == BT_INTEGER || r == BT_REAL || r == BT_COMPLEX) &&        
-	(o == BT_INTEGER || o == BT_REAL || o == BT_COMPLEX))      
-      goto bad_repl;  
+  if (k->u.expr == NULL) return 1;  
   
-    break;       
-       
-  case INTRINSIC_GE:  /* Binary numeric operators that do not support */      
-  case INTRINSIC_LE:  /* complex numbers */    
-  case INTRINSIC_LT:     
-  case INTRINSIC_GT:       
-    if (argu == 1) goto num_args;    
-    
-    if ((r == BT_INTEGER || r == BT_REAL) &&
-	(o == BT_INTEGER || o == BT_REAL)) goto bad_repl;     
-     
-    break;   
-   
-  case INTRINSIC_OR:       /* Binary logical */        
-  case INTRINSIC_AND:     
-  case INTRINSIC_EQV:   
-  case INTRINSIC_NEQV: 
-    if (argu == 1) goto num_args;   
-    if (r == BT_LOGICAL && o == BT_LOGICAL) goto bad_repl;      
-    break;          
-          
-  case INTRINSIC_NOT:      /* Unary logical */  
-    if (argu != 1) goto num_args;     
-    if (r == BT_LOGICAL) goto bad_repl;         
-    break;          
-          
-  case INTRINSIC_CONCAT:   /* Binary string */  
-    if (argu != 2) goto num_args;        
-    if (r == BT_CHARACTER && o == BT_CHARACTER) goto bad_repl; 
-    break;         
-         
-  case INTRINSIC_ASSIGN:   /* Class by itself */   
-    if (argu != 2) goto num_args;    
-    break;   
-  }      
-      
-  /* Check intents on operator interfaces */      
-      
-  if (op1 == INTRINSIC_ASSIGN) {         
-    if (i != INTENT_OUT && i != INTENT_INOUT)          
-      g95_error("First argument of defined assignment at %L must be "   
-		"INTENT(IN) or INTENT(INOUT)", &inter->where);     
-     
-    if (d != INTENT_IN)  
-      g95_error("Second argument of defined assignment at %L must be "    
-		"INTENT(IN)", &inter->where);       
-  } else {  
-    if (i != INTENT_IN)      
-      g95_error("First argument of operator interface at %L must be "          
-		"INTENT(IN)", &inter->where);     
-     
-    if (argu == 2 && d != INTENT_IN)  
-      g95_error("Second argument of operator interface at %L must be "      
-		"INTENT(IN)", &inter->where);   
-  }        
+  if (i->u.expr->type != EXPR_VARIABLE) {    
+    if (k->u.expr->type != EXPR_VARIABLE) return 0;    
+    return -1;         
+  } 
+ 
+  if (k->u.expr->type != EXPR_VARIABLE) return 1;        
         
-  return; 
- 
- bad_repl:        
-  g95_error("Operator interface at %L conflicts with intrinsic interface",        
-	    &inter->where);       
-  return;         
-         
- num_args:        
-  g95_error("Operator interface at %L has the wrong number of arguments",
-	    &inter->where);  
-  return;         
-}      
-      
-      
-        
-        
-/* check_intents()-- Given formal and actual argument lists that
- * correspond to one another, check that they are compatible in the
- * sense that intents are not mismatched.  */        
-        
-static try check_intents(g95_formal_arglist *h, g95_actual_arglist *m) { 
-sym_intent a_intent, f_intent;         
-         
-  for(;; h=h->next, m=m->next) {      
-    if (h == NULL && m == NULL) break;     
-    if (h == NULL || m == NULL) 
-      g95_internal_error("check_intents(): List mismatch");   
-   
-    if (m->type == ALT_RETURN) continue;         
-         
-    if (m->u.expr == NULL || m->u.expr->type != EXPR_VARIABLE) continue;   
-   
-    a_intent = m->u.expr->symbol->attr.intent;   
-    f_intent = h->sym->attr.intent;    
-    
-    if (a_intent == INTENT_IN && 
-	(f_intent == INTENT_INOUT || f_intent == INTENT_OUT)) {    
-    
-      g95_error("Procedure argument at %L is INTENT(IN) while interface "  
-		"specifies INTENT(%s)", &m->u.expr->where,       
-		g95_intent_string(f_intent));          
-      return FAILURE;     
-    }    
-    
-    if (g95_pure(NULL) && g95_impure_variable(m->u.expr->symbol)) { 
-      if (f_intent == INTENT_INOUT || f_intent == INTENT_OUT) {
-	g95_error("Procedure argument at %L is local to a PURE procedure and "        
-		  "is passed to an INTENT(%s) argument", &m->u.expr->where,         
-		  g95_intent_string(f_intent));       
-	return FAILURE;       
-      } 
- 
-      if (m->u.expr->symbol->attr.pointer) {     
-	g95_error("Procedure argument at %L is local to a PURE procedure and "   
-		  "has the POINTER attribute", &m->u.expr->where); 
-	return FAILURE;
-      }      
-    }  
-  }      
-      
-  return SUCCESS;         
-}        
-        
-        
-
-
-/* g95_match_interface()-- Match one of the five forms of an interface
- * statement. */       
-       
-match g95_match_interface(void) {    
-char nam[G95_MAX_SYMBOL_LEN+1];    
-interface_type type;   
-g95_symbol *sym; 
-int o;     
-match z;      
-      
-  z = g95_match_space(); 
- 
-  if (g95_match_generic_spec(&type, nam, &o) == MATCH_ERROR)   
-    return MATCH_ERROR;      
-      
-  if (g95_match_eos() != MATCH_YES || 
-      (type != INTERFACE_NAMELESS && z != MATCH_YES)) {  
-    g95_syntax_error(ST_INTERFACE);    
-    return MATCH_ERROR;
-  }   
-   
-  current_interface.type = type;     
-     
-  switch(type) {   
-  case INTERFACE_GENERIC:          
-    if (g95_get_symbol(nam, NULL, &sym)) return MATCH_ERROR;       
-       
-    if (!sym->attr.generic && g95_add_generic(&sym->attr, NULL) == FAILURE) 
-      return MATCH_ERROR;      
-      
-    current_interface.sym = g95_new_block = sym;
-    break; 
- 
-  case INTERFACE_USER_OP:     
-    current_interface.uop = g95_get_uop(nam);   
-    break;      
-      
-  case INTERFACE_INTRINSIC_OP:    
-    current_interface.op = o;
-    break;         
-         
-  case INTERFACE_NAMELESS:       
-    break;     
-  }      
-      
-  return MATCH_YES;      
-} 
- 
- 
-   
-   
-/* compare_type_rank()-- Given two symbols that are formal arguments,
- * compare their ranks and types.  Returns nonzero if they have the
- * same rank and type, zero otherwise. */      
-      
-static int compare_type_rank(g95_symbol *k, g95_symbol *c) {    
-int y, t;     
-     
-  y = (k->as != NULL) ? k->as->rank : 0;   
-  t = (c->as != NULL) ? c->as->rank : 0;     
-     
-  if (y != t) return 0;   /* Ranks differ */         
-         
-  return g95_compare_types(&k->ts, &c->ts);    
-}  
-  
-  
-    
-    
-/* check_interface1()-- Check lists of interfaces to make sure that no
- * two interfaces are ambiguous.  Duplicate interfaces (from the same
- * symbol) are OK here. */ 
- 
-static int check_interface1(g95_interface *n, g95_interface *x,       
-			    int generic_flag, char *interface_name) {
-
-  for(; n; n=n->next)   
-    for(; x; x=x->next) {      
-      if (n->sym == x->sym) continue;   /* Duplicates OK here */       
-       
-      if (strcmp(n->sym->name, x->sym->name) == 0 &&        
-	  strcmp(n->sym->module, x->sym->module) == 0) continue;
-
-      if (compare_interfaces(n->sym, x->sym, generic_flag)) {          
-	g95_error("Ambiguous interfaces '%s' and '%s' in %s at %L",       
-		  n->sym->name, x->sym->name, interface_name, &n->where);  
-	return 1;      
-      }      
-    }       
-       
-  return 0;         
+  return i->u.expr->symbol < k->u.expr->symbol;         
 }       
        
        
 
 
-static int symbol_rank(g95_symbol *s) {
-
-  return (s->as == NULL) ? 0 : s->as->rank;     
+/* g95_free_interface()-- Frees a singly linked list of g95_interface
+ * structures */     
+     
+void g95_free_interface(g95_interface *inter) {  
+g95_interface *nxt;      
+      
+  for(; inter; inter=nxt) {         
+    nxt = inter->next;  
+    g95_free(inter);  
+  }     
+}         
+         
+         
+       
+       
+/* compare_type_rank()-- Given two symbols that are formal arguments,
+ * compare their ranks and types.  Returns nonzero if they have the
+ * same rank and type, zero otherwise. */          
+          
+static int compare_type_rank(g95_symbol *p, g95_symbol *u) {
+int w, a;    
+    
+  w = (p->as != NULL) ? p->as->rank : 0;
+  a = (u->as != NULL) ? u->as->rank : 0;  
+  
+  if (w != a) return 0;   /* Ranks differ */   
+   
+  return g95_compare_types(&p->ts, &u->ts);   
 }      
       
       
@@ -428,935 +594,91 @@ static int symbol_rank(g95_symbol *s) {
  * that point, two formal interfaces must be compared for equality
  * which is what happens here. */         
          
-static int operator_correspondence(g95_formal_arglist *w,
-				   g95_formal_arglist *g) {        
+static int operator_correspondence(g95_formal_arglist *c,    
+				   g95_formal_arglist *q) {         
   for(;;) {      
-    if (w == NULL && g == NULL) break; 
-    if (w == NULL || g == NULL) return 1;  
-  
-    if (!compare_type_rank(w->sym, g->sym)) return 1;  
-  
-    w = w->next;      
-    g = g->next;
-  } 
+    if (c == NULL && q == NULL) break;   
+    if (c == NULL || q == NULL) return 1; 
  
-  return 0;     
-}    
-    
-    
- 
- 
-/* fold_unary()-- Change the operators unary plus and minus into
- * binary plus and minus respectively, leaving the rest unchanged.  */
-
-static int fold_unary(int o) {          
-          
-  switch(o) {        
-  case INTRINSIC_UPLUS:   o = INTRINSIC_PLUS;   break;
-  case INTRINSIC_UMINUS:  o = INTRINSIC_MINUS;  break;        
-  default: break;  
-  } 
- 
-  return o;     
-}    
-    
-    
-     
-     
-/* compare_parameter()-- Given a symbol of a formal argument list and
- * an expression, see if the two are compatible as arguments.  Returns
- * nonzero if compatible, zero if not compatible. */         
-         
-static int compare_parameter(g95_symbol *formal, g95_actual_arglist *c,        
-			     int is_elemental, int error_flag) {    
-g95_expr *real;
-int formal_rank;        
-g95_ref *re;   
+    if (!compare_type_rank(c->sym, q->sym)) return 1;   
    
-  real = c->u.expr;
-
-  if (real->ts.type == BT_PROCEDURE) {        
-    if (formal->attr.flavor != FL_PROCEDURE) {      
-      if (error_flag)      
-	g95_error("Actual parameter '%s' at %L must be a PROCEDURE",     
-		  formal->name, &c->u.expr->where); 
- 
-      return 0;   
-    }         
-         
-    if (formal->attr.function &&     
-	!compare_type_rank(formal, real->symbol->result)) return 0;         
-         
-    if (formal->attr.if_source == IFSRC_UNKNOWN) return 1;  /* Assume match */          
-          
-    return compare_interfaces(formal, real->symbol, 0);          
+    c = c->next;   
+    q = q->next;         
   }    
     
-  if (real->type != EXPR_NULL &&        
-      !g95_compare_types(&formal->ts, &real->ts)) {         
-    if (error_flag) g95_error("Type mismatch in parameter '%s' at %L",
-			      formal->name, &c->u.expr->where);       
-    return 0;     
-  }     
-     
-  formal_rank = symbol_rank(formal);   
-   
-  /* Scalar to scalar */  
-  
-  if (formal_rank == 0 && real->rank == 0) return 1;  
-  
-  /* Array to array */     
-     
-  if (formal_rank > 0 && real->rank > 0) {     
-    if (formal_rank != real->rank &&    
-	(formal->as->type == AS_ASSUMED_SHAPE || 
-	 formal->as->type == AS_DEFERRED)) { 
- 
-      if (error_flag) g95_error("Rank mismatch for assumed-shape array in "      
-				"parameter '%s' at %L", formal->name,
-				&c->u.expr->where);        
-      return 0;       
-    }   
-   
-    c->type = (formal->as->type == AS_ASSUMED_SHAPE ||    
-	       formal->as->type == AS_DEFERRED) ? ARRAY_DESC : FULL_ARRAY;       
-    return 1;
-  }         
-         
-  /* Array to scalar.  The reference must be elemental. */          
-          
-  if (formal_rank == 0 && real->rank > 0) {
-    if (is_elemental) return 1;   
-   
-    if (error_flag) g95_error("Cannot pass array to scalar parameter "
-			      "'%s' at %L", formal->name, &c->u.expr->where);    
-    return 0;   
-  }   
-   
-  /* Scalar to array.  The array cannot be assumed-shape and the final
-   * reference of the actual argument must be an array element. */     
-     
-  if (formal->as->type == AS_ASSUMED_SHAPE ||    
-      formal->as->type == AS_DEFERRED) goto error;   
-   
-  re = real->ref; 
-  if (re == NULL) goto error;        
-        
-  while(re->next)       
-    re = re->next;         
-         
-  if (re->type == REF_ARRAY && re->u.ar.type == AR_ELEMENT) {     
-    c->type = ARRAY_ELEMENT;    
-    return 1;  
-  }          
-          
-error:
-  if (error_flag) g95_error("Cannot pass scalar to array parameter '%s' at %L",    
-			    formal->name, &c->u.expr->where);
-  return 0;    
-}     
-     
-     
-      
-      
-/* compare_actual_expr()-- Given two expressions from some actual
- * arguments, test whether they refer to the same expression. The
- * analysis is conservative. Returning FAILURE will produce no
- * warning. */  
-  
-static try compare_actual_expr(g95_expr *m, g95_expr *s){        
-const g95_ref *o, *j;    
-      
-  if (!m || !s ||
-      m->type != EXPR_VARIABLE || 
-      s->type != EXPR_VARIABLE ||
-      m->symbol != s->symbol)
-    return FAILURE;   
-   
-  /* TODO improve comparison see expr.c 'show_ref' */      
-      
-  for(o = m->ref, j = s->ref; o && j; o = o->next, j = j->next){   
-    if (o->type != j->type) return FAILURE;
-
-    switch (o->type) {         
-    case REF_ARRAY:  
-      if (o->u.ar.type != j->u.ar.type) return FAILURE;          
-          
-      /* at the moment, consider only full arrays;
-       * we could do better.  */   
-      if (o->u.ar.type != AR_FULL || j->u.ar.type != AR_FULL) return FAILURE;          
-      break;          
-          
-    case REF_COMPONENT:      
-      if (o->u.c.component != j->u.c.component) return FAILURE;        
-      break;      
-      
-    case REF_SUBSTRING:        
-      return FAILURE;     
-     
-    default: 
-      g95_internal_error("compare_actual_expr(): Bad component code");        
-    }          
-  }         
-         
-  return (o == NULL && j == NULL) ? SUCCESS : FAILURE;      
+  return 0;      
 }       
        
        
-  
-  
+     
+     
 /* g95_free_formal_arglist()-- Gets rid of a formal argument list.  We
  * do not free symbols.  Symbols are freed when a namespace is freed. */          
           
-void g95_free_formal_arglist(g95_formal_arglist *z) {    
-g95_formal_arglist *s;
+void g95_free_formal_arglist(g95_formal_arglist *t) {      
+g95_formal_arglist *y;
 
-  for(; z; z=s) {         
-    s = z->next;          
-    g95_free(z); 
-  }        
-}       
-  
-  
-/* compare_type_rank_if()-- Given two symbols that are formal
- * arguments, compare their types and rank and their formal interfaces
- * if they are both dummy procedures.  Returns nonzero if the same,
- * zero if different. */  
-  
-static int compare_type_rank_if(g95_symbol *b, g95_symbol *n) {       
-       
-  if (b->attr.flavor != FL_PROCEDURE && n->attr.flavor != FL_PROCEDURE)          
-    return compare_type_rank(b, n);          
-          
-  if (b->attr.flavor != FL_PROCEDURE || n->attr.flavor != FL_PROCEDURE)       
-    return 0;       
-       
-  /* At this point, both symbols are procedures */     
-     
-  if ((b->attr.function == 0 && b->attr.subroutine == 0) ||          
-      (n->attr.function == 0 && n->attr.subroutine == 0)) return 0;       
-       
-  if (b->attr.function != n->attr.function ||
-      b->attr.subroutine != n->attr.subroutine) return 0;     
-     
-  if (b->attr.function && compare_type_rank(b, n) == 0) return 0;      
-      
-  return compare_interfaces(b, n, 0);    /* Recurse! */     
-}        
-        
-        
-         
-         
-/* check_some_aliasing()-- Given formal and actual argument lists that
- * correspond to one another, check that identical actual arguments
- * aren't not associated with some incompatible INTENTs.  */      
-      
-static try check_some_aliasing(g95_formal_arglist *y, g95_actual_arglist *r) {      
-sym_intent f1_intent, f2_intent;    
-g95_formal_arglist *d;        
-g95_actual_arglist *b;    
-size_t o, q, m;         
-argpair *c;   
-try w = SUCCESS;     
-     
-  o = 0;          
-  for(d=y, b=r;; d=d->next, b=b->next) {         
-    if (d == NULL && b == NULL) break;         
-    if (d == NULL || b == NULL)  
-      g95_internal_error("check_some_aliasing(): List mismatch");       
-       
-    o++;      
-  }   
-   
-  if (o == 0) return w;  
-  c = (argpair*) alloca(o*sizeof(argpair));         
-         
-  for(q=0, d=y, b=r ; q<o; q++, d=d->next, b=b->next) {         
-    c[q].f = d;        
-    c[q].a = b;     
+  for(; t; t=y) {
+    y = t->next;  
+    g95_free(t);          
   }
-
-  qsort(c, o, sizeof(argpair), pair_cmp);         
+}     
          
-  for(q=0; q<o; q++){ 
-    if (!c[q].a->u.expr || c[q].a->u.expr->type != EXPR_VARIABLE ||      
-	c[q].a->u.expr->ts.type == BT_PROCEDURE) continue;   
-   
-    f1_intent = c[q].f->sym->attr.intent;        
-        
-    for(m=q+1; m<o; m++) {     
-      /* expected order after the sort */        
-        
-      if (!c[m].a->u.expr || c[m].a->u.expr->type != EXPR_VARIABLE)          
-	g95_internal_error("check_some_aliasing(): corrupted data");   
-   
-      /* are the expression the same ? */    
-      if (compare_actual_expr(c[q].a->u.expr, c[m].a->u.expr) == FAILURE)break;          
-      f2_intent = c[m].f->sym->attr.intent;        
-        
-      if ((f1_intent == INTENT_IN && f2_intent == INTENT_OUT) ||    
-	  (f1_intent == INTENT_OUT && f2_intent == INTENT_IN)) {    
-	g95_warning("Same actual argument associated with INTENT(%s) "   
-		    "argument '%s' and INTENT(%s) argument '%s' at %L",        
-		    g95_intent_string(f1_intent), c[q].f->sym->name,      
-		    g95_intent_string(f2_intent), c[m].f->sym->name,     
-		    &c[q].a->u.expr->where);         
-	w = FAILURE;
-      }          
-    }        
-  }         
-               
-  return w; 
-}      
-      
-      
-  
-  
-/* find_keyword_arg()-- Given a formal argument list and a keyword
- * name, search the list for that keyword.  Returns the correct symbol
- * node if found, NULL if not found. */   
-   
-static g95_symbol *find_keyword_arg(char *name0, g95_formal_arglist *u) {        
-        
-  for(; u; u=u->next) 
-    if (strcmp(u->sym->name, name0) == 0) return u->sym;   
-   
-  return NULL;    
-} 
- 
- 
-   
-   
-/* g95_free_interface()-- Frees a singly linked list of g95_interface
- * structures */         
          
-void g95_free_interface(g95_interface *intr) {        
-g95_interface *next1;      
-      
-  for(; intr; intr=next1) {  
-    next1 = intr->next;        
-    g95_free(intr);   
-  }       
-}  
-  
-  
-        
-        
 /* g95_match_generic_spec()-- Match a generic specification.
  * Depending on which type of interface is found, the 'name' or
  * 'operator' pointers may be set.  This subroutine doesn't return
- * MATCH_NO. */       
-       
-match g95_match_generic_spec(interface_type *type, char *nam,        
-			     int *oper) {    
-char b[G95_MAX_SYMBOL_LEN+1];   
-match m; 
-int o;      
-       
-  if (g95_match(" assignment ( = )") == MATCH_YES) {      
-    *type = INTERFACE_INTRINSIC_OP;          
-    *oper = INTRINSIC_ASSIGN;
-    return MATCH_YES;       
-  }         
-         
-  if (g95_match(" operator ( %o )", &o) == MATCH_YES) { /* Operator i/f */   
-    *type = INTERFACE_INTRINSIC_OP; 
-    *oper = fold_unary(o);       
-    return MATCH_YES;       
-  }          
-          
-  if (g95_match(" operator ( ") == MATCH_YES) {    
-    m = g95_match_defined_op_name(b, 1);   
-    if (m == MATCH_NO) goto syntax;       
-    if (m != MATCH_YES) return MATCH_ERROR;  
-  
-    m = g95_match_char(')'); 
-    if (m == MATCH_NO) goto syntax;   
-    if (m != MATCH_YES) return MATCH_ERROR;    
-    
-    strcpy(nam, b);          
-    *type = INTERFACE_USER_OP;          
+ * MATCH_NO. */ 
+ 
+match g95_match_generic_spec(interface_type *t, char *name0,    
+			     int *op1) {         
+char b[G95_MAX_SYMBOL_LEN+1];         
+match a;       
+int j;       
+        
+  if (g95_match(" assignment ( = )") == MATCH_YES) {  
+    *t = INTERFACE_INTRINSIC_OP;        
+    *op1 = INTRINSIC_ASSIGN;          
+    return MATCH_YES;        
+  }     
+     
+  if (g95_match(" operator ( %o )", &j) == MATCH_YES) { /* Operator i/f */ 
+    *t = INTERFACE_INTRINSIC_OP;        
+    *op1 = fold_unary(j);      
     return MATCH_YES;          
   }      
       
-  if (g95_match_name(b) == MATCH_YES) {   
-    strcpy(nam, b);   
-    *type = INTERFACE_GENERIC;         
-    return MATCH_YES;   
-  }  
+  if (g95_match(" operator ( ") == MATCH_YES) {          
+    a = g95_match_defined_op_name(b, 1);        
+    if (a == MATCH_NO) goto syntax;       
+    if (a != MATCH_YES) return MATCH_ERROR;  
   
-  *type = INTERFACE_NAMELESS;          
+    a = g95_match_char(')');        
+    if (a == MATCH_NO) goto syntax;    
+    if (a != MATCH_YES) return MATCH_ERROR;   
+   
+    strcpy(name0, b);   
+    *t = INTERFACE_USER_OP;      
+    return MATCH_YES;     
+  }      
+      
+  if (g95_match_name(b) == MATCH_YES) {     
+    strcpy(name0, b);         
+    *t = INTERFACE_GENERIC;          
+    return MATCH_YES;        
+  }       
+       
+  *t = INTERFACE_NAMELESS;   
   return MATCH_YES;         
          
-syntax:     
-  g95_error("Syntax error in generic specification at %C");     
-  return MATCH_ERROR; 
-}          
-          
-          
- 
- 
-/* unknown_interface()-- For a symbol without an interface, massage
- * the actual argument list.  This only has to do with marking
- * arguments which pass whole arrays. */   
-   
-static void unknown_interface(g95_actual_arglist *a) {        
-        
-  for(; a; a=a->next) {     
-    if (a->type == ALT_RETURN || a->u.expr->rank == 0) continue;        
-        
-    a->type = FULL_ARRAY;      
-  }        
-}      
-      
-      
-
-
-/* check_interface0()-- Given a pointer to an interface pointer,
- * remove duplicate interfaces and make sure that all symbols are
- * either functions or subroutines.  Returns nonzero if something goes
- * wrong. */   
-   
-static int check_interface0(g95_interface *d, char *interface_name) {          
-g95_interface *w, *qlast;   
-   
-  /* Make sure all symbols in the interface have been defined as
-   * functions or subroutines. */      
-      
-  for(; d; d=d->next)    
-    if (!d->sym->attr.function && !d->sym->attr.subroutine) {        
-      g95_error("Procedure '%s' in %s at %L is neither function nor "    
-		"subroutine", d->sym->name, interface_name, 
-		&d->sym->declared_at);
-      return 1;   
-    }        
-        
-  /* Remove duplicate interfaces in this interface list */       
-       
-  for(; d; d=d->next) { 
-    qlast = d;
-
-    for(w=d->next; w;) {        
-      if (d->sym != w->sym) {   
-	qlast = w;  
-	w = w->next;     
-     
-      } else {           /* Duplicate interface */     
-	qlast->next = w->next;        
-	g95_free(w);     
-	w = qlast->next;
-      }       
-    }   
-  } 
- 
-  return 0;   
-}   
-   
-   
-      
-      
-/* g95_compare_types()-- Compare two typespecs, recursively if
- * necessary. */  
-  
-int g95_compare_types(g95_typespec *ts1, g95_typespec *ts2) {       
-g95_component *dt1, *dt2;         
-         
-  if (ts1->type != ts2->type) return 0; 
-  if (ts1->type != BT_DERIVED) return (ts1->kind == ts2->kind);      
-      
-/* Compare derived types. */   
-   
-  if (ts1->derived == ts2->derived) return 1; 
- 
-/* Special case for comparing derived types across namespaces.  If the
- * true names and module names are the same and the module name is
- * nonnull, then they are equal. */          
-          
-  if (strcmp(ts1->derived->name, ts2->derived->name) == 0 &&        
-      ts1->derived->module[0] != '\0' && 
-      strcmp(ts1->derived->module, ts2->derived->module) == 0) return 1;   
-   
-/* Compare type via the rules of the standard.  Both types must have
- * the SEQUENCE attribute to be equal */        
-        
-  if (strcmp(ts1->derived->name, ts2->derived->name)) return 0;        
-        
-  dt1 = ts1->derived->components;  
-  dt2 = ts2->derived->components;   
-   
-  if (ts1->derived->attr.sequence == 0 || ts2->derived->attr.sequence == 0)      
-    return 0;     
-     
-/* Since subtypes of SEQUENCE types must be SEQUENCE types as well, a
- * simple test can speed things up.  Otherwise, lots of things have to
- * match. */   
-   
-  for(;;) {         
-    if (strcmp(dt1->name, dt2->name) != 0) return 0;   
-   
-    if (dt1->pointer != dt2->pointer) return 0;  
-  
-    if (dt1->dimension != dt2->dimension) return 0;     
-     
-    if (dt1->dimension && g95_compare_array_spec(dt1->as, dt2->as) == 0)   
-      return 0;  
-  
-    if (g95_compare_types(&dt1->ts, &dt2->ts) == 0) return 0;
-
-    dt1 = dt1->next;  
-    dt2 = dt2->next; 
- 
-    if (dt1 == NULL && dt2 == NULL) break;   
-    if (dt1 == NULL || dt1 == NULL) return 0; 
-  }          
-          
-  return 1;         
-}          
-          
-          
-    
-    
-static void check_uop_interfaces(g95_user_op *op) {
-char interface_name[100];       
-g95_user_op *uop2;      
-g95_namespace *names;     
-     
-  sprintf(interface_name, "operator interface '%s'", op->name);        
-  if (check_interface0(op->operator, interface_name)) return;          
-          
-  for(names=g95_current_ns; names; names=names->parent) {
-    uop2 = g95_find_uop(op->name, names);        
-    if (uop2 == NULL) continue;      
-      
-    check_interface1(op->operator, uop2->operator, 0, interface_name);     
-  }     
-}   
-   
-   
-     
-     
-/* compare_actual_formal()-- Given formal and actual argument lists,
- * see if they are compatible.  If they are compatible, the actual
- * argument list is sorted to correspond with the formal list, and
- * elements for missing optional arguments are inserted.
- *
- * If the 'where' pointer is nonnull, then we issue errors when things
- * don't match instead of just returning the status code. */         
-         
-static int compare_actual_formal(g95_actual_arglist **ap, 
-				 g95_formal_arglist *form,      
-				 int is_elemental, locus *where) {
-g95_actual_arglist **old, *v, *act, tmp;      
-g95_formal_arglist *z;         
-symbol_attribute attr;
-int k, l, na;  
-  
-  act = *ap;         
-         
-  for(v=act; v; v=v->next)    
-    if (v->type != ALT_RETURN) v->type = EXPR;
-
-  if (act == NULL && form == NULL) return 1;       
-       
-  l = 0;       
-  for(z=form; z; z=z->next)   
-    l++;
-
-  old = (g95_actual_arglist **) alloca(l*sizeof(g95_actual_arglist *));       
-       
-  for(k=0; k<l; k++)  
-    old[k] = NULL;          
-          
-  na = 0;         
-  z = form;        
-  k = 0;     
-     
-  for(v=act; v; v=v->next, z=z->next) {
-    if (v->name[0] != '\0') {         
-      k = 0;         
-      for(z=form; z; z=z->next, k++) {      
-	if (z->sym == NULL) continue;
-	if (strcmp(z->sym->name, v->name) == 0) break;  
-      }         
-         
-      if (z == NULL) {   
-	if (where)      
-	  g95_error("Keyword argument '%s' at %L is not in the procedure",    
-		    v->name, &v->u.expr->where);        
-	return 0;       
-      }   
-   
-      if (old[k] != NULL) {
-	if (where)        
-	  g95_error("Keyword argument '%s' at %L is already associated "       
-		    "with another actual argument",   
-		    v->name, &v->u.expr->where);    
-	return 0;        
-      }
-    }         
-         
-    if (z == NULL) {      
-      if (where)   
-	g95_error("More actual than formal arguments in procedure call at %L",      
-		  where);        
-        
-      return 0;  
-    }          
-          
-    if (v->type == ALT_RETURN) {          
-      if (z->sym == NULL) goto match;
-
-      if (where) 
-	g95_error("Unexpected alternate return spec in subroutine call at %L",      
-		  where);     
-     
-      return 0; 
-    }        
-        
-    /* The argument is an expression */  
-  
-    if (z->sym == NULL) {      
-      if (where)  
-	g95_error("Missing alternate return spec in subroutine call at %L", 
-		  where);          
-      return 0;      
-    }      
-      
-    if (v->u.expr == NULL) goto match;     
-     
-    if (!compare_parameter(z->sym, v, is_elemental, where != NULL)) return 0;  
-  
-    /* Make sure we have a pointer if required */ 
- 
-    attr = g95_expr_attr(v->u.expr); 
-    if (attr.pointer || v->u.expr->type == EXPR_NULL) {  
-      if (z->sym->attr.pointer) v->pointer = 1;  /* Passing a pointer */    
-    } else {
-      if (z->sym->attr.pointer) {  
-	if (where) g95_error("Actual argument for '%s' must be a pointer " 
-			     "at %L", z->sym->name, &v->u.expr->where);       
-	return 0;   
-      } 
-    }  
-  
-  match:         
-    if (v == act) na = k;  
-  
-    old[k++] = v;          
-  }    
-    
-  /* Make sure missing actual arguments are optional */        
-        
-  k = 0;       
-  for(z=form; z; z=z->next, k++) {  
-    if (old[k] != NULL) continue;       
-    if (!z->sym->attr.optional) {         
-      if (where) g95_error("Missing actual argument for argument '%s' at %L",   
-			   z->sym->name, where);  
-      return 0;         
-    }          
-  }    
-    
-  /* The argument lists are compatible.  We now relink a new actual
-   * argument list with null arguments in the right places.  The head
-   * of the list remains the head. */
-
-  for(k=0; k<l; k++)    
-    if (old[k] == NULL) old[k] = g95_get_actual_arglist();        
-        
-  if (na != 0) {         
-    tmp = *old[0];        
-    *old[0] = *act;
-    *act = tmp;         
-         
-    v = old[0];         
-    old[0] = old[na];         
-    old[na] = v;  
-  }        
-        
-  for(k=0; k<l-1; k++)
-    old[k]->next = old[k+1];         
-         
-  old[k]->next = NULL;       
-       
-  if (*ap == NULL && l > 0) *ap = old[0];    
-    
-  /* Copy types for missing arguements */ 
- 
-  for(v=act, z=form; v; v=v->next, z=z->next)      
-    if (v->type != ALT_RETURN && v->u.expr == NULL) 
-      v->missing_arg_type = z->sym->ts.type; 
- 
-  return 1;          
+syntax:         
+  g95_error("Syntax error in generic specification at %C");      
+  return MATCH_ERROR;          
 } 
  
  
-     
-     
-/* g95_extend_assign()-- Tries to replace an assignment code node with
- * a subroutine call to the subroutine associated with the assignment
- * operator.  Return SUCCESS if the node was replaced.  On FAILURE, no
- * error is generated. */         
-         
-try g95_extend_assign(g95_code *l, g95_namespace *namesp) {     
-g95_actual_arglist *act;
-g95_expr *left, *right;     
-g95_symbol *sy;  
-  
-  left = l->expr;  
-  right = l->expr2;     
-     
-  /* Don't allow an intrinsic assignment to be replaced */      
-      
-  if (left->ts.type != BT_DERIVED && right->ts.type != BT_DERIVED && 
-      (left->ts.type == right->ts.type ||        
-       (g95_numeric_ts(&left->ts) && g95_numeric_ts(&right->ts)))) return FAILURE;      
-      
-  act = g95_get_actual_arglist();  
-  act->type = EXPR;     
-  act->u.expr = left;     
-     
-  act->next = g95_get_actual_arglist();
-  act->next->type = EXPR;       
-  act->next->u.expr = right;     
-     
-  sy = NULL;         
-         
-  for(; namesp; namesp=namesp->parent) { 
-    sy = g95_search_interface(namesp->operator[INTRINSIC_ASSIGN], 1, &act);          
-    if (sy != NULL) break;         
-  }  
-  
-  if (sy == NULL) {        
-    g95_free(act->next);     
-    g95_free(act);      
-    return FAILURE;  
-  }      
-      
-  /* Replace the assignment with the call */
-
-  l->type = EXEC_CALL;      
-  l->sym = sy;    
-  l->expr = NULL;       
-  l->expr2 = NULL;
-  l->ext.actual = act;     
-     
-  if (g95_pure(NULL) && !g95_pure(sy)) { 
-    g95_error("Subroutine '%s' called in lieu of assignment at %L must be " 
-	      "PURE", sy->name, &l->where);   
-    return FAILURE;          
-  }       
-       
-  return SUCCESS;        
-}       
-       
-       
   
   
-/* count_types_test()-- Given a pair of formal argument lists, we see
- * if the two lists can be distinguished by counting the number of
- * nonoptional arguments of a given type/rank in f1 and seeing if
- * there are less then that number of those arguments in f2 (including
- * optional arguments).  Since this test is asymmetric, it has to be
- * called twice to make it symmetric.  Returns nonzero if the argument
- * lists are incompatible by this test.  This subroutine implements
- * rule 1 of section 14.1.2.3. */     
-     
-static int count_types_test(g95_formal_arglist *g, g95_formal_arglist *h) {      
-int rv, ac1, ac2, a, u, c, r;     
-g95_formal_arglist *o;         
-arginfo *args; 
- 
-  r = 0;      
-      
-  for(o=g; o; o=o->next)  
-    r++;
-
-  /* Build an array of integers that gives the same integer to
-   * arguments of the same type/rank.  */      
-      
-  args = g95_getmem(r*sizeof(arginfo));  
-  
-  o = g;  
-  for(a=0; a<r; a++, o=o->next) {     
-    args[a].flag = -1;    
-    args[a].sym = o->sym;     
-  }  
-  
-  c = 0; 
- 
-  for(a=0; a<r; a++) {    
-    if (args[a].flag != -1) continue; 
- 
-    if (args[a].sym->attr.optional) continue;   /* Skip optional arguments */    
-    
-    args[a].flag = c;  
-  
-    /* Find other nonoptional arguments of the same type/rank */          
-          
-    for(u=a+1; u<r; u++)        
-      if (!args[u].sym->attr.optional &&      
-	  compare_type_rank_if(args[a].sym, args[u].sym)) args[u].flag = c;   
-   
-    c++;
-  }       
-       
-  /* Now loop over each distinct type found in f1 */ 
- 
-  c = 0;      
-  rv = 0;          
-          
-  for(a=0; a<r; a++) {       
-    if (args[a].flag != c) continue;     
-     
-    ac1 = 1;          
-    for(u=a+1; u<r; u++)    
-      if (args[u].flag == c) ac1++;          
-          
-    /* Count the number of arguments in f2 with that type, including
-     * those that are optional. */          
-          
-    ac2 = 0;      
-      
-    for(o=h; o; o=o->next)        
-      if (compare_type_rank_if(args[a].sym, o->sym)) ac2++;          
-          
-    if (ac1 > ac2) { rv = 1; break; }      
-      
-    c++;         
-  }  
-  
-  g95_free(args);   
-   
-  return rv;   
-}      
-      
-      
-          
-          
-/* g95_procedure_use()-- Check how a procedure is used against its
- * interface.  If all goes well, the actual argument list will also
- * end up being properly sorted. */ 
- 
-void g95_procedure_use(g95_symbol *symb, g95_actual_arglist **a, locus *w){        
-        
-  if (symb->attr.if_source == IFSRC_UNKNOWN) {     
-    unknown_interface(*a);       
-    return;       
-  }          
-          
-  if (!compare_actual_formal(a, symb->formal, symb->attr.elemental, w))       
-    return;         
-         
-  check_intents(symb->formal, *a);    
-    
-  if (g95_option.aliasing) check_some_aliasing(symb->formal, *a);        
-}      
-      
-      
-  
-  
-/* g95_extend_expr()-- This subroutine is called when an expression is
- * being resolved.  The expression node in question is either a user
- * defined operator or an instrinsic operator with arguments that
- * aren't compatible with the operator.  This subroutine builds an
- * actual argument list corresponding to the operands, then searches
- * for a compatible interface.  If one is found, the expression node
- * is replaced with the appropriate function call.  */      
-      
-try g95_extend_expr(g95_expr *q) {
-g95_actual_arglist *real;   
-g95_namespace *namesp;  
-g95_user_op *uop;
-g95_symbol *sym;      
-int m;    
-    
-  sym = NULL;      
-      
-  real = g95_get_actual_arglist();
-
-  real->type = EXPR; 
-  real->u.expr = q->op1;  
-  
-  if (q->op2 != NULL) {    
-    real->next = g95_get_actual_arglist();  
-  
-    real->next->type = EXPR;   
-    real->next->u.expr = q->op2;      
-  } 
- 
-  m = fold_unary(q->operator);  
-  
-  if (m == INTRINSIC_USER) {       
-    for(namesp=g95_current_ns; namesp; namesp=namesp->parent) {        
-      uop = g95_find_uop(q->uop->name, namesp);    
-      if (uop == NULL) continue;
-
-      sym = g95_search_interface(uop->operator, 0, &real);         
-      if (sym != NULL) break;    
-    }  
-  } else { 
-    for(namesp=g95_current_ns; namesp; namesp=namesp->parent) {      
-      sym = g95_search_interface(namesp->operator[m], 0, &real);          
-      if (sym != NULL) break;     
-    }     
-  }    
-    
-  if (sym == NULL) {  /* Don't use g95_free_actual_arglist() */      
-    if (real->next != NULL) g95_free(real->next);  
-    g95_free(real);       
-       
-    return FAILURE;       
-  }     
-     
-/* Change the expression node to a function call */  
-  
-  q->type = EXPR_FUNCTION;        
-  q->symbol = sym;        
-  q->value.function.actual = real;
-
-  if (g95_pure(NULL) && !g95_pure(sym)) {         
-    g95_error("Function '%s' called in lieu of an operator at %L must be PURE",  
-	      sym->name, &q->where);        
-    return FAILURE;         
-  } 
- 
-  if (g95_resolve_expr(q) == FAILURE) return FAILURE;  
-  
-  return SUCCESS; 
-}   
-   
-   
-    
-    
-/* check_sym_interfaces()-- Check the generic and operator interfaces of
- * symbols to make sure that none of the interfaces conflict.  The
- * check has to be done after all of the symbols are actually loaded. */         
-         
-static void check_sym_interfaces(g95_symbol *symb) {        
-char interface_name[100];  
-g95_symbol *b;         
-         
-  if (symb->ns != g95_current_ns) return;          
-         
-  if (symb->generic != NULL) {      
-    sprintf(interface_name, "generic interface '%s'", symb->name);        
-    if (check_interface0(symb->generic, interface_name)) return;  
-  
-    b = symb; 
-    while(b != NULL) {      
-      if (check_interface1(symb->generic, b->generic, 1, interface_name))      
-	return;          
-          
-      if (b->ns->parent == NULL) break;       
-      if (g95_find_symbol(symb->name, b->ns->parent, 1, &b)) break;  
-    }          
-  }         
-}
-
-
-       
-       
 /* generic_correspondence()-- Perform the correspondence test in rule
  * 2 of section 14.1.2.3.  Returns zero if no argument is found that
  * satisifes rule 2, nonzero otherwise.  This test is also not
@@ -1375,292 +697,971 @@ g95_symbol *b;
  *     END SUBROUTINE F1
  * END INTERFACE FOO
  *
- * At this point, 'CALL FOO(A=1, B=1.0)' is ambiguous. */ 
- 
-static int generic_correspondence(g95_formal_arglist *p,   
-				  g95_formal_arglist *n) {   
-   
-g95_formal_arglist *f2_save, *z;   
-g95_symbol *symb;         
-         
-  f2_save = n; 
- 
-  while(p) {          
-    if (p->sym->attr.optional) goto nxt;       
+ * At this point, 'CALL FOO(A=1, B=1.0)' is ambiguous. */     
+     
+static int generic_correspondence(g95_formal_arglist *a,     
+				  g95_formal_arglist *e) {     
+     
+g95_formal_arglist *f2_save, *x;   
+g95_symbol *sym;
+
+  f2_save = e;          
+          
+  while(a) {      
+    if (a->sym->attr.optional) goto next;        
+        
+    if (e != NULL && compare_type_rank(a->sym, e->sym)) goto next;       
        
-    if (n != NULL && compare_type_rank(p->sym, n->sym)) goto nxt;      
-      
     /* Now search for a disambiguating keyword argument starting at
-     * the current non-match. */ 
+     * the current non-match. */          
+          
+    for(x=a; x; x=x->next) {        
+      if (x->sym->attr.optional) continue;       
+       
+      sym = find_keyword_arg(x->sym->name, f2_save);        
+      if (sym == NULL || !compare_type_rank(x->sym, sym)) return 1;        
+    }        
+        
+  next:         
+    a = a->next;        
+    if (e != NULL) e = e->next;    
+  } 
  
-    for(z=p; z; z=z->next) { 
-      if (z->sym->attr.optional) continue;         
-         
-      symb = find_keyword_arg(z->sym->name, f2_save);  
-      if (symb == NULL || !compare_type_rank(z->sym, symb)) return 1;      
-    }         
-         
-  nxt:    
-    p = p->next;        
-    if (n != NULL) n = n->next;         
+  return 0;  
+}   
+   
+   
+          
+          
+/* g95_extend_assign()-- Tries to replace an assignment code node with
+ * a subroutine call to the subroutine associated with the assignment
+ * operator.  Return SUCCESS if the node was replaced.  On FAILURE, no
+ * error is generated. */      
+      
+try g95_extend_assign(g95_code *z, g95_namespace *namesp) {       
+g95_actual_arglist *real;      
+g95_expr *left, *rhs;    
+g95_symbol *symbol;     
+     
+  left = z->expr;    
+  rhs = z->expr2;   
+   
+  /* Don't allow an intrinsic assignment to be replaced */       
+       
+  if (left->ts.type != BT_DERIVED && rhs->ts.type != BT_DERIVED &&         
+      (left->ts.type == rhs->ts.type ||   
+       (g95_numeric_ts(&left->ts) && g95_numeric_ts(&rhs->ts)))) return FAILURE;       
+       
+  real = g95_get_actual_arglist(); 
+  real->type = EXPR;  
+  real->u.expr = left; 
+ 
+  real->next = g95_get_actual_arglist();      
+  real->next->type = EXPR; 
+  real->next->u.expr = rhs;          
+          
+  symbol = NULL;      
+      
+  for(; namesp; namesp=namesp->parent) {        
+    symbol = g95_search_interface(namesp->operator[INTRINSIC_ASSIGN], 1, &real);
+    if (symbol != NULL) break;  
   }    
     
-  return 0;    
-}        
-        
-        
-     
-     
-/* check_new_interface()-- Make sure that the interface just parsed is
- * not already present in the given interface list.  Ambiguity isn't
- * checked yet since module procedures can be present without
- * interfaces.  */
-
-static try check_new_interface(g95_interface *b, g95_symbol *old) {          
-g95_interface *ip;          
-          
-  for(ip=b; ip; ip=ip->next) {        
-    if (ip->sym == old) {         
-      g95_error("Entity '%s' at %C is already present in the interface",
-		old->name);      
-      return FAILURE;  
-    }      
+  if (symbol == NULL) {       
+    g95_free(real->next);  
+    g95_free(real);       
+    return FAILURE;
   }   
    
-  return SUCCESS;         
+  /* Replace the assignment with the call */       
+       
+  z->type = EXEC_CALL;
+  z->sym = symbol;     
+  z->expr = NULL;
+  z->expr2 = NULL; 
+  z->ext.actual = real;          
+          
+  if (g95_pure(NULL) && !g95_pure(symbol)) {          
+    g95_error("Subroutine '%s' called in lieu of assignment at %L must be " 
+	      "PURE", symbol->name, &z->where); 
+    return FAILURE;        
+  } 
+ 
+  return SUCCESS;   
+}       
+       
+       
+ 
+ 
+/* compare_parameter()-- Given a symbol of a formal argument list and
+ * an expression, see if the two are compatible as arguments.  Returns
+ * nonzero if compatible, zero if not compatible. */   
+   
+static int compare_parameter(g95_symbol *f, g95_actual_arglist *k,     
+			     int is_elemental, int error_flag) {      
+g95_expr *actual;         
+int formal_rank;
+g95_ref *reference;          
+          
+  actual = k->u.expr;      
+      
+  if (actual->ts.type == BT_PROCEDURE) {
+    if (f->attr.flavor != FL_PROCEDURE) {   
+      if (error_flag)   
+	g95_error("Actual parameter '%s' at %L must be a PROCEDURE",  
+		  f->name, &k->u.expr->where); 
+ 
+      return 0;        
+    }         
+         
+    if (f->attr.function &&      
+	!compare_type_rank(f, actual->symbol->result)) return 0;      
+      
+    if (f->attr.if_source == IFSRC_UNKNOWN) return 1;  /* Assume match */   
+   
+    return compare_interfaces(f, actual->symbol, 0);  
+  }     
+     
+  if (actual->type != EXPR_NULL &&       
+      !g95_compare_types(&f->ts, &actual->ts)) {
+    if (error_flag) g95_error("Type mismatch in parameter '%s' at %L",    
+			      f->name, &k->u.expr->where);       
+    return 0; 
+  }    
+    
+  formal_rank = symbol_rank(f);      
+      
+  /* Scalar to scalar */        
+        
+  if (formal_rank == 0 && actual->rank == 0) return 1;     
+     
+  /* Array to array */  
+  
+  if (formal_rank > 0 && actual->rank > 0) {      
+    if (formal_rank != actual->rank &&        
+	(f->as->type == AS_ASSUMED_SHAPE ||   
+	 f->as->type == AS_DEFERRED)) {  
+  
+      if (error_flag) g95_error("Rank mismatch for assumed-shape array in "          
+				"parameter '%s' at %L", f->name,     
+				&k->u.expr->where);   
+      return 0;
+    }       
+       
+    k->type = (f->as->type == AS_ASSUMED_SHAPE ||   
+	       f->as->type == AS_DEFERRED) ? ARRAY_DESC : FULL_ARRAY;        
+    return 1;  
+  }      
+      
+  /* Array to scalar.  The reference must be elemental. */        
+        
+  if (formal_rank == 0 && actual->rank > 0) {         
+    if (is_elemental) return 1;  
+  
+    if (error_flag) g95_error("Cannot pass array to scalar parameter "
+			      "'%s' at %L", f->name, &k->u.expr->where);
+    return 0; 
+  }
+
+  /* Scalar to array.  The array cannot be assumed-shape and the final
+   * reference of the actual argument must be an array element. */ 
+ 
+  if (f->as->type == AS_ASSUMED_SHAPE ||     
+      f->as->type == AS_DEFERRED) goto error;        
+        
+  reference = actual->ref;
+  if (reference == NULL) goto error;     
+     
+  while(reference->next)       
+    reference = reference->next;     
+     
+  if (reference->type == REF_ARRAY && reference->u.ar.type == AR_ELEMENT) { 
+    k->type = ARRAY_ELEMENT;
+    return 1;      
+  }   
+   
+error:      
+  if (error_flag) g95_error("Cannot pass scalar to array parameter '%s' at %L",        
+			    f->name, &k->u.expr->where);         
+  return 0;          
+}      
+      
+      
+     
+     
+/* g95_match_interface()-- Match one of the five forms of an interface
+ * statement. */         
+         
+match g95_match_interface(void) {          
+char nam[G95_MAX_SYMBOL_LEN+1];        
+interface_type type; 
+g95_symbol *sy;  
+int o;       
+match i;      
+      
+  i = g95_match_space();  
+  
+  if (g95_match_generic_spec(&type, nam, &o) == MATCH_ERROR)         
+    return MATCH_ERROR;      
+      
+  if (g95_match_eos() != MATCH_YES ||           
+      (type != INTERFACE_NAMELESS && i != MATCH_YES)) {   
+    g95_syntax_error(ST_INTERFACE);    
+    return MATCH_ERROR;   
+  } 
+ 
+  current_interface.type = type;          
+          
+  switch(type) {   
+  case INTERFACE_GENERIC:          
+    if (g95_get_symbol(nam, NULL, &sy)) return MATCH_ERROR;     
+     
+    if (!sy->attr.generic && g95_add_generic(&sy->attr, NULL) == FAILURE)     
+      return MATCH_ERROR;       
+       
+    current_interface.sym = g95_new_block = sy;    
+    break;         
+         
+  case INTERFACE_USER_OP:   
+    current_interface.uop = g95_get_uop(nam);  
+    break;    
+    
+  case INTERFACE_INTRINSIC_OP:      
+    current_interface.op = o;       
+    break;         
+         
+  case INTERFACE_NAMELESS:   
+    break;     
+  } 
+ 
+  return MATCH_YES; 
 }          
           
           
+        
+        
+/* compare_type_rank_if()-- Given two symbols that are formal
+ * arguments, compare their types and rank and their formal interfaces
+ * if they are both dummy procedures.  Returns nonzero if the same,
+ * zero if different. */    
     
-    
-/* g95_match_end_interface()-- Match the different sort of
- * generic-specs that can be present after the END INTERFACE itself. */         
+static int compare_type_rank_if(g95_symbol *q, g95_symbol *m) {         
          
-match g95_match_end_interface(void) {    
-char name0[G95_MAX_SYMBOL_LEN+1];     
-interface_type t;    
-int op1;  
-match a;          
+  if (q->attr.flavor != FL_PROCEDURE && m->attr.flavor != FL_PROCEDURE)      
+    return compare_type_rank(q, m);          
           
-  a = g95_match_space();
-
-  if (g95_match_generic_spec(&t, name0, &op1) == MATCH_ERROR) 
-    return MATCH_ERROR;   
+  if (q->attr.flavor != FL_PROCEDURE || m->attr.flavor != FL_PROCEDURE)   
+    return 0;   
    
-  if (g95_match_eos() != MATCH_YES ||
-      (t != INTERFACE_NAMELESS && a != MATCH_YES)) {          
-    g95_syntax_error(ST_END_INTERFACE);  
-    return MATCH_ERROR; 
-  }          
+  /* At this point, both symbols are procedures */   
+   
+  if ((q->attr.function == 0 && q->attr.subroutine == 0) ||   
+      (m->attr.function == 0 && m->attr.subroutine == 0)) return 0;          
           
-  a = MATCH_YES;     
-     
-  switch(current_interface.type) { 
-  case INTERFACE_NAMELESS:    
-    if (t != current_interface.type) {   
-      g95_error("Expected a nameless interface at %C");      
-      a = MATCH_ERROR;
-    }         
-         
-    break;   
-   
-  case INTERFACE_INTRINSIC_OP:     
-    if (t != current_interface.type || op1 != current_interface.op) {     
-     
-      if (current_interface.op == INTRINSIC_ASSIGN)   
-	g95_error("Expected 'END INTERFACE ASSIGNMENT (=)' at %C");  
-      else   
-	g95_error("Expecting 'END INTERFACE OPERATOR (%s)' at %C",          
-		  g95_op2string(current_interface.op));  
+  if (q->attr.function != m->attr.function || 
+      q->attr.subroutine != m->attr.subroutine) return 0;       
+       
+  if (q->attr.function && compare_type_rank(q, m) == 0) return 0; 
+ 
+  return compare_interfaces(q, m, 0);    /* Recurse! */        
+}  
   
-      a = MATCH_ERROR;        
-    }       
+  
+   
+   
+/* compare_actual_formal()-- Given formal and actual argument lists,
+ * see if they are compatible.  If they are compatible, the actual
+ * argument list is sorted to correspond with the formal list, and
+ * elements for missing optional arguments are inserted.
+ *
+ * If the 'where' pointer is nonnull, then we issue errors when things
+ * don't match instead of just returning the status code. */
+
+static int compare_actual_formal(g95_actual_arglist **ap,      
+				 g95_formal_arglist *frm,   
+				 int is_elemental, g95_locus *where) {      
+g95_actual_arglist **new, *z, *act, t;      
+g95_formal_arglist *m; 
+symbol_attribute attribute;    
+int i, y, na;   
+   
+  act = *ap;
+
+  for(z=act; z; z=z->next)      
+    if (z->type != ALT_RETURN) z->type = EXPR;         
+         
+  if (act == NULL && frm == NULL) return 1;       
        
-    break;       
-       
-  case INTERFACE_USER_OP:         
-  /* Comparing the symbol node names is OK because only use-associated
-   * symbols can be renamed */      
+  y = 0; 
+  for(m=frm; m; m=m->next) 
+    y++;        
+        
+  new = (g95_actual_arglist **) alloca(y*sizeof(g95_actual_arglist *));    
+    
+  for(i=0; i<y; i++)         
+    new[i] = NULL;     
+     
+  na = 0;       
+  m = frm;          
+  i = 0;     
+     
+  for(z=act; z; z=z->next, m=m->next) {          
+    if (z->name[0] != '\0') {       
+      i = 0;     
+      for(m=frm; m; m=m->next, i++) {        
+	if (m->sym == NULL) continue;         
+	if (strcmp(m->sym->name, z->name) == 0) break;        
+      }         
+         
+      if (m == NULL) {   
+	if (where)     
+	  g95_error("Keyword argument '%s' at %L is not in the procedure",   
+		    z->name, &z->u.expr->where);    
+	return 0;  
+      }   
+   
+      if (new[i] != NULL) {     
+	if (where)   
+	  g95_error("Keyword argument '%s' at %L is already associated "        
+		    "with another actual argument",   
+		    z->name, &z->u.expr->where);     
+	return 0;      
+      }     
+    }  
+  
+    if (m == NULL) {          
+      if (where)
+	g95_error("More actual than formal arguments in procedure call at %L",
+		  where);      
       
-    if (t != current_interface.type ||      
-	strcmp(current_interface.sym->name, name0) != 0) {        
-      g95_error("Expecting 'END INTERFACE OPERATOR (.%s.)' at %C",   
-		current_interface.sym->name);          
-      a = MATCH_ERROR;         
+      return 0;        
     }    
     
-    break;
-
-  case INTERFACE_GENERIC:         
-    if (t != current_interface.type ||   
-	strcmp(current_interface.sym->name, name0) != 0) {      
-      g95_error("Expecting 'END INTERFACE %s' at %C",   
-		current_interface.sym->name);  
-      a = MATCH_ERROR;       
-    }     
+    if (z->type == ALT_RETURN) { 
+      if (m->sym == NULL) goto match;        
+        
+      if (where)
+	g95_error("Unexpected alternate return spec in subroutine call at %L",     
+		  where);     
      
-    break;       
+      return 0;    
+    }       
+       
+    /* The argument is an expression */
+
+    if (m->sym == NULL) {    
+      if (where)       
+	g95_error("Missing alternate return spec in subroutine call at %L",          
+		  where);    
+      return 0;     
+    }   
+   
+    if (z->u.expr == NULL) goto match;    
+    
+    if (!compare_parameter(m->sym, z, is_elemental, where != NULL)) return 0;          
+          
+    /* Make sure we have a pointer if required */         
+         
+    attribute = g95_expr_attr(z->u.expr);      
+    if (attribute.pointer || z->u.expr->type == EXPR_NULL) {    
+      if (m->sym->attr.pointer) z->pointer = 1;  /* Passing a pointer */      
+    } else {      
+      if (m->sym->attr.pointer) {  
+	if (where) g95_error("Actual argument for '%s' must be a pointer "    
+			     "at %L", m->sym->name, &z->u.expr->where);      
+	return 0;    
+      }        
+    }  
+  
+  match: 
+    if (z == act) na = i;       
+       
+    new[i++] = z;   
+  }  
+  
+  /* Make sure missing actual arguments are optional */       
+       
+  i = 0; 
+  for(m=frm; m; m=m->next, i++) {      
+    if (new[i] != NULL) continue; 
+    if (!m->sym->attr.optional) {        
+      if (where) g95_error("Missing actual argument for argument '%s' at %L",         
+			   m->sym->name, where);      
+      return 0;         
+    }
   }       
        
-  return a;   
-}        
-        
-        
+  /* The argument lists are compatible.  We now relink a new actual
+   * argument list with null arguments in the right places.  The head
+   * of the list remains the head. */  
   
-  
-/* g95_search_interface()-- Given an interface pointer and an actual
- * argument list, search for a formal argument list that matches the
- * actual.  If found, returns a pointer to the symbol of the correct
- * interface.  Returns NULL if not found. */   
-   
-g95_symbol *g95_search_interface(g95_interface *i, int sub_flag,     
-				 g95_actual_arglist **a) {          
+  for(i=0; i<y; i++)        
+    if (new[i] == NULL) new[i] = g95_get_actual_arglist();          
           
-  for(; i; i=i->next) {       
-    if ((sub_flag && i->sym->attr.function) ||     
-	(!sub_flag && i->sym->attr.subroutine)) continue;    
+  if (na != 0) {  
+    t = *new[0];
+    *new[0] = *act;
+    *act = t;     
+     
+    z = new[0];     
+    new[0] = new[na];          
+    new[na] = z;        
+  }        
+        
+  for(i=0; i<y-1; i++)       
+    new[i]->next = new[i+1];         
+         
+  new[i]->next = NULL;    
     
-    if (compare_actual_formal(a, i->sym->formal,    
-			      i->sym->attr.elemental, NULL)) {
+  if (*ap == NULL && y > 0) *ap = new[0];         
+         
+  /* Copy types for missing arguements */
 
-      check_intents(i->sym->formal, *a);      
+  for(z=act, m=frm; z; z=z->next, m=m->next)          
+    if (z->type != ALT_RETURN && z->u.expr == NULL)          
+      z->missing_arg_type = m->sym->ts.type;     
+     
+  return 1;  
+}      
       
-      if (g95_option.aliasing) check_some_aliasing(i->sym->formal, *a);
+      
+       
+       
+/* compare_actual_expr()-- Given two expressions from some actual
+ * arguments, test whether they refer to the same expression. The
+ * analysis is conservative. Returning FAILURE will produce no
+ * warning. */          
+          
+static try compare_actual_expr(g95_expr *z, g95_expr *q){   
+const g95_ref *l, *w;  
+    
+  if (!z || !q || 
+      z->type != EXPR_VARIABLE ||        
+      q->type != EXPR_VARIABLE ||      
+      z->symbol != q->symbol) 
+    return FAILURE;
 
-      return i->sym;    
+  /* TODO improve comparison see expr.c 'show_ref' */  
+  
+  for(l = z->ref, w = q->ref; l && w; l = l->next, w = w->next){      
+    if (l->type != w->type) return FAILURE; 
+ 
+    switch (l->type) { 
+    case REF_ARRAY:   
+      if (l->u.ar.type != w->u.ar.type) return FAILURE;  
+  
+      /* at the moment, consider only full arrays;
+       * we could do better.  */      
+      if (l->u.ar.type != AR_FULL || w->u.ar.type != AR_FULL) return FAILURE;   
+      break; 
+ 
+    case REF_COMPONENT:        
+      if (l->u.c.component != w->u.c.component) return FAILURE;         
+      break;     
+     
+    case REF_SUBSTRING:    
+      return FAILURE;  
+  
+    default:    
+      g95_internal_error("compare_actual_expr(): Bad component code");   
+    }      
+  }          
+          
+  return (l == NULL && w == NULL) ? SUCCESS : FAILURE;          
+}         
+         
+         
+    
+    
+/* count_types_test()-- Given a pair of formal argument lists, we see
+ * if the two lists can be distinguished by counting the number of
+ * nonoptional arguments of a given type/rank in f1 and seeing if
+ * there are less then that number of those arguments in f2 (including
+ * optional arguments).  Since this test is asymmetric, it has to be
+ * called twice to make it symmetric.  Returns nonzero if the argument
+ * lists are incompatible by this test.  This subroutine implements
+ * rule 1 of section 14.1.2.3. */       
+       
+static int count_types_test(g95_formal_arglist *m, g95_formal_arglist *v) {    
+int retval, ac1, ac2, u, e, q, r;         
+g95_formal_arglist *d;      
+arginfo *argum;          
+          
+  r = 0;
+
+  for(d=m; d; d=d->next)         
+    r++; 
+ 
+  /* Build an array of integers that gives the same integer to
+   * arguments of the same type/rank.  */  
+  
+  argum = g95_getmem(r*sizeof(arginfo));        
+        
+  d = m; 
+  for(u=0; u<r; u++, d=d->next) {    
+    argum[u].flag = -1;         
+    argum[u].sym = d->sym;         
+  }       
+       
+  q = 0;          
+          
+  for(u=0; u<r; u++) {      
+    if (argum[u].flag != -1) continue;  
+  
+    if (argum[u].sym->attr.optional) continue;   /* Skip optional arguments */       
+       
+    argum[u].flag = q;     
+     
+    /* Find other nonoptional arguments of the same type/rank */     
+     
+    for(e=u+1; e<r; e++)         
+      if (!argum[e].sym->attr.optional &&   
+	  compare_type_rank_if(argum[u].sym, argum[e].sym)) argum[e].flag = q;          
+          
+    q++;       
+  }
+
+  /* Now loop over each distinct type found in f1 */
+
+  q = 0;      
+  retval = 0;        
+        
+  for(u=0; u<r; u++) {        
+    if (argum[u].flag != q) continue;  
+  
+    ac1 = 1;    
+    for(e=u+1; e<r; e++)
+      if (argum[e].flag == q) ac1++;          
+          
+    /* Count the number of arguments in f2 with that type, including
+     * those that are optional. */ 
+ 
+    ac2 = 0;       
+       
+    for(d=v; d; d=d->next)       
+      if (compare_type_rank_if(argum[u].sym, d->sym)) ac2++;  
+  
+    if (ac1 > ac2) { retval = 1; break; }    
+    
+    q++;          
+  } 
+ 
+  g95_free(argum);   
+   
+  return retval;     
+}  
+  
+  
+       
+       
+/* check_some_aliasing()-- Given formal and actual argument lists that
+ * correspond to one another, check that identical actual arguments
+ * aren't not associated with some incompatible INTENTs.  */     
+     
+static try check_some_aliasing(g95_formal_arglist *w, g95_actual_arglist *v) { 
+sym_intent f1_intent, f2_intent;        
+g95_formal_arglist *d;      
+g95_actual_arglist *r;      
+size_t s, h, g;     
+argpair *b;     
+try o = SUCCESS;     
+     
+  s = 0;         
+  for(d=w, r=v;; d=d->next, r=r->next) {          
+    if (d == NULL && r == NULL) break;         
+    if (d == NULL || r == NULL) 
+      g95_internal_error("check_some_aliasing(): List mismatch");        
+        
+    s++;      
+  }
+
+  if (s == 0) return o;   
+  b = (argpair*) alloca(s*sizeof(argpair));  
+  
+  for(h=0, d=w, r=v ; h<s; h++, d=d->next, r=r->next) {        
+    b[h].f = d;        
+    b[h].a = r;  
+  }     
+     
+  qsort(b, s, sizeof(argpair), pair_cmp); 
+ 
+  for(h=0; h<s; h++){          
+    if (!b[h].a->u.expr || b[h].a->u.expr->type != EXPR_VARIABLE ||           
+	b[h].a->u.expr->ts.type == BT_PROCEDURE) continue;       
+       
+    f1_intent = b[h].f->sym->attr.intent;
+
+    for(g=h+1; g<s; g++) {           
+      /* expected order after the sort */          
+          
+      if (!b[g].a->u.expr || b[g].a->u.expr->type != EXPR_VARIABLE)          
+	g95_internal_error("check_some_aliasing(): corrupted data"); 
+ 
+      /* are the expression the same ? */      
+      if (compare_actual_expr(b[h].a->u.expr, b[g].a->u.expr) == FAILURE)break;         
+      f2_intent = b[g].f->sym->attr.intent;    
+    
+      if ((f1_intent == INTENT_IN && f2_intent == INTENT_OUT) ||        
+	  (f1_intent == INTENT_OUT && f2_intent == INTENT_IN)) {    
+	g95_warning(101, "Same actual argument associated with INTENT(%s) "          
+		    "argument '%s' and INTENT(%s) argument '%s' at %L",    
+		    g95_intent_string(f1_intent), b[h].f->sym->name,    
+		    g95_intent_string(f2_intent), b[g].f->sym->name,      
+		    &b[h].a->u.expr->where);    
+	o = FAILURE;     
+      }   
     }  
-  }   
+  }     
+           
+  return o;        
+}  
+  
+  
+
+
+/* check_sym_interfaces()-- Check the generic and operator interfaces of
+ * symbols to make sure that none of the interfaces conflict.  The
+ * check has to be done after all of the symbols are actually loaded. */
+
+static void check_sym_interfaces(g95_symbol *symb) {         
+char interface_name[100];        
+g95_symbol *t;     
+     
+  if (symb->ns != g95_current_ns) return;    
    
-  return NULL;       
-} 
+  if (symb->generic != NULL) {       
+    sprintf(interface_name, "generic interface '%s'", symb->name);     
+    if (check_interface0(symb->generic, interface_name)) return;       
+       
+    t = symb;
+    while(t != NULL) {          
+      if (check_interface1(symb->generic, t->generic, 1, interface_name))        
+	return; 
+ 
+      if (t->ns->parent == NULL) break;       
+      if (g95_find_symbol(symb->name, t->ns->parent, 1, &t)) break;   
+    }  
+  }  
+}       
+       
+       
  
  
-   
-   
 /* g95_check_interfaces()-- For the namespace, check generic, user
  * operator and intrinsic operator interfaces for consistency and to
  * remove duplicate interfaces.  We traverse the whole namespace,
  * counting on the fact that most symbols will not have generic or
  * operator interfaces. */ 
  
-void g95_check_interfaces(g95_namespace *name) {      
-g95_namespace *old_ns, *ns2;  
+void g95_check_interfaces(g95_namespace *ns) { 
+g95_namespace *old_ns, *ns2; 
 char interface_name[100];     
-int s;      
-      
-  old_ns = g95_current_ns; 
-  g95_current_ns = name;
-
-  g95_traverse_ns(name, check_sym_interfaces);          
-          
-  g95_traverse_user_op(name, check_uop_interfaces);        
+int i;    
+    
+  old_ns = g95_current_ns;       
+  g95_current_ns = ns;   
+   
+  g95_traverse_ns(ns, check_sym_interfaces);        
         
-  for(s=0; s<G95_INTRINSIC_OPS; s++) {          
-    if (s == INTRINSIC_USER) continue;   
-   
-    if (s == INTRINSIC_ASSIGN)   
-      strcpy(interface_name, "intrinsic assignment operator");   
-    else      
-      sprintf(interface_name, "intrinsic '%s' operator", g95_op2string(s));          
+  g95_traverse_user_op(ns, check_uop_interfaces); 
+ 
+  for(i=0; i<G95_INTRINSIC_OPS; i++) {          
+    if (i == INTRINSIC_USER) continue;        
+        
+    if (i == INTRINSIC_ASSIGN)      
+      strcpy(interface_name, "intrinsic assignment operator");
+    else          
+      sprintf(interface_name, "intrinsic '%s' operator", g95_op2string(i));        
+        
+    if (check_interface0(ns->operator[i], interface_name)) continue;     
+     
+    check_operator_interface(ns->operator[i], i);       
+       
+    for(ns2=ns->parent; ns2; ns2=ns2->parent)    
+      if (check_interface1(ns->operator[i], ns2->operator[i], 0,       
+			   interface_name)) break;    
+  } 
+ 
+  g95_current_ns = old_ns;    
+}        
+        
+        
+  
+  
+/* g95_add_interface()-- Add a symbol to the current interface */        
+        
+try g95_add_interface(g95_symbol *n) { 
+g95_interface **h, *i; 
+g95_namespace *ns;        
+g95_symbol *s;         
+         
+  switch(current_interface.type) {   
+  case INTERFACE_NAMELESS:          
+    return SUCCESS;        
+        
+  case INTERFACE_INTRINSIC_OP: 
+    for(ns=current_interface.ns; ns; ns=ns->parent)    
+      if (check_new_interface(ns->operator[current_interface.op], n)     
+	  == FAILURE) return FAILURE;        
+        
+    h = &current_interface.ns->operator[current_interface.op]; 
+    break;  
+  
+  case INTERFACE_GENERIC:      
+    for(ns=current_interface.ns; ns; ns=ns->parent) {        
+      g95_find_symbol(current_interface.sym->name, ns, 0, &s);  
+      if (s == NULL) continue;       
+       
+      if (check_new_interface(s->generic, n) == FAILURE) return FAILURE;     
+    }
+
+    h = &current_interface.sym->generic;       
+    break;
+
+  case INTERFACE_USER_OP:         
+    if (check_new_interface(current_interface.uop->operator, n) == FAILURE) 
+      return FAILURE;          
           
-    if (check_interface0(name->operator[s], interface_name)) continue;
-
-    check_operator_interface(name->operator[s], s);
-
-    for(ns2=name->parent; ns2; ns2=ns2->parent)          
-      if (check_interface1(name->operator[s], ns2->operator[s], 0, 
-			   interface_name)) break;         
-  }   
+    h = &current_interface.uop->operator;
+    break;      
+      
+  default:     
+    g95_internal_error("g95_add_interface(): Bad interface type"); 
+  }      
+      
+  i = g95_get_interface(); 
+  i->sym = n;       
+  i->where = g95_current_locus;          
+          
+  i->next = *h;     
+  *h = i; 
+ 
+  return SUCCESS;
+}   
    
-  g95_current_ns = old_ns;     
-}       
+   
        
        
+/* unknown_interface()-- For a symbol without an interface, massage
+ * the actual argument list.  This only has to do with marking
+ * arguments which pass whole arrays. */  
+  
+static void unknown_interface(g95_actual_arglist *real) {        
+        
+  for(; real; real=real->next) {       
+    if (real->type == ALT_RETURN || real->u.expr->rank == 0) continue; 
+ 
+    real->type = FULL_ARRAY;       
+  }        
+}
+
+
        
        
 /* compare_interfaces()-- 'Compare' two formal interfaces
  * associated with a pair of symbols.  We return nonzero if there
  * exists an actual argument list that would be ambiguous between the
- * two interfaces, zero otherwise. */ 
- 
-static int compare_interfaces(g95_symbol *r, g95_symbol *a,        
-			      int generic_flag) {
-g95_formal_arglist *e, *j;         
-         
-  if (r->attr.function != a->attr.function &&     
-      r->attr.subroutine != a->attr.subroutine)        
-    return 0;   /* disagreement between function/subroutine */ 
- 
-  e = r->formal;         
-  j = a->formal;      
+ * two interfaces, zero otherwise. */      
       
-  if (e == NULL && j == NULL) return 1;   /* Special case */ 
- 
-  if (count_types_test(e, j)) return 0;    
-  if (count_types_test(j, e)) return 0;    
-    
-  if (generic_flag) {  
-    if (generic_correspondence(e, j)) return 0;      
-    if (generic_correspondence(j, e)) return 0; 
-  } else {
-    if (operator_correspondence(e, j)) return 0;   
-  }   
-   
-  return 1;     
-}   
-   
-   
-   
-   
-/* g95_add_interface()-- Add a symbol to the current interface */          
-          
-try g95_add_interface(g95_symbol *new) {
-g95_interface **head, *inter;  
-g95_namespace *ns;         
-g95_symbol *s;       
-       
-  switch(current_interface.type) {        
-  case INTERFACE_NAMELESS:     
-    return SUCCESS;         
-         
-  case INTERFACE_INTRINSIC_OP:          
-    for(ns=current_interface.ns; ns; ns=ns->parent)        
-      if (check_new_interface(ns->operator[current_interface.op], new)         
-	  == FAILURE) return FAILURE;
-
-    head = &current_interface.ns->operator[current_interface.op];   
-    break;  
-  
-  case INTERFACE_GENERIC:      
-    for(ns=current_interface.ns; ns; ns=ns->parent) {         
-      g95_find_symbol(current_interface.sym->name, ns, 0, &s);          
-      if (s == NULL) continue;     
+static int compare_interfaces(g95_symbol *e, g95_symbol *n,      
+			      int generic_flag) {        
+g95_formal_arglist *a, *o;     
      
-      if (check_new_interface(s->generic, new) == FAILURE) return FAILURE;      
-    }   
-   
-    head = &current_interface.sym->generic;  
-    break;        
-        
-  case INTERFACE_USER_OP: 
-    if (check_new_interface(current_interface.uop->operator, new) == FAILURE) 
-      return FAILURE;      
-      
-    head = &current_interface.uop->operator;     
-    break;
-
-  default: 
-    g95_internal_error("g95_add_interface(): Bad interface type");    
-  }         
-         
-  inter = g95_get_interface();    
-  inter->sym = new;   
-  inter->where = *g95_current_locus();    
+  if (e->attr.function != n->attr.function &&         
+      e->attr.subroutine != n->attr.subroutine)
+    return 0;   /* disagreement between function/subroutine */    
     
-  inter->next = *head;   
-  *head = inter;   
+  a = e->formal;          
+  o = n->formal;       
+       
+  if (a == NULL && o == NULL) return 1;   /* Special case */   
    
-  return SUCCESS; 
+  if (count_types_test(a, o)) return 0;    
+  if (count_types_test(o, a)) return 0;          
+          
+  if (generic_flag) {        
+    if (generic_correspondence(a, o)) return 0;         
+    if (generic_correspondence(o, a)) return 0;          
+  } else { 
+    if (operator_correspondence(a, o)) return 0;  
+  }          
+          
+  return 1;   
+}     
+     
+     
+     
+     
+/* check_intents()-- Given formal and actual argument lists that
+ * correspond to one another, check that they are compatible in the
+ * sense that intents are not mismatched.  */   
+   
+static try check_intents(g95_formal_arglist *o, g95_actual_arglist *y) { 
+sym_intent a_intent, f_intent;      
+      
+  for(;; o=o->next, y=y->next) {        
+    if (o == NULL && y == NULL) break;       
+    if (o == NULL || y == NULL) 
+      g95_internal_error("check_intents(): List mismatch");          
+          
+    if (y->type == ALT_RETURN) continue;        
+        
+    if (y->u.expr == NULL || y->u.expr->type != EXPR_VARIABLE) continue;     
+     
+    a_intent = y->u.expr->symbol->attr.intent;          
+    f_intent = o->sym->attr.intent;   
+   
+    if (a_intent == INTENT_IN &&     
+	(f_intent == INTENT_INOUT || f_intent == INTENT_OUT)) {  
+  
+      g95_error("Procedure argument at %L is INTENT(IN) while interface "
+		"specifies INTENT(%s)", &y->u.expr->where,        
+		g95_intent_string(f_intent));        
+      return FAILURE; 
+    }     
+     
+    if (g95_pure(NULL) && g95_impure_variable(y->u.expr->symbol)) { 
+      if (f_intent == INTENT_INOUT || f_intent == INTENT_OUT) {  
+	g95_error("Procedure argument at %L is local to a PURE procedure and " 
+		  "is passed to an INTENT(%s) argument", &y->u.expr->where,        
+		  g95_intent_string(f_intent));      
+	return FAILURE;
+      }     
+     
+      if (y->u.expr->symbol->attr.pointer) { 
+	g95_error("Procedure argument at %L is local to a PURE procedure and "          
+		  "has the POINTER attribute", &y->u.expr->where);    
+	return FAILURE;   
+      }      
+    }         
+  }  
+  
+  return SUCCESS;    
+}          
+          
+          
+          
+          
+/* g95_search_interface()-- Given an interface pointer and an actual
+ * argument list, search for a formal argument list that matches the
+ * actual.  If found, returns a pointer to the symbol of the correct
+ * interface.  Returns NULL if not found. */
+
+g95_symbol *g95_search_interface(g95_interface *intr, int sub_flag,
+				 g95_actual_arglist **a) {    
+    
+  for(; intr; intr=intr->next) {       
+    if ((sub_flag && intr->sym->attr.function) ||     
+	(!sub_flag && intr->sym->attr.subroutine)) continue;
+
+    if (compare_actual_formal(a, intr->sym->formal,         
+			      intr->sym->attr.elemental, NULL)) {
+
+      check_intents(intr->sym->formal, *a);   
+   
+      if (g95_option.aliasing) check_some_aliasing(intr->sym->formal, *a);   
+   
+      return intr->sym;          
+    }         
+  }
+
+  return NULL;       
+}     
+     
+     
+          
+          
+/* g95_procedure_use()-- Check how a procedure is used against its
+ * interface.  If all goes well, the actual argument list will also
+ * end up being properly sorted. */         
+         
+void g95_procedure_use(g95_symbol *symb, g95_actual_arglist **ap,    
+		       g95_locus *where) {       
+       
+  if (symb->attr.if_source == IFSRC_UNKNOWN) {
+    unknown_interface(*ap);      
+    return;          
+  }  
+  
+  if (!compare_actual_formal(ap, symb->formal, symb->attr.elemental, where))         
+    return;       
+       
+  check_intents(symb->formal, *ap);        
+        
+  if (g95_option.aliasing) check_some_aliasing(symb->formal, *ap);   
 }        
         
         
+       
+       
+/* g95_extend_expr()-- This subroutine is called when an expression is
+ * being resolved.  The expression node in question is either a user
+ * defined operator or an instrinsic operator with arguments that
+ * aren't compatible with the operator.  This subroutine builds an
+ * actual argument list corresponding to the operands, then searches
+ * for a compatible interface.  If one is found, the expression node
+ * is replaced with the appropriate function call.  */     
+     
+try g95_extend_expr(g95_expr *l) {   
+g95_actual_arglist *a;  
+g95_namespace *namesp;      
+g95_user_op *op;         
+g95_symbol *symb;  
+int b;        
+        
+  symb = NULL;
+
+  a = g95_get_actual_arglist();     
+     
+  a->type = EXPR;
+  a->u.expr = l->op1;  
+  
+  if (l->op2 != NULL) {     
+    a->next = g95_get_actual_arglist();  
+  
+    a->next->type = EXPR;        
+    a->next->u.expr = l->op2; 
+  }     
+     
+  b = fold_unary(l->operator);         
+         
+  if (b == INTRINSIC_USER) {   
+    for(namesp=g95_current_ns; namesp; namesp=namesp->parent) {         
+      op = g95_find_uop(l->uop->name, namesp);    
+      if (op == NULL) continue;         
+         
+      symb = g95_search_interface(op->operator, 0, &a);        
+      if (symb != NULL) break;          
+    }    
+  } else {
+    for(namesp=g95_current_ns; namesp; namesp=namesp->parent) {          
+      symb = g95_search_interface(namesp->operator[b], 0, &a); 
+      if (symb != NULL) break;         
+    }          
+  }         
+         
+  if (symb == NULL) {  /* Don't use g95_free_actual_arglist() */      
+    if (a->next != NULL) g95_free(a->next);  
+    g95_free(a);        
+        
+    return FAILURE;        
+  }     
+     
+/* Change the expression node to a function call */ 
+ 
+  l->type = EXPR_FUNCTION;
+  l->symbol = symb;  
+  l->value.function.actual = a;         
+         
+  if (g95_pure(NULL) && !g95_pure(symb)) {   
+    g95_error("Function '%s' called in lieu of an operator at %L must be PURE",    
+	      symb->name, &l->where);      
+    return FAILURE;   
+  }     
+     
+  if (g95_resolve_expr(l) == FAILURE) return FAILURE;        
+        
+  return SUCCESS;         
+}         
+         
+         

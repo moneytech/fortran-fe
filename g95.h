@@ -142,8 +142,8 @@ typedef enum { AR_FULL=1, AR_ELEMENT, AR_SECTION, AR_UNKNOWN } ar_type;
 
 /* Statement label types */
 
-typedef enum { ST_LABEL_UNKNOWN=1, ST_LABEL_TARGET,
-               ST_LABEL_BAD_TARGET, ST_LABEL_FORMAT
+typedef enum { ST_LABEL_UNKNOWN=1, ST_LABEL_TARGET, ST_LABEL_BAD_TARGET,
+	       ST_LABEL_BAD_TARGET2, ST_LABEL_FORMAT
 } g95_sl_type;
 
 /* Intrinsic operators */
@@ -256,7 +256,9 @@ enum g95_generic_isym_id {
   G95_ISYM_SINH, G95_ISYM_SIZE, G95_ISYM_SPREAD, G95_ISYM_SQRT,
   G95_ISYM_SUM, G95_ISYM_TAN, G95_ISYM_TANH, G95_ISYM_TRANSFER,
   G95_ISYM_TRANSPOSE, G95_ISYM_TRIM, G95_ISYM_UBOUND, G95_ISYM_UNPACK,
-  G95_ISYM_VERIFY, G95_ISYM_CONVERSION
+  G95_ISYM_VERIFY, G95_ISYM_CONVERSION,
+
+  G95_ISYM_CMOV
 };
 
 
@@ -298,31 +300,26 @@ typedef struct {
 } symbol_attribute;
 
 
+typedef struct g95_file {
+  struct g95_file *included_by, *next, *up;
+  int inclusion_line, line;
+  char *filename;
+} g95_file;
+
+
+typedef struct g95_linebuf {
+  int linenum;
+  struct g95_file *file;
+  struct g95_linebuf *next;
+
+  char line[1];  /* Expands */
+} g95_linebuf;
+
+
 typedef struct {
   char *nextc;
-  int line;                /* line within the lp structure */
-  struct linebuf *lp;
-  struct g95_file *file;
-} locus;
-
-/* The linebuf structure deserves some explanation.  This is the
- * primary structure for holding lines.  A source file is stored in a
- * singly linked list of these structures.  Each structure holds an
- * integer number of lines.  The line[] member is actually an array of
- * pointers that point to the NULL-terminated lines.  This list grows
- * upwards, and the actual lines are stored at the top of the
- * structure and grow downward.  Each structure is packed with as many
- * lines as it can hold, then another linebuf is allocated.  */
-
-#define LINEBUF_SIZE 4080
-          /* Chosen so that sizeof(linebuf) = 4096 on most machines */
-
-typedef struct linebuf {
-  int start_line, lines;
-  struct linebuf *next;
-  char *line[1];
-  char buf[LINEBUF_SIZE];
-} linebuf;
+  g95_linebuf *lb;
+} g95_locus;
 
 
 #include <limits.h>
@@ -331,14 +328,6 @@ typedef struct linebuf {
 # define PATH_MAX MAXPATHLEN
 #endif
 
-
-typedef struct g95_file {
-  char filename[PATH_MAX+1];
-  g95_source_form form;
-  struct g95_file *included_by, *next;
-  locus loc;
-  struct linebuf *start;
-} g95_file;
 
 /* Structure for storing strings to be matched by g95_match_string */
 
@@ -406,7 +395,7 @@ typedef struct g95_component {
   g95_array_spec *as;
 
   tree backend_decl;
-  locus loc;
+  g95_locus loc;
   struct g95_expr *initializer;
   struct g95_component *next;
 } g95_component;
@@ -466,7 +455,7 @@ typedef struct g95_st_label {
 
   struct g95_expr *format;
   int length;
-  locus where;
+  g95_locus where;
 
   tree backend_decl;
 
@@ -478,7 +467,7 @@ typedef struct g95_st_label {
 
 typedef struct g95_interface {
   struct g95_symbol *sym;
-  locus where;
+  g95_locus where;
   struct g95_interface *next;
 } g95_interface;
 
@@ -504,7 +493,7 @@ typedef struct {
 typedef struct g95_symbol {
   char name[G95_MAX_SYMBOL_LEN+1],    /* Primary name, before renaming */
        module[G95_MAX_SYMBOL_LEN+1];  /* Module this symbol came from */
-  locus declared_at;
+  g95_locus declared_at;
 
   g95_typespec ts;
   symbol_attribute attr;
@@ -546,7 +535,7 @@ typedef struct g95_symbol {
 
 
 typedef struct {
-  locus where;
+  g95_locus where;
   int use_assoc, saved;
   g95_symbol *head;
 } g95_common_head;
@@ -595,8 +584,8 @@ typedef struct g95_namespace {
   struct g95_data *data;
 
   g95_charlen *cl_list;
-
-  int save_all, seen_save;
+  g95_compile_state state;
+  int save_all, seen_save, interface;
 
   tree backend_decl;
 } g95_namespace;
@@ -647,7 +636,7 @@ typedef struct g95_array_ref {
   ar_type type;
   int dimen;                  /* # of components in the reference */
 
-  locus c_where[G95_MAX_DIMENSIONS];     /* All expressions can be NULL */
+  g95_locus c_where[G95_MAX_DIMENSIONS];     /* All expressions can be NULL */
   struct g95_expr *start[G95_MAX_DIMENSIONS], *end[G95_MAX_DIMENSIONS],
                   *stride[G95_MAX_DIMENSIONS];
 
@@ -684,7 +673,7 @@ typedef struct g95_ref {
 
   } u;
 
-  locus where;
+  g95_locus where;
   struct g95_ref *next;
 } g95_ref;
 
@@ -748,7 +737,7 @@ typedef struct g95_expr {
   g95_ref *ref;
 
   struct g95_expr *op1, *op2;
-  locus where;
+  g95_locus where;
 
   union {
     mpz_t integer;
@@ -829,7 +818,7 @@ typedef struct g95_equiv {
 typedef struct g95_case {
   g95_expr *low, *high;
 
-  locus where;
+  g95_locus where;
   int n;
 
   struct g95_case *next, *cprev, *cnext;
@@ -894,7 +883,7 @@ typedef struct {
   g95_st_label *format_label;
   g95_st_label *err, *end, *eor;
 
-  locus eor_where, end_where;
+  g95_locus eor_where, end_where;
 } g95_dt;
 
 
@@ -909,7 +898,7 @@ typedef struct g95_forall_iterator {
 
 typedef enum {
   EXEC_NOP=1, EXEC_ASSIGN, EXEC_POINTER_ASSIGN, EXEC_GOTO, EXEC_CALL,
-  EXEC_RETURN, EXEC_STOP, EXEC_PAUSE, EXEC_CONTINUE,
+  EXEC_RETURN, EXEC_STOP, EXEC_PAUSE, EXEC_CONTINUE, EXEC_ENTRY,
   EXEC_IF, EXEC_ARITHMETIC_IF, EXEC_DO, EXEC_DO_WHILE, EXEC_SELECT,
   EXEC_FORALL, EXEC_WHERE, EXEC_CYCLE, EXEC_EXIT,
   EXEC_ALLOCATE, EXEC_DEALLOCATE,
@@ -923,7 +912,7 @@ typedef struct g95_code {
   g95_exec_op type;
 
   struct g95_code *block, *next;
-  locus where;
+  g95_locus where;
 
   g95_st_label *here, *label, *label2, *label3;
   g95_symbol *sym;
@@ -973,7 +962,7 @@ typedef struct g95_data_value {
 typedef struct g95_data {
   g95_data_variable *var;
   g95_data_value *value;
-  locus where;
+  g95_locus where;
 
   struct g95_data *next;
 } g95_data;
@@ -990,17 +979,25 @@ typedef struct g95_directorylist {
   struct g95_directorylist *next;
 } g95_directorylist;
 
+
+typedef struct g95_nowarn {
+  int warning;
+  struct g95_nowarn *next;
+} g95_nowarn;
+
+
 /* Structure for holding compile options */
 
 typedef struct {
   char *source;
-  int verbose, pedantic, surprising, aliasing, unused_label, line_truncation,
+  int verbose, pedantic, aliasing, unused_label, line_truncation,
     implicit_none, fixed_line_length, module_access_private, fmode, dollar,
     q_kind, quiet, r8, i8, d8, l1, pack_derived, max_frame_size, bounds_check;
 
   g95_directorylist *include_dirs;
   char *module_dir;
   g95_source_form form;
+  g95_nowarn *nowarn;
 } g95_option_t;
 
 extern g95_option_t g95_option;
@@ -1011,7 +1008,7 @@ extern g95_option_t g95_option;
 typedef struct g95_constructor {
   g95_expr *expr;
   g95_iterator *iterator;
-  locus where;
+  g95_locus where;
   struct g95_constructor *next;
 } g95_constructor;
 
@@ -1026,7 +1023,7 @@ typedef struct g95_gsymbol {
 	 GSYM_MODULE, GSYM_COMMON, GSYM_BLOCK_DATA } type;
 
   int size, defined, used;
-  locus where;
+  g95_locus where;
   tree backend_decl;
 } g95_gsymbol;
 
@@ -1038,15 +1035,11 @@ typedef struct g95_gsymbol {
 void g95_scanner_done_1(void);
 void g95_scanner_init_1(void);
 
-locus *g95_current_locus(void);
-void g95_set_locus(locus *);
-
 int g95_at_end(void);
 int g95_at_eof(void);
 int g95_at_bol(void);
 int g95_at_eol(void);
 void g95_advance_line(void);
-int g95_check_include(void);
 
 void g95_skip_comment_line(void);
 void g95_skip_comments(void);
@@ -1058,6 +1051,9 @@ void g95_gobble_whitespace(void);
 try g95_new_file(char *, g95_source_form);
 
 extern g95_file *g95_current_file;
+extern g95_source_form g95_current_form;
+extern char *g95_source_file;
+extern g95_locus g95_current_locus;
 
 /* misc.c */
 
@@ -1085,6 +1081,7 @@ void g95_done_2(void);
 void g95_display_help(void);
 int g95_parse_arg(int argc, char *argv[]);
 void g95_init_options(void);
+void g95_options_done(void);
 
 /* iresolve.c */
 
@@ -1102,8 +1099,8 @@ void g95_iresolve_done_1(void);
 void g95_error_init_1(void);
 void g95_buffer_error(int);
 
-void g95_warning(char *, ...);
-void g95_warning_now(char *, ...);
+void g95_warning(int, char *, ...);
+void g95_warning_now(int, char *, ...);
 void g95_clear_warning(void);
 void g95_warning_check(void);
 
@@ -1174,7 +1171,7 @@ int g95_default_character_kind(void);
 int g95_default_logical_kind(void);
 int g95_default_complex_kind(void);
 
-g95_expr *g95_constant_result(bt, int, locus *);
+g95_expr *g95_constant_result(bt, int, g95_locus *);
 int g95_validate_kind(bt, int);
 arith g95_range_check(g95_expr *);
 
@@ -1223,8 +1220,8 @@ g95_expr *g95_ge(g95_expr *, g95_expr *);
 g95_expr *g95_lt(g95_expr *, g95_expr *);
 g95_expr *g95_le(g95_expr *, g95_expr *);
 
-g95_expr *g95_convert_integer(char *, int, int, locus *);
-g95_expr *g95_convert_real(char *, int, locus *);
+g95_expr *g95_convert_integer(char *, int, int, g95_locus *);
+g95_expr *g95_convert_real(char *, int, g95_locus *);
 g95_expr *g95_convert_complex(g95_expr *, g95_expr *, int);
 
 g95_expr *g95_int2int(g95_expr *, int);
@@ -1240,6 +1237,7 @@ g95_expr *g95_log2log(g95_expr *, int);
 
 
 /* symbol.c */
+extern g95_gsymbol *g95_gsym_root;
 
 match g95_match_implicit_none(void);
 void g95_set_implicit_none(void);
@@ -1255,38 +1253,38 @@ void g95_show_attr(symbol_attribute *);
 void g95_set_component_attr(g95_component *, symbol_attribute *);
 void g95_get_component_attr(symbol_attribute *, g95_component *);
 
-try g95_add_allocatable(symbol_attribute *, locus *);
-try g95_add_dimension(symbol_attribute *, locus *);
-try g95_add_external(symbol_attribute *, locus *);
-try g95_add_intrinsic(symbol_attribute *, locus *);
-try g95_add_optional(symbol_attribute *, locus *);
-try g95_add_pointer(symbol_attribute *, locus *);
-try g95_add_result(symbol_attribute *, locus *);
-try g95_add_save(symbol_attribute *, locus *);
-try g95_add_target(symbol_attribute *, locus *);
-try g95_add_dummy(symbol_attribute *, locus *);
-try g95_add_generic(symbol_attribute *, locus *);
-try g95_add_in_common(symbol_attribute *, locus *);
-try g95_add_in_namelist(symbol_attribute *, locus *);
-try g95_add_sequence(symbol_attribute *, locus *);
-try g95_add_elemental(symbol_attribute *, locus *);
-try g95_add_pure(symbol_attribute *, locus *);
-try g95_add_recursive(symbol_attribute *, locus *);
-try g95_add_function(symbol_attribute *, locus *);
-try g95_add_subroutine(symbol_attribute *, locus *);
+try g95_add_allocatable(symbol_attribute *, g95_locus *);
+try g95_add_dimension(symbol_attribute *, g95_locus *);
+try g95_add_external(symbol_attribute *, g95_locus *);
+try g95_add_intrinsic(symbol_attribute *, g95_locus *);
+try g95_add_optional(symbol_attribute *, g95_locus *);
+try g95_add_pointer(symbol_attribute *, g95_locus *);
+try g95_add_result(symbol_attribute *, g95_locus *);
+try g95_add_save(symbol_attribute *, g95_locus *);
+try g95_add_target(symbol_attribute *, g95_locus *);
+try g95_add_dummy(symbol_attribute *, g95_locus *);
+try g95_add_generic(symbol_attribute *, g95_locus *);
+try g95_add_in_common(symbol_attribute *, g95_locus *);
+try g95_add_in_namelist(symbol_attribute *, g95_locus *);
+try g95_add_sequence(symbol_attribute *, g95_locus *);
+try g95_add_elemental(symbol_attribute *, g95_locus *);
+try g95_add_pure(symbol_attribute *, g95_locus *);
+try g95_add_recursive(symbol_attribute *, g95_locus *);
+try g95_add_function(symbol_attribute *, g95_locus *);
+try g95_add_subroutine(symbol_attribute *, g95_locus *);
 
-try g95_add_access(symbol_attribute *, g95_access, locus *);
-try g95_add_flavor(symbol_attribute *, sym_flavor, locus *);
-try g95_add_entry(symbol_attribute *, locus *);
-try g95_add_procedure(symbol_attribute *, procedure_type, locus *);
-try g95_add_intent(symbol_attribute *, sym_intent, locus *);
+try g95_add_access(symbol_attribute *, g95_access, g95_locus *);
+try g95_add_flavor(symbol_attribute *, sym_flavor, g95_locus *);
+try g95_add_entry(symbol_attribute *, g95_locus *);
+try g95_add_procedure(symbol_attribute *, procedure_type, g95_locus *);
+try g95_add_intent(symbol_attribute *, sym_intent, g95_locus *);
 try g95_add_explicit_interface(g95_symbol *, ifsrc, g95_formal_arglist *,
-			       locus *);
-try g95_add_type(g95_symbol *, g95_typespec *, locus *);
+			       g95_locus *);
+try g95_add_type(g95_symbol *, g95_typespec *, g95_locus *);
 
 int g95_compare_attr(symbol_attribute *, symbol_attribute *);
 void g95_clear_attr(symbol_attribute *);
-try g95_copy_attr(symbol_attribute *, symbol_attribute *, locus *);
+try g95_copy_attr(symbol_attribute *, symbol_attribute *, g95_locus *);
 
 try g95_add_component(g95_symbol *, char *, g95_component **);
 g95_symbol *g95_use_derived(g95_symbol *);
@@ -1295,10 +1293,10 @@ void g95_show_components(g95_symbol *);
 g95_st_label *g95_get_st_label(int);
 void g95_free_st_label(g95_st_label *);
 g95_st_label *g95_new_internal_label(void);
-void g95_define_st_label(g95_st_label *, g95_sl_type, locus *);
+void g95_define_st_label(g95_st_label *, g95_sl_type, g95_locus *);
 try g95_reference_st_label(g95_st_label *, g95_sl_type);
 
-g95_namespace *g95_get_namespace(g95_namespace *);
+g95_namespace *g95_get_namespace(g95_namespace *, int);
 int g95_compare_symtree(g95_symtree *, g95_symtree *);
 g95_symtree *g95_new_symtree(g95_symtree **, char *);
 g95_symtree *g95_find_symtree(g95_symtree *, char *);
@@ -1316,7 +1314,6 @@ void g95_commit_symbols(void);
 void g95_free_namespace(g95_namespace *);
 
 void g95_symbol_init_2(void);
-void g95_symbol_done_2(void);
 void g95_show_symbol(g95_symbol *);
 
 void g95_traverse_symtree(g95_namespace *, void (*)(g95_symtree *));
@@ -1327,7 +1324,8 @@ int g95_module_symbol(g95_symbol *);
 void g95_show_namespace(g95_namespace *);
 void g95_symbol_state(void);
 g95_gsymbol *g95_get_gsymbol(char *);
-void g95_global_used(g95_gsymbol *, locus *);
+g95_gsymbol *g95_find_gsymbol(g95_gsymbol *, char *);
+void g95_global_used(g95_gsymbol *, g95_locus *);
 
 /* intrinsic.c */
 
@@ -1451,6 +1449,7 @@ match g95_match_literal_constant(g95_expr **, int);
 symbol_attribute g95_variable_attr(g95_expr *, g95_typespec *);
 symbol_attribute g95_expr_attr(g95_expr *);
 int g95_local_symbol(g95_symbol *);
+match g95_match_structure_constructor(g95_symbol *, g95_expr **);
 g95_ref *g95_extend_ref(g95_expr *, int);
 match g95_match_rvalue(g95_expr **);
 match g95_match_variable(g95_expr **, int);
@@ -1461,7 +1460,10 @@ void g95_show_actual_arglist(g95_actual_arglist *);
 void g95_free_actual_arglist(g95_actual_arglist *);
 g95_actual_arglist *g95_copy_actual_arglist(g95_actual_arglist *);
 char *g95_extract_int(g95_expr *, int *);
-
+g95_expr *g95_null_expr(g95_locus *);
+g95_symbol *g95_get_temporary(g95_typespec *ts, int);
+g95_symbol *g95_get_temporary_int(void);
+g95_expr *g95_get_variable_expr(g95_symbol *sym);
 g95_expr *g95_build_funcall(g95_symbol *func, ...);
 void g95_free_ref_list(g95_ref *);
 void g95_type_convert_binary(g95_expr *);
@@ -1473,8 +1475,10 @@ g95_expr *g95_get_expr(void);
 void g95_free_expr(g95_expr *);
 void g95_replace_expr(g95_expr *, g95_expr *);
 g95_expr *g95_int_expr(int);
-g95_expr *g95_logical_expr(int, locus *);
-g95_expr *g95_char_expr(int, int, locus *);
+g95_expr *g95_logical_expr(int, g95_locus *);
+g95_expr *g95_char_expr(int, int, g95_locus *);
+g95_formal_arglist *g95_copy_formal_arglist(g95_formal_arglist *);
+g95_ref *g95_full_ref(void);
 mpz_t *g95_copy_shape(mpz_t *, int);
 g95_expr *g95_copy_expr(g95_expr *);
 
@@ -1500,11 +1504,13 @@ void g95_show_code(int, g95_code *);
 /* resolve.c */
 
 try g95_resolve_expr(g95_expr *);
-try g95_resolve(g95_namespace *);
 int g95_impure_variable(g95_symbol *);
 int g95_pure(g95_symbol *);
 int g95_elemental(g95_symbol *);
 try g95_resolve_iterator(g95_iterator *);
+g95_symbol *g95_find_entries(g95_symtree *, int);
+void g95_process_entry(g95_namespace *);
+try g95_resolve(g95_namespace *);
 
 /* array.c */
 
@@ -1514,14 +1520,14 @@ void g95_free_array_ref(g95_array_ref *);
 void g95_show_array_ref(g95_array_ref *);
 g95_array_ref *g95_copy_array_ref(g95_array_ref *);
 
-try g95_set_array_spec(g95_symbol *, g95_array_spec *, locus *);
+try g95_set_array_spec(g95_symbol *, g95_array_spec *, g95_locus *);
 g95_array_spec *g95_copy_array_spec(g95_array_spec *);
 try g95_resolve_array_spec(g95_array_spec *, int);
 match g95_match_array_spec(g95_array_spec **);
 match g95_match_array_ref(g95_array_ref *, int);
 int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
 
-g95_expr *g95_start_constructor(bt, int, locus *);
+g95_expr *g95_start_constructor(bt, int, g95_locus *);
 void g95_append_constructor(g95_expr *, g95_expr *);
 void g95_free_constructor(g95_constructor *);
 match g95_match_array_constructor(g95_expr **);
@@ -1551,7 +1557,7 @@ match g95_match_interface(void);
 match g95_match_end_interface(void);
 int g95_compare_types(g95_typespec *, g95_typespec *);
 void g95_check_interfaces(g95_namespace *);
-void g95_procedure_use(g95_symbol *, g95_actual_arglist **, locus *);
+void g95_procedure_use(g95_symbol *, g95_actual_arglist **, g95_locus *);
 g95_symbol *g95_search_interface(g95_interface *, int, g95_actual_arglist **);
 try g95_extend_expr(g95_expr *);
 void g95_free_formal_arglist(g95_formal_arglist *);
@@ -1615,8 +1621,6 @@ void g95_use_module(void);
 /* trans.c */
 
 void g95_generate_code(g95_namespace *);
-void g95_generate_module(g95_namespace *);
-void g95_generate_block_data(g95_namespace *);
 
 /* bbt.c */
 
@@ -1625,9 +1629,7 @@ void g95_delete_bbt(void *, void *, int (*)());
 
 /* scalarize.c */
 
-g95_symbol *g95_get_temporary(g95_typespec *ts, int);
-g95_symbol *g95_get_temporary_int(void);
-g95_expr *g95_get_variable_expr(g95_symbol *sym);
+void g95_expand_where(g95_code **);
 void g95_scalarize(g95_namespace *);
 
 /* data.c */
@@ -1636,5 +1638,4 @@ try g95_expand_ac_element(g95_expr *);
 
 /* assign.c */
 
-void g95_expand_where(g95_code *);
 void g95_expand_forall(g95_code *);
