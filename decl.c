@@ -188,14 +188,6 @@ g95_expr *init;
 
   if (sym->ts.type == BT_CHARACTER) sym->ts.cl = cl;
 
-/* If we have an initializer or array specification, then the name is
- * probably a variable. */
-
-  if ((*as != NULL || init != NULL) &&
-      current_attr.flavor != FL_PARAMETER &&
-      sym->attr.function == 0 &&
-      g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) return FAILURE;
-
 /* Add dimension attribute if present. */
 
   if (g95_set_array_spec(sym, *as, var_locus) == FAILURE) return FAILURE;

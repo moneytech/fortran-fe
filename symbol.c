@@ -566,9 +566,10 @@ static const char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
     break;
 
   case FL_PARAMETER:
-    conf2(target);
-    conf2(dummy);
-    conf2(in_common);
+    conf2(external);      conf2(intrinsic);    conf2(optional);
+    conf2(allocatable);   conf2(function);     conf2(subroutine);
+    conf2(entry);         conf2(pointer);      conf2(target);
+    conf2(dummy);         conf2(in_common);
     break;
 
   default:

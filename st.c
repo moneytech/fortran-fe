@@ -402,9 +402,14 @@ g95_alloc *a;
 
 static void resolve_symbol(g95_symbol *sym) {
 
-  if (sym->attr.flavor == FL_UNKNOWN &&
-      sym->attr.external == 0 && sym->attr.intrinsic == 0)
-    sym->attr.flavor = FL_VARIABLE;
+  if (sym->attr.flavor == FL_UNKNOWN) {
+    if (sym->attr.external == 0 && sym->attr.intrinsic == 0)
+      sym->attr.flavor = FL_VARIABLE;
+    else {
+      sym->attr.flavor = FL_PROCEDURE;
+      if (sym->attr.dimension) sym->attr.function = 1;
+    }
+  }
 
   if (sym->as != NULL && sym->as->type == AS_ASSUMED_SIZE &&
       sym->attr.dummy == 0) {
