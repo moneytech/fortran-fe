@@ -258,6 +258,9 @@ int i;
 try g95_set_default_type(g95_symbol *sym, int error_flag, g95_namespace *ns) {
 int i;
 
+  if (sym->ts.type != BT_UNKNOWN)
+    g95_internal_error("g95_set_default_type(): symbol already has a type");
+
   i = sym->name[0] - 'a';
 
   if (ns == NULL) ns = g95_current_ns;
@@ -269,9 +272,6 @@ int i;
 
     return FAILURE;
   }
-
-  if (sym->ts.type != BT_UNKNOWN)
-    g95_internal_error("g95_set_default_type(): symbol already has a type");
 
   sym->ts = ns->default_type[i];
   sym->attr.implicit_type = 1;
