@@ -84,8 +84,6 @@ void g95_init_options(void) {
 
 /* g95_display_help()-- Display help message and exit */
 
-#define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
-
 void g95_display_help(void) {
 int i, lo, ld, pld, no, nd, seennl, WO, WD, lo_size;
 const char *co, *cd, *cdp;
