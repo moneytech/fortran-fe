@@ -1780,14 +1780,19 @@ arith rc;
 
   case INTRINSIC_GE:  case INTRINSIC_LT:  /* Additional restrictions */
   case INTRINSIC_LE:  case INTRINSIC_GT:  /* for ordering relations */
-    if (op1->ts.type == BT_COMPLEX || op2->ts.type == BT_COMPLEX)
+    if (op1->ts.type == BT_COMPLEX || op2->ts.type == BT_COMPLEX) {
+      temp.ts.type = BT_LOGICAL;
+      temp.ts.kind = g95_default_logical_kind();
       goto runtime;
+    }
 
     /* Fall through */
 
   case INTRINSIC_EQ:      case INTRINSIC_NE:
     if (op1->ts.type == BT_CHARACTER && op2->ts.type == BT_CHARACTER) {
       unary = 0;
+      temp.ts.type = BT_LOGICAL;
+      temp.ts.kind = g95_default_logical_kind();
       break;
     }
 

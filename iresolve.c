@@ -749,6 +749,7 @@ void g95_resolve_repeat(g95_expr *f, g95_expr *string, g95_expr *ncopies) {
 
 void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
+static char reshape0[] = "__reshape";
 mpz_t rank;
 int kind;
 
@@ -762,19 +763,18 @@ int kind;
   else
     kind = source->ts.kind;
 
-  switch (kind)
-    {
-    case 4:
-    case 8:
+  switch (kind) {
+  case 4:
+  case 8:
     /* case 16: */
-      f->value.function.name =
-        g95_get_string("__reshape_%d", source->ts.kind);
-      break;
+    f->value.function.name =
+      g95_get_string("__reshape_%d", source->ts.kind);
+    break;
       
-    default:
-      f->value.function.name = "__reshape";
-      break;
-    }
+  default:
+    f->value.function.name = reshape0;
+    break;
+  }
 
 }
 
