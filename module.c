@@ -53,8 +53,8 @@ Boston, MA 02111-1307, USA.  */
  * )
  *
  * In general, symbols refer to other symbols by their symbol number,
- * which is the order (zero based) in which the symbols are saved
- * within the module.  */
+ * which are zero based.  Symbols are written to the module in no
+ * particular order.  */
 
 
 #include <string.h>
