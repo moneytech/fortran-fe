@@ -54,8 +54,6 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
 { "-M[directory]",
       N_("put and search module files in directory") },
 
-#undef N_
-
 #endif
 
 

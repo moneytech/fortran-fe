@@ -1107,6 +1107,9 @@ match m;
     return MATCH_ERROR;
   }
 
+  /* save the first statement in the loop - needed by the backend */
+  new_st.ext.whichloop=p->head;
+  
   new_st.op = op;
   new_st.sym = sym;
 

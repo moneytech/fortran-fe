@@ -37,7 +37,10 @@ static struct
   const char *description;
 }
 
+#ifndef BACKEND_CODE
 #define N_(msg) (msg)
+#endif
+
 #define DEFINE_LANG_NAME(x)
 lang_options[] = {
 #include "lang-options.h"
