@@ -348,6 +348,10 @@ typedef struct {
 
 #define g95_get_array_spec() g95_getmem(sizeof(g95_array_spec))
 
+#ifndef IN_GCC
+typedef void * tree; /* Just a dummy place holder. */
+#endif
+
 /* Components of derived types */
 
 typedef struct g95_component {
@@ -399,10 +403,6 @@ typedef struct g95_namelist {
 } g95_namelist;
 
 #define g95_get_namelist() g95_getmem(sizeof(g95_namelist))
-
-#ifndef IN_GCC
-typedef void * tree; /* Just a dummy place holder. */
-#endif
 
 /* The g95_st_label structure is a doubly linked list attached to a
  * namespace that records the usage of statement labels within that space */
