@@ -1019,6 +1019,10 @@ int c;
 
   case MATCH_YES:
     g95_find_symbol(name, NULL, 1, &sym);
+
+    /* See if we have a function with no result clause */
+    if (sym != NULL && sym->result == sym) break;
+
     if (sym == NULL ||
 	(!sym->attr.intrinsic && !sym->attr.external &&
 	 sym->attr.flavor != FL_PROCEDURE)) {
