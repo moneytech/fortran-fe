@@ -1066,6 +1066,23 @@ g95_component *p, *tail;
 }
 
 
+/* switch_type()-- Recursive function to switch derived types of all
+ * symbol in a namespace. */
+
+static void switch_types(g95_symtree *st, g95_symbol *from, g95_symbol *to) {
+g95_symbol *sym;
+
+  if (st == NIL) return;
+
+  sym = st->sym;
+  if (sym->ts.type == BT_DERIVED && sym->ts.derived == from)
+    sym->ts.derived = to;
+
+  switch_types(st->left, from, to);
+  switch_types(st->right, from, to);
+}
+
+
 /* g95_use_derived()-- This subroutine is called when a derived type
  * is used in order to make the final determination about which
  * version to use.  The standard requires that a type be defined
@@ -1124,6 +1141,11 @@ int i;
 	p->tlink = sym->tlink;
 	break;
       }
+
+  switch_types(sym->ns->root, sym, s);
+
+  /* TODO: Also have to replace sym -> s in other lists like
+   * namelists, common lists and interface lists.  */
 
   g95_free_symbol(sym);
 
@@ -1398,7 +1420,6 @@ done:
  * this case, that symbol has been used as a host associated variable
  * at some previous time.  */
 
-#define NIL &g95_st_sentinel           /* all leaves are sentinels */
 g95_symtree g95_st_sentinel = { { '\0' }, 0, NULL, NIL, NIL, NIL, BLACK };
 
 #define CompLT(a,b) (strcmp(a,b) < 0)

@@ -491,6 +491,9 @@ typedef struct g95_symtree {
   enum { BLACK, RED } color;   /* node color (BLACK, RED) */
 } g95_symtree;
 
+extern g95_symtree g95_st_sentinel;
+#define NIL &g95_st_sentinel
+
 
 typedef struct g95_namespace {
   g95_symtree *root;    /* Root of the red/black symbol tree */

@@ -117,9 +117,6 @@ static enum { IO_INPUT, IO_OUTPUT } iomode;
 static g95_use_rename *g95_rename_list;
 static sym_stack *write_stack;
 
-#define ST_NIL &g95_st_sentinel
-extern g95_symtree g95_st_sentinel;
-
 
 /* g95_free_rename()-- Free the rename list left behind by a USE
  * statement. */
@@ -1676,7 +1673,7 @@ int level;
 static g95_symbol *bf_search(g95_symtree *st, symbol_info *info) {
 g95_symbol *result;
 
-  if (st == ST_NIL) return NULL;
+  if (st == NIL) return NULL;
 
   result = st->sym;
 
