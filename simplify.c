@@ -2869,33 +2869,29 @@ int indx, len, lenc;
 
 g95_expr *g95_simplify_selected_int_kind(g95_expr *e) {
 int i, kind, range;
+g95_expr *result;
 
-  if (e->expr_type != EXPR_CONSTANT ||
-      g95_extract_int(e, &range) != NULL) return NULL;
+  if (e->expr_type != EXPR_CONSTANT || g95_extract_int(e, &range) != NULL)
+    return NULL;
 
   kind = INT_MAX;
-  for(i=0; g95_integer_kinds[i].kind!=0; i++) {
+
+  for(i=0; g95_integer_kinds[i].kind!=0; i++)
     if (g95_integer_kinds[i].range >= range && 
-	g95_integer_kinds[i].kind < kind) {
-      kind = g95_integer_kinds[i].kind;
-    }
-  }
+	g95_integer_kinds[i].kind < kind) kind = g95_integer_kinds[i].kind;
 
-  if (kind == INT_MAX) {
-    g95_error("Range %d exceeds all integer kinds at %L", range, &e->where);
-    return &g95_bad_expr;
-  }
+  if (kind == INT_MAX) kind = -1;
 
-  return g95_int_expr(kind);
+  result = g95_int_expr(kind);
+  result->where = e->where;
+
+  return result;
 }
-
 
 
 g95_expr *g95_simplify_selected_real_kind(g95_expr *p, g95_expr *q) {
 int range, precision, i, kind, found_precision, found_range;
-
-  if (p == NULL && q == NULL)
-    g95_internal_error("No arguments to SELECTED_REAL_KIND()");
+g95_expr *result;
 
   if (p == NULL)
     precision = 0;
@@ -2916,10 +2912,10 @@ int range, precision, i, kind, found_precision, found_range;
   found_range = 0;
 
   for(i=0; g95_real_kinds[i].kind!=0; i++) {
-    if (g95_real_kinds[i].precision >= precision)
-      found_precision = 1;
-    if (g95_real_kinds[i].range >= range) 
-      found_range = 1;
+    if (g95_real_kinds[i].precision >= precision) found_precision = 1;
+
+    if (g95_real_kinds[i].range >= range) found_range = 1;
+
     if (g95_real_kinds[i].precision >= precision &&
 	g95_real_kinds[i].range >= range &&
 	g95_real_kinds[i].kind < kind)
@@ -2928,18 +2924,14 @@ int range, precision, i, kind, found_precision, found_range;
   
   if (kind == INT_MAX) {
     kind = 0;
-    if (!found_precision) {
-      g95_warning("Specified precision %d exceeds all REAL kinds at %L",
-		  precision, &p->where);
-      kind = -1;
-    }
 
-    if (!found_range) {
-      g95_warning("Specified exponent range %d exceeds all REAL kinds at %L", 
-		  range, &q->where);
-      kind -= 2;
-    }
+    if (!found_precision) kind = -1;
+
+    if (!found_range) kind -= 2;
   }
+
+  result = g95_int_expr(kind);
+  result->where = (p != NULL) ? p->where : q->where;
 
   return g95_int_expr(kind);
 }
