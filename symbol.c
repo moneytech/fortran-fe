@@ -441,17 +441,18 @@ void g95_show_attr(symbol_attribute *attr) {
  * to avoid having a single conflict in two places. */
 
 #define conf(a, b) if (attr->a && attr->b) { a1 = a; a2 = b; goto conflict; }
+#define conf2(a) if (attr->a) { a2 = a; goto conflict; }
 
 static try check_conflict(symbol_attribute *attr, locus *loc) {
 char *a1, *a2;
 
-static char *dummy = "DUMMY", *parameter = "PARAMETER", *save = "SAVE",
-  *pointer = "POINTER", *target = "TARGET", *external = "EXTERNAL",
-  *intent = "INTENT", *intrinsic = "INTRINSIC", *allocatable = "ALLOCATABLE",
-  *elemental = "ELEMENTAL", *private = "PRIVATE", *sequence = "SEQUENCE",
-  *recursive = "RECURSIVE", *in_common = "COMMON", *result = "RESULT",
-  *in_namelist = "NAMELIST", *public = "PUBLIC", *optional = "OPTIONAL",
-  *entry = "ENTRY", *function = "FUNCTION", *subroutine = "SUBROUTINE";
+static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
+  *target = "TARGET", *external = "EXTERNAL", *intent = "INTENT",
+  *intrinsic = "INTRINSIC", *allocatable = "ALLOCATABLE",
+  *elemental = "ELEMENTAL", *private = "PRIVATE", *recursive = "RECURSIVE",
+  *in_common = "COMMON", *result = "RESULT", *in_namelist = "NAMELIST",
+  *public = "PUBLIC", *optional = "OPTIONAL", *entry = "ENTRY",
+  *function = "FUNCTION", *subroutine = "SUBROUTINE";
 
   if (loc == NULL) loc = g95_current_locus();
 
@@ -509,25 +510,50 @@ static char *dummy = "DUMMY", *parameter = "PARAMETER", *save = "SAVE",
   }
 
   switch(attr->flavor) {
+  case FL_PROGRAM: case FL_BLOCK_DATA: case FL_MODULE: case FL_LABEL:
+    if (attr->intent != SCOPE_UNKNOWN) { a2 = intent; goto conflict; }
+
+    conf2(dummy);         conf2(save);        conf2(pointer);
+    conf2(target);        conf2(external);    conf2(intrinsic);
+    conf2(allocatable);   conf2(result);      conf2(in_namelist);
+    conf2(optional);      conf2(function);    conf2(subroutine);
+    break;
+
+  case FL_VARIABLE:
+  case FL_NAMELIST:
+  case FL_GENERIC:
+    break;
+
   case FL_MODULE_PROC:
+    conf2(dummy);
+
+    /* Fall through */
+
   case FL_PROCEDURE:
-    if (attr->result)    { a2 = result; goto conflict; }
-    if (attr->in_common) { a2 = in_common; goto conflict; }
+  case FL_DUMMY_PROC:
+    conf2(result);
+    conf2(in_common);
+    conf2(save);
+
     break;
 
   case FL_ST_FUNCTION:
-    if (attr->in_common) { a2 = in_common; goto conflict; }
+    conf2(in_common);
     break;
 
   case FL_DERIVED:
-    if (attr->private)  { a2 = private;  goto conflict; }
-    if (attr->sequence) { a2 = sequence; goto conflict; }
+    conf2(dummy);        conf2(save);        conf2(pointer);
+    conf2(target);       conf2(external);    conf2(intrinsic);
+    conf2(allocatable);  conf2(optional);    conf2(entry);
+    conf2(function);     conf2(subroutine);
+      
+    if (attr->intent != INTENT_UNKNOWN) { a2 = intent; goto conflict; }
     break;
 
   case FL_PARAMETER:
-    if (attr->target)    { a2 = parameter; goto conflict; }
-    if (attr->dummy)     { a2 = dummy;     goto conflict; }
-    if (attr->in_common) { a2 = in_common; goto conflict; }
+    conf2(target);
+    conf2(dummy);
+    conf2(in_common);
     break;
 
   default:
