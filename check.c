@@ -23,6 +23,7 @@ Boston, MA 02111-1307, USA.  */
 /* check.c-- check that actual arguments are consistent with an
  * intrinsic interface. */
 
+#include <stdlib.h>
 #include <stdarg.h>
 
 #include "g95.h"
@@ -158,6 +159,7 @@ char *message;
 
   message = alloca(100);
   sprintf(message, "the same type and kind as '%s'", g95_intrinsic_arg[n]);
+
   must_be(f, m, message);
 
   return FAILURE;

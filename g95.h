@@ -19,14 +19,34 @@ along with GNU G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-#include <stdio.h> /* need FILE * here */
-#include "config.h"
-
 /* g95.h-- It's probably insane to have just one header file, but it
  * seemed like everything had to be recompiled anyway when a change
  * was made to a header file, and there were ordering issues with
  * multiple header files.  Besides, Microsoft's winnt.h was 250k last
  * time I looked, so by comparison this is perfectly reasonable. */
+
+
+/* The following ifdefs are recommended by the autoconf documentation
+ * for any code using alloca */
+
+/* AIX requires this to be the first thing in the file. */
+#ifdef __GNUC__
+#else /* not __GNUC__ */
+#ifdef HAVE_ALLOCA_H
+#include <alloca.h>
+#else /* do not HAVE_ALLOCA_H */
+#ifdef _AIX
+ #pragma alloca
+#else
+#ifndef alloca /* predefined by HP cc +Olibcalls */
+char *alloca ();
+#endif /* not predefined */
+#endif /* not _AIX */
+#endif /* do not HAVE_ALLOCA_H */
+#endif /* not __GNUC__ */
+
+#include <stdio.h> /* need FILE * here */
+#include "config.h"
 
 /* Major control parameters */
 

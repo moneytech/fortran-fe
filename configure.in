@@ -22,6 +22,8 @@ if test "x$with_gmp_dir" != x -a -d "$with_gmp_dir"; then
 	LDFLAGS="-L$with_gmp_dir/.libs $LDFLAGS"
 fi
 
+AC_FUNC_ALLOCA([AC_MSG_ERROR([alloca not found])])
+
 AC_CHECK_HEADER(gmp.h, [], [AC_MSG_ERROR([gmp.h not found])])
 
 AC_MSG_CHECKING([for correct version of gmp.h])
