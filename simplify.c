@@ -2025,7 +2025,7 @@ int p, i, k;
 }
 
 
-static g95_expr *simplify_nint(char *name, g95_expr *e, g95_expr *k) {
+static g95_expr *simplify_nint(const char *name, g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *itrunc, *result;
 int kind, cmp;
 
