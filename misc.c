@@ -78,15 +78,15 @@ const char *p;
   if (!dir) {
     dir = *list = g95_getmem(sizeof(g95_directorylist));
   } else {
-    while(dir->next) {
+    while(dir->next)
       dir = dir->next;
-    }
+
     dir->next = g95_getmem(sizeof(g95_directorylist));
     dir = dir->next;
   }
 
   dir->next = NULL;
-  dir->path = g95_getmem(strlen(p)+1);
+  dir->path = g95_getmem(strlen(p)+2);
   strcpy(dir->path, p);
   strcat(dir->path, "/");     /* make '/' last character */ 
 }
@@ -103,15 +103,14 @@ FILE *f;
   f = fopen(name, "r"); 
   if (f != NULL) return f;
 
-  p = g95_option.include_dirs;
-  while(p != NULL) {
+  for(p=g95_option.include_dirs; p; p=p->next) {
+    if (strlen(p->path)+strlen(name)+1 > PATH_MAX) continue;
+
     strcpy(fullname, p->path);
     strcat(fullname, name);
 
     f = fopen(fullname, "r");
     if (f != NULL) return f;
-
-    p = p->next;
   }
 
   return NULL;
