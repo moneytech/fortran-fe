@@ -1062,28 +1062,32 @@ int c;
 
 /* g95_match_actual_arglist()-- Matches an actual argument list of a
  * function or subroutine, from the opening parenthesis to the closing
- * parenthesis.  */
+ * parenthesis.  The argument list is assumed to allow keyword
+ * arguments because we don't know if the symbol associated with the
+ * procedure has an implicit interface or not.  We make sure keywords
+ * are unique. */
 
 match g95_match_actual_arglist(int sub_flag, g95_actual_arglist **argp,
 			       g95_label_list **labels) {
 
+g95_actual_arglist *a, *actual, *actual_tail;
 g95_label_list *label_head, *label_tail;
-g95_actual_arglist *arglist, *arg_tail;
+int arg_number, label, seen_keyword;
 char name[G95_MAX_SYMBOL_LEN+1];
-locus old_loc, name_loc;
-int arg_number, label;
+locus old_loc, name_locus;
 match m;
 
-  *argp = arg_tail = NULL;
+  *argp = actual_tail = NULL;
   old_loc = *g95_current_locus();
   label_head = label_tail = NULL;
 
   arg_number = 1;
+  seen_keyword = 0;
 
   if (g95_match(" (") == MATCH_NO) return (sub_flag) ? MATCH_YES : MATCH_NO;
 
   if (g95_match(" )") == MATCH_YES) return MATCH_YES;
-  arglist = NULL;
+  actual = NULL;
 
   for(;;) {
     if (sub_flag && g95_match(" *") == MATCH_YES) {
@@ -1102,35 +1106,58 @@ match m;
       goto next;
     }
 
-    if (arglist == NULL)
-      arglist = arg_tail = g95_get_actual_arglist();
-    else {
-      arg_tail->next = g95_get_actual_arglist();
-      arg_tail = arg_tail->next;
-    }
+    name_locus = *g95_current_locus();
 
-    arg_tail->arg_number = arg_number++;
+    /* See if we have keyword argument.  After the first keyword
+     * argument is seen, any more are mandatory. */
 
-    name_loc = *g95_current_locus();
+    name[0] = '\0';
 
     m = g95_match_name(name);
     if (m == MATCH_ERROR) goto cleanup;
 
-    /* See if we have a named argument */
-
-    if (m == MATCH_YES && g95_match(" =") == MATCH_YES) {
-      m = match_actual_arg(&arg_tail->expr);
-      if (m == MATCH_ERROR) goto cleanup;
-      if (m == MATCH_YES) {
-	strcpy(arg_tail->name, name);
-	goto next;
+    if (seen_keyword) {
+      if (m != MATCH_YES) {
+	g95_error("Missing keyword name in actual argument list at %C");
+	goto cleanup;
       }
+
+      if (g95_match(" =") == MATCH_NO) {
+	g95_error("Missing keyword argument in actual argument list at %C");
+	goto cleanup;
+      }
+
+    } else {   /* See if we have the first keyword argument */
+      if (m == MATCH_YES && g95_match(" =") == MATCH_YES)
+	seen_keyword = 1;
+      else
+	g95_set_locus(&name_locus);
     }
 
-    /* Deal with an unnamed argument */
+    /* Make sure we haven't seen this keyword yet */
 
-    g95_set_locus(&name_loc);
-    m = match_actual_arg(&arg_tail->expr);
+    if (name[0] != '\0') {
+      for(a=actual; a; a=a->next)
+	if (strcmp(a->name, name) == 0) {
+	  g95_error("Keyword '%s' at %C has already appeared in the current "
+		    "argument list", name);
+	  goto cleanup;
+	}
+    }
+
+    if (actual == NULL)
+      actual = actual_tail = g95_get_actual_arglist();
+    else {
+      actual_tail->next = g95_get_actual_arglist();
+      actual_tail = actual_tail->next;
+    }
+
+    strcpy(actual_tail->name, name);
+    actual_tail->arg_number = arg_number++;
+
+    /* Match the actual argument */
+
+    m = match_actual_arg(&actual_tail->expr);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
@@ -1139,7 +1166,7 @@ match m;
     if (g95_match(" ,") != MATCH_YES) goto syntax;
   }
 
-  *argp = arglist;
+  *argp = actual;
   if (label_head != NULL) *labels = label_head;
 
   return MATCH_YES;
@@ -1149,7 +1176,7 @@ syntax:
 
 cleanup:
   g95_free_label_list(label_head);
-  g95_free_actual_arglist(arglist);
+  g95_free_actual_arglist(actual);
   g95_set_locus(&old_loc);
 
   return MATCH_ERROR;
