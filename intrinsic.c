@@ -925,12 +925,12 @@ g95_expr *arg, *result;
 
   result = g95_copy_expr(arg);
 
-  mpf_init_set_str(mpf_one, "1.0", 10);
+  mpf_init_set_str(mpf_zero, "0.0", 10);
 
   mpf_init(result->value.complex.r);
   mpf_init(result->value.complex.i);
   mpf_set(result->value.complex.r, arg->value.complex.r);
-  mpf_sub(result->value.complex.i, arg->value.complex.r, mpf_one);
+  mpf_sub(result->value.complex.i, mpf_zero, arg->value.complex.i);
 
   g95_replace_expr(e, result);
 
