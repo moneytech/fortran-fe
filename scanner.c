@@ -684,6 +684,57 @@ linebuf *lp;
 }
 
 
+/* form_from_filename() -- determines the source form from the
+ * filename extension.  We assume case insensitivity. */
+
+static g95_source_form form_from_filename(char *filename) {
+
+static struct { char *extension; g95_source_form form; } exttype[] = {
+  {".f90", FORM_FREE }, 
+  {".f95", FORM_FREE }, 
+  {".f",   FORM_FIXED}, 
+  {".for", FORM_FIXED},
+  {"",     FORM_UNKNOWN} };   /* sentinal value */
+       
+g95_source_form  f_form;
+char *fileext;
+int i;
+
+  /* find end of file name */
+ 
+  i = 0;
+  while ((i < PATH_MAX) && (filename[i] != '\0')) i++;
+
+  /* improperly terminated or too-long filename */
+
+  if (i == PATH_MAX) return FORM_UNKNOWN;    
+ 
+  /* find last period */
+
+  while (i >= 0 && (filename[i] != '.')) i--;
+
+  /* no file extension! */
+
+  if (i < 0) return FORM_UNKNOWN;
+
+  /* get file extension and compare it to others. */
+
+  fileext = &(filename[i]); 
+
+  i = -1;
+  f_form = FORM_UNKNOWN;
+  do {
+    i++;
+    if (strcasecmp(fileext,exttype[i].extension) == 0) {
+      f_form = exttype[i].form;
+      break;
+    }
+  } while (exttype[i].form != FORM_UNKNOWN);
+
+  return f_form;
+}
+
+
 /* g95_new_file()-- Open a new file and start scanning from that file.
  * Every new file gets a g95_file node, even if it is a duplicate file.
  * Returns zero if everything went OK, nonzero otherwise. */
@@ -736,33 +787,14 @@ int len;
   if (form != FORM_UNKNOWN)
     fp->form = form;
   else {
-    if (len>4 && ((strcmp(filename+len-4, ".f90") == 0) ||
-		  (strcmp(filename+len-4, ".F90") == 0) ||
-		  (strcmp(filename+len-4, ".f95") == 0) ||
-		  (strcmp(filename+len-4, ".F95") == 0))) {
+    form = form_from_filename(filename);
+
+    if (form == FORM_UNKNOWN) {
       fp->form = FORM_FREE;
-      goto got_form;
+      g95_warning_now("Reading file %s as free form", filename);
     }
-
-    if (len>2 && ((strcmp(filename+len-2, ".f") == 0) ||
-		  (strcmp(filename+len-2, ".F") == 0))) {
-      fp->form = FORM_FIXED;
-      goto got_form;
-    }
-
-    if ((len>4 && filename[len-4] == '.' &&
-	 (filename[len-3] == 'f' || filename[len-3] == 'F') &&
-	 (filename[len-2] == 'o' || filename[len-2] == 'O') &&
-         (filename[len-1] == 'r' || filename[len-1] == 'R'))) {
-      fp->form = FORM_FIXED;
-      goto got_form;
-    }
-
-    fp->form = FORM_FREE;
-    g95_warning_now("Reading file %s as free form", filename);
   }
 
-got_form:
   fp->next = first_file;
   first_file = fp;
 
