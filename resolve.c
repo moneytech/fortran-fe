@@ -1286,7 +1286,7 @@ static try resolve_substring(g95_ref *ref) {
     if (g95_resolve_expr(ref->u.ss.end) == FAILURE) return FAILURE;
 
     if (ref->u.ss.end->ts.type != BT_INTEGER) {
-      g95_error("Substring end index at %C must be of type INTEGER",
+      g95_error("Substring end index at %L must be of type INTEGER",
 		&ref->u.ss.end->where);
       return FAILURE;
     }

@@ -2092,7 +2092,7 @@ loop:
     return MATCH_ERROR;
   }
 
-  m = g95_match(" %n%t", &name);
+  m = g95_match(" %n%t", name);
   if (m != MATCH_YES) return m;
 
 /* Make sure the name isn't the name of an intrinsic type.  The

@@ -286,7 +286,7 @@ int rank;
   if (mpz_cmp_ui(dim->value.integer, 1) < 0 ||
       mpz_cmp_ui(dim->value.integer, rank) > 0) {
     g95_error("'dim' argument of '%s' intrinsic at %L is not a valid "
-	      "dimension index", &dim->where);
+	      "dimension index", g95_current_intrinsic, &dim->where);
 
     return FAILURE;
   }
@@ -1041,7 +1041,7 @@ int m;
 
   if (m > 0) {
     g95_error("'shape' argument of 'reshape' intrinsic at %L has more than "
-	      stringize(G95_MAX_DIMENSIONS) " elements");
+	      stringize(G95_MAX_DIMENSIONS) " elements", &shape->where);
     return FAILURE;
   }
 

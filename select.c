@@ -516,7 +516,7 @@ try t;
       if (type == BT_LOGICAL && cp->low != NULL && cp->high != NULL &&
 	  cp->low != cp->high) {
 	g95_error("Logical range in CASE statement at %L is not allowed",
-		  cp->low->where);
+		  &cp->low->where);
 	t = FAILURE;
       }      
  

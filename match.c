@@ -1828,7 +1828,7 @@ match m;
     return MATCH_YES;
   }   
 
-  m = g95_match(" %n%t", &name);
+  m = g95_match(" %n%t", name);
   if (m != MATCH_YES) return MATCH_ERROR;
 
   if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;

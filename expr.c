@@ -1224,7 +1224,7 @@ try t;
       break;
     }
 
-    g95_error("Variable '%s' cannot appear in the specification expression ",
+    g95_error("Variable '%s' cannot appear in the specification expression "
 	      "at %L", sym->name, &e->where);
 
     break;

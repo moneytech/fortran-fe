@@ -781,7 +781,7 @@ g95_expr *result;
     break;
 
   default:
-    g95_internal_error("bad type in g95_simplify_dble", &e->where);
+    g95_internal_error("g95_simplify_dble(): bad type at %L", &e->where);
   }
 
   return range_check(result, "DBLE");
