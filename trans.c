@@ -196,7 +196,6 @@ g95_simple_fold_tmp(tree expr, tree * phead, tree * ptail, tree * tmpvar)
   return var;
 }
 
-static int nest_level = 0;
 /* Create a new scope/binding level.  */
 void
 g95_start_stmt (void)

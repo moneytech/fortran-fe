@@ -289,6 +289,7 @@ g95_typenode_for_spec (g95_typespec * spec)
   return basetype;
 }
 
+/* Build an INT_CST for constant expressions, otherwise return NULL_TREE.  */
 static tree
 g95_conv_array_bound (g95_expr * expr)
 {
@@ -305,87 +306,15 @@ g95_get_element_type (tree type)
 {
   tree element;
 
-  element = g95_get_data_component (type);
-  element = TREE_TYPE (element);
+  element = TREE_TYPE (TYPE_FIELDS (type));
 
   assert (TREE_CODE (element) == POINTER_TYPE);
   element = TREE_TYPE (element);
 
-  while (TREE_CODE (element) == ARRAY_TYPE)
-    element = TREE_TYPE (element);
+  assert (TREE_CODE (element) == ARRAY_TYPE);
+  element = TREE_TYPE (element);
 
   return element;
-}
-
-tree
-g95_get_lbound_component (tree type, int n)
-{
-  tree field;
-
-  assert (G95_DESCRIPTOR_TYPE_P (type));
-
-  n = 2 * n + G95_TYPE_DESCRIPTOR_RANK (type) + 2;
-  field = g95_advance_chain (TYPE_FIELDS (type), n);
-  assert (field != NULL_TREE && TREE_TYPE (field) == g95_array_index_type);
-
-  return field;
-}
-
-tree
-g95_get_ubound_component (tree type, int n)
-{
-  tree field;
-
-  assert (G95_DESCRIPTOR_TYPE_P (type));
-
-  n = 2 * n +  G95_TYPE_DESCRIPTOR_RANK (type) + 3;
-  field = g95_advance_chain (TYPE_FIELDS (type), n);
-  assert (field != NULL_TREE && TREE_TYPE (field) == g95_array_index_type);
-
-  return field;
-}
-
-tree
-g95_get_stride_component (tree type, int n)
-{
-  tree field;
-
-  assert (G95_DESCRIPTOR_TYPE_P (type));
-
-  field = g95_advance_chain (TYPE_FIELDS (type), n + 2);
-  assert (field != NULL_TREE && TREE_TYPE (field) == g95_array_index_type);
-
-  return field;
-}
-
-tree
-g95_get_data_component (tree type)
-{
-  tree field;
-
-  assert (G95_DESCRIPTOR_TYPE_P (type));
-
-  field = TYPE_FIELDS (type);
-  assert (field != NULL_TREE
-          && TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
-          && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
-
-  return field;
-}
-
-tree
-g95_get_base_component (tree type)
-{
-  tree field;
-
-  assert (G95_DESCRIPTOR_TYPE_P (type));
-
-  field = g95_advance_chain (TYPE_FIELDS (type), 1);
-  assert (field != NULL_TREE
-          && TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
-          && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
-
-  return field;
 }
 
 /* Creates a type with the given size.  Used for holding array data.  */
@@ -411,18 +340,13 @@ g95_get_stack_array_type (tree size)
       array *data
       array *base;
       //index dimensions -  Maybe we should include this for error checking?
-      index stride0;
-      index stride1;
-      ...
-      index lbound0;
-      index ubound0;
-      index lbound1;
-      index ubound1;
-      ...
+      index stride[N_DIM];
+      index lbound[N_DIM];
+      index ubound[N_DIM];
     }
 
-   Translation code should use g95_get_*_component rather than assuming a
-   particular ordering.
+   Translation code should use g95_conv_descriptor_* rather than accessing
+   the descriptor directly.
 
    This is represented internaly as a RECORD_TYPE. The index nodes are
    g95_array_index_type and the data node is a pointer to the data.
@@ -519,17 +443,18 @@ g95_build_array_type (tree type, g95_array_spec * as)
   return g95_get_array_type_bounds (type, as->rank, lbound, ubound);
 }
 
-/* Build an array type with given bounds.  */
+/* Build an array (descriptor) type with given bounds.  */
 /*GCC ARRAYS*/
 tree
-g95_get_array_type_bounds (tree type, int dimen, tree * lbound, tree * ubound)
+g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
 {
   tree fat_type, fat_pointer_type;
   tree fieldlist;
   tree arraytype;
   tree decl;
   int n;
-  char fieldname[7+G95_RANK_DIGITS];
+  char name[8+G95_RANK_DIGITS+G95_MAX_SYMBOL_LEN];
+  const char *typename;
   tree lower;
   tree upper;
   tree stride;
@@ -542,24 +467,31 @@ g95_get_array_type_bounds (tree type, int dimen, tree * lbound, tree * ubound)
     ggc_alloc_cleared (sizeof (struct lang_type));
   G95_TYPE_DESCRIPTOR_RANK (fat_type) = dimen;
 
-  /* Include the name of the element type in the array name.  */
-  sprintf (fieldname, "array"G95_RANK_PRINTF_FORMAT, dimen);
-  TYPE_NAME (fat_type) = get_identifier (fieldname);
+  /* TODO: Include the name of the element type in the array name.  */
+  tmp = TYPE_NAME (etype);
+  if (tmp)
+    typename = IDENTIFIER_POINTER (tmp);
+  else
+    typename = "unknown";
+
+  sprintf (name, "array"G95_RANK_PRINTF_FORMAT"_%.*s", dimen,
+           G95_MAX_SYMBOL_LEN, typename);
+  TYPE_NAME (fat_type) = get_identifier (name);
   TYPE_PACKED (fat_type) = 0;
 
   fat_pointer_type = build_pointer_type (fat_type);
 
-  /* Build an array descriptor.  */
-  fieldlist = NULL_TREE;
-
-  /* this will be the type of the array data.  Start with a single element.  */
-  arraytype = type;
+  /* Build an array descriptor record type.  */
   stride = integer_one_node;
 
   for (n = 0 ; n < dimen; n++)
     {
       G95_TYPE_DESCRIPTOR_STRIDE (fat_type, n) = stride;
-      lower = lbound[n];
+      if (lbound)
+        lower = lbound[n];
+      else
+        lower = NULL_TREE;
+
       if (lower != NULL_TREE)
         {
           if (INTEGER_CST_P (lower))
@@ -590,47 +522,13 @@ g95_get_array_type_bounds (tree type, int dimen, tree * lbound, tree * ubound)
         }
       else
         stride = NULL_TREE;
-
-      /* Add stride component.  */
-      sprintf (fieldname, "stride"G95_RANK_PRINTF_FORMAT, n);
-      decl = build_decl (FIELD_DECL, get_identifier (fieldname),
-                        g95_array_index_type);
-      DECL_CONTEXT (decl) = fat_type;
-      DECL_INITIAL (decl) = NULL_TREE;
-      fieldlist = chainon (fieldlist, decl);
     }
-
   G95_TYPE_DESCRIPTOR_SIZE (fat_type) = stride;
-
-  for (n = 0 ; n < dimen; n++)
-    {
-      /* Add lower bound.  */
-      sprintf (fieldname, "lbound"G95_RANK_PRINTF_FORMAT, n);
-      lower = build_decl (FIELD_DECL, get_identifier (fieldname),
-                         g95_array_index_type);
-      DECL_CONTEXT (lower) = fat_type;
-      DECL_INITIAL (lower) = NULL_TREE;
-      fieldlist = chainon (fieldlist, lower);
-
-      /* Now add upper bound.  */
-      fieldname[0] = 'u';
-      upper = build_decl (FIELD_DECL, get_identifier (fieldname),
-                         g95_array_index_type);
-      DECL_CONTEXT (upper) = fat_type;
-      DECL_INITIAL (upper) = NULL_TREE;
-      fieldlist = chainon (fieldlist, upper);
-    }
 
    /* We define data as an unknown size array. Much better than doing
       pointer arithmetic.  */
-  arraytype = build_array_type (arraytype, build_range_type (
+  arraytype = build_array_type (etype, build_range_type (
         g95_array_index_type, integer_zero_node, NULL_TREE));
-
-  /* Add the base component for Type B arrays.  */
-  decl = build_decl (FIELD_DECL, get_identifier ("base"),
-                      build_pointer_type (arraytype));
-  DECL_CONTEXT (decl) = fat_type;
-  fieldlist = chainon (decl, fieldlist);
 
   /* The pointer to the array data.  */
   decl = build_decl (FIELD_DECL,
@@ -639,7 +537,35 @@ g95_get_array_type_bounds (tree type, int dimen, tree * lbound, tree * ubound)
 
   DECL_CONTEXT (decl) = fat_type;
   /* Add the data member as the first element of the descriptor.  */
-  fieldlist = chainon (decl, fieldlist);
+  fieldlist = decl;
+
+  /* Add the base component.  */
+  decl = build_decl (FIELD_DECL, get_identifier ("base"),
+                      build_pointer_type (arraytype));
+  DECL_CONTEXT (decl) = fat_type;
+  fieldlist = chainon (fieldlist, decl);
+
+  /* Build the array type for the stride and bound components.  */
+  arraytype = build_array_type (g95_array_index_type, build_range_type (
+        g95_array_index_type, integer_zero_node, g95_rank_cst[dimen - 1]));
+
+  /* Add the stride component.  */
+  decl = build_decl (FIELD_DECL, get_identifier ("stride"), arraytype);
+  DECL_CONTEXT (decl) = fat_type;
+  DECL_INITIAL (decl) = NULL_TREE;
+  fieldlist = chainon (fieldlist, decl);
+
+  /* Add the lower bound component.  */
+  decl = build_decl (FIELD_DECL, get_identifier ("lbound"), arraytype);
+  DECL_CONTEXT (decl) = fat_type;
+  DECL_INITIAL (decl) = NULL_TREE;
+  fieldlist = chainon (fieldlist, decl);
+
+  /* Add the upper bound component.  */
+  decl = build_decl (FIELD_DECL, get_identifier ("ubound"), arraytype);
+  DECL_CONTEXT (decl) = fat_type;
+  DECL_INITIAL (decl) = NULL_TREE;
+  fieldlist = chainon (fieldlist, decl);
 
   /* Finish off the type.  */
   TYPE_FIELDS (fat_type) = fieldlist;

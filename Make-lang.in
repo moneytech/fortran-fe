@@ -54,31 +54,25 @@ STAMP = echo timestamp >
 # this is in addition to th warning flags defined by default
 f95-warn = -Wno-write-strings
 
-G95_GENERATED =
-
-G95_EXES = f951$(exeext)
-
-G95_PARSER_SOURCE = /g95
-
-G95_PARSER_OBJS = f95/arith.o f95/array.o f95/bbt.o f95/check.o f95/decl.o\
+F95_PARSER_OBJS = f95/arith.o f95/array.o f95/bbt.o f95/check.o f95/decl.o\
     f95/error.o f95/expr.o f95/format.o f95/interface.o f95/intrinsic.o \
     f95/io.o f95/iresolve.o f95/match.o f95/matchexp.o f95/misc.o \
     f95/module.o f95/parse.o f95/primary.o f95/resolve.o f95/scanner.o \
     f95/select.o f95/simplify.o f95/st.o f95/symbol.o
 
-G95_OBJS = $(G95_PARSER_OBJS) \
+F95_OBJS = $(F95_PARSER_OBJS) \
     f95/f95-lang.o f95/support.o f95/convert.o f95/trans.o \
     f95/trans-decl.o f95/trans-types.o f95/trans-const.o f95/trans-expr.o \
     f95/trans-stmt.o f95/trans-io.o f95/trans-array.o f95/trans-intrinsic.o \
     f95/f95-tree.o
 
-G95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o \
+F95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o \
 	tree-cfg.o tree-dfa.o tree-optimize.o tree-simple.o \
 	tree-ssa.o tree-ssa-pre.o tree-ssa-ccp.o disjoint-set.o \
 	tree-alias-ecr.o tree-alias-type.o tree-alias-steen.o
 
 # G95 uses GMP for its internal arithmetics.
-G95_LIBS = $(LIBS) -lgmp
+F95_LIBS = $(LIBS) -lgmp
 
 #
 # Define the names for selecting g95 in LANGUAGES.
@@ -89,21 +83,28 @@ G95_LIBS = $(LIBS) -lgmp
 
 F95 f95: f951$(exeext)
 
+g95spec.o: $(srcdir)/f95/g95spec.c $(SYSTEM_H) $(GCC_H) $(CONFIG_H)
+	(SHLIB_LINK='$(SHLIB_LINK)' \
+	SHLIB_MULTILIB='$(SHLIB_MULTILIB)'; \
+	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(DRIVER_DEFINES) \
+		$(INCLUDES) $(srcdir)/f95/g95spec.c)
+
+G95_D_OBJS = gcc.o g95spec.o version.o prefix.o intl.o
+g95$(exeext): $(G95_D_OBJS) $(EXTRA_GCC_OBJS) $(LIBDEPS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ \
+	  $(G95_D_OBJS) $(EXTRA_GCC_OBJS) $(LIBS)
+
+g95-cross$(exeext): g95$(exeext)
+	-rm -f g95-cross$(exeext)
+	cp g95$(exeext) g95-cross$(exeext)
+
 # The actual 'compiler' is called f951
-f951$(exeext): $(G95_OBJS) $(G95_ADDITIONAL_OBJS) \
+f951$(exeext): $(F95_OBJS) $(F95_ADDITIONAL_OBJS) \
 		$(BACKEND) $(LIBDEPS)
 	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ \
-		$(G95_OBJS) $(G95_ADDITIONAL_OBJS) $(BACKEND) $(G95_LIBS)
+		$(F95_OBJS) $(F95_ADDITIONAL_OBJS) $(BACKEND) $(F95_LIBS)
 
 gt-f95-f95-lang.h gtype-f95.h gt-f95-trans-decl.h gt-f95-trans.h gt-f95-trans-io: s-gtype; @true
-
-#
-# Compiling object files from source files.
-
-# Object file makes
-#f95/g95.o: $(srcdir)/g95.c  $(CONFIG_H) $(TREE_H) flags.h
-#	$(GCC_FOR_TARGET) -o $@ -c $(ALL_CFLAGS) $(INCLUDES) $<
-
 
 # Generated files
 # The files from lex and yacc are put into the source directory
@@ -118,11 +119,10 @@ $(INTL_TARGETS):
 #
 # Build hooks:
 
-f95.all.build: f95
-f95.all.cross:
-	_error_not_here_yet - havent even thought about it - it may even work
+f95.all.build: g95$(exeext)
+f95.all.cross: g95-cross$(exeext)
 
-f95.start.encap:
+f95.start.encap: g95$(exeext)
 f95.rest.encap:
 
 f95.info:
@@ -136,12 +136,32 @@ f95.generated-manpages:
 f95.install-normal:
 
 f95.install-common: installdirs
+	-if [ -f f951$(exeext) ] ; then \
+	  if [ -f g95-cross$(exeext) ] ; then \
+	    rm -f $(bindir)/$(G95_CROSS_NAME)$(exeext); \
+	    $(INSTALL_PROGRAM) g95-cross$(exeext) $(bindir)/$(G95_CROSS_NAME)$(exeext); \
+	    chmod a+x $(bindir)/$(G95_CROSS_NAME)$(exeext); \
+	    if [ -d $(gcc_tooldir)/bin/. ] ; then \
+	      rm -f $(gcc_tooldir)/bin/g95$(exeext); \
+	      $(INSTALL_PROGRAM) g95-cross$(exeext) $(gcc_tooldir)/bin/g95$(exeext); \
+	    else true; fi; \
+	  else \
+	    rm -f $(bindir)/$(G95_INSTALL_NAME)$(exeext); \
+	    $(INSTALL_PROGRAM) g95$(exeext) $(bindir)/$(G95_INSTALL_NAME)$(exeext); \
+	    chmod a+x $(bindir)/$(G95_INSTALL_NAME)$(exeext); \
+	    rm -f $(bindir)/$(G95_TARGET_INSTALL_NAME)$(exeext); \
+	    $(LN) $(bindir)/$(G95_INSTALL_NAME)$(exeext) $(bindir)/$(G95_TARGET_INSTALL_NAME)$(exeext); \
+	  fi ; \
+	fi
 
 f95.install-info:
 
-f95.install-man:
+f95.install-man: installdirs
+#TODO: write the g95 man pages
 
 f95.uninstall:
+	-rm -rf $(bindir)/$(G95_INSTALL_NAME)$(exeext)
+	-rm -rf $(bindir)/$(G95_CROSS_NAME)$(exeext)
 
 #
 # Clean hooks:
@@ -153,16 +173,12 @@ f95.mostlyclean:
 	-rm -f f95/*.o
 
 
-f95.clean: f95.mostlyclean
-
+f95.clean:
 f95.distclean:
 	-rm -f f95/config.status f95/Makefile
-	-rm -f f95/*.output
 
 f95.extraclean:
-
 f95.maintainer-clean:
-
 
 #
 # Stage hooks:
@@ -194,7 +210,6 @@ check-f95:
 check-f95-fix: force
 
 # Dependencies for source files.
-# Can't be bothered doing these properly... Fix later :-)
 
 # Everything depends on g95.h
 $(G95_PARSER_OBJS): f95/g95.h f95/intrinsic.h
@@ -205,6 +220,7 @@ G95_TRANS_DEPS = f95/g95.h f95/intrinsic.h f95/trans-array.h \
 
 f95/f95-lang.o: $(G95_TRANS_DEPS) f95/g95-support.h gt-f95-f95-lang.h \
     gtype-f95.h
+f95/f95-tree.c: f95/g95.h f95/trans.h
 f95/support.o: $(G95_TRANS_DEPS) f95/g95-support.h
 f95/convert.o: $(G95_TRANS_DEPS) f95/g95-support.h
 f95/trans.o: $(G95_TRANS_DEPS)

@@ -108,6 +108,7 @@ typedef struct g95_ss
       tree expr;
       tree string_length;
     } scalar;
+
     /* All other types.  */
     g95_ss_info info;
   } data;
@@ -217,6 +218,9 @@ void g95_conv_intrinsic_function (g95_se *, g95_expr *);
 void g95_conv_function_call (g95_se *, g95_symbol *, g95_actual_arglist *);
 /* g95_trans_* shouldn't call push/poplevel, use g95_push/pop_scope */
 
+/* Generate code for a scalar assignment.  */
+tree g95_trans_scalar_assign (g95_se *, g95_se *, bt);
+
 /* Get the length of a string.  */
 tree g95_conv_string_length (tree);
 /* Initialize a string length variable.  */
@@ -283,11 +287,14 @@ void g95_set_backend_locus (locus *);
 void g95_get_backend_locus (locus *);
 
 /* Handle static constructor functions.  */
-tree g95_static_ctors;
+extern GTY(()) tree g95_static_ctors;
 void g95_generate_constructors (void);
 
 /* Generate a runtime error check.  */
 void g95_trans_runtime_check (tree, tree, tree *, tree *);
+
+/* Generate code for an assigment, includes scalarization.  */
+tree g95_trans_assignment (g95_expr *, g95_expr *);
 
 /* Initialize function decls for library functions.  */
 void g95_build_intrinsic_lib_fndecls (void);

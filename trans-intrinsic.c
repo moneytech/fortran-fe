@@ -389,23 +389,17 @@ g95_conv_intrinsic_lib_function (g95_se * se, g95_expr * expr)
   se->expr = g95_build_function_call (fndecl, args);
 }
 
-/* UBOUND and LBOUND.  A known second parameter is handled directly, otherwise
-   a switch statement is generated.  */
+/* UBOUND and LBOUND.  */
 static void
 g95_conv_intrinsic_bound (g95_se * se, g95_expr * expr, int upper)
 {
   g95_actual_arglist *arg;
   g95_actual_arglist *arg2;
   g95_se argse;
-  tree type;
   tree bound;
   tree desc;
-  tree stmt;
-  tree head;
-  tree tail;
-  tree res;
   tree tmp;
-  tree label;
+  tree cond;
   int n;
 
   arg = expr->value.function.actual;
@@ -460,63 +454,34 @@ g95_conv_intrinsic_bound (g95_se * se, g95_expr * expr, int upper)
         se->expr = g95_conv_array_ubound (desc, n);
       else
         se->expr = g95_conv_array_lbound (desc, n);
-      se->expr = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, NULL);
-
-      /* Convert to the correct type.  */
-      type = g95_typenode_for_spec (&expr->ts);
-      se->expr = g95_simple_convert (type, se->expr);
     }
   else
     {
-      /* Implement an array bound query as a switch statement.  */
-      /* Create a variable to hold the result.  */
-      res = create_tmp_var (g95_array_index_type, "bound");
-
-      /* Create the body of the switch statement.  */
-      g95_start_stmt ();
-      head = tail = NULL_TREE;
-      for (n = 0; n < G95_TYPE_DESCRIPTOR_RANK (TREE_TYPE (desc)); n++)
-        {
-          /* Create a label for this case.  */
-          label = build_decl (LABEL_DECL, NULL_TREE, NULL_TREE);
-
-          /* Build the case marker.  */
-          tmp = build_int_2 (n, 0);
-          stmt = build_stmt (CASE_LABEL, tmp, NULL_TREE, label);
-          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
-
-          if (upper)
-            tmp = g95_conv_array_ubound (desc, n);
-          else
-            tmp = g95_conv_array_lbound(desc, n);
-
-          /* Get the bound.  */
-          tmp = build (MODIFY_EXPR, g95_array_index_type, res, tmp);
-          stmt = build_stmt (EXPR_STMT, tmp);
-          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
-
-          stmt = build_stmt (BREAK_STMT);
-          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
-        }
+      bound = g95_simple_convert (g95_array_index_type, bound);
+      bound = g95_simple_fold (bound, &se->pre, &se->pre_tail, NULL);
 
       if (flag_bounds_check)
         {
-          /* Create a default case to generate an bound error.  */
-          label = build_decl (LABEL_DECL, NULL_TREE, NULL_TREE);
-          stmt = build_stmt (CASE_LABEL, NULL_TREE, NULL_TREE, label);
-          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
-
-          g95_trans_runtime_check (integer_one_node, g95_strconst_fault,
-                                   &head, &tail);
+          cond = build (LT_EXPR, boolean_type_node, bound, integer_zero_node);
+          g95_trans_runtime_check (cond, g95_strconst_fault, &se->pre,
+                                   &se->pre_tail);
+          cond = build (GT_EXPR, boolean_type_node, bound,
+              g95_rank_cst[G95_TYPE_DESCRIPTOR_RANK (TREE_TYPE (desc))]);
+          g95_trans_runtime_check (cond, g95_strconst_fault, &se->pre,
+                                   &se->pre_tail);
         }
-      /* Construct the case statement.  */
-      stmt = g95_finish_stmt (head, tail);
-      stmt = build_stmt (SWITCH_STMT, bound, stmt);
-      g95_add_stmt_to_pre (se, stmt, stmt);
 
-      /* Convert the value to the required type.  */
-      tmp = g95_typenode_for_spec (&expr->ts);
-      se->expr = g95_simple_convert (tmp, res);
+      if (upper)
+        se->expr = g95_conv_descriptor_ubound (desc, bound);
+      else
+        se->expr = g95_conv_descriptor_lbound (desc, bound);
+    }
+  /* Convert the value to the required type.  */
+  tmp = g95_typenode_for_spec (&expr->ts);
+  if (TREE_TYPE (se->expr) != tmp)
+    {
+      se->expr = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, NULL);
+      se->expr = g95_simple_convert (tmp, se->expr);
     }
 }
 
@@ -791,6 +756,36 @@ g95_conv_intrinsic_minmax (g95_se * se, g95_expr * expr, int op)
   se->expr = mvar;
 }
 
+static g95_symbol *
+g95_get_symbol_for_expr (g95_expr * expr)
+{
+  g95_symbol *sym;
+  g95_symbol *esym;
+  char name[G95_MAX_SYMBOL_LEN+1];
+
+  assert (strlen (expr->value.function.name) <= G95_MAX_SYMBOL_LEN - 5);
+  sprintf (name, "gfori%s", expr->value.function.name);
+  sym = g95_new_symbol (name, NULL);
+  esym = expr->symbol;
+
+  sym->ts = expr->ts;
+  sym->attr.external = 1;
+  sym->attr.function = 1;
+  sym->attr.proc = PROC_INTRINSIC;
+  sym->attr.flavor = FL_PROCEDURE;
+  if (expr->rank > 0)
+    {
+      sym->attr.dimension = 1;
+      sym->as = g95_get_array_spec ();
+      sym->as->type = AS_ASSUMED_SHAPE;
+      sym->as->rank = expr->rank;
+    }
+
+  /* TODO: proper argument lists for external intrinsics.  */
+  /* TODO: free symbol for external intrinsic.  */
+  return sym;
+}
+
 static void
 g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
 {
@@ -808,16 +803,23 @@ g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
   g95_se maskse;
   g95_expr *arrayexpr;
   g95_expr *maskexpr;
+  g95_symbol *sym;
 
   if (se->ss)
-    g95_todo_error ("sum intrinsic with DIM parameter");
+    {
+      assert (se->ss->expr == expr);
+
+      sym = g95_get_symbol_for_expr (expr);
+      g95_conv_function_call (se, sym, expr->value.function.actual);
+      return;
+    }
 
   type = g95_typenode_for_spec (&expr->ts);
   /* Initialize the result.  */
   sum = create_tmp_var (type, "sum");
   tmp = g95_build_const (type, integer_zero_node);
   tmp = build (MODIFY_EXPR, type, sum, tmp);
-  stmt = build (EXPR_STMT, tmp);
+  stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_pre (se, stmt, stmt);
 
   /* Walk the arguments.  */
@@ -870,7 +872,7 @@ g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
   g95_init_se (&arrayse, NULL);
   g95_copy_loopinfo_to_se (&arrayse, &loop);
   arrayse.ss = arrayss;
-  g95_conv_simple_rhs (&arrayse, arrayexpr);
+  g95_conv_simple_val (&arrayse, arrayexpr);
   g95_add_stmt_to_list (&head, &tail, arrayse.pre, arrayse.pre_tail);
   tmp = build (PLUS_EXPR, type, sum, arrayse.expr);
   tmp = build (MODIFY_EXPR, type, sum, tmp);
@@ -1196,15 +1198,17 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
   g95_intrinsic_sym *isym;
   char *name;
 
-  if (se->ss && se->ss->type == G95_SS_SCALAR)
+  isym = expr->value.function.isym;
+
+  if (se->ss && se->ss->type == G95_SS_SCALAR
+      && ! isym->elemental)
     {
+      assert (se->ss->expr == expr);
       se->expr = se->ss->data.scalar.expr;
       se->string_length = se->ss->data.scalar.string_length;
       g95_advance_se_ss_chain (se);
       return;
     }
-
-  isym = expr->value.function.isym;
 
   assert (strncmp (expr->value.function.name, "__", 2) == 0);
   name = &expr->value.function.name[2];
@@ -1386,8 +1390,19 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 /* This generates code to execute before entering the scalarization loop.
    Currently does nothing.  */
 void
-g95_add_intrinsic_ss_code (g95_loopinfo * loop ATTRIBUTE_UNUSED, g95_ss * ss ATTRIBUTE_UNUSED)
+g95_add_intrinsic_ss_code (g95_loopinfo * loop ATTRIBUTE_UNUSED, g95_ss * ss)
 {
+  switch (ss->expr->value.function.isym->generic_id)
+    {
+    case G95_ISYM_UBOUND:
+    case G95_ISYM_LBOUND:
+      break;
+
+    default:
+      abort ();
+      break;
+    }
+
   return;
 }
 
@@ -1398,11 +1413,29 @@ g95_walk_intrinsic_bound (g95_ss * ss, g95_expr * expr)
 {
   g95_ss *newss;
 
+  /* The two argument version returns a scalar.  */
   if (expr->value.function.actual->next->expr)
     return ss;
 
   newss = g95_get_ss ();
   newss->type = G95_SS_INTRINSIC;
+  newss->expr = expr;
+  newss->next = ss;
+
+  return newss;
+}
+
+static g95_ss *
+g95_walk_intrinsic_sum (g95_ss * ss, g95_expr * expr)
+{
+  g95_ss *newss;
+
+  /* Pass the scalar version back.  */
+  if (expr->rank == 0)
+    return ss;
+
+  newss = g95_get_ss ();
+  newss->type = G95_SS_FUNCTION;
   newss->expr = expr;
   newss->next = ss;
 
@@ -1425,6 +1458,10 @@ g95_walk_intrinsic_function (g95_ss * ss, g95_expr * expr,
     case G95_ISYM_LBOUND:
     case G95_ISYM_UBOUND:
       return g95_walk_intrinsic_bound (ss, expr);
+
+    case G95_ISYM_SUM:
+      return g95_walk_intrinsic_sum (ss, expr);
+      break;
 
     case G95_ISYM_LEN:
       /* Returns a single scalar value.  Pass it back.  */

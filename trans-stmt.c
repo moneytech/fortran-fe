@@ -562,19 +562,349 @@ g95_trans_do_while (g95_code * code)
 }
 
 tree
-g95_trans_select (g95_code *code ATTRIBUTE_UNUSED)
+g95_trans_select (g95_code * code ATTRIBUTE_UNUSED)
 {
   g95_todo_error ("Statement not implemented: SELECT");
 }
 
-tree
-g95_trans_forall (g95_code *code ATTRIBUTE_UNUSED)
+static tree
+g95_trans_forall_loop (tree * var, tree * start, tree * end, tree * step,
+                       int nvar, tree body)
 {
-  g95_todo_error ("Statement not implemented: FORALL");
+  tree init;
+  tree cond;
+  tree inc;
+  int n;
+
+  for (n = 0; n < nvar; n++)
+    {
+      init = build (MODIFY_EXPR, TREE_TYPE (var[n]), var[n], start[n]);
+      init = build_stmt (EXPR_STMT, init);
+      cond = build (LE_EXPR, boolean_type_node, var[n], end[n]);
+      inc = build (PLUS_EXPR, TREE_TYPE (var[n]), var[n], step[n]);
+      inc = build (MODIFY_EXPR, TREE_TYPE (var[n]), var[n], inc);
+
+      body = build_stmt (FOR_STMT, init, cond, inc, body);
+    }
+  return body;
+}
+
+/* Allocate data for holding a temporary array.  Returns either a local
+   temporary array or a pointer variable.  */
+static tree
+g95_do_allocate (tree bytesize, tree size, tree * pdata,
+                 tree * phead, tree * ptail)
+{
+  tree tmpvar;
+  tree pointer;
+  tree type;
+  tree tmp;
+  tree args;
+
+  if (INTEGER_CST_P (size))
+    {
+      tmp = fold (build (MINUS_EXPR, g95_array_index_type, size,
+                  integer_one_node));
+    }
+  else
+    tmp = NULL_TREE;
+
+  type = build_range_type (g95_array_index_type, integer_zero_node, tmp);
+  type = build_array_type (boolean_type_node, type);
+  if (g95_can_put_var_on_stack (bytesize))
+    {
+      assert (INTEGER_CST_P (size));
+      tmpvar = create_tmp_var (type, "mask");
+      pointer = NULL_TREE;
+    }
+  else
+    {
+      tmpvar = create_tmp_var (build_pointer_type (type), "mask");
+      pointer = build1 (ADDR_EXPR, ppvoid_type_node, tmpvar);
+      pointer = g95_simple_fold (pointer, phead, ptail, NULL);
+
+      args = g95_chainon_list (NULL_TREE, pointer);
+      args = g95_chainon_list (args, bytesize);
+
+      if (g95_array_index_kind == 4)
+        tmp = gfor_fndecl_internal_malloc;
+      else if (g95_array_index_kind == 8)
+        tmp = gfor_fndecl_internal_malloc64;
+      else
+        abort();
+      tmp = g95_build_function_call (tmp, args);
+      tmp = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_list (phead, ptail, tmp, tmp);
+    }
+  *pdata = pointer;
+  return tmpvar;
+}
+
+/* FORALL and WHERE statements are really nasty, especially when you nest them.
+   All the rhs of a forall assignment must be evaluated before the actual
+   assignments are performaed. Presumably this alos applies to all the
+   assignments in an inner where statement.  */
+/* It is possible to want more than G95_MAX_DIMENSIONS vars, but unlikley.  */
+#define MAX_FORALL_VARS G95_MAX_DIMENSIONS
+/* Generate code for a FORALL statement.  Any temporaries are allocated as a
+   linear array, relying on the fact that we process in the same order in all
+   loops.
+ */
+tree
+g95_trans_forall (g95_code * code)
+{
+  tree head;
+  tree tail;
+  tree body;
+  tree body_tail;
+  tree var[MAX_FORALL_VARS];
+  tree start[MAX_FORALL_VARS];
+  tree end[MAX_FORALL_VARS];
+  tree step[MAX_FORALL_VARS];
+  g95_expr *varexpr[MAX_FORALL_VARS];
+  tree tmp;
+  tree size;
+  tree bytesize;
+  tree tmpvar;
+  tree sizevar;
+  tree lenvar;
+  tree maskindex;
+  tree mask;
+  tree pmask;
+  tree stmt;
+  int n;
+  int nvar;
+  int need_temp;
+  g95_forall_iterator *fa;
+  g95_se se;
+  g95_code *block;
+
+  g95_start_stmt ();
+  head = tail = NULL_TREE;
+
+  n = 0;
+  for (fa = code->ext.forall_iterator; fa; fa = fa->next)
+    {
+      if (n == MAX_FORALL_VARS)
+        fatal_error ("too many variables in FORALL statement");
+
+      /* TODO: don't use actual variables in forall.  */
+      g95_init_se (&se, NULL);
+      g95_conv_simple_lhs (&se, fa->var);
+      assert (is_simple_id (se.expr));
+      assert (se.pre == NULL_TREE && se.post == NULL_TREE);
+      var[n] = se.expr;
+
+      g95_init_se (&se, NULL);
+      g95_conv_simple_val (&se, fa->start);
+      g95_add_stmt_to_list (&head, &tail, se.pre, se.pre_tail);
+      assert (se.post == NULL_TREE);
+      start[n] = se.expr;
+
+      g95_init_se (&se, NULL);
+      g95_conv_simple_val (&se, fa->end);
+      g95_make_safe_expr (&se);
+      g95_add_stmt_to_list (&head, &tail, se.pre, se.pre_tail);
+      assert (se.post == NULL_TREE);
+      end[n] = se.expr;
+
+      g95_init_se (&se, NULL);
+      g95_conv_simple_val (&se, fa->stride);
+      g95_make_safe_expr (&se);
+      g95_add_stmt_to_list (&head, &tail, se.pre, se.pre_tail);
+      assert (se.post == NULL_TREE);
+      step[n] = se.expr;
+
+      n++;
+    }
+  nvar = n;
+
+  assert (nvar <= G95_MAX_DIMENSIONS);
+
+  tmpvar = NULL_TREE;
+  lenvar = NULL_TREE;
+  size = integer_one_node;
+  sizevar = NULL_TREE;
+  for (n = 0; n < nvar; n++)
+    {
+      if (lenvar && TREE_TYPE (lenvar) != TREE_TYPE (start[n]))
+        lenvar = NULL_TREE;
+      /* size = (end + step - start) / step.  */
+      tmp = build (MINUS_EXPR, TREE_TYPE (start[n]), step[n], start[n]);
+      tmp = g95_simple_fold (tmp, &head, &tail, &lenvar);
+      tmp = build (PLUS_EXPR, TREE_TYPE (end[n]), end[n], tmp);
+      tmp = g95_simple_fold (tmp, &head, &tail, &lenvar);
+
+      tmp = build (FLOOR_DIV_EXPR, TREE_TYPE (tmp), tmp, step[n]);
+      tmp = g95_simple_fold (tmp, &head, &tail, &lenvar);
+
+      tmp = g95_simple_convert (g95_array_index_type, tmp);
+      tmp = g95_simple_fold (tmp, &head, &tail, &tmpvar);
+
+      tmp = build (MULT_EXPR, g95_array_index_type, size, tmp);
+      size = g95_simple_fold_tmp (tmp, &head, &tail, &sizevar);
+    }
+
+  /* Copy the mask into a temporary variable if required.  */
+  /* For now we assume a mask temporary is needed. */
+  if (code->expr)
+    {
+      bytesize = build (MULT_EXPR, g95_array_index_type, size,
+                        TYPE_SIZE_UNIT (boolean_type_node));
+      bytesize = g95_simple_fold (bytesize, &head, &tail, NULL);
+
+      mask = g95_do_allocate (bytesize, size, &pmask, &head, &tail);
+
+      maskindex = create_tmp_alias_var (g95_array_index_type, "mi");
+      tmp = build (MODIFY_EXPR, g95_array_index_type, maskindex,
+                   integer_zero_node);
+      tmp = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_list (&head, &tail, tmp, tmp);
+
+      /* Start of mask assignment loop body.  */
+      g95_start_stmt ();
+      body = body_tail = NULL_TREE;
+
+      /* Evaluate the mask expression.  */
+      g95_init_se (&se, NULL);
+      g95_conv_simple_cond (&se, code->expr);
+      g95_add_stmt_to_list (&body, &body_tail, se.pre, se.pre_tail);
+      assert (se.post == NULL_TREE);
+
+      /* Store the mask.  */
+      if (TREE_TYPE (se.expr) != boolean_type_node)
+        {
+          se.expr = g95_simple_fold (se.expr, &body, &body_tail, NULL);
+          se.expr = g95_simple_convert (boolean_type_node, se.expr);
+        }
+
+      if (pmask)
+        tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (mask)), mask);
+      else
+        tmp = mask;
+      tmp = build (ARRAY_REF, boolean_type_node, tmp, maskindex);
+      tmp = build (MODIFY_EXPR, boolean_type_node, tmp, se.expr);
+      tmp = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_list (&body, &body_tail, tmp, tmp);
+
+      /* Advance to the next mask element.  */
+      tmp = build (PLUS_EXPR, g95_array_index_type, maskindex,
+                   integer_one_node);
+      tmp = build (MODIFY_EXPR, g95_array_index_type, maskindex, tmp);
+      tmp = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_list (&body, &body_tail, tmp, tmp);
+
+      /* Generate the loops.  */
+      stmt = g95_finish_stmt (body, body_tail);
+      stmt = g95_trans_forall_loop (var, start, end, step, nvar, stmt);
+      g95_add_stmt_to_list (&head, &tail, stmt, NULL_TREE);
+    }
+  else
+   {
+     /* No mask was specified.  */
+     maskindex = NULL_TREE;
+     mask = pmask = NULL_TREE;
+   }
+
+  block = code->block->next;
+
+  /* TODO: loop merging in FORALL statements.  */
+  while (block)
+    {
+      switch (block->op)
+        {
+        case EXEC_ASSIGN:
+          need_temp = g95_check_dependancy (block->expr, block->expr2,
+                                            varexpr, nvar);
+          if (need_temp)
+            g95_todo_error ("Forall with temporary");
+
+          if (mask)
+            {
+              tmp = build (MODIFY_EXPR, g95_array_index_type, maskindex,
+                           integer_zero_node);
+              tmp = build_stmt (EXPR_STMT, tmp);
+              g95_add_stmt_to_list (&head, &tail, tmp, tmp);
+            }
+
+          g95_start_stmt ();
+          body = body_tail = NULL_TREE;
+          if (mask)
+            g95_start_stmt ();
+
+          tmp = g95_trans_assignment (block->expr, block->expr2);
+          g95_add_stmt_to_list (&body, &body_tail, tmp, NULL_TREE);
+
+          if (mask)
+            {
+              /* If a mask was specified make the assignment contitional.  */
+              stmt = g95_finish_stmt (body, body_tail);
+              body = body_tail = NULL_TREE;
+
+              if (pmask)
+                tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (mask)), mask);
+              else
+                tmp = mask;
+              tmp = build (ARRAY_REF, boolean_type_node, tmp, maskindex);
+              tmp = g95_simple_fold (tmp, &body, &body_tail, NULL);
+
+              stmt = build_stmt (IF_STMT, tmp, stmt);
+              g95_add_stmt_to_list (&body, &body_tail, stmt, stmt);
+            }
+
+          if (mask)
+            {
+              /* Advance to the next element.  */
+              tmp = build (PLUS_EXPR, g95_array_index_type, maskindex,
+                           integer_one_node);
+              tmp = build (MODIFY_EXPR, g95_array_index_type, maskindex, tmp);
+              stmt = build_stmt (EXPR_STMT, tmp);
+              g95_add_stmt_to_list (&body, &body_tail, stmt, stmt);
+            }
+
+          /* Finish the loop.  */
+          stmt = g95_finish_stmt (body, body_tail);
+          stmt = g95_trans_forall_loop (var, start, end, step, nvar, stmt);
+          g95_add_stmt_to_list (&head, &tail, stmt, NULL_TREE);
+          break;
+
+        case EXEC_WHERE:
+          g95_todo_error ("WHERE inside FORALL");
+          break;
+
+        case EXEC_POINTER_ASSIGN:
+          g95_todo_error ("Pointer assignment inside FORALL");
+          break;
+
+        case EXEC_FORALL:
+          g95_todo_error ("Nested FORALL");
+          break;
+
+        default:
+          abort ();
+          break;
+        }
+
+      block = block->next;
+    }
+
+  if (pmask)
+    {
+      /* Free the temporary for the mask.  */
+      tmp = g95_chainon_list (NULL_TREE, pmask);
+      tmp = g95_build_function_call (gfor_fndecl_internal_free, tmp);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+    }
+  if (maskindex)
+    pushdecl (maskindex);
+
+  head = g95_finish_stmt (head, tail);
+  return head;
 }
 
 tree
-g95_trans_where (g95_code *code ATTRIBUTE_UNUSED)
+g95_trans_where (g95_code * code ATTRIBUTE_UNUSED)
 {
   g95_todo_error ("Statement not implemented: WHERE");
 }

@@ -47,6 +47,8 @@ tree g95_strconst_fault;
 tree g95_strconst_wrong_return;
 tree g95_strconst_current_filename;
 
+tree g95_rank_cst[G95_MAX_DIMENSIONS + 1];
+
 /* Build a constant with given type from an int_cst.  */
 tree
 g95_build_const (tree type, tree intval)
@@ -92,8 +94,16 @@ g95_build_string_const(int length, char *s)
 }
 
 void
-g95_init_string_constants ()
+g95_init_constants ()
 {
+  int n;
+
+  for (n = 0; n <= G95_MAX_DIMENSIONS; n++)
+    {
+      g95_rank_cst[n] = build_int_2 (n, 0);
+      TREE_TYPE (g95_rank_cst[n]) = g95_array_index_type;
+    }
+
   g95_strconst_bounds =
     g95_build_string_const (21, "Array bound mismatch");
 

@@ -82,7 +82,7 @@ void g95_conv_tmp_ref (g95_se *);
 /* Convert an array for passing as an actual function parameter.  */
 void g95_conv_array_parameter (g95_se *, g95_expr *, g95_ss *);
 
-/* Return either an INT_CST or a COMPONENT_REF. */
+/* Return either an INT_CST or an expression for that part of the descriptor. */
 tree g95_conv_array_stride (tree, int);
 tree g95_conv_array_lbound (tree, int);
 tree g95_conv_array_ubound (tree, int);
@@ -92,6 +92,17 @@ extern unsigned HOST_WIDE_INT g95_stack_space_left;
 /* Returns true if a variable of specified size should go on the stack.  */
 int g95_can_put_var_on_stack (tree);
 
+/* Translate expressions for components of an array descriptor.  */
+tree g95_conv_descriptor_data (tree);
+tree g95_conv_descriptor_base (tree);
+tree g95_conv_descriptor_stride (tree, tree);
+tree g95_conv_descriptor_lbound (tree, tree);
+tree g95_conv_descriptor_ubound (tree, tree);
+
+/* Entry point for dependancy checking code.  */
+int g95_check_dependancy (g95_expr *, g95_expr *, g95_expr **, int);
+
 /* Add pre-loop scalarization code for intrinsic functions which require
    special handling.  */
 void g95_add_intrinsic_ss_code (g95_loopinfo *, g95_ss *);
+

@@ -1064,8 +1064,10 @@ g95_conv_function_val (g95_se * se, g95_symbol * sym)
   else
     {
       /* TODO: We should already have a decl for contained procedures.  */
-      tmp = g95_get_extern_function_decl (sym);
+      if (! sym->backend_decl)
+        sym->backend_decl = g95_get_extern_function_decl (sym);
 
+      tmp = sym->backend_decl;
       assert (TREE_CODE (tmp) == FUNCTION_DECL);
       se->expr = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (tmp)), tmp);
     }
@@ -1074,7 +1076,7 @@ g95_conv_function_val (g95_se * se, g95_symbol * sym)
 /* Generate code for a procedure call.  Note can return se->post != NULL.  */
 void
 g95_conv_function_call (g95_se * se, g95_symbol * sym,
-                       g95_actual_arglist * arg)
+                        g95_actual_arglist * arg)
 {
   tree arglist;
   tree tmp;
@@ -1135,8 +1137,7 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
       g95_trans_allocate_temp_array (se->loop, info, tmp, NULL_TREE);
 
       /* Zero the first stride to indicate a temporary.  */
-      tmp = g95_get_stride_component (TREE_TYPE (info->descriptor), 0);
-      tmp = build (COMPONENT_REF, TREE_TYPE (tmp), info->descriptor, tmp);
+      tmp = g95_conv_descriptor_stride (info->descriptor, g95_rank_cst[0]);
       tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, integer_zero_node);
       stmt = build_stmt (EXPR_STMT, tmp);
       g95_add_stmt_to_pre (se, stmt, stmt);
@@ -1150,8 +1151,16 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   /* Evaluate the arguments.  */
   for (; arg != NULL; arg = arg->next)
     {
-      /* We don't do alternate returns.  */
-      assert (arg->expr != NULL);
+      if (arg->expr == NULL)
+        {
+
+          /* We don't do alternate returns or optional parameters.
+             The correct intrinsic will already have been chosen.  */
+          if (sym->attr.proc == PROC_INTRINSIC)
+            continue;
+          else
+            abort ();
+        }
 
       if (se->ss && se->ss->useflags)
         {
@@ -1197,12 +1206,8 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
       g95_add_stmt_to_pre (se, stmt, stmt);
       if (flag_bounds_check)
         {
-          tree field;
-
           /* Check the stride has been set to 1. */
-          field = g95_get_stride_component (TREE_TYPE (info->descriptor), 0);
-          tmp = build (COMPONENT_REF, TREE_TYPE (field), info->descriptor,
-                       field);
+          tmp = g95_conv_descriptor_stride (info->descriptor, g95_rank_cst[0]);
           tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
           tmp = build (NE_EXPR, boolean_type_node, tmp, integer_one_node);
           g95_trans_runtime_check (tmp, g95_strconst_wrong_return, &se->pre,
@@ -1210,12 +1215,10 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
 
           /* Check the data pointer hasn't been modified.  This would happen
              in a function returning a pointer.  */
-          field = g95_get_data_component (TREE_TYPE (info->descriptor));
-          tmp = build (COMPONENT_REF, TREE_TYPE (field), info->descriptor,
-                       field);
+          tmp = g95_conv_descriptor_data (info->descriptor);
           tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
           tmp = build (NE_EXPR, boolean_type_node, tmp, info->data);
-          g95_trans_runtime_check (tmp, g95_strconst_wrong_return, &se->pre,
+          g95_trans_runtime_check (tmp, g95_strconst_fault, &se->pre,
                                    &se->pre_tail);
         }
       se->expr = info->descriptor;
@@ -1360,10 +1363,29 @@ g95_trans_string_assign (g95_se * lse, g95_se * rse)
   return tmp;
 }
 
-/* Translate an assignment statement.  Most of the code is concerned with
+/* Generate code for assignment of scalar variables.  Includes character
+   strings.  */
+tree
+g95_trans_scalar_assign (g95_se * lse, g95_se * rse, bt type)
+{
+  tree tmp;
+
+  if (type == BT_CHARACTER)
+    {
+      /* String assignments are more complicated, so are handled seperately. */
+      return g95_trans_string_assign (lse, rse);
+    }
+  else
+    {
+      tmp = build (MODIFY_EXPR, TREE_TYPE (lse->expr), lse->expr, rse->expr);
+      return build_stmt (EXPR_STMT, tmp);
+    }
+}
+
+/* Translate an assignment.  Most of the code is concerned with
    setting up the scalarizer.  */
 tree
-g95_trans_assign (g95_code * code)
+g95_trans_assignment (g95_expr * expr1, g95_expr * expr2)
 {
   g95_se lse;
   g95_se rse;
@@ -1372,7 +1394,6 @@ g95_trans_assign (g95_code * code)
   g95_ss *rss;
   g95_loopinfo loop;
   tree assign;
-  tree tmp;
   tree body;
 
   /* Assignment of the form lhs = rhs.  */
@@ -1382,7 +1403,7 @@ g95_trans_assign (g95_code * code)
   g95_init_se (&rse, NULL);
 
   /* Walk the lhs.  */
-  lss = g95_walk_expr (g95_ss_terminator, code->expr);
+  lss = g95_walk_expr (g95_ss_terminator, expr1);
   rss = NULL;
   if (lss != g95_ss_terminator)
     {
@@ -1400,14 +1421,14 @@ g95_trans_assign (g95_code * code)
       g95_init_loopinfo (&loop);
 
       /* Walk the rhs.  */
-      rss = g95_walk_expr (g95_ss_terminator, code->expr2);
+      rss = g95_walk_expr (g95_ss_terminator, expr2);
       if (rss == g95_ss_terminator)
         {
           /* The rhs is scalar.  Add a ss for the expression.  */
           rss = g95_get_ss ();
           rss->next = g95_ss_terminator;
           rss->type = G95_SS_SCALAR;
-          rss->expr = code->expr2;
+          rss->expr = expr2;
         }
       /* The SS chains are built in reverse order, so reverse them.  */
       rss = g95_reverse_ss (rss);
@@ -1447,7 +1468,7 @@ g95_trans_assign (g95_code * code)
     }
 
   /* Translate the expression.  */
-  g95_conv_simple_rhs (&rse, code->expr2);
+  g95_conv_simple_rhs (&rse, expr2);
 
   if (lss != g95_ss_terminator && loop.temp_ss != NULL)
     {
@@ -1455,18 +1476,9 @@ g95_trans_assign (g95_code * code)
       g95_advance_se_ss_chain (&lse);
     }
   else
-    g95_conv_simple_lhs (&lse, code->expr);
+    g95_conv_simple_lhs (&lse, expr1);
 
-  if (code->expr->ts.type == BT_CHARACTER)
-    {
-      /* String assignments are more complicated, so are handled seperately. */
-      assign = g95_trans_string_assign (&lse, &rse);
-    }
-  else
-    {
-      tmp = build (MODIFY_EXPR, TREE_TYPE (lse.expr), lse.expr, rse.expr);
-      assign = build_stmt (EXPR_STMT, tmp);
-    }
+  assign = g95_trans_scalar_assign (&lse, &rse, expr1->ts.type);
 
   /* Chain all parts of the loop body together.  */
   g95_add_stmt_to_pre (&lse, rse.pre, rse.pre_tail);
@@ -1501,7 +1513,7 @@ g95_trans_assign (g95_code * code)
 
           g95_conv_tmp_array_ref (&rse);
           g95_advance_se_ss_chain (&rse);
-          g95_conv_simple_lhs (&lse, code->expr);
+          g95_conv_simple_lhs (&lse, expr1);
 
           if (lse.ss != g95_ss_terminator)
             abort ();
@@ -1509,16 +1521,7 @@ g95_trans_assign (g95_code * code)
           if (rse.ss != g95_ss_terminator)
             abort ();
 
-          if (code->expr->ts.type == BT_CHARACTER)
-            {
-              assign = g95_trans_string_assign (&lse, &rse);
-            }
-          else
-            {
-              tmp = build (MODIFY_EXPR, TREE_TYPE (lse.expr), lse.expr,
-                           rse.expr);
-              assign = build_stmt (EXPR_STMT, tmp);
-            }
+          assign = g95_trans_scalar_assign (&lse, &rse, expr1->ts.type);
 
           g95_add_stmt_to_pre (&lse, rse.pre, rse.pre_tail);
           g95_add_stmt_to_pre (&lse, assign, NULL_TREE);
@@ -1535,5 +1538,11 @@ g95_trans_assign (g95_code * code)
       g95_cleanup_loop (&loop);
     }
   return body;
+}
+
+tree
+g95_trans_assign (g95_code * code)
+{
+  return g95_trans_assignment (code->expr, code->expr2);
 }
 

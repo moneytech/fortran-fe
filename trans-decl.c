@@ -92,26 +92,20 @@ tree gfor_fndecl_string_len_trim;
 static void
 g95_add_decl_to_parent_function (tree decl)
 {
-  tree stmt;
-
   assert (decl);
   DECL_CONTEXT (decl) = DECL_CONTEXT (current_function_decl);
   DECL_NONLOCAL (decl) = 1;
-  stmt = build_stmt (DECL_STMT, decl);
-  TREE_CHAIN (stmt) = saved_parent_function_decls;
-  saved_parent_function_decls = stmt;
+  TREE_CHAIN (decl) = saved_parent_function_decls;
+  saved_parent_function_decls = decl;
 }
 
 static void
 g95_add_decl_to_function (tree decl)
 {
-  tree stmt;
-
   assert (decl);
   DECL_CONTEXT (decl) = current_function_decl;
-  stmt = build_stmt (DECL_STMT, decl);
-  TREE_CHAIN (stmt) = saved_function_decls;
-  saved_function_decls = stmt;
+  TREE_CHAIN (decl) = saved_function_decls;
+  saved_function_decls = decl;
 }
 
 /* Build a  backend label declaration.
@@ -1183,7 +1177,6 @@ g95_generate_function_code (g95_namespace * ns)
 {
   tree fndecl;
   tree old_context;
-  tree stmt;
   tree decl;
   tree body;
   tree result;
@@ -1244,6 +1237,8 @@ g95_generate_function_code (g95_namespace * ns)
   /* function.c requires a push at the start of the function */
   pushlevel (0);
 
+  g95_start_stmt ();
+
   g95_generate_contained_functions (ns);
 
   /* Check that the frontend isn't still using this.  */
@@ -1291,29 +1286,19 @@ g95_generate_function_code (g95_namespace * ns)
       g95_current_io_state = NULL_TREE;
     }
 
-  /* Add any decls that were pushed.  */
-  for (decl = getdecls(); decl; decl = TREE_CHAIN (decl))
+  /* Add all the decls we created during processing.  */
+  decl = saved_function_decls;
+  while (decl)
     {
-      stmt = build_stmt (DECL_STMT, decl);
-      body = chainon (stmt, body);
+      tree next;
+
+      next = TREE_CHAIN (decl);
+      TREE_CHAIN (decl) = NULL_TREE;
+      pushdecl (decl);
+      decl = next;
     }
 
-  /* Add all the decls we created during processing.  */
-  for (stmt = saved_function_decls; stmt; stmt = TREE_CHAIN (stmt))
-    pushdecl (DECL_STMT_DECL (stmt));
-
-  body = chainon (saved_function_decls, body);
-  saved_function_decls = NULL;
-
-  stmt = build_stmt (SCOPE_STMT, NULL);
-  SCOPE_BEGIN_P (stmt) = 1;
-  body = chainon(stmt, body);
-  stmt = build_stmt (SCOPE_STMT, NULL);
-  SCOPE_BEGIN_P (stmt) = 0;
-  body = chainon(body, stmt);
-
-  body = build_stmt (COMPOUND_STMT, body);
-  DECL_SAVED_TREE (fndecl) = body;
+  DECL_SAVED_TREE (fndecl) = g95_finish_stmt (body, NULL_TREE);
 
   /* Finish off this function and send it for code generation.  */
   poplevel (1, 0, 1);

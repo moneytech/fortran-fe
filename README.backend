@@ -19,13 +19,18 @@ Don't use the G95 configure system.
 You'll probably need GMP installed on your system.
 
 To make useful programs you'll also need the runtime and IO libraries
- (libgfor.c and libgforio.a).  These are not required to build a fortran 95
+ (libgfor.a and libgforio.a).  These are not required to build a fortran 95
  enabled GCC, just to link fortran programs.  Until it finds a permanent
- home libgfor.c is avalable from http://www.brookbunch.freeserve.co.uk/g95
+ home libgfor is avalable from http://www.brookbunch.freeserve.co.uk/g95
 The latest version of the IO library is:
   http://www.jeremysanders.net/g95/gforio-0.0.6.tar.gz
-Problems have been reported when compiling with the IO library inside the
- GCC source tree, so it is reccommended that you keep them seperate.
+The IO and runtime libraries should be compiled seperately from gcc. The
+ runtime library is partially written in fortran, so should be built
+ after GCC.
+
+When using 'g95' to link programs the runtime libraries should be automatically
+ linked in. Otherwise you need to specify -lgfor and possibly -lm. You will
+ probably also need to link in the io library with -lgforio
 
 Note that the backend interface is still at an early stage. Many features are
 either missing or only partially complete.

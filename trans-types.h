@@ -80,13 +80,6 @@ tree g95_unsigned_type (tree);
 tree g95_signed_type (tree);
 tree g95_signed_or_unsigned_type (int, tree);
 
-/* Return components of an array descriptor.  */
-tree g95_get_ubound_component (tree, int);
-tree g95_get_lbound_component (tree, int);
-tree g95_get_stride_component (tree, int);
-tree g95_get_data_component (tree);
-tree g95_get_base_component (tree);
-
 tree g95_get_element_type (tree);
 tree g95_get_array_type_bounds (tree, int, tree *, tree *);
 

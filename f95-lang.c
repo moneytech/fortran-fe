@@ -148,10 +148,6 @@ void g95_be_parse_file (void *);
 
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
 
-/* This is the function we're currently expanding to RTL (well, once
-   we get to that...).  */
-tree current_function_decl;
-
 /* A list (chain of TREE_LIST nodes) of all LABEL_DECLs in the function
    that have names.  Here so we can clear out their names' definitions
    at the end of the function.  */
@@ -508,7 +504,7 @@ g95_init (const char *filename)
   /* Runtime/IO library functions.  */
   g95_build_builtin_function_decls ();
 
-  g95_init_string_constants ();
+  g95_init_constants ();
 
   if (g95_new_file (g95_option.source, g95_option.form) != SUCCESS)
     return (NULL);

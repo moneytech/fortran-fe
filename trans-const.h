@@ -25,8 +25,8 @@ tree g95_conv_mpz_to_tree (mpz_t i, int kind);
 /* only really for use by g95_trans_simple_expr */
 void g95_conv_constant (g95_se *, g95_expr *);
 
-/* Initialise the string constants.  */
-void g95_init_string_constants (void);
+/* Initialise the nodes for constants.  */
+void g95_init_constants (void);
 
 /* Build a constant with given type from an int_cst.  */
 tree g95_build_const (tree, tree);
@@ -36,3 +36,7 @@ extern GTY(()) tree g95_strconst_current_filename;
 extern GTY(()) tree g95_strconst_bounds;
 extern GTY(()) tree g95_strconst_fault;
 extern GTY(()) tree g95_strconst_wrong_return;
+
+/* Integer constants 0..G95_MAX_DIMENSIONS.  */
+extern GTY(()) tree g95_rank_cst[G95_MAX_DIMENSIONS + 1];
+
