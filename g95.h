@@ -231,14 +231,14 @@ typedef enum { IFSRC_UNKNOWN=0, IFSRC_DECL, IFSRC_IFBODY, IFSRC_USAGE
 typedef struct {
 
 /* Variable attributes */
-  unsigned allocatable:1, dimension:1, external:1,    intrinsic:1,
-           optional:1,    pointer:1,   save:1,        target:1,
-           dummy:1,       common:1,    result_var:1,  entry:1;
+  unsigned allocatable:1, dimension:1,  external:1,    intrinsic:1,
+           optional:1,    pointer:1,    save:1,        target:1,
+           dummy:1,       result_var:1, entry:1;
 
   unsigned data:1,        /* Symbol is named in a DATA statement */
            use_assoc:1;   /* Symbol has been use-associated */
 
-  unsigned in_namelist:1, in_common:1, saved_common:1;
+  unsigned in_namelist:1, in_common:1;
   unsigned function:1, subroutine:1, generic:1;
 
   unsigned implicit_type:1;    /* Type defined via implicit rules */
@@ -487,7 +487,7 @@ typedef struct g95_symbol {
   struct g95_symbol *result;        /* function result symbol */
   g95_component *components;        /* Derived type components */
 
-  struct g95_symbol *common_head, *common_next;  /* Links for COMMON syms */
+  struct g95_symbol *common_next;   /* Links for COMMON syms */
 
   g95_namelist *namelist, *namelist_tail;
 
@@ -508,6 +508,15 @@ typedef struct g95_symbol {
 } g95_symbol;
 
 
+typedef struct {
+  locus where;
+  int use_assoc, saved;
+  g95_symbol *head;
+} g95_common_head;
+
+#define g95_get_common_head() g95_getmem(sizeof(g95_common_head))
+
+
 /* Within a namespace, symbols are pointed to by symtree nodes that
  * are linked together in a balanced binary tree.  There can be
  * several symtrees pointing to the same symbol node via USE
@@ -523,6 +532,7 @@ typedef struct g95_symtree {
   union {
     g95_symbol *sym;             /* Symbol associated with this node */
     g95_user_op *uop;
+    g95_common_head *common;
   } n;
 
   struct g95_symtree *link;
@@ -531,7 +541,7 @@ typedef struct g95_symtree {
 
 
 typedef struct g95_namespace {
-  g95_symtree *sym_root, *uop_root;   /* Roots of the red/black symbol trees */
+  g95_symtree *sym_root, *uop_root, *common_root;   /* Roots of symbol trees */
 
   int set_flag[G95_LETTERS];
   g95_typespec default_type[G95_LETTERS];    /* IMPLICIT typespecs */
@@ -947,8 +957,8 @@ typedef struct {
   char *source;
   int verbose, pedantic, surprising, aliasing, unused_label, line_truncation,
     implicit_none, fixed_line_length, module_access_private, fmode, dollar,
-    q_kind, quiet, r8, i8, d8, l1, pack_derived, max_stack_var_size,
-    no_repack_arrays, inline_repack_arrays;
+    q_kind, quiet, r8, i8, d8, l1, pack_derived, max_stack_var_size;
+
   g95_directorylist *include_dirs;
   char *module_dir;
   g95_source_form form;
@@ -1200,11 +1210,9 @@ try g95_add_optional(symbol_attribute *, locus *);
 try g95_add_pointer(symbol_attribute *, locus *);
 try g95_add_result(symbol_attribute *, locus *);
 try g95_add_save(symbol_attribute *, locus *);
-try g95_add_saved_common(symbol_attribute *, locus *);
 try g95_add_target(symbol_attribute *, locus *);
 try g95_add_dummy(symbol_attribute *, locus *);
 try g95_add_generic(symbol_attribute *, locus *);
-try g95_add_common(symbol_attribute *, locus *);
 try g95_add_in_common(symbol_attribute *, locus *);
 try g95_add_in_namelist(symbol_attribute *, locus *);
 try g95_add_sequence(symbol_attribute *, locus *);
@@ -1333,6 +1341,7 @@ match g95_match_nullify(void);
 match g95_match_deallocate(void);
 match g95_match_return(void);
 match g95_match_call(void);
+g95_common_head *g95_get_common(char *);
 match g95_match_common(void);
 match g95_match_block_data(void);
 void g95_free_namelist(g95_namelist *);
@@ -1550,6 +1559,7 @@ void g95_use_module(void);
 
 void g95_generate_code(g95_namespace *);
 void g95_generate_module_code(g95_namespace *);
+void g95_generate_block_data(g95_namespace *);
 
 /* bbt.c */
 
@@ -1563,3 +1573,5 @@ void g95_generate_data(g95_namespace *);
 /* scalarize.c */
 
 void g95_scalarize(g95_namespace *);
+
+try g95_expand_ac_element(g95_expr *);

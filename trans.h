@@ -57,7 +57,6 @@ typedef struct {
 /* A simplified expresson */
 
 typedef struct g95_se {
-
   /* Code blocks to be executed before and after using the value.  */
   stmtblock_t pre;
   stmtblock_t post;
@@ -95,6 +94,7 @@ typedef struct {
 
 
 #define BLANK_COMMON_NAME PREFIX "blank_common"
+#define BLANK_BLOCK_DATA_NAME PREFIX "blank_block_data"
 
 
 /* trans.c */
@@ -125,16 +125,13 @@ tree g95_finish_block(stmtblock_t *);
 
 void g95_set_backend_locus(locus *);
 void g95_get_backend_locus(locus *);
-
+void g95_save_expr(g95_se *);
 
 void g95_trans_runtime_check(tree, tree, stmtblock_t *);
 tree g95_trans_assignment(g95_expr *, g95_expr *);
 void g95_build_intrinsic_lib_fndecls(void);
 void g95_build_io_library_fndecls(void);
 tree g95_library_decl VPARAMS((char *name, tree rettype, int nargs, ...));
-
-/* trans.c */
-
 tree g95_call_procedure_alloc(tree, tree);
 
 /* trans-array.c */
@@ -150,9 +147,9 @@ tree g95_get_adesc_ubound(tree, tree);
 void g95_array_argument(g95_se *, g95_actual_arglist *);
 void g95_init_array_types(void);
 tree g95_get_array_desc(int);
-tree g95_get_array_storage(variable_info *, tree);
+tree g95_get_array_storage(variable_info *);
 void g95_init_array_desc(variable_info *, tree, tree);
-
+tree g95_conv_array_initializer(variable_info *);
 
 /* trans-types.c */
 tree g95_get_element_type(tree);
@@ -162,14 +159,13 @@ tree g95_result_type(g95_symbol *);
 void g95_component_vinfo(g95_component *, variable_info *);
 void g95_symbol_vinfo(g95_symbol *, variable_info *);
 tree g95_get_descriptor(variable_info *);
-tree g95_get_storage(variable_info *, tree);
+tree g95_get_storage(variable_info *);
 void g95_init_descriptor(variable_info *, tree, tree);
 		    
 /* trans-const.c  */
-tree g95_conv_constant(g95_expr *, tree);
+void g95_conv_constant(g95_se *, g95_expr *, tree);
 tree g95_conv_mpf_to_tree(mpf_t, int);
 tree g95_build_string_const(int, char *);
-tree g95_conv_string_init(tree, g95_expr *);
 void g95_init_constants(void);
 tree g95_build_const(tree, tree);
 
@@ -187,6 +183,7 @@ void g95_add_decl_to_function(tree, g95_symbol *);
 tree g95_initial_value(g95_symbol *);
 
 tree g95_get_label_decl(g95_st_label *);
+void g95_get_symbol_decl(g95_symbol *);
 tree g95_get_extern_function_decl(g95_symbol *);
 tree g95_get_function_decl(g95_symbol *);
 tree g95_build_function_call(tree, tree);
@@ -194,7 +191,6 @@ tree g95_build_label_decl(tree);
 tree g95_get_fake_result_decl(g95_symbol *);
 tree g95_get_return_label(void);
 void g95_build_builtin_function_decls(void);
-tree g95_get_symbol_decl(g95_symbol *);
 void g95_generate_procedure(g95_namespace *);
 void g95_generate_procedure_variables(g95_namespace *);
 
@@ -289,19 +285,8 @@ enum {
 #define G95_DTYPE_TYPE_MASK 0x38
 #define G95_DTYPE_SIZE_SHIFT 6
 
-enum {
-  G95_DTYPE_UNKNOWN = 0,
-  G95_DTYPE_INTEGER,
-  /* TODO: recognize logical types.  */
-  G95_DTYPE_LOGICAL,
-  G95_DTYPE_REAL,
-  G95_DTYPE_COMPLEX,
-  G95_DTYPE_DERIVED,
-  G95_DTYPE_CHARACTER
-};
 
 extern GTY(()) tree g95_type_nodes[NUM_F95_TYPES];
-
 extern GTY(()) tree ppvoid_type_node;
 extern GTY(()) tree pvoid_type_node;
 extern GTY(()) tree pchar_type_node;
@@ -347,7 +332,6 @@ tree getdecls(void);
 /* The remaining space available for stack variables.  */
 extern unsigned HOST_WIDE_INT g95_stack_space_left;
 
-
 /* Runtime library function decls.  */
 
 extern GTY(()) tree library_procedure_alloc;
@@ -355,10 +339,8 @@ extern GTY(()) tree library_temp_alloc;
 extern GTY(()) tree library_temp_free;
 extern GTY(()) tree library_allocate_pointer_array;
 extern GTY(()) tree gfor_fndecl_runtime_error;
-extern GTY(()) tree gfor_fndecl_repack[G95_MAX_DIMENSIONS];
 
-/* Math functions.  Many other math functions are handled in
-   trans-intrinsic.c.  */
+/* External math functions */
 
 extern GTY(()) tree library_integer_4_power;
 extern GTY(()) tree library_real_4_power;
@@ -375,10 +357,6 @@ extern GTY(()) tree gfor_fndecl_math_sign8;
 extern GTY(()) tree gfor_fndecl_math_ishftc4;
 extern GTY(()) tree gfor_fndecl_math_ishftc8;
 
-/* Other misc. runtime library functions.  */
-extern GTY(()) tree gfor_fndecl_size0;
-extern GTY(()) tree gfor_fndecl_size1;
-
 /* True if node is an integer constant.  */
 #define INTEGER_CST_P(node) (TREE_CODE(node) == INTEGER_CST)
 
@@ -387,26 +365,14 @@ extern GTY(()) tree gfor_fndecl_size1;
 struct lang_type GTY (()) {};
 struct lang_decl GTY (()) {};
 
-
 /* Nonzero if the type is a descriptor (character or array) */
 
 #define G95_DESCRIPTOR_P(node) TREE_LANG_FLAG_0(node)
-
-#define G95_DECL_STRING_LENGTH(node) ((tree) DECL_LANG_SPECIFIC(node))
-#define G95_TYPE_STRING_LENGTH(node) ((tree) TYPE_LANG_SPECIFIC(node))
-
 
 #define CONSTANT_P(X) \
   (TREE_CODE(X) == INTEGER_CST || \
    TREE_CODE(X) == REAL_CST || \
    TREE_CODE(X) == COMPLEX_CST)
-
-
-/* An array descriptor.  */
-#define G95_DESCRIPTOR_TYPE_P(node) TYPE_LANG_FLAG_1(node)
-/* An array without a descriptor.  */
-#define G95_ARRAY_TYPE_P(node) TYPE_LANG_FLAG_2(node)
-
 
 #define g95_todo_error(args...) fatal_error("g95_todo: Not Implemented: " args)
 #define build_v(code, args...) build(code, void_type_node, args)

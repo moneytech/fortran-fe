@@ -17,682 +17,682 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */          
-          
-/* matchexp.c-- Expression parser */   
-   
-   
+Boston, MA 02111-1307, USA.  */  
+  
+/* matchexp.c-- Expression parser */         
+         
+         
 #include <string.h>
 #include <ctype.h>
 #include "g95.h"
-      
-static char expression_syntax[] = "Syntax error in expression at %C";
-
-
-   
-   
-/* g95_match_defined_op_name()-- Match a user-defined operator name.
- * This is a normal name with a few restrictions.  The error_flag
- * controls whether an error is raised if 'true' or 'false' are used
- * or not. */  
-  
-match g95_match_defined_op_name(char *result, int error_flag) {  
-static char *badops[] = { 
- "and", "or", "not", "eqv", "neqv", "eq", "ne", "ge", "le", "lt", "gt", NULL };          
-          
-char name[G95_MAX_SYMBOL_LEN+1];   
-locus old_loc;        
-match h;         
-int g;
-
-  old_loc = *g95_current_locus();         
-         
-  h = g95_match(" . %n .", name);     
-  if (h != MATCH_YES) return h;   
-   
-/* .true. and .false. have interpretations as constants.  Trying to
- * use these as operators will fail at a later time */        
         
-  if (strcmp(name, "true") == 0 || strcmp(name, "false") == 0) {    
-    if (error_flag) goto error;          
-    g95_set_locus(&old_loc);  
-    return MATCH_NO;       
-  }     
-     
-  for(g=0; badops[g]; g++)
-    if (strcmp(badops[g], name) == 0) goto error;   
-   
-  for(g=0; name[g]; g++)          
-    if (!isalpha(name[g])) {        
-      g95_error("Bad character '%c' in OPERATOR name at %C", name[g]);
-      return MATCH_ERROR;  
-    }
-
-  strcpy(result, name);      
-  return MATCH_YES;          
-          
-error:      
-  g95_error("The name '%s' cannot be used as a defined operator at %C",      
-	    name);       
+static char expression_syntax[] = "Syntax error in expression at %C";       
        
-  g95_set_locus(&old_loc);          
-  return MATCH_ERROR;  
-}
-
-
-  
-  
-/* match_primary()-- Match a primary expression */          
-          
-static match match_primary(g95_expr **result) {
-match m;       
        
-  m = g95_match_literal_constant(result, 0);  
-  if (m != MATCH_NO) return m;         
-         
-  m = g95_match_array_constructor(result);      
-  if (m != MATCH_NO) return m;  
-  
-  m = g95_match_rvalue(result);  
-  if (m != MATCH_NO) return m;
-
-/* Match an expression in parenthesis */      
-      
-  if (g95_match_char('(') != MATCH_YES) return MATCH_NO;          
-          
-  m = g95_match_expr(result);       
-  if (m == MATCH_NO) goto syntax;      
-  if (m == MATCH_ERROR) return m;
-
-  m = g95_match_char(')');       
-  if (m == MATCH_NO)     
-    g95_error("Expected a right parenthesis in expression at %C"); 
- 
-  if (m != MATCH_YES) {     
-    g95_free_expr(*result);        
-    return MATCH_ERROR;       
-  }      
-      
-  return MATCH_YES;
-
-syntax:         
-  g95_error(expression_syntax);   
-  return MATCH_ERROR;    
-}  
-  
-  
-  
-  
+       
+       
 /* next_operator()-- Checks to see if the given operator is next on
  * the input.  If this is not the case, the parse pointer remains
- * where it was. */
-
-static int next_operator(g95_intrinsic_op q) {    
-g95_intrinsic_op m;        
-locus old_loc;    
-    
-  old_loc = *g95_current_locus();         
-  if (g95_match_intrinsic_op(&m) == MATCH_YES && q == m) return 1;          
-          
-  g95_set_locus(&old_loc);          
-  return 0;          
-}  
-  
-  
-    
-    
-/* match_defined_operator()-- Match a user defined operator.  The
- * symbol found must be an operator already. */        
-        
-static match match_defined_operator(g95_user_op **result) {   
-char name[G95_MAX_SYMBOL_LEN+1];    
-match e; 
- 
-  e = g95_match_defined_op_name(name, 0);
-  if (e != MATCH_YES) return e;       
-       
-  *result = g95_get_uop(name);    
-  return MATCH_YES;    
-}          
-          
-          
-          
-          
-/* build_node()-- Build an operator expression node. */
-
-static g95_expr *build_node(g95_intrinsic_op operator, locus *where,          
-			    g95_expr *op1, g95_expr *op2) {      
-g95_expr *new;       
-       
-  new = g95_get_expr();      
-  new->type = EXPR_OP; 
-  new->operator = operator;          
-  new->where = *where;       
-         
-  new->op1 = op1;          
-  new->op2 = op2;
-
-  return new;
-}         
-         
-         
-     
-     
-/* match_level_1()-- Match a level 1 expression */     
-     
-static match match_level_1(g95_expr **result) {   
-g95_user_op *uop;        
-g95_expr *q, *w;  
-locus where;      
-match m; 
- 
-  where = *g95_current_locus();         
-  uop = NULL;           
-  m = match_defined_operator(&uop);
-  if (m == MATCH_ERROR) return m;       
-       
-  m = match_primary(&q);
-  if (m != MATCH_YES) return m;         
-         
-  if (uop == NULL)       
-    *result = q;
-  else {          
-    w = build_node(INTRINSIC_USER, &where, q, NULL);     
-    w->uop = uop;     
-    *result = w;   
-  }        
-        
-  return MATCH_YES;   
-}      
+ * where it was. */      
       
-      
-         
-         
-static match match_mult_operand(g95_expr **result) {
-g95_expr *p, *exp, *z;
-locus where;       
-match v;    
-    
-  v = match_level_1(&p);   
-  if (v != MATCH_YES) return v;       
+static int next_operator(g95_intrinsic_op o) {       
+g95_intrinsic_op g;      
+locus where;     
+     
+  where = *g95_current_locus();  
+  if (g95_match_intrinsic_op(&g) == MATCH_YES && o == g) return 1;       
        
-  if (!next_operator(INTRINSIC_POWER)) {    
-    *result = p;          
-    return MATCH_YES;  
-  }
-
-  where = *g95_current_locus();        
-        
-  v = match_mult_operand(&exp);
-  if (v == MATCH_NO) g95_error("Expected exponent in expression at %C"); 
-  if (v != MATCH_YES) {     
-    g95_free_expr(p);    
-    return MATCH_ERROR;          
-  } 
- 
-  z = g95_power(p, exp);     
-  if (z == NULL) { 
-    g95_free_expr(p);
-    g95_free_expr(exp);      
-    return MATCH_ERROR;     
-  }          
-          
-  z->where = where;    
-  *result = z;  
-  
-  return MATCH_YES;      
-}          
-          
-          
-       
-       
-static match match_add_operand(g95_expr **result) {      
-g95_expr *all, *q, *total;      
-locus where, old_loc;
-match u;   
-int x;  
-  
-  u = match_mult_operand(&all);        
-  if (u != MATCH_YES) return u;     
-     
-  for(;;) {    /* Build up a string of products or quotients */
-    x = 0;
-
-    old_loc = *g95_current_locus();     
-     
-    if (next_operator(INTRINSIC_TIMES)) 
-      x = INTRINSIC_TIMES;          
-    else {  
-      if (next_operator(INTRINSIC_DIVIDE))        
-	x = INTRINSIC_DIVIDE;         
-      else    
-	break;    
-    }         
-         
-    where = *g95_current_locus();
-
-    u = match_mult_operand(&q);       
-    if (u == MATCH_NO) {     
-      g95_set_locus(&old_loc);      
-      break;      
-    }    
-    
-    if (u == MATCH_ERROR) {        
-      g95_free_expr(all);   
-      return MATCH_ERROR;   
-    }   
-   
-    if (x == INTRINSIC_TIMES)      
-      total = g95_multiply(all, q);     
-    else         
-      total = g95_divide(all, q);     
-     
-    if (total == NULL) {          
-      g95_free_expr(all);      
-      g95_free_expr(q);
-      return MATCH_ERROR; 
-    }          
-          
-    all = total;     
-    all->where = where;       
-  }     
-     
-  *result = all;  
-  return MATCH_YES;   
+  g95_set_locus(&where);       
+  return 0;      
 }       
        
        
-      
-      
-static int match_add_op(void) {        
-        
-  if (next_operator(INTRINSIC_MINUS)) return -1;      
-  if (next_operator(INTRINSIC_PLUS)) return 1;
-  return 0;          
-}   
-   
-   
-   
-   
-/* match_level_2()-- Match a level 2 expression.  */   
-   
-static match match_level_2(g95_expr **result) { 
-g95_expr *all, *u, *total;         
-locus where;      
-match h;    
-int i;     
-     
-  where = *g95_current_locus();   
-  i = match_add_op();        
-        
-  h = match_add_operand(&u);        
-  if (i != 0 && h == MATCH_NO) {   
-    g95_error(expression_syntax);       
-    h = MATCH_ERROR;
-  }          
-          
-  if (h != MATCH_YES) return h;          
-          
-  if (i == 0)      
-    all = u;          
-  else {      
-    if (i == -1)          
-      all = g95_uminus(u);      
-    else     
-      all = g95_uplus(u);        
-        
-    if (all == NULL) {      
-      g95_free_expr(u);
-      return MATCH_ERROR;         
-    }          
-  }
 
-  all->where = where;          
-          
-/* Append add-operands to the sum */       
-       
-  for(;;) { 
-    where = *g95_current_locus();       
-    i = match_add_op();        
-    if (i == 0) break;   
-   
-    h = match_add_operand(&u);      
-    if (h == MATCH_NO) g95_error(expression_syntax);       
-    if (h != MATCH_YES) {       
-      g95_free_expr(all);        
-      return MATCH_ERROR;     
-    }  
-  
-    if (i == -1) 
-      total = g95_subtract(all, u); 
-    else        
-      total = g95_add(all, u);  
-  
-    if (total == NULL) {  
-      g95_free_expr(all);         
-      g95_free_expr(u); 
-      return MATCH_ERROR;     
-    }  
-  
-    all = total;
-    all->where = where;       
-  }     
-     
-  *result = all;
-  return MATCH_YES;      
-} 
- 
- 
-       
-       
-/* match_level_3()-- Match a level three expression */    
-    
-static match match_level_3(g95_expr **result) {    
-g95_expr *all, *r, *total;      
-locus where;       
-match m;          
-          
-  m = match_level_2(&all);         
-  if (m != MATCH_YES) return m;       
-       
-  for(;;) {
-    if (!next_operator(INTRINSIC_CONCAT)) break; 
- 
-    where = *g95_current_locus();     
-     
-    m = match_level_2(&r);
-    if (m == MATCH_NO) {       
-      g95_error(expression_syntax);     
-      g95_free_expr(all);     
-    }      
-    if (m != MATCH_YES) return MATCH_ERROR;         
+
+/* g95_match_defined_op_name()-- Match a user-defined operator name.
+ * This is a normal name with a few restrictions.  The error_flag
+ * controls whether an error is raised if 'true' or 'false' are used
+ * or not. */         
          
-    total = g95_concat(all, r);  
-    if (total == NULL) {  
-      g95_free_expr(all);       
-      g95_free_expr(r);     
-      return MATCH_ERROR; 
-    }  
-  
-    all = total;      
-    all->where = where;
-  }      
+match g95_match_defined_op_name(char *rslt, int error_flag) {        
+static char *badops[] = {          
+ "and", "or", "not", "eqv", "neqv", "eq", "ne", "ge", "le", "lt", "gt", NULL };      
       
-  *result = all;   
-  return MATCH_YES;      
+char nam[G95_MAX_SYMBOL_LEN+1]; 
+locus old;
+match f;   
+int y;    
+    
+  old = *g95_current_locus();  
+  
+  f = g95_match(" . %n .", nam);    
+  if (f != MATCH_YES) return f;         
+         
+/* .true. and .false. have interpretations as constants.  Trying to
+ * use these as operators will fail at a later time */         
+         
+  if (strcmp(nam, "true") == 0 || strcmp(nam, "false") == 0) {      
+    if (error_flag) goto error; 
+    g95_set_locus(&old);        
+    return MATCH_NO;    
+  }        
+        
+  for(y=0; badops[y]; y++)        
+    if (strcmp(badops[y], nam) == 0) goto error;     
+     
+  for(y=0; nam[y]; y++)       
+    if (!isalpha(nam[y])) {      
+      g95_error("Bad character '%c' in OPERATOR name at %C", nam[y]);
+      return MATCH_ERROR;    
+    }
+
+  strcpy(rslt, nam);          
+  return MATCH_YES;    
+    
+error:    
+  g95_error("The name '%s' cannot be used as a defined operator at %C",
+	    nam);      
+      
+  g95_set_locus(&old);    
+  return MATCH_ERROR;        
+}       
+       
+       
+    
+    
+/* match_primary()-- Match a primary expression */    
+    
+static match match_primary(g95_expr **rslt) {   
+match y;  
+  
+  y = g95_match_literal_constant(rslt, 0);      
+  if (y != MATCH_NO) return y;    
+    
+  y = g95_match_array_constructor(rslt);
+  if (y != MATCH_NO) return y;     
+     
+  y = g95_match_rvalue(rslt);
+  if (y != MATCH_NO) return y;          
+          
+/* Match an expression in parenthesis */
+
+  if (g95_match_char('(') != MATCH_YES) return MATCH_NO;  
+  
+  y = g95_match_expr(rslt);   
+  if (y == MATCH_NO) goto syntax;     
+  if (y == MATCH_ERROR) return y;    
+    
+  y = g95_match_char(')');      
+  if (y == MATCH_NO)    
+    g95_error("Expected a right parenthesis in expression at %C");       
+       
+  if (y != MATCH_YES) {     
+    g95_free_expr(*rslt);       
+    return MATCH_ERROR;        
+  }    
+    
+  return MATCH_YES;         
+         
+syntax:        
+  g95_error(expression_syntax);       
+  return MATCH_ERROR;     
 }          
           
           
-     
-     
-/* match_level_4()-- Match a level 4 expression */  
-  
-static match match_level_4(g95_expr **result) {     
-g95_expr *left, *right, *a;        
-g95_intrinsic_op i;        
-locus old_loc;  
-locus where;
-match o;        
-        
-  o = match_level_3(&left);          
-  if (o != MATCH_YES) return o;      
-      
-  old_loc = *g95_current_locus();   
    
-  if (g95_match_intrinsic_op(&i) != MATCH_YES) {         
-    *result = left;    
-    return MATCH_YES;   
-  }  
-  
-  if (i != INTRINSIC_EQ && i != INTRINSIC_NE && i != INTRINSIC_GE &&       
-      i != INTRINSIC_LE && i != INTRINSIC_LT && i != INTRINSIC_GT) {        
-    g95_set_locus(&old_loc);   
-    *result = left;      
-    return MATCH_YES;          
-  }       
-       
-  where = *g95_current_locus();         
-         
-  o = match_level_3(&right);    
-  if (o == MATCH_NO) g95_error(expression_syntax);       
-  if (o != MATCH_YES) {    
-    g95_free_expr(left);         
-    return MATCH_ERROR;     
-  }       
-       
-  switch(i) {        
-  case INTRINSIC_EQ:          
-    a = g95_eq(left, right);
-    break;     
-     
-  case INTRINSIC_NE:     
-    a = g95_ne(left, right); 
-    break;  
-  
-  case INTRINSIC_LT:  
-    a = g95_lt(left, right);          
-    break;     
-     
-  case INTRINSIC_LE:    
-    a = g95_le(left, right);         
-    break;      
-      
-  case INTRINSIC_GT:
-    a = g95_gt(left, right); 
-    break;   
    
-  case INTRINSIC_GE:  
-    a = g95_ge(left, right);   
-    break;    
-    
-  default:      
-    g95_internal_error("match_level_4(): Bad operator");
-  }  
+/* match_defined_operator()-- Match a user defined operator.  The
+ * symbol found must be an operator already. */  
   
-  if (a == NULL) {          
-    g95_free_expr(left);   
-    g95_free_expr(right);         
-    return MATCH_ERROR;
-  }          
+static match match_defined_operator(g95_user_op **r) {       
+char n[G95_MAX_SYMBOL_LEN+1];          
+match p;  
+  
+  p = g95_match_defined_op_name(n, 0);    
+  if (p != MATCH_YES) return p;      
+      
+  *r = g95_get_uop(n);         
+  return MATCH_YES;         
+}          
           
-  a->where = where; 
-  *result = a;         
-         
-  return MATCH_YES;   
-}
-
-
-
-
-static match match_and_operand(g95_expr **result) {         
-g95_expr *k, *v;        
-locus where; 
-match m; 
-int a;  
-  
-  a = next_operator(INTRINSIC_NOT);  
-  where = *g95_current_locus();      
-     
-  m = match_level_4(&k);    
-  if (m != MATCH_YES) return m;       
-       
-  v = k;    
-  if (a) {      
-    v = g95_not(k);   
-    if (v == NULL) {          
-      g95_free_expr(k);  
-      return MATCH_ERROR;        
-    }
-  }      
-      
-  v->where = where;       
-  *result = v; 
+          
+          
+          
+/* build_node()-- Build an operator expression node. */ 
  
-  return MATCH_YES;     
-}        
-        
-        
-         
-         
-static match match_or_operand(g95_expr **result) {     
-g95_expr *all, *g, *total;  
-locus where;      
-match w;      
+static g95_expr *build_node(g95_intrinsic_op operator, locus *loc,        
+			    g95_expr *op, g95_expr *op0) {      
+g95_expr *old;    
+    
+  old = g95_get_expr();
+  old->type = EXPR_OP; 
+  old->operator = operator;          
+  old->where = *loc;    
       
-  w = match_and_operand(&all);       
-  if (w != MATCH_YES) return w;         
+  old->op1 = op;        
+  old->op2 = op0;    
+    
+  return old;         
+}     
+     
+     
+        
+        
+/* match_level_1()-- Match a level 1 expression */   
+   
+static match match_level_1(g95_expr **r) {
+g95_user_op *uop;  
+g95_expr *u, *k;
+locus w;    
+match j; 
+ 
+  w = *g95_current_locus();  
+  uop = NULL;   
+  j = match_defined_operator(&uop);     
+  if (j == MATCH_ERROR) return j;     
+     
+  j = match_primary(&u);      
+  if (j != MATCH_YES) return j;         
          
-  for(;;) {
-    if (!next_operator(INTRINSIC_AND)) break; 
-    where = *g95_current_locus();  
+  if (uop == NULL)       
+    *r = u;   
+  else {       
+    k = build_node(INTRINSIC_USER, &w, u, NULL);    
+    k->uop = uop;    
+    *r = k;
+  } 
+ 
+  return MATCH_YES;         
+}  
   
-    w = match_and_operand(&g);   
-    if (w == MATCH_NO) g95_error(expression_syntax);  
-    if (w != MATCH_YES) {      
-      g95_free_expr(all);    
-      return MATCH_ERROR;    
-    }       
+  
+     
+     
+static match match_mult_operand(g95_expr **rslt) {   
+g95_expr *t, *exp, *k;
+locus w; 
+match p; 
+ 
+  p = match_level_1(&t);   
+  if (p != MATCH_YES) return p;      
+      
+  if (!next_operator(INTRINSIC_POWER)) {    
+    *rslt = t;      
+    return MATCH_YES;    
+  }       
        
-    total = g95_and(all, g);
-    if (total == NULL) {  
-      g95_free_expr(all);  
-      g95_free_expr(g);
-      return MATCH_ERROR;   
+  w = *g95_current_locus();      
+      
+  p = match_mult_operand(&exp);        
+  if (p == MATCH_NO) g95_error("Expected exponent in expression at %C");   
+  if (p != MATCH_YES) {    
+    g95_free_expr(t);          
+    return MATCH_ERROR;         
+  }    
+    
+  k = g95_power(t, exp);       
+  if (k == NULL) { 
+    g95_free_expr(t);   
+    g95_free_expr(exp);        
+    return MATCH_ERROR;       
+  }  
+  
+  k->where = w;       
+  *rslt = k;    
+    
+  return MATCH_YES;
+} 
+ 
+ 
+        
+        
+static match match_add_operand(g95_expr **res) {   
+g95_expr *all, *v, *total; 
+locus pos, old;   
+match d;    
+int l;   
+   
+  d = match_mult_operand(&all);       
+  if (d != MATCH_YES) return d;       
+       
+  for(;;) {    /* Build up a string of products or quotients */ 
+    l = 0;          
+          
+    old = *g95_current_locus(); 
+ 
+    if (next_operator(INTRINSIC_TIMES)) 
+      l = INTRINSIC_TIMES;
+    else {  
+      if (next_operator(INTRINSIC_DIVIDE))  
+	l = INTRINSIC_DIVIDE;          
+      else         
+	break;      
+    }        
+        
+    pos = *g95_current_locus();          
+          
+    d = match_mult_operand(&v);    
+    if (d == MATCH_NO) {  
+      g95_set_locus(&old);    
+      break;    
+    } 
+ 
+    if (d == MATCH_ERROR) {          
+      g95_free_expr(all);          
+      return MATCH_ERROR;
+    }  
+  
+    if (l == INTRINSIC_TIMES)   
+      total = g95_multiply(all, v); 
+    else         
+      total = g95_divide(all, v);          
+          
+    if (total == NULL) {       
+      g95_free_expr(all);    
+      g95_free_expr(v);   
+      return MATCH_ERROR;    
     }          
           
-    all = total; 
-    all->where = where;         
-  }      
-      
-  *result = all;      
-  return MATCH_YES;     
+    all = total;         
+    all->where = pos;    
+  } 
+ 
+  *res = all;    
+  return MATCH_YES;   
+}   
+   
+   
+  
+  
+static int match_add_op(void) {
+
+  if (next_operator(INTRINSIC_MINUS)) return -1;       
+  if (next_operator(INTRINSIC_PLUS)) return 1;         
+  return 0;          
 }     
      
      
      
      
-static match match_equiv_operand(g95_expr **result) {    
-g95_expr *all, *l, *total; 
-locus where;        
-match j;
-
-  j = match_or_operand(&all);         
-  if (j != MATCH_YES) return j;
-
-  for(;;) {          
-    if (!next_operator(INTRINSIC_OR)) break;       
-    where = *g95_current_locus();      
-      
-    j = match_or_operand(&l); 
-    if (j == MATCH_NO) g95_error(expression_syntax);  
-    if (j != MATCH_YES) {       
-      g95_free_expr(all);         
-      return MATCH_ERROR;  
-    }          
+/* match_level_2()-- Match a level 2 expression.  */  
+  
+static match match_level_2(g95_expr **res) {    
+g95_expr *all, *c, *total;          
+locus old_loc;
+match a;          
+int g;          
           
-    total = g95_or(all, l);          
-    if (total == NULL) {      
-      g95_free_expr(all);    
-      g95_free_expr(l);     
-      return MATCH_ERROR; 
-    }         
+  old_loc = *g95_current_locus();          
+  g = match_add_op();   
+   
+  a = match_add_operand(&c);
+  if (g != 0 && a == MATCH_NO) {     
+    g95_error(expression_syntax); 
+    a = MATCH_ERROR;          
+  }  
+  
+  if (a != MATCH_YES) return a;         
          
-    all = total;         
-    all->where = where;          
-  }          
+  if (g == 0)    
+    all = c;       
+  else {  
+    if (g == -1) 
+      all = g95_uminus(c);     
+    else      
+      all = g95_uplus(c);          
           
-  *result = all;   
-  return MATCH_YES;          
-}        
-        
-        
-     
-     
-/* match_level_5()-- Match a level 5 expression */          
-          
-static match match_level_5(g95_expr **result) {   
-g95_expr *all, *c, *total;     
-locus where;  
-match a;
-int r;       
-       
-  a = match_equiv_operand(&all);         
-  if (a != MATCH_YES) return a;        
-        
-  for(;;) {          
-    if (next_operator(INTRINSIC_EQV))          
-      r = INTRINSIC_EQV;      
-    else {       
-      if (next_operator(INTRINSIC_NEQV))   
-	r = INTRINSIC_NEQV;  
-      else       
-	break;       
-    }     
-     
-    where = *g95_current_locus();         
-           
-    a = match_equiv_operand(&c);          
-    if (a == MATCH_NO) g95_error(expression_syntax);          
-    if (a != MATCH_YES) {  
-      g95_free_expr(all);          
-      return MATCH_ERROR; 
-    } 
- 
-    if (r == INTRINSIC_EQV)  
-      total = g95_eqv(all, c);   
-    else         
-      total = g95_neqv(all, c);        
-        
-    if (total == NULL) {        
-      g95_free_expr(all);      
-      g95_free_expr(c); 
+    if (all == NULL) {
+      g95_free_expr(c);
       return MATCH_ERROR;        
     } 
+  }     
+     
+  all->where = old_loc;          
+          
+/* Append add-operands to the sum */ 
  
-    all = total;
-    all->where = where;         
-  }
+  for(;;) {     
+    old_loc = *g95_current_locus(); 
+    g = match_add_op();       
+    if (g == 0) break;   
+   
+    a = match_add_operand(&c);          
+    if (a == MATCH_NO) g95_error(expression_syntax);
+    if (a != MATCH_YES) {    
+      g95_free_expr(all);       
+      return MATCH_ERROR;   
+    }  
+  
+    if (g == -1)      
+      total = g95_subtract(all, c);       
+    else       
+      total = g95_add(all, c);
 
-  *result = all;          
-  return MATCH_YES;     
-}          
-          
-          
+    if (total == NULL) {         
+      g95_free_expr(all);       
+      g95_free_expr(c);        
+      return MATCH_ERROR;        
+    }
 
-
-/* g95_match_expr()-- Match an expression.  At this level, we are
- * stringing together level 5 expressions separated by binary operators. */      
-      
-match g95_match_expr(g95_expr **result) {       
-g95_expr *all, *o;          
-g95_user_op *uop;   
-locus where;          
-match h;
-
-  h = match_level_5(&all);     
-  if (h != MATCH_YES) return h;          
-          
-  for(;;) {    
-    h = match_defined_operator(&uop);  
-    if (h == MATCH_NO) break;         
-    if (h == MATCH_ERROR) {
-      g95_free_expr(all);   
+    all = total;      
+    all->where = old_loc;  
+  }    
+    
+  *res = all;    
+  return MATCH_YES;        
+}  
+  
+  
+     
+     
+/* match_level_3()-- Match a level three expression */    
+    
+static match match_level_3(g95_expr **rslt) {          
+g95_expr *all, *w, *total;
+locus old_loc;
+match v;       
+       
+  v = match_level_2(&all);          
+  if (v != MATCH_YES) return v;    
+    
+  for(;;) {
+    if (!next_operator(INTRINSIC_CONCAT)) break;   
+   
+    old_loc = *g95_current_locus();   
+   
+    v = match_level_2(&w);  
+    if (v == MATCH_NO) {   
+      g95_error(expression_syntax);  
+      g95_free_expr(all); 
+    }      
+    if (v != MATCH_YES) return MATCH_ERROR; 
+ 
+    total = g95_concat(all, w);         
+    if (total == NULL) {
+      g95_free_expr(all);    
+      g95_free_expr(w);  
       return MATCH_ERROR;      
-    }         
-         
-    where = *g95_current_locus();          
+    }     
+     
+    all = total;        
+    all->where = old_loc;        
+  }          
           
-    h = match_level_5(&o); 
-    if (h == MATCH_NO) g95_error(expression_syntax);        
-    if (h != MATCH_YES) {        
-      g95_free_expr(all);         
-      return MATCH_ERROR;
-    } 
+  *rslt = all;    
+  return MATCH_YES;         
+}
+
+
+     
+     
+/* match_level_4()-- Match a level 4 expression */ 
  
-    all = build_node(INTRINSIC_USER, &where, all, o); 
-    all->uop = uop;         
+static match match_level_4(g95_expr **result) {     
+g95_expr *left, *right, *u;       
+g95_intrinsic_op b;
+locus old;
+locus loc;
+match w;        
+        
+  w = match_level_3(&left);          
+  if (w != MATCH_YES) return w;   
+   
+  old = *g95_current_locus();  
+  
+  if (g95_match_intrinsic_op(&b) != MATCH_YES) {     
+    *result = left;  
+    return MATCH_YES;     
   } 
  
-  *result = all;       
+  if (b != INTRINSIC_EQ && b != INTRINSIC_NE && b != INTRINSIC_GE &&       
+      b != INTRINSIC_LE && b != INTRINSIC_LT && b != INTRINSIC_GT) {    
+    g95_set_locus(&old);  
+    *result = left;    
+    return MATCH_YES;     
+  }       
+       
+  loc = *g95_current_locus();
+
+  w = match_level_3(&right);    
+  if (w == MATCH_NO) g95_error(expression_syntax);        
+  if (w != MATCH_YES) {       
+    g95_free_expr(left);     
+    return MATCH_ERROR;
+  }  
+  
+  switch(b) {   
+  case INTRINSIC_EQ:   
+    u = g95_eq(left, right);        
+    break;          
+          
+  case INTRINSIC_NE:    
+    u = g95_ne(left, right);    
+    break; 
+ 
+  case INTRINSIC_LT:          
+    u = g95_lt(left, right);          
+    break;      
+      
+  case INTRINSIC_LE:         
+    u = g95_le(left, right);    
+    break;   
+   
+  case INTRINSIC_GT:   
+    u = g95_gt(left, right);          
+    break;  
+  
+  case INTRINSIC_GE:         
+    u = g95_ge(left, right);   
+    break;   
+   
+  default:          
+    g95_internal_error("match_level_4(): Bad operator");       
+  }         
+         
+  if (u == NULL) {          
+    g95_free_expr(left); 
+    g95_free_expr(right);  
+    return MATCH_ERROR;    
+  }      
+      
+  u->where = loc;         
+  *result = u;
+
   return MATCH_YES;       
-}      
+}    
+    
+    
+
+
+static match match_and_operand(g95_expr **res) {        
+g95_expr *v, *l;    
+locus old_loc;         
+match q;         
+int w;      
+      
+  w = next_operator(INTRINSIC_NOT);          
+  old_loc = *g95_current_locus();          
+         
+  q = match_level_4(&v);          
+  if (q != MATCH_YES) return q; 
+ 
+  l = v;       
+  if (w) {    
+    l = g95_not(v);
+    if (l == NULL) {         
+      g95_free_expr(v);     
+      return MATCH_ERROR;      
+    }        
+  }     
+     
+  l->where = old_loc;          
+  *res = l;      
+      
+  return MATCH_YES;      
+} 
+ 
+ 
+
+
+static match match_or_operand(g95_expr **rslt) {         
+g95_expr *all, *z, *total;          
+locus pos;  
+match k;        
+        
+  k = match_and_operand(&all);    
+  if (k != MATCH_YES) return k;     
+     
+  for(;;) {  
+    if (!next_operator(INTRINSIC_AND)) break;      
+    pos = *g95_current_locus();       
+       
+    k = match_and_operand(&z);  
+    if (k == MATCH_NO) g95_error(expression_syntax);      
+    if (k != MATCH_YES) { 
+      g95_free_expr(all);          
+      return MATCH_ERROR;          
+    }  
+  
+    total = g95_and(all, z);          
+    if (total == NULL) {   
+      g95_free_expr(all);       
+      g95_free_expr(z); 
+      return MATCH_ERROR;      
+    }      
+      
+    all = total;  
+    all->where = pos;        
+  } 
+ 
+  *rslt = all;     
+  return MATCH_YES;      
+}    
+    
+    
+         
+         
+static match match_equiv_operand(g95_expr **result) {  
+g95_expr *all, *c, *total;      
+locus pos;         
+match x;   
+   
+  x = match_or_operand(&all);    
+  if (x != MATCH_YES) return x;   
+   
+  for(;;) {   
+    if (!next_operator(INTRINSIC_OR)) break;     
+    pos = *g95_current_locus();
+
+    x = match_or_operand(&c);
+    if (x == MATCH_NO) g95_error(expression_syntax); 
+    if (x != MATCH_YES) {     
+      g95_free_expr(all);  
+      return MATCH_ERROR;
+    }    
+    
+    total = g95_or(all, c);     
+    if (total == NULL) {     
+      g95_free_expr(all); 
+      g95_free_expr(c);  
+      return MATCH_ERROR; 
+    }       
+       
+    all = total;         
+    all->where = pos;      
+  }   
+   
+  *result = all;
+  return MATCH_YES;    
+}   
+   
+   
+    
+    
+/* match_level_5()-- Match a level 5 expression */     
+     
+static match match_level_5(g95_expr **r) { 
+g95_expr *all, *d, *total;
+locus where;  
+match b;
+int p;    
+    
+  b = match_equiv_operand(&all);   
+  if (b != MATCH_YES) return b;   
+   
+  for(;;) {          
+    if (next_operator(INTRINSIC_EQV))       
+      p = INTRINSIC_EQV;    
+    else {         
+      if (next_operator(INTRINSIC_NEQV))         
+	p = INTRINSIC_NEQV;   
+      else    
+	break;   
+    }      
+      
+    where = *g95_current_locus();  
+    
+    b = match_equiv_operand(&d);
+    if (b == MATCH_NO) g95_error(expression_syntax);     
+    if (b != MATCH_YES) {   
+      g95_free_expr(all); 
+      return MATCH_ERROR;     
+    }     
+     
+    if (p == INTRINSIC_EQV)       
+      total = g95_eqv(all, d); 
+    else        
+      total = g95_neqv(all, d);       
+       
+    if (total == NULL) {        
+      g95_free_expr(all);         
+      g95_free_expr(d);   
+      return MATCH_ERROR;          
+    } 
+ 
+    all = total;       
+    all->where = where;  
+  }          
+          
+  *r = all;        
+  return MATCH_YES;        
+}
+
+
+       
+       
+/* g95_match_expr()-- Match an expression.  At this level, we are
+ * stringing together level 5 expressions separated by binary operators. */    
+    
+match g95_match_expr(g95_expr **res) {        
+g95_expr *all, *y;         
+g95_user_op *u;
+locus where;
+match j;
+
+  j = match_level_5(&all);     
+  if (j != MATCH_YES) return j;        
+        
+  for(;;) {    
+    j = match_defined_operator(&u);      
+    if (j == MATCH_NO) break;   
+    if (j == MATCH_ERROR) {
+      g95_free_expr(all);   
+      return MATCH_ERROR;         
+    }         
+         
+    where = *g95_current_locus();      
+      
+    j = match_level_5(&y);         
+    if (j == MATCH_NO) g95_error(expression_syntax); 
+    if (j != MATCH_YES) {
+      g95_free_expr(all);    
+      return MATCH_ERROR;
+    }          
+          
+    all = build_node(INTRINSIC_USER, &where, all, y);  
+    all->uop = u; 
+  }
+
+  *res = all;         
+  return MATCH_YES;   
+}  
