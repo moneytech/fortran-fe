@@ -1980,15 +1980,18 @@ g95_symbol *sym;
 
   sym = rb->n.sym;
 
-  if (sym->formal_ns != NULL) {
-    ns = sym->formal_ns;
-    sym->formal_ns = NULL;
-    g95_free_namespace(ns);
-  }
-
   sym->refs--;
   if (sym->refs < 0) g95_internal_error("free_sym_tree(): Negative refs");
-  if (sym->refs == 0) g95_free_symbol(sym);
+
+  if (sym->refs == 0) {   /* Go ahead and delete the symbol */
+    if (sym->formal_ns != NULL) {
+      ns = sym->formal_ns;
+      sym->formal_ns = NULL;
+      g95_free_namespace(ns);
+    }
+
+    g95_free_symbol(sym);
+  }
 
   g95_free(rb);
 }
