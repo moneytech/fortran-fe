@@ -630,7 +630,15 @@ int i, n, limit;
 
 /* g95_default_*_kind()-- Return default kinds */
 
-int g95_default_integer_kind(void)   { return g95_integer_kinds[0].kind; }
+int g95_default_integer_kind(void) 
+{ 
+  if ( g95_option.i8 == 1 ) {
+    return g95_integer_kinds[1].kind; 
+  }
+  else {
+    return g95_integer_kinds[0].kind; 
+  }
+}
 
 int g95_default_real_kind(void)      
 { 
