@@ -72,10 +72,7 @@ F95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o c-dump.o \
 	disjoint-set.o tree-alias-common.o tree-alias-ecr.o \
 	tree-alias-type.o tree-alias-steen.o gimplify.o
 
-# G95 uses GMP for its internal arithmetics.
-F95_LIBS = $(LIBS) -lgmp
-
-#
+#
 # Define the names for selecting g95 in LANGUAGES.
 
 # Tell GNU make to ignore files by these names if they exist.

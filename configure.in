@@ -1,6 +1,7 @@
+
 AC_INIT(g95.h)
-AM_INIT_AUTOMAKE(g95, 0.23)
-AM_CONFIG_HEADER(config.h)
+AM_INIT_AUTOMAKE(g95, 0.25)
+AM_CONFIG_HEADER(g95-config.h)
 
 #############################################################################
 AC_PROG_CC
@@ -18,12 +19,15 @@ esac
 
 AC_ARG_WITH(gcc-dir, [  --with-gcc-dir=PATH     Specify directory for GCC ])
 
+## This option almost works.  The last difficulty is creating the gty
+## include files, particularly the master language file.
+
 if test "x$with_gcc_dir" != x -a -d "$with_gcc_dir"; then
-   CFLAGS="$CFLAGS -DBACKEND -DIN_GCC"
+   CFLAGS="$CFLAGS -DBACKEND -DIN_GCC -DNO_GTY"
    CPPFLAGS="-I- -I$with_gcc_dir/gcc -I$with_gcc_dir/include -I$with_gcc_dir/gcc/config $CPPFLAGS"
 
    LDFLAGS="$LDFLAGS -L$with_gcc_dir/gcc -L$with_gcc_dir/libiberty"
-   LIBS="$LIBS -lbackend -liberty -lgcc"
+   LIBS="$LIBS -lbackend -liberty"
 
    DEFAULT_INCLUDES=" "
 
@@ -33,9 +37,14 @@ if test "x$with_gcc_dir" != x -a -d "$with_gcc_dir"; then
    if test -f $with_gcc_dir/gcc/libbackend.a; then
       AC_MSG_RESULT([yes])
    else
-      AC_MSG_ERROR([could not link with libbackend])
+      AC_MSG_ERROR([could not find libbackend.a])
    fi
+
+   GCC_DIR=$with_gcc_dir
+   AC_SUBST([GCC_DIR])
 fi
+
+AM_CONDITIONAL(GCC, test "x$with_gcc_dir" != "x")
 
 
 #############################################################################
@@ -45,7 +54,7 @@ AC_ARG_WITH(gmp-dir, [  --with-gmp-dir=PATH     Specify directory for the GMP li
 
 if test "x$with_gmp_dir" != x -a -d "$with_gmp_dir"; then
 	CPPFLAGS="$CPPFLAGS -I$with_gmp_dir"
-	LDFLAGS="-L$with_gmp_dir/.libs $LDFLAGS"
+	LIBS="$with_gmp_dir/.libs/libgmp.a $LIBS"
 fi
 
 AC_FUNC_ALLOCA([AC_MSG_ERROR([alloca not found])])
@@ -61,8 +70,6 @@ AC_TRY_COMPILE([#include "gmp.h"],[
    [AC_MSG_ERROR([gmp version 3.0 or later is required])])
 
 AC_MSG_CHECKING([for mpf_init in -lgmp])
-
-LIBS="$LIBS -lgmp"
 
 AC_TRY_LINK([#include <gmp.h>], [mpf_t n; mpf_init(n);],
   [AC_MSG_RESULT([yes])],  [AC_MSG_ERROR([could not link with libgmp])])

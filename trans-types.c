@@ -23,6 +23,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include <stdio.h>
 #include "c-common.h"
@@ -146,7 +148,7 @@ g95_init_types (void)
   n += G95_DTYPE_SIZE_SHIFT;
   g95_max_array_element_size = (~(unsigned HOST_WIDE_INT)0) >> n;
 
-  c_size_type_node = g95_array_index_type;
+  size_type_node = g95_array_index_type;
 }
 
 /* Get a type node for an integer kind */

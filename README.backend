@@ -8,35 +8,29 @@ trees, so you'll need tree-ssa-20020619-branch from GCC CVS.
 
 $ cvs -d :pserver:anoncvs@subversions.gnu.org:/cvsroot/gcc login
 (no password)
-$ cvs -z9 -d :pserver:anoncvs@subversions.gnu.org:/cvsroot/gcc co -r tree-ssa-20020619-branch gcc
+$ cvs -z9 -d :pserver:anoncvs@subversions.gnu.org:/cvsroot/gcc co -r tree-ssa-20020619-branch -D 1/4/2003 gcc
 
-Should get you started.  See http://gcc.gnu.org/ for full details.
+G95 requires the GMP library (v3) for its internal numerics.
+Configure it and build it.
 
-Create $gcc_src/gcc/f95/ and copy all the g95 files into it.
-You then need to add the runtime library to the tree.  The libgfor directory
-should be placed in the top-level gcc source directory, ie. as a sibling of the
-gcc and libiberty directories.  Then apply libgfor/gcc_config.patch to the
-top-level gcc source directory.
+Create $GCC_SRC/gcc/f95/ and copy all the g95 files into it (or
+symlink it).  Apply the gcc_config.patch to the top-level gcc source
+directory.
 
-Configure GCC as normal with --enable-languages=c,f95
-Do not use the G95 configure system. Specifically make sure you don't have any
- extra config.h files floating about. These can confuse the GCC build system.
- If you're getting 'parse error before "tree"' in g95.h this is probably
- the cause. There should _not_ be a config.h file in the f95 directory.
-You'll probably need GMP installed on your system.
+The patch changes gcc's configure.in, so cd to '$GCC_SRC/gcc' and run
+'autoconf' to get a new configure script.
 
-Until it finds a permanent home libgfor is avalable from
- http://www.brookbunch.freeserve.co.uk/g95
+cd to $GCC_SRC and Configure GCC as normal with the arguments:
+--enable-languages=c,f95 --with-gmp-dir=<top level GMP directory>
+Don't use the G95 configure system.
 
-When using 'g95' to link programs the runtime libraries should be automatically
-linked in. Otherwise you need to specify -lgfor and possibly -lm.  To compile
-Fortran 77 source with g95 you need to specify -x f95, otherwise g77 will
-be used. This will generate "Fortran compiler not installed on this system"
-if you did not compile g77.
+Configure and build the runtime library in g95/runtime.  This leaves
+libf95.a in the top level directory.
 
-Note that the backend interface is still at an early stage. Many features are
-either missing or only partially complete.
+When using 'g95' to link programs the runtime libraries must be linked
+in.  Use -L <dir> -lf95 and possibly -lm.  Proper installation coming
+soon.
 
-Any problems/comments/suggestions please let me know.
-
-Paul Brook <paul@nowt.org>
+To compile Fortran 77 source with g95 you need to specify -x f95,
+otherwise g77 will be used.  This will generate "Fortran compiler not
+installed on this system" if you did not compile g77.

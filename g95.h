@@ -27,8 +27,8 @@ Boston, MA 02111-1307, USA.  */
  * reasonable. */
 
 
-#ifndef BACKEND_CODE /* Defined only if included by backend code. */
-#include "config.h"
+#ifndef IN_GCC         /* Defined only if included by backend code. */
+#include "g95-config.h"
 #endif
 
 /* The following ifdefs are recommended by the autoconf documentation
@@ -55,7 +55,7 @@ char *alloca ();
 
 /* Major control parameters */
 
-#define G95_VERSION "0.23"
+#define G95_VERSION "0.25"
 
 #define G95_MAX_SYMBOL_LEN 31
 
@@ -77,7 +77,7 @@ char *alloca ();
 #define NULL ((void *) 0)
 #endif
 
-#ifndef IN_GCC
+#ifndef GCC_TREE_H
 typedef void *tree; /* Just a dummy place holder. */
 #endif
 

@@ -1,0 +1,1265 @@
+Index: Makefile.def
+===================================================================
+RCS file: /cvsroot/gcc/gcc/Makefile.def,v
+retrieving revision 1.3.4.8
+diff --unified=15 -r1.3.4.8 Makefile.def
+--- Makefile.def	17 Dec 2002 20:45:41 -0000	1.3.4.8
++++ Makefile.def	7 Jan 2003 03:27:57 -0000
+@@ -64,30 +64,31 @@
+ host_modules= { module= wdiff; };
+ host_modules= { module= zip; no_check_cross=true; };
+ host_modules= { module= zlib; no_install=true; no_check=true; };
+ host_modules= { module= gdb; with_x=true; };
+ host_modules= { module= expect; with_x=true; };
+ host_modules= { module= guile; with_x=true; };
+ host_modules= { module= tk; with_x=true; };
+ host_modules= { module= tix; with_x=true; };
+ host_modules= { module= libtermcap; no_check=true; no_clean=true; };
+ host_modules= { module= utils; no_check=true; };
+ 
+ target_modules = { module= libstdc++-v3; raw_cxx=true; };
+ target_modules = { module= libmudflap; };
+ target_modules = { module= newlib; };
+ target_modules = { module= libf2c; };
++target_modules = { module= libgfor; };
+ target_modules = { module= libobjc; };
+ target_modules = { module= libtermcap; no_check=true; no_clean=true; };
+ target_modules = { module= winsup; };
+ target_modules = { module= libgloss; no_check=true; };
+ target_modules = { module= libiberty; };
+ target_modules = { module= gperf; };
+ target_modules = { module= examples; no_check=true; no_install=true; };
+ target_modules = { module= libffi; no_install=true; };
+ target_modules = { module= libjava; raw_cxx=true; };
+ target_modules = { module= zlib; };
+ target_modules = { module= boehm-gc; };
+ target_modules = { module= qthreads; };
+ target_modules = { module= rda; };
+ 
+ // These are (some of) the targets to be done in each subdirectory.
+Index: Makefile.in
+===================================================================
+RCS file: /cvsroot/gcc/gcc/Makefile.in,v
+retrieving revision 1.104.2.15
+diff --unified=15 -r1.104.2.15 Makefile.in
+--- Makefile.in	27 Dec 2002 01:50:49 -0000	1.104.2.15
++++ Makefile.in	7 Jan 2003 03:28:06 -0000
+@@ -249,30 +249,31 @@
+ 
+ # configure.in sets SET_LIB_PATH to this if --enable-shared was used.
+ # Some platforms don't like blank entries, so we remove duplicate,
+ # leading and trailing colons.
+ REALLY_SET_LIB_PATH = \
+   $(RPATH_ENVVAR)=`echo "$(HOST_LIB_PATH):$(TARGET_LIB_PATH):$$$(RPATH_ENVVAR)" | sed 's,::*,:,g;s,^:*,,;s,:*$$,,'`; export $(RPATH_ENVVAR);
+ 
+ # Should be substed by configure.in
+ FLAGS_FOR_TARGET = @FLAGS_FOR_TARGET@
+ CC_FOR_TARGET = @CC_FOR_TARGET@
+ CXX_FOR_TARGET = @CXX_FOR_TARGET@
+ RAW_CXX_FOR_TARGET = @RAW_CXX_FOR_TARGET@
+ CXX_FOR_TARGET_FOR_RECURSIVE_MAKE = @CXX_FOR_TARGET_FOR_RECURSIVE_MAKE@
+ RAW_CXX_FOR_TARGET_FOR_RECURSIVE_MAKE = @RAW_CXX_FOR_TARGET_FOR_RECURSIVE_MAKE@
+ GCJ_FOR_TARGET = @GCJ_FOR_TARGET@
++G95_FOR_TARGET = @G95_FOR_TARGET@
+ 
+ # If GCC_FOR_TARGET is not overriden on the command line, then this
+ # variable is passed down to the gcc Makefile, where it is used to
+ # build libgcc2.a.  We define it here so that it can itself be
+ # overridden on the command line.
+ GCC_FOR_TARGET=@GCC_FOR_TARGET@
+ USUAL_GCC_FOR_TARGET = $(STAGE_CC_WRAPPER) $$r/gcc/xgcc -B$$r/gcc/ $(FLAGS_FOR_TARGET)
+ 
+ AS_FOR_TARGET=@AS_FOR_TARGET@
+ USUAL_AS_FOR_TARGET = ` \
+   if [ -f $$r/gas/as-new ] ; then \
+     echo $$r/gas/as-new ; \
+   elif [ -f $$r/gcc/xgcc ]; then \
+     $(CC_FOR_TARGET) -print-prog-name=as ; \
+   else \
+@@ -371,30 +372,31 @@
+ #### host and target specific makefile fragments come in here.
+ ###
+ 
+ # Flags to pass down to all sub-makes.
+ # Please keep these in alphabetical order.
+ BASE_FLAGS_TO_PASS = \
+ 	"AR_FLAGS=$(AR_FLAGS)" \
+ 	"AR_FOR_TARGET=$(AR_FOR_TARGET)" \
+ 	"AS_FOR_TARGET=$(AS_FOR_TARGET)" \
+ 	"BISON=$(BISON)" \
+ 	"CC_FOR_BUILD=$(CC_FOR_BUILD)" \
+ 	"CC_FOR_TARGET=$(CC_FOR_TARGET)" \
+ 	"CFLAGS=$(CFLAGS)" \
+ 	"CFLAGS_FOR_TARGET=$(CFLAGS_FOR_TARGET)" \
+ 	"GCJ_FOR_TARGET=$(GCJ_FOR_TARGET)" \
++	"G95_FOR_TARGET=$(G95_FOR_TARGET)" \
+ 	"CXX_FOR_BUILD=$(CXX_FOR_BUILD)" \
+ 	"CXXFLAGS=$(CXXFLAGS)" \
+ 	"CXXFLAGS_FOR_TARGET=$(CXXFLAGS_FOR_TARGET)" \
+ 	"CXX_FOR_TARGET=$(CXX_FOR_TARGET)" \
+ 	"DLLTOOL_FOR_TARGET=$(DLLTOOL_FOR_TARGET)" \
+ 	"INSTALL=$(INSTALL)" \
+ 	"INSTALL_DATA=$(INSTALL_DATA)" \
+ 	"INSTALL_PROGRAM=$(INSTALL_PROGRAM)" \
+ 	"INSTALL_SCRIPT=$(INSTALL_SCRIPT)" \
+ 	"LDFLAGS=$(LDFLAGS)" \
+ 	"LEX=$(LEX)" \
+ 	"LD_FOR_TARGET=$(LD_FOR_TARGET)" \
+ 	"LIBCFLAGS=$(LIBCFLAGS)" \
+ 	"LIBCFLAGS_FOR_TARGET=$(LIBCFLAGS_FOR_TARGET)" \
+ 	"LIBCXXFLAGS=$(LIBCXXFLAGS)" \
+@@ -588,30 +590,31 @@
+ 	clean-texinfo \
+ 	clean-textutils \
+ 	clean-time \
+ 	clean-uudecode \
+ 	clean-wdiff \
+ 	clean-zip \
+ 	clean-zlib \
+ 	clean-utils
+ 
+ # All of the target modules that can be cleaned
+ CLEAN_TARGET_MODULES = \
+ 	clean-target-libstdc++-v3 \
+ 	clean-target-libmudflap \
+ 	clean-target-newlib \
+ 	clean-target-libf2c \
++	clean-target-libgfor \
+ 	clean-target-libobjc \
+ 	clean-target-winsup \
+ 	clean-target-libgloss \
+ 	clean-target-libiberty \
+ 	clean-target-gperf \
+ 	clean-target-examples \
+ 	clean-target-libffi \
+ 	clean-target-libjava \
+ 	clean-target-zlib \
+ 	clean-target-boehm-gc \
+ 	clean-target-qthreads \
+ 	clean-target-rda
+ 
+ # All of the x11 modules that can be cleaned
+ CLEAN_X11_MODULES = \
+@@ -1236,30 +1239,31 @@
+ 
+ .PHONY: configure-build-libiberty maybe-configure-build-libiberty
+ maybe-configure-build-libiberty:
+ configure-build-libiberty: $(BUILD_SUBDIR)/libiberty/Makefile
+ $(BUILD_SUBDIR)/libiberty/Makefile: config.status
+ 	@[ -d $(BUILD_SUBDIR)/libiberty ] || mkdir $(BUILD_SUBDIR)/libiberty;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    AR="$(AR_FOR_BUILD)"; export AR; \
+ 	    AS="$(AS_FOR_BUILD)"; export AS; \
+ 	    CC="$(CC_FOR_BUILD)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_BUILD)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_BUILD)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_BUILD)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_BUILD)"; export GCJ; \
++	    G95="$(G95_FOR_BUILD)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_BUILD)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_BUILD)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_BUILD)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_BUILD)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_BUILD)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_BUILD)"; export WINDRES; \
+ 	    echo Configuring in $(BUILD_SUBDIR)/libiberty; \
+ 	    cd "$(BUILD_SUBDIR)/libiberty" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(BUILD_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -5921,30 +5925,31 @@
+ 	cp multilib.out $(TARGET_SUBDIR)/libstdc++-v3/multilib.out
+ 
+ $(TARGET_SUBDIR)/libstdc++-v3/Makefile: config.status $(TARGET_SUBDIR)/libstdc++-v3/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libstdc++-v3 ] || mkdir $(TARGET_SUBDIR)/libstdc++-v3;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX_FOR_TARGET="$(RAW_CXX_FOR_TARGET)"; export CXX_FOR_TARGET; \
+ 	    CXX="$(RAW_CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libstdc++-v3; \
+ 	    cd "$(TARGET_SUBDIR)/libstdc++-v3" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6020,30 +6025,31 @@
+ 	echo "Configuring multilibs for libmudflap"; \
+ 	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/libmudflap/multilib.out 2> /dev/null
+ 
+ $(TARGET_SUBDIR)/libmudflap/Makefile: config.status $(TARGET_SUBDIR)/libmudflap/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libmudflap ] || mkdir $(TARGET_SUBDIR)/libmudflap;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libmudflap; \
+ 	    cd "$(TARGET_SUBDIR)/libmudflap" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6116,30 +6122,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/newlib ] || mkdir $(TARGET_SUBDIR)/newlib;\
+ 	cp multilib.out $(TARGET_SUBDIR)/newlib/multilib.out
+ 
+ $(TARGET_SUBDIR)/newlib/Makefile: config.status $(TARGET_SUBDIR)/newlib/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/newlib ] || mkdir $(TARGET_SUBDIR)/newlib;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/newlib; \
+ 	    cd "$(TARGET_SUBDIR)/newlib" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6212,30 +6219,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/libf2c ] || mkdir $(TARGET_SUBDIR)/libf2c;\
+ 	cp multilib.out $(TARGET_SUBDIR)/libf2c/multilib.out
+ 
+ $(TARGET_SUBDIR)/libf2c/Makefile: config.status $(TARGET_SUBDIR)/libf2c/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libf2c ] || mkdir $(TARGET_SUBDIR)/libf2c;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libf2c; \
+ 	    cd "$(TARGET_SUBDIR)/libf2c" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6287,51 +6295,152 @@
+ 	  $(SET_LIB_PATH) \
+ 	  (cd $(TARGET_SUBDIR)/libf2c && \
+ 	    $(MAKE) $(TARGET_FLAGS_TO_PASS)  check)
+ 
+ 
+ .PHONY: install-target-libf2c maybe-install-target-libf2c
+ maybe-install-target-libf2c:
+ install-target-libf2c: installdirs
+ 	@r=`${PWD}`; export r; \
+ 	  s=`cd $(srcdir); ${PWD}`; export s; \
+ 	  $(SET_LIB_PATH) \
+ 	  (cd $(TARGET_SUBDIR)/libf2c && \
+ 	    $(MAKE) $(TARGET_FLAGS_TO_PASS) install)
+ 
+ 
++.PHONY: configure-target-libgfor maybe-configure-target-libgfor
++maybe-configure-target-libgfor:
++configure-target-libgfor: $(TARGET_SUBDIR)/libgfor/Makefile
++
++# Don't manually override CC_FOR_TARGET at make time; get it set right
++# at configure time.  Otherwise multilibs may be wrong.
++$(TARGET_SUBDIR)/libgfor/multilib.out: maybe-all-gcc
++	@[ -d $(TARGET_SUBDIR)/libgfor ] || mkdir $(TARGET_SUBDIR)/libgfor;\
++	r=`${PWD}`; export r; \
++	echo "Configuring multilibs for libgfor"; \
++	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/libgfor/multilib.out 2> /dev/null
++
++$(TARGET_SUBDIR)/libgfor/Makefile: config.status $(TARGET_SUBDIR)/libgfor/multilib.out
++	@[ -d $(TARGET_SUBDIR)/libgfor ] || mkdir $(TARGET_SUBDIR)/libgfor;\
++	    r=`${PWD}`; export r; \
++	    s=`cd $(srcdir); ${PWD}`; export s; \
++	    $(SET_LIB_PATH) \
++	    AR="$(AR_FOR_TARGET)"; export AR; \
++	    AS="$(AS_FOR_TARGET)"; export AS; \
++	    CC="$(CC_FOR_TARGET)"; export CC; \
++	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
++	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
++	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
++	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
++	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
++	    LD="$(LD_FOR_TARGET)"; export LD; \
++            LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
++	    NM="$(NM_FOR_TARGET)"; export NM; \
++	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
++	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
++	    echo Configuring in $(TARGET_SUBDIR)/libgfor; \
++	    cd "$(TARGET_SUBDIR)/libgfor" || exit 1; \
++	    case $(srcdir) in \
++	    /* | [A-Za-z]:[\\/]*) \
++	      topdir=$(srcdir) ;; \
++	    *) \
++	      case "$(TARGET_SUBDIR)" in \
++	      .) topdir="../$(srcdir)" ;; \
++	      *) topdir="../../$(srcdir)" ;; \
++	      esac ;; \
++	    esac; \
++	    if [ "$(srcdir)" = "." ] ; then \
++	      if [ "$(TARGET_SUBDIR)" != "." ] ; then \
++		if $(SHELL) $$s/symlink-tree $${topdir}/libgfor "no-such-file" ; then \
++		  if [ -f Makefile ]; then \
++		    if $(MAKE) distclean; then \
++		      true; \
++		    else \
++		      exit 1; \
++		    fi; \
++		  else \
++		    true; \
++		  fi; \
++		else \
++		  exit 1; \
++		fi; \
++	      else \
++		true; \
++	      fi; \
++	      srcdiroption="--srcdir=."; \
++	      libsrcdir="."; \
++	    else \
++	      srcdiroption="--srcdir=$${topdir}/libgfor"; \
++	      libsrcdir="$$s/libgfor"; \
++	    fi; \
++	    rm -f no-such-file || : ; \
++	    CONFIG_SITE=no-such-file $(SHELL) $${libsrcdir}/configure \
++	      $(TARGET_CONFIGARGS) $${srcdiroption} \
++	      --with-target-subdir="$(TARGET_SUBDIR)" \
++	      || exit 1
++
++.PHONY: all-target-libgfor maybe-all-target-libgfor
++maybe-all-target-libgfor:
++all-target-libgfor: configure-target-libgfor
++	@r=`${PWD}`; export r; \
++	  s=`cd $(srcdir); ${PWD}`; export s; \
++	  $(SET_LIB_PATH) \
++	  (cd $(TARGET_SUBDIR)/libgfor; \
++	    $(MAKE) $(TARGET_FLAGS_TO_PASS)  all)
++
++.PHONY: check-target-libgfor
++check-target-libgfor:
++	@r=`${PWD}`; export r; \
++	  s=`cd $(srcdir); ${PWD}`; export s; \
++	  $(SET_LIB_PATH) \
++	  (cd $(TARGET_SUBDIR)/libgfor; \
++	    $(MAKE) $(TARGET_FLAGS_TO_PASS)  check)
++
++
++.PHONY: install-target-libgfor maybe-install-target-libgfor
++maybe-install-target-libgfor:
++install-target-libgfor: installdirs
++	@r=`${PWD}`; export r; \
++	  s=`cd $(srcdir); ${PWD}`; export s; \
++	  $(SET_LIB_PATH) \
++	  (cd $(TARGET_SUBDIR)/libgfor; \
++	    $(MAKE) $(TARGET_FLAGS_TO_PASS) install)
++
++
+ .PHONY: configure-target-libobjc maybe-configure-target-libobjc
+ maybe-configure-target-libobjc:
+ configure-target-libobjc: $(TARGET_SUBDIR)/libobjc/Makefile
+ 
+ # There's only one multilib.out.  Cleverer subdirs shouldn't need it copied.
+ $(TARGET_SUBDIR)/libobjc/multilib.out: multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libobjc ] || mkdir $(TARGET_SUBDIR)/libobjc;\
+ 	cp multilib.out $(TARGET_SUBDIR)/libobjc/multilib.out
+ 
+ $(TARGET_SUBDIR)/libobjc/Makefile: config.status $(TARGET_SUBDIR)/libobjc/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libobjc ] || mkdir $(TARGET_SUBDIR)/libobjc;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libobjc; \
+ 	    cd "$(TARGET_SUBDIR)/libobjc" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6404,30 +6513,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/libtermcap ] || mkdir $(TARGET_SUBDIR)/libtermcap;\
+ 	cp multilib.out $(TARGET_SUBDIR)/libtermcap/multilib.out
+ 
+ $(TARGET_SUBDIR)/libtermcap/Makefile: config.status $(TARGET_SUBDIR)/libtermcap/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libtermcap ] || mkdir $(TARGET_SUBDIR)/libtermcap;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libtermcap; \
+ 	    cd "$(TARGET_SUBDIR)/libtermcap" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6496,30 +6606,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/winsup ] || mkdir $(TARGET_SUBDIR)/winsup;\
+ 	cp multilib.out $(TARGET_SUBDIR)/winsup/multilib.out
+ 
+ $(TARGET_SUBDIR)/winsup/Makefile: config.status $(TARGET_SUBDIR)/winsup/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/winsup ] || mkdir $(TARGET_SUBDIR)/winsup;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/winsup; \
+ 	    cd "$(TARGET_SUBDIR)/winsup" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6592,30 +6703,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/libgloss ] || mkdir $(TARGET_SUBDIR)/libgloss;\
+ 	cp multilib.out $(TARGET_SUBDIR)/libgloss/multilib.out
+ 
+ $(TARGET_SUBDIR)/libgloss/Makefile: config.status $(TARGET_SUBDIR)/libgloss/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libgloss ] || mkdir $(TARGET_SUBDIR)/libgloss;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libgloss; \
+ 	    cd "$(TARGET_SUBDIR)/libgloss" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6684,30 +6796,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/libiberty ] || mkdir $(TARGET_SUBDIR)/libiberty;\
+ 	cp multilib.out $(TARGET_SUBDIR)/libiberty/multilib.out
+ 
+ $(TARGET_SUBDIR)/libiberty/Makefile: config.status $(TARGET_SUBDIR)/libiberty/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libiberty ] || mkdir $(TARGET_SUBDIR)/libiberty;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libiberty; \
+ 	    cd "$(TARGET_SUBDIR)/libiberty" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6780,30 +6893,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/gperf ] || mkdir $(TARGET_SUBDIR)/gperf;\
+ 	cp multilib.out $(TARGET_SUBDIR)/gperf/multilib.out
+ 
+ $(TARGET_SUBDIR)/gperf/Makefile: config.status $(TARGET_SUBDIR)/gperf/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/gperf ] || mkdir $(TARGET_SUBDIR)/gperf;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/gperf; \
+ 	    cd "$(TARGET_SUBDIR)/gperf" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6876,30 +6990,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/examples ] || mkdir $(TARGET_SUBDIR)/examples;\
+ 	cp multilib.out $(TARGET_SUBDIR)/examples/multilib.out
+ 
+ $(TARGET_SUBDIR)/examples/Makefile: config.status $(TARGET_SUBDIR)/examples/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/examples ] || mkdir $(TARGET_SUBDIR)/examples;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/examples; \
+ 	    cd "$(TARGET_SUBDIR)/examples" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -6964,30 +7079,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/libffi ] || mkdir $(TARGET_SUBDIR)/libffi;\
+ 	cp multilib.out $(TARGET_SUBDIR)/libffi/multilib.out
+ 
+ $(TARGET_SUBDIR)/libffi/Makefile: config.status $(TARGET_SUBDIR)/libffi/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libffi ] || mkdir $(TARGET_SUBDIR)/libffi;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libffi; \
+ 	    cd "$(TARGET_SUBDIR)/libffi" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -7057,30 +7173,31 @@
+ 	cp multilib.out $(TARGET_SUBDIR)/libjava/multilib.out
+ 
+ $(TARGET_SUBDIR)/libjava/Makefile: config.status $(TARGET_SUBDIR)/libjava/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/libjava ] || mkdir $(TARGET_SUBDIR)/libjava;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX_FOR_TARGET="$(RAW_CXX_FOR_TARGET)"; export CXX_FOR_TARGET; \
+ 	    CXX="$(RAW_CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/libjava; \
+ 	    cd "$(TARGET_SUBDIR)/libjava" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -7153,30 +7270,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/zlib ] || mkdir $(TARGET_SUBDIR)/zlib;\
+ 	cp multilib.out $(TARGET_SUBDIR)/zlib/multilib.out
+ 
+ $(TARGET_SUBDIR)/zlib/Makefile: config.status $(TARGET_SUBDIR)/zlib/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/zlib ] || mkdir $(TARGET_SUBDIR)/zlib;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/zlib; \
+ 	    cd "$(TARGET_SUBDIR)/zlib" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -7249,30 +7367,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/boehm-gc ] || mkdir $(TARGET_SUBDIR)/boehm-gc;\
+ 	cp multilib.out $(TARGET_SUBDIR)/boehm-gc/multilib.out
+ 
+ $(TARGET_SUBDIR)/boehm-gc/Makefile: config.status $(TARGET_SUBDIR)/boehm-gc/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/boehm-gc ] || mkdir $(TARGET_SUBDIR)/boehm-gc;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/boehm-gc; \
+ 	    cd "$(TARGET_SUBDIR)/boehm-gc" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -7345,30 +7464,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/qthreads ] || mkdir $(TARGET_SUBDIR)/qthreads;\
+ 	cp multilib.out $(TARGET_SUBDIR)/qthreads/multilib.out
+ 
+ $(TARGET_SUBDIR)/qthreads/Makefile: config.status $(TARGET_SUBDIR)/qthreads/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/qthreads ] || mkdir $(TARGET_SUBDIR)/qthreads;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/qthreads; \
+ 	    cd "$(TARGET_SUBDIR)/qthreads" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -7441,30 +7561,31 @@
+ 	@[ -d $(TARGET_SUBDIR)/rda ] || mkdir $(TARGET_SUBDIR)/rda;\
+ 	cp multilib.out $(TARGET_SUBDIR)/rda/multilib.out
+ 
+ $(TARGET_SUBDIR)/rda/Makefile: config.status $(TARGET_SUBDIR)/rda/multilib.out
+ 	@[ -d $(TARGET_SUBDIR)/rda ] || mkdir $(TARGET_SUBDIR)/rda;\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/rda; \
+ 	    cd "$(TARGET_SUBDIR)/rda" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -7788,30 +7909,32 @@
+ all-send-pr: maybe-all-prms
+ all-snavigator: maybe-all-tcl maybe-all-tk maybe-all-itcl maybe-all-tix maybe-all-db maybe-all-grep maybe-all-libgui
+ all-tar: maybe-all-libiberty
+ all-uudecode: maybe-all-libiberty
+ 
+ ALL_GCC = maybe-all-gcc
+ ALL_GCC_C = $(ALL_GCC) maybe-all-target-newlib maybe-all-target-libgloss
+ ALL_GCC_CXX = $(ALL_GCC_C) maybe-all-target-libstdc++-v3
+ 
+ # Target modules specific to gcc.
+ configure-target-boehm-gc: $(ALL_GCC_C) maybe-configure-target-qthreads
+ configure-target-fastjar: maybe-configure-target-zlib
+ all-target-fastjar: maybe-all-target-zlib maybe-all-target-libiberty
+ configure-target-libf2c: $(ALL_GCC_C)
+ all-target-libf2c: maybe-all-target-libiberty
++configure-target-libgfor: $(ALL_GCC_C)
++all-target-libgfor: maybe-all-target-libiberty
+ configure-target-libffi: $(ALL_GCC_C) 
+ configure-target-libjava: $(ALL_GCC_C) maybe-configure-target-zlib maybe-configure-target-boehm-gc maybe-configure-target-qthreads maybe-configure-target-libffi
+ all-target-libjava: maybe-all-fastjar maybe-all-target-zlib maybe-all-target-boehm-gc maybe-all-target-qthreads maybe-all-target-libffi
+ configure-target-libobjc: $(ALL_GCC_C)
+ all-target-libobjc: maybe-all-target-libiberty
+ configure-target-libstdc++-v3: $(ALL_GCC_C)
+ all-target-libstdc++-v3: maybe-all-target-libiberty
+ configure-target-zlib: $(ALL_GCC_C)
+ 
+ # Target modules in the 'src' repository.
+ configure-target-examples: $(ALL_GCC_C)
+ configure-target-libgloss: $(ALL_GCC)
+ all-target-libgloss: maybe-configure-target-newlib
+ configure-target-libiberty: $(ALL_GCC_C)
+ configure-target-libtermcap: $(ALL_GCC_C)
+Index: Makefile.tpl
+===================================================================
+RCS file: /cvsroot/gcc/gcc/Makefile.tpl,v
+retrieving revision 1.11.2.9
+diff --unified=15 -r1.11.2.9 Makefile.tpl
+--- Makefile.tpl	27 Dec 2002 01:50:50 -0000	1.11.2.9
++++ Makefile.tpl	7 Jan 2003 03:28:08 -0000
+@@ -252,30 +252,31 @@
+ 
+ # configure.in sets SET_LIB_PATH to this if --enable-shared was used.
+ # Some platforms don't like blank entries, so we remove duplicate,
+ # leading and trailing colons.
+ REALLY_SET_LIB_PATH = \
+   $(RPATH_ENVVAR)=`echo "$(HOST_LIB_PATH):$(TARGET_LIB_PATH):$$$(RPATH_ENVVAR)" | sed 's,::*,:,g;s,^:*,,;s,:*$$,,'`; export $(RPATH_ENVVAR);
+ 
+ # Should be substed by configure.in
+ FLAGS_FOR_TARGET = @FLAGS_FOR_TARGET@
+ CC_FOR_TARGET = @CC_FOR_TARGET@
+ CXX_FOR_TARGET = @CXX_FOR_TARGET@
+ RAW_CXX_FOR_TARGET = @RAW_CXX_FOR_TARGET@
+ CXX_FOR_TARGET_FOR_RECURSIVE_MAKE = @CXX_FOR_TARGET_FOR_RECURSIVE_MAKE@
+ RAW_CXX_FOR_TARGET_FOR_RECURSIVE_MAKE = @RAW_CXX_FOR_TARGET_FOR_RECURSIVE_MAKE@
+ GCJ_FOR_TARGET = @GCJ_FOR_TARGET@
++G95_FOR_TARGET = @G95_FOR_TARGET@
+ 
+ # If GCC_FOR_TARGET is not overriden on the command line, then this
+ # variable is passed down to the gcc Makefile, where it is used to
+ # build libgcc2.a.  We define it here so that it can itself be
+ # overridden on the command line.
+ GCC_FOR_TARGET=@GCC_FOR_TARGET@
+ USUAL_GCC_FOR_TARGET = $(STAGE_CC_WRAPPER) $$r/gcc/xgcc -B$$r/gcc/ $(FLAGS_FOR_TARGET)
+ 
+ AS_FOR_TARGET=@AS_FOR_TARGET@
+ USUAL_AS_FOR_TARGET = ` \
+   if [ -f $$r/gas/as-new ] ; then \
+     echo $$r/gas/as-new ; \
+   elif [ -f $$r/gcc/xgcc ]; then \
+     $(CC_FOR_TARGET) -print-prog-name=as ; \
+   else \
+@@ -374,30 +375,31 @@
+ #### host and target specific makefile fragments come in here.
+ ###
+ 
+ # Flags to pass down to all sub-makes.
+ # Please keep these in alphabetical order.
+ BASE_FLAGS_TO_PASS = \
+ 	"AR_FLAGS=$(AR_FLAGS)" \
+ 	"AR_FOR_TARGET=$(AR_FOR_TARGET)" \
+ 	"AS_FOR_TARGET=$(AS_FOR_TARGET)" \
+ 	"BISON=$(BISON)" \
+ 	"CC_FOR_BUILD=$(CC_FOR_BUILD)" \
+ 	"CC_FOR_TARGET=$(CC_FOR_TARGET)" \
+ 	"CFLAGS=$(CFLAGS)" \
+ 	"CFLAGS_FOR_TARGET=$(CFLAGS_FOR_TARGET)" \
+ 	"GCJ_FOR_TARGET=$(GCJ_FOR_TARGET)" \
++	"G95_FOR_TARGET=$(G95_FOR_TARGET)" \
+ 	"CXX_FOR_BUILD=$(CXX_FOR_BUILD)" \
+ 	"CXXFLAGS=$(CXXFLAGS)" \
+ 	"CXXFLAGS_FOR_TARGET=$(CXXFLAGS_FOR_TARGET)" \
+ 	"CXX_FOR_TARGET=$(CXX_FOR_TARGET)" \
+ 	"DLLTOOL_FOR_TARGET=$(DLLTOOL_FOR_TARGET)" \
+ 	"INSTALL=$(INSTALL)" \
+ 	"INSTALL_DATA=$(INSTALL_DATA)" \
+ 	"INSTALL_PROGRAM=$(INSTALL_PROGRAM)" \
+ 	"INSTALL_SCRIPT=$(INSTALL_SCRIPT)" \
+ 	"LDFLAGS=$(LDFLAGS)" \
+ 	"LEX=$(LEX)" \
+ 	"LD_FOR_TARGET=$(LD_FOR_TARGET)" \
+ 	"LIBCFLAGS=$(LIBCFLAGS)" \
+ 	"LIBCFLAGS_FOR_TARGET=$(LIBCFLAGS_FOR_TARGET)" \
+ 	"LIBCXXFLAGS=$(LIBCXXFLAGS)" \
+@@ -791,30 +793,31 @@
+ [+ FOR build_modules +]
+ .PHONY: configure-build-[+module+] maybe-configure-build-[+module+]
+ maybe-configure-build-[+module+]:
+ configure-build-[+module+]: $(BUILD_SUBDIR)/[+module+]/Makefile
+ $(BUILD_SUBDIR)/[+module+]/Makefile: config.status
+ 	@[ -d $(BUILD_SUBDIR)/[+module+] ] || mkdir $(BUILD_SUBDIR)/[+module+];\
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    AR="$(AR_FOR_BUILD)"; export AR; \
+ 	    AS="$(AS_FOR_BUILD)"; export AS; \
+ 	    CC="$(CC_FOR_BUILD)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_BUILD)"; export CFLAGS; \
+ 	    CXX="$(CXX_FOR_BUILD)"; export CXX; \
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_BUILD)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_BUILD)"; export GCJ; \
++	    G95="$(G95_FOR_BUILD)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_BUILD)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_BUILD)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_BUILD)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_BUILD)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_BUILD)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_BUILD)"; export WINDRES; \
+ 	    echo Configuring in $(BUILD_SUBDIR)/[+module+]; \
+ 	    cd "$(BUILD_SUBDIR)/[+module+]" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(BUILD_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -978,30 +981,31 @@
+ 	    r=`${PWD}`; export r; \
+ 	    s=`cd $(srcdir); ${PWD}`; export s; \
+ 	    $(SET_LIB_PATH) \
+ 	    AR="$(AR_FOR_TARGET)"; export AR; \
+ 	    AS="$(AS_FOR_TARGET)"; export AS; \
+ 	    CC="$(CC_FOR_TARGET)"; export CC; \
+ 	    CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \[+ 
+ 	IF raw_cxx +]
+ 	    CXX_FOR_TARGET="$(RAW_CXX_FOR_TARGET)"; export CXX_FOR_TARGET; \
+ 	    CXX="$(RAW_CXX_FOR_TARGET)"; export CXX; \[+ 
+ 	ELSE normal_cxx +]
+ 	    CXX="$(CXX_FOR_TARGET)"; export CXX; \[+ 
+ 	ENDIF raw_cxx +]
+ 	    CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+ 	    GCJ="$(GCJ_FOR_TARGET)"; export GCJ; \
++	    G95="$(G95_FOR_TARGET)"; export G95; \
+ 	    DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	    LD="$(LD_FOR_TARGET)"; export LD; \
+             LDFLAGS="$(LDFLAGS_FOR_TARGET)"; export LDFLAGS; \
+ 	    NM="$(NM_FOR_TARGET)"; export NM; \
+ 	    RANLIB="$(RANLIB_FOR_TARGET)"; export RANLIB; \
+ 	    WINDRES="$(WINDRES_FOR_TARGET)"; export WINDRES; \
+ 	    echo Configuring in $(TARGET_SUBDIR)/[+module+]; \
+ 	    cd "$(TARGET_SUBDIR)/[+module+]" || exit 1; \
+ 	    case $(srcdir) in \
+ 	    /* | [A-Za-z]:[\\/]*) \
+ 	      topdir=$(srcdir) ;; \
+ 	    *) \
+ 	      case "$(TARGET_SUBDIR)" in \
+ 	      .) topdir="../$(srcdir)" ;; \
+ 	      *) topdir="../../$(srcdir)" ;; \
+@@ -1342,30 +1346,32 @@
+ all-send-pr: maybe-all-prms
+ all-snavigator: maybe-all-tcl maybe-all-tk maybe-all-itcl maybe-all-tix maybe-all-db maybe-all-grep maybe-all-libgui
+ all-tar: maybe-all-libiberty
+ all-uudecode: maybe-all-libiberty
+ 
+ ALL_GCC = maybe-all-gcc
+ ALL_GCC_C = $(ALL_GCC) maybe-all-target-newlib maybe-all-target-libgloss
+ ALL_GCC_CXX = $(ALL_GCC_C) maybe-all-target-libstdc++-v3
+ 
+ # Target modules specific to gcc.
+ configure-target-boehm-gc: $(ALL_GCC_C) maybe-configure-target-qthreads
+ configure-target-fastjar: maybe-configure-target-zlib
+ all-target-fastjar: maybe-all-target-zlib maybe-all-target-libiberty
+ configure-target-libf2c: $(ALL_GCC_C)
+ all-target-libf2c: maybe-all-target-libiberty
++configure-target-libgfor: $(ALL_GCC_C)
++all-target-libgfor: maybe-all-target-libiberty
+ configure-target-libffi: $(ALL_GCC_C) 
+ configure-target-libjava: $(ALL_GCC_C) maybe-configure-target-zlib maybe-configure-target-boehm-gc maybe-configure-target-qthreads maybe-configure-target-libffi
+ all-target-libjava: maybe-all-fastjar maybe-all-target-zlib maybe-all-target-boehm-gc maybe-all-target-qthreads maybe-all-target-libffi
+ configure-target-libobjc: $(ALL_GCC_C)
+ all-target-libobjc: maybe-all-target-libiberty
+ configure-target-libstdc++-v3: $(ALL_GCC_C)
+ all-target-libstdc++-v3: maybe-all-target-libiberty
+ configure-target-zlib: $(ALL_GCC_C)
+ 
+ # Target modules in the 'src' repository.
+ configure-target-examples: $(ALL_GCC_C)
+ configure-target-libgloss: $(ALL_GCC)
+ all-target-libgloss: maybe-configure-target-newlib
+ configure-target-libiberty: $(ALL_GCC_C)
+ configure-target-libtermcap: $(ALL_GCC_C)
+Index: configure.in
+===================================================================
+RCS file: /cvsroot/gcc/gcc/configure.in,v
+retrieving revision 1.161.2.17
+diff --unified=15 -r1.161.2.17 configure.in
+--- configure.in	27 Dec 2002 01:50:50 -0000	1.161.2.17
++++ configure.in	7 Jan 2003 03:28:10 -0000
+@@ -88,30 +88,31 @@
+ libgcj="target-libffi \
+ 	target-boehm-gc \
+ 	target-zlib \
+ 	target-qthreads \
+ 	target-libjava"
+ 
+ # these libraries are built for the target environment, and are built after
+ # the host libraries and the host tools (which may be a cross compiler)
+ #
+ target_libs="target-libiberty \
+ 		target-libgloss \
+ 		target-newlib \
+ 		${libstdcxx_version} \
+ 		target-libmudflap \
+ 		target-libf2c \
++		target-libgfor \
+ 		${libgcj}
+ 		target-libobjc"
+ 
+ # these tools are built using the target libs, and are intended to run only
+ # in the target environment
+ #
+ # note: any program that *uses* libraries that are in the "target_libs"
+ # list belongs in this list.  those programs are also very likely
+ # candidates for the "native_only" list which follows
+ #
+ target_tools="target-examples target-groff target-gperf target-rda"
+ 
+ ################################################################################
+ 
+ ## All tools belong in one of the four categories, and are assigned above
+@@ -1654,30 +1655,44 @@
+ 
+ if test "x${GCJ_FOR_TARGET+set}" = xset; then
+   :
+ elif test -d ${srcdir}/gcc; then
+   GCJ_FOR_TARGET='$$r/gcc/gcj -B$$r/gcc/'
+ elif test "$host" = "$target"; then
+   GCJ_FOR_TARGET='gcj'
+ else
+   GCJ_FOR_TARGET=`echo gcj | sed -e 's/x/x/' ${program_transform_name}`
+ fi
+ case $GCJ_FOR_TARGET in
+ *' $(FLAGS_FOR_TARGET)') ;;
+ *) GCJ_FOR_TARGET=$GCJ_FOR_TARGET' $(FLAGS_FOR_TARGET)' ;;
+ esac
+ 
++if test "x${G95_FOR_TARGET+set}" = xset; then
++  :
++elif test -d ${srcdir}/gcc; then
++  G95_FOR_TARGET='$$r/gcc/g95 -B$$r/gcc/'
++elif test "$host" = "$target"; then
++  G95_FOR_TARGET='g95'
++else
++  G95_FOR_TARGET=`echo g95 | sed -e 's/x/x/' ${program_transform_name}`
++fi
++case $G95_FOR_TARGET in
++*' $(FLAGS_FOR_TARGET)') ;;
++*) G95_FOR_TARGET=$G95_FOR_TARGET' $(FLAGS_FOR_TARGET)' ;;
++esac
++
+ # Don't use libstdc++-v3's flags to configure/build itself.
+ libstdcxx_flags='`test ! -f $$r/$(TARGET_SUBDIR)/libstdc++-v3/testsuite_flags || $(SHELL) $$r/$(TARGET_SUBDIR)/libstdc++-v3/testsuite_flags --build-includes` -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src/.libs'
+ raw_libstdcxx_flags=' -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src/.libs'
+ 
+ if test "x${CXX_FOR_TARGET+set}" = xset; then
+   :
+ elif test -d ${srcdir}/gcc; then
+   # We add -shared-libgcc to CXX_FOR_TARGET whenever we use xgcc instead
+   # of g++ for linking C++ or Java, because g++ has -shared-libgcc by
+   # default whereas gcc does not.
+   # RAW_CXX_FOR_TARGET is for linking C++ or java; CXX_FOR_TARGET is for
+   # all other cases.
+   CXX_FOR_TARGET='$$r/gcc/g++ -B$$r/gcc/ -nostdinc++ '$libstdcxx_flags
+   RAW_CXX_FOR_TARGET='$$r/gcc/xgcc -shared-libgcc -B$$r/gcc/ -nostdinc++ '$raw_libstdcxx_flags
+ elif test "$host" = "$target"; then
+@@ -1715,30 +1730,31 @@
+ s%@all_build_modules@%${all_build_modules}%
+ s%@configure_host_modules@%${configure_host_modules}%
+ s%@all_host_modules@%${all_host_modules}%
+ s%@check_host_modules@%${check_host_modules}%
+ s%@install_host_modules@%${install_host_modules}%
+ s%@install_host_modules_nogcc@%${install_host_modules_nogcc}%
+ s%@configure_target_modules@%${configure_target_modules}%
+ s%@all_target_modules@%${all_target_modules}%
+ s%@check_target_modules@%${check_target_modules}%
+ s%@install_target_modules@%${install_target_modules}%
+ s:@target_configdirs@:${target_configdirs}:
+ s%@target_configargs@%${targargs}%
+ s%@FLAGS_FOR_TARGET@%${FLAGS_FOR_TARGET}%
+ s%@CC_FOR_TARGET@%\$(STAGE_CC_WRAPPER) ${CC_FOR_TARGET}%
+ s%@GCJ_FOR_TARGET@%\$(STAGE_CC_WRAPPER) ${GCJ_FOR_TARGET}%
++s%@G95_FOR_TARGET@%\$(STAGE_CC_WRAPPER) ${G95_FOR_TARGET}%
+ s%@CXX_FOR_TARGET@%\$(STAGE_CC_WRAPPER) ${qCXX_FOR_TARGET}%
+ s%@RAW_CXX_FOR_TARGET@%\$(STAGE_CC_WRAPPER) ${qRAW_CXX_FOR_TARGET}%
+ s%@CXX_FOR_TARGET_FOR_RECURSIVE_MAKE@%\$(STAGE_CC_WRAPPER) ${qqCXX_FOR_TARGET}%
+ s%@RAW_CXX_FOR_TARGET_FOR_RECURSIVE_MAKE@%\$(STAGE_CC_WRAPPER) ${qqRAW_CXX_FOR_TARGET}%
+ s%@target_subdir@%${target_subdir}%
+ s%@build_subdir@%${build_subdir}%
+ s%@build_configargs@%${buildargs}%
+ s%@gxx_include_dir@%${gxx_include_dir}%
+ s%@libstdcxx_incdir@%${libstdcxx_incdir}%
+ s%@host_configargs@%${hostargs}%
+ EOF
+ sed -f $sedtemp Makefile > Makefile.tem
+ rm -f Makefile $sedtemp
+ mv -f Makefile.tem Makefile
+ 
+Index: gcc/Makefile.in
+===================================================================
+RCS file: /cvsroot/gcc/gcc/gcc/Makefile.in,v
+retrieving revision 1.903.2.60
+diff --unified=15 -r1.903.2.60 Makefile.in
+--- gcc/Makefile.in	3 Jan 2003 01:57:16 -0000	1.903.2.60
++++ gcc/Makefile.in	7 Jan 2003 03:28:16 -0000
+@@ -159,30 +159,32 @@
+ # do not correctly set the timestamp due to buggy versions of `utime'
+ # in the kernel.  So, we use `echo' instead.
+ STAMP = echo timestamp >
+ 
+ # This is where we get zlib from.  zlibdir is -L../zlib and zlibinc is
+ # -I../zlib, unless we were configured with --with-system-zlib, in which
+ # case both are empty.
+ ZLIB = @zlibdir@ -lz
+ ZLIBINC = @zlibinc@
+ 
+ BANSHEELIB = @BANSHEELIB@
+ BANSHEEINC = @BANSHEEINC@
+ # Substitution type for target's getgroups 2nd arg.
+ TARGET_GETGROUPS_T = @TARGET_GETGROUPS_T@
+ 
++F95_LIBS = @F95_LIBS@ $(BANSHEELIB) $(LIBIBERTY)
++
+ # Target to use when installing include directory.  Either
+ # install-headers-tar, install-headers-cpio or install-headers-cp.
+ INSTALL_HEADERS_DIR = @build_install_headers_dir@
+ 
+ # Header files that are made available under the same name
+ # to programs compiled with GCC.
+ USER_H = $(srcdir)/ginclude/float.h \
+ 	 $(srcdir)/ginclude/iso646.h \
+ 	 $(srcdir)/ginclude/stdarg.h \
+ 	 $(srcdir)/ginclude/stdbool.h \
+ 	 $(srcdir)/ginclude/stddef.h \
+ 	 $(srcdir)/ginclude/varargs.h \
+ 	 $(EXTRA_HEADERS)
+ 
+ # The GCC to use for compiling libgcc.a and crt*.o.
+Index: gcc/configure.in
+===================================================================
+RCS file: /cvsroot/gcc/gcc/gcc/configure.in,v
+retrieving revision 1.606.2.16
+diff --unified=15 -r1.606.2.16 configure.in
+--- gcc/configure.in	27 Dec 2002 01:51:12 -0000	1.606.2.16
++++ gcc/configure.in	7 Jan 2003 03:28:19 -0000
+@@ -72,30 +72,61 @@
+     ;;
+   *)
+     gcc_exec_prefix_setting="ok"
+     ;;
+ esac
+ changequote([,])dnl
+ AC_MSG_RESULT($gcc_exec_prefix_setting)
+ if test "$gcc_exec_prefix_setting" != "ok"; then
+ AC_MSG_ERROR([
+ *** GCC_EXEC_PREFIX shouldn't contain the current directory when
+ *** building gcc. Please change the environment variable
+ *** and run configure again.])
+ fi
+ 
+ # Check for additional parameters
++AC_SUBST(F95_LIBS)
++
++AC_ARG_WITH(gmp-dir, [  --with-gmp-dir=PATH     Specify directory for the GMP library])
++
++LIBS_temp=$LIBS
++
++if test "x$with_gmp_dir" != x -a -d "$with_gmp_dir"; then
++        CPPFLAGS="$CPPFLAGS -I$with_gmp_dir"
++        F95_LIBS="$with_gmp_dir/.libs/libgmp.a"
++        LIBS="$with_gmp_dir/.libs/libgmp.a $LIBS"
++fi
++
++AC_FUNC_ALLOCA([AC_MSG_ERROR([alloca not found])])
++
++AC_CHECK_HEADER(gmp.h, [], [AC_MSG_ERROR([gmp.h not found])])
++
++AC_MSG_CHECKING([for correct version of gmp.h])
++AC_TRY_COMPILE([#include "gmp.h"],[
++#if __GNU_MP_VERSION < 3
++       choke me
++#endif
++], [AC_MSG_RESULT([yes])],
++   [AC_MSG_ERROR([gmp version 3.0 or later is required])])
++
++AC_MSG_CHECKING([for mpf_init in -lgmp])
++
++
++AC_TRY_LINK([#include <gmp.h>], [mpf_t n; mpf_init(n);],
++  [AC_MSG_RESULT([yes])],  [AC_MSG_ERROR([could not link with libgmp])])
++
++LIBS=$LIBS_temp
+ 
+ # With GNU ld
+ AC_ARG_WITH(gnu-ld,
+ [  --with-gnu-ld           arrange to work with GNU ld.],
+ gnu_ld_flag="$with_gnu_ld",
+ gnu_ld_flag=no)
+ 
+ # With pre-defined ld
+ AC_ARG_WITH(ld,
+ [  --with-ld               arrange to use the specified ld (full pathname)],
+ DEFAULT_LINKER="$with_ld")
+ if test x"${DEFAULT_LINKER+set}" = x"set"; then
+   if test ! -x "$DEFAULT_LINKER"; then
+     AC_MSG_WARN([cannot execute: $DEFAULT_LINKER: check --with-ld or env. var. DEFAULT_LINKER])
+   elif $DEFAULT_LINKER -v < /dev/null 2>&1 | grep GNU > /dev/null; then
