@@ -631,45 +631,54 @@ g95_iterator iter;
 locus old_loc;
 g95_expr *e;
 match m;
+int n;
 
   old_loc = *g95_current_locus();
 
   if (g95_match_char('(') == MATCH_NO) return MATCH_NO;
 
   memset(&iter, '\0', sizeof(g95_iterator));
+  head = NULL;
 
   m = match_array_cons_element(&head);
-  if (m != MATCH_YES) {
-    g95_set_locus(&old_loc);
-    return m;
-  }
+  if (m != MATCH_YES) goto cleanup;
 
   tail = head;
 
   if (g95_match_char(',') != MATCH_YES) {
-    g95_free_constructor(head);
-    g95_set_locus(&old_loc);
-    return MATCH_NO;
+    m = MATCH_NO;
+    goto cleanup;
   }
 
-  for(;;) {
+  for(n=1;; n++) {
     m = g95_match_iterator(&iter, 0);
     if (m == MATCH_YES) break;
     if (m == MATCH_ERROR) goto cleanup;
 
     m = match_array_cons_element(&new);
     if (m == MATCH_ERROR) goto cleanup;
-    if (m == MATCH_NO) goto syntax;
+    if (m == MATCH_NO) {
+      if (n > 2) goto syntax;
+      m = MATCH_NO;
+      goto cleanup;    /* Could be a complex constant */
+    }
 
     tail->next = new;
     tail = new;
 
-    if (g95_match_char(',') != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) {
+      if (n > 2) goto syntax;
+      m = MATCH_NO;
+      goto cleanup;
+    }
   }
 
   if (g95_match_char(')') != MATCH_YES) goto syntax;
 
-  if (check_duplicate_iterator(head, iter.var->symbol)) goto cleanup;
+  if (check_duplicate_iterator(head, iter.var->symbol)) {
+    m = MATCH_ERROR;
+    goto cleanup;
+  }
 
   e = g95_get_expr();
   e->expr_type = EXPR_ARRAY;
@@ -688,11 +697,13 @@ match m;
 
 syntax:
   g95_error("Syntax error in array constructor at %C");
+  m = MATCH_ERROR;
 
 cleanup:
   g95_free_constructor(head);
   g95_free_iterator(&iter, 0);
-  return MATCH_ERROR;
+  g95_set_locus(&old_loc);
+  return m;
 }
 
 

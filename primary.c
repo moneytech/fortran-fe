@@ -999,7 +999,9 @@ match m;
   }
 
 /* If m is error, then something was wrong with the real part and we
- * definitely have a complex constant because we've seen the ',' */
+ * assume we have a complex constant because we've seen the ','.  An
+ * ambiguous case here is the start of an iterator list of some sort.
+ * These sort of lists are matched prior to coming here. */
   
   if (m == MATCH_ERROR) goto cleanup;
   g95_pop_error(&old_error);
@@ -1152,7 +1154,10 @@ match m;
   m = g95_match_name(name);
 
   if (m != MATCH_YES) goto cleanup;
-  if (g95_match_char('=') != MATCH_YES) goto cleanup;
+  if (g95_match_char('=') != MATCH_YES) {
+    m = MATCH_NO;
+    goto cleanup;
+  }
 
   m = match_actual_arg(&actual->expr);
   if (m != MATCH_YES) goto cleanup;
@@ -1173,7 +1178,7 @@ match m;
 
 cleanup:
   g95_set_locus(&name_locus);
-  return MATCH_NO;
+  return m;
 }
 
 

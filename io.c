@@ -835,7 +835,9 @@ g95_code *head, *tail, *new;
 g95_iterator *iter;
 locus old_loc;
 match m;
+int n;
 
+  iter = NULL;
   head = tail = NULL; 
   old_loc = *g95_current_locus();
 
@@ -845,27 +847,33 @@ match m;
   tail = head;
 
   if (m != MATCH_YES || g95_match_char(',') != MATCH_YES) {
-    g95_set_locus(&old_loc);     /* Can't be an IO iterator */
-    g95_free_statements(head);
-    return MATCH_NO;
+    m = MATCH_NO;
+    goto cleanup;
   }
 
 /* Can't be anything but an IO iterator.  Build a list */
 
   iter = g95_get_iterator();
 
-  for(;;) {
+  for(n=1;; n++) {
     m = g95_match_iterator(iter, 0);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_YES) break;
 
     m = match_io_element(k, &new);
-    if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
+    if (m == MATCH_NO) {
+      if (n > 2) goto syntax;
+      goto cleanup;
+    }
 
     tail = g95_append_code(tail, new);
 
-    if (g95_match_char(',') != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) {
+      if (n > 2) goto syntax;
+      m = MATCH_NO;
+      goto cleanup;
+    }
   }
 
   if (g95_match_char(')') != MATCH_YES) goto syntax;
@@ -887,7 +895,8 @@ syntax:
 cleanup:
   g95_free_iterator(iter, 1);
   g95_free_statements(head);
-  return MATCH_ERROR;
+  g95_set_locus(&old_loc);
+  return m;
 }
 
 
