@@ -987,7 +987,7 @@ cleanup:
 static void terminate_io(g95_code *io_code) {
 g95_code *c;
 
-  if (io_code == NULL) return; 
+  if (io_code == NULL) io_code = &new_st;
 
   c = g95_get_code();
   c->op = EXEC_DT_END;
