@@ -514,8 +514,6 @@ int errors, warnings, i;
 
   if (argc == 1) display_help();
 
-  g95_init_1();
-
   init_options();
 
   argv++;
@@ -526,6 +524,8 @@ int errors, warnings, i;
     argc -= i;
     argv += i;
   }
+
+  g95_init_1();
 
   if (g95_option.source == NULL) g95_fatal_error("Need a file to compile");
 

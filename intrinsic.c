@@ -497,7 +497,7 @@ int di, dr, dd, dl, dc, dz;
   dz = g95_default_complex_kind();
 
   add_sym("abs", 1, 1, BT_REAL, dr,
-	  g95_check_abs, g95_simplify_abs, g95_resolve_abs,
+	  NULL, g95_simplify_abs, g95_resolve_abs,
 	  a, BT_REAL, dr, 0, NULL);
 
   add_sym("iabs", 1, 1, BT_INTEGER, di,

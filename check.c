@@ -299,14 +299,6 @@ int rank;
 
 /***** Check functions *****/
 
-try g95_check_abs(g95_expr *a) {
-
-  if (numeric_check(a, 0) == FAILURE) return FAILURE;
-
-  return SUCCESS;
-}
-
-
 /* g95_check_a_kind()-- Check subroutine suitable for aint, anint,
  * ceiling, floor and nint. */
 

@@ -663,7 +663,7 @@ int g95_default_integer_kind(void) {
 }
 
 int g95_default_real_kind(void) {
-  return g95_real_kinds[g95_option.i8 ? 1 : 0].kind;
+  return g95_real_kinds[g95_option.r8 ? 1 : 0].kind;
 }
 
 int g95_default_double_kind(void)    { return g95_real_kinds[1].kind; }

@@ -28,7 +28,6 @@ extern g95_expr g95_bad_expr;
 
 try g95_check_a_kind(g95_expr *, g95_expr *);
 try g95_check_a_p(g95_expr *, g95_expr *);
-try g95_check_abs(g95_expr *);
 
 try g95_check_all_any(g95_expr *, g95_expr *);
 try g95_check_allocated(g95_expr *);
