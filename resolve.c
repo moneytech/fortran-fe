@@ -1416,7 +1416,8 @@ g95_ref *ref;
       break;
       
     case REF_COMPONENT:
-      if (current_part_dimension && ref->u.c.component->pointer) {
+      if ((current_part_dimension || seen_part_dimension ) &&
+	  ref->u.c.component->pointer) {
 	g95_error("Component to the right of a part reference with nonzero "
 		  "rank must not have the POINTER attribute at %L",
 		  &expr->where);
