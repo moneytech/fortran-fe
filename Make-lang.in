@@ -60,11 +60,11 @@ G95_EXES = f951$(exeext)
 
 G95_PARSER_SOURCE = /g95
 
-G95_PARSER_OBJS = f95/arith.o f95/array.o f95/check.o f95/decl.o f95/error.o \
-    f95/expr.o f95/format.o f95/interface.o f95/intrinsic.o f95/io.o \
-    f95/iresolve.o f95/match.o f95/matchexp.o f95/misc.o f95/module.o \
-    f95/parse.o f95/primary.o f95/resolve.o f95/scanner.o f95/select.o \
-    f95/simplify.o f95/st.o f95/symbol.o
+G95_PARSER_OBJS = f95/arith.o f95/array.o f95/bbt.o f95/check.o f95/decl.o\
+    f95/error.o f95/expr.o f95/format.o f95/interface.o f95/intrinsic.o \
+    f95/io.o f95/iresolve.o f95/match.o f95/matchexp.o f95/misc.o \
+    f95/module.o f95/parse.o f95/primary.o f95/resolve.o f95/scanner.o \
+    f95/select.o f95/simplify.o f95/st.o f95/symbol.o
 
 G95_OBJS = $(G95_PARSER_OBJS) \
     f95/f95-lang.o f95/support.o f95/convert.o f95/trans.o \
@@ -73,7 +73,7 @@ G95_OBJS = $(G95_PARSER_OBJS) \
 
 G95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o \
 	tree-cfg.o tree-dfa.o tree-optimize.o tree-ssa.o \
-	tree-ssa-pre.o tree-simple.o
+	tree-ssa-pre.o tree-ssa-ccp.o tree-simple.o
 
 # G95 uses GMP for its internal arithmetics.
 G95_LIBS = $(LIBS) -lgmp

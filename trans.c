@@ -569,7 +569,7 @@ g95_generate_code (g95_namespace * ns)
     {
       /* Lots of things get upset if a subroutine doesn't have a symbol, so we
           make one now.  Hopefully we've set all the required fields.  */
-      g95_get_symbol ("__fortran_main", ns, 0, &main_program);
+      g95_get_symbol ("__fortran_main", ns, &main_program);
       attr.flavor = FL_PROCEDURE;
       attr.proc = PROC_UNKNOWN;
       attr.subroutine = 1;

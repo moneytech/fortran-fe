@@ -1722,27 +1722,28 @@ static void save_symbol_data(g95_symbol *sym) {
 }
 
 
-/* g95_get_symbol()-- Given a name, find a symbol.  The parent_flag
- * indicates if we try host association after a local search fails.
- * If this flag is not set and a host-associated symbol is found, an
- * error is generated.
+/* g95_get_symbol()-- Given a name, find a symbol, or create it if it does
+ * not exist yet in the current namespace.
+ * If the symbol is found we make sure that it's OK.
  *
  * The integer return code indicates
  *  0   All OK
  *  1   The symbol name was ambiguous
  *  2   The name meant to be established was already host associated.
  *
- * If nonzero, then an error was issued.  */
+ * So if nonzero, then an error was issued.  */
 
 int g95_get_symbol(char *name, g95_namespace *ns, g95_symbol **result) {
 g95_symtree *st;
 g95_symbol *p;
 
+  /* This doesn't usually happen during resolution.  */
   if (ns == NULL) ns = g95_current_ns;
 
+  /* Try to find the symbol in ns.  */
   st = g95_find_symtree(ns->sym_root, name);
 
-  if (st == NULL) {     /* Create new symbol */
+  if (st == NULL) {     /* If not there, create a new symbol */
     p = g95_new_symbol(name, ns); 
 
     p->old_symbol = NULL;   /* Add to the list of tentative symbols. */
