@@ -36,28 +36,13 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "trans.h"
 
-/* Callback for walk_tree.  Mark *TP and its sub-trees as not simplified.  */
-
-static tree
-mark_not_simple_r (tree *tp, int *walk_subtrees, void *data ATTRIBUTE_UNUSED)
-{
-  const enum tree_code code = TREE_CODE (*tp);
-  const char class = TREE_CODE_CLASS (code);
-
-  /* Don't mark constants, identifier nodes, declarations nor types.  */
-  if (class == 'c' || class == 'd' || class == 't' || code == IDENTIFIER_NODE)
-    *walk_subtrees = 0;
-  else
-    set_tree_flag (*tp, TF_NOT_SIMPLE);
-
-  return NULL_TREE;
-}
-
+/* Mark *EXPR_P as not simplified.  */
 void
 mark_not_simple (tree *expr_p)
 {
-  walk_tree (expr_p, mark_not_simple_r, NULL, NULL);
+  TREE_NOT_GIMPLE (*expr_p) = 1;
 }
+
 /* Similar to copy_tree_r() but do not copy SAVE_EXPR nodes.  These nodes
    model computations that should only be done once.  If we were to unshare
    something like SAVE_EXPR(i++), the simplification process would create

@@ -43,7 +43,6 @@ Boston, MA 02111-1307, USA.  */
 #include "timevar.h"
 #include "flags.h"
 #include "target.h"
-#include "tree-optimize.h"
 #include "diagnostic.h"
 #include <assert.h>
 #define BACKEND_CODE
