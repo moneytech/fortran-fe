@@ -583,6 +583,9 @@ typedef struct g95_array_ref {
   struct g95_expr *start[G95_MAX_DIMENSIONS], *end[G95_MAX_DIMENSIONS],
                   *stride[G95_MAX_DIMENSIONS];
 
+  enum { DIMEN_ELEMENT=1, DIMEN_RANGE, DIMEN_VECTOR }
+    dimen_type[G95_MAX_DIMENSIONS];
+
   struct g95_expr *offset;
 } g95_array_ref;
 

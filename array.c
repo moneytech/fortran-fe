@@ -209,9 +209,8 @@ int i;
 
 
 /* match_subscript()-- Match a single dimension of an array reference.
- * This can be a single element or an array section.  Any
- * modifications we've made to the ar structure are cleaned up by the
- * caller. */
+ * This can be a single element or an array section.  Any modifications
+ * we've made to the ar structure are cleaned up by the caller.  */
 
 static match match_subscript(g95_array_ref *ar, int init) {
 g95_expr *e;
@@ -222,6 +221,8 @@ int i;
 
   ar->c_where[i] = *g95_current_locus();
   ar->start[i] = ar->end[i] = ar->stride[i] = NULL;
+
+  ar->dimen_type[i] = DIMEN_ELEMENT;
 
   if (g95_match_char(':') == MATCH_YES) goto end_element;
 
@@ -242,6 +243,7 @@ int i;
       return MATCH_ERROR;
     }
 
+    ar->dimen_type[i] = DIMEN_VECTOR;
     ar->type = AR_SECTION;
     return MATCH_YES;
   }
@@ -252,6 +254,7 @@ int i;
 
 end_element:
   ar->type = AR_SECTION;
+  ar->dimen_type[i] = DIMEN_RANGE;
 
   if (init)
     m = g95_match_init_expr(&ar->end[i]);
@@ -259,8 +262,6 @@ end_element:
     m = g95_match_expr(&ar->end[i]);
 
   if (m == MATCH_ERROR) return MATCH_ERROR;
-
-  /* Build UBOUND expression */
 
 /* See if we have an optional stride */
 
