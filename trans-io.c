@@ -710,6 +710,7 @@ stmtblock_t block, post_block;
 g95_expr *unity;
 g95_dt *dt;
 tree tmp;
+char *p;
 
   g95_init_block(&block); 
   g95_init_block(&post_block);
@@ -729,8 +730,17 @@ tree tmp;
     set_string(&block, &post_block, ioparm_format, ioparm_format_len,
 	       dt->format_expr);
 
-  if (dt->format_label) {   /* Create the format string and point to it */
+  if (dt->format_label) {
+    tmp = build(COMPONENT_REF, TREE_TYPE(ioparm_format), ioparm_var,
+		ioparm_format);
 
+    p = dt->format_label->format;
+    g95_add_modify_expr(&block, tmp, build_string(strlen(p), p));
+
+    tmp = build(COMPONENT_REF, TREE_TYPE(ioparm_format_len), ioparm_var,
+					 ioparm_format_len);
+
+    g95_add_modify_expr(&block, tmp, build_int_2(strlen(p), 0));
   }
 
   if (dt->format_expr == NULL &&
