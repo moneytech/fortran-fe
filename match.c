@@ -1710,6 +1710,10 @@ g95_array_spec *as;
 match m;
 
   old_blank_common = g95_current_ns->blank_common;
+  if (old_blank_common) {
+    while(old_blank_common->common_next)
+      old_blank_common = old_blank_common->common_next;
+  }
 
   common_name = NULL;
   as = NULL;
@@ -1805,7 +1809,10 @@ syntax:
   g95_syntax_error(ST_COMMON);
 
 cleanup:
-  g95_current_ns->blank_common = old_blank_common;
+  if (old_blank_common)
+    old_blank_common->common_next = NULL;
+  else
+    g95_current_ns->blank_common = NULL;
   g95_free_array_spec(as);
   return MATCH_ERROR;
 }
