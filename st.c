@@ -107,10 +107,10 @@ static void free_statement(g95_code *p) {
   if (p->expr2) g95_free_expr(p->expr2);
 
   switch(p->op) {
-  case EXEC_NOP:     case EXEC_ASSIGN:  case EXEC_GOTO:   case EXEC_CYCLE:
-  case EXEC_RETURN:  case EXEC_IF:      case EXEC_STOP:	  case EXEC_EXIT: 
-  case EXEC_ARITHMETIC_IF:   case EXEC_POINTER_ASSIGN:
-  case EXEC_WHERE:           case EXEC_DO_WHILE:
+  case EXEC_NOP:      case EXEC_ASSIGN:     case EXEC_GOTO:  case EXEC_CYCLE:
+  case EXEC_RETURN:   case EXEC_IF:         case EXEC_STOP:  case EXEC_EXIT: 
+  case EXEC_WHERE:    case EXEC_IOLENGTH:   case EXEC_POINTER_ASSIGN:
+  case EXEC_DO_WHILE: case EXEC_ARITHMETIC_IF:   
     break;
 
   case EXEC_CALL:
