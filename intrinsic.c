@@ -209,7 +209,12 @@ static void kind_error(g95_expr *arg) {
 
 static try check_arg_dim(g95_expr *arg, g95_expr *dim, int optional) {
 
-  if (optional && dim == NULL) return SUCCESS;
+  if (optional) {
+    if (dim == NULL) return SUCCESS;
+
+    if (dim->expr_type == EXPR_VARIABLE && dim->symbol->attr.optional)
+      return FAILURE;
+  }
 
   if (dim == NULL) {
     intrinsic_error("Missing DIM parameter at %%L",&arg->where);
@@ -1098,7 +1103,7 @@ static try check_maxloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
     return FAILURE;
   }
 
-  if (check_arg_dim(array,dim,0) == FAILURE) return FAILURE;
+  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
 
   if (mask != NULL && (mask->rank != 0 || mask->ts.type != BT_LOGICAL))
     return FAILURE;
@@ -1116,7 +1121,7 @@ static try check_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
     return FAILURE;
   }
 
-  if (check_arg_dim(array,dim,0) == FAILURE) return FAILURE;
+  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
 
   if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
     return FAILURE;
@@ -1314,8 +1319,6 @@ static try check_present(g95_expr *a) {
 
   if (a->expr_type != EXPR_VARIABLE) return FAILURE;
 
-  if (a->ref != NULL) return FAILURE;
-
   if (a->symbol->attr.dummy == 0 || a->symbol->attr.optional == 0)
     return FAILURE;
 
@@ -1332,7 +1335,7 @@ static try check_product(g95_expr *array, g95_expr *dim, g95_expr *mask) {
     return FAILURE;
   }
 
-  if (check_arg_dim(array,dim,0) == FAILURE) return FAILURE;
+  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
 
   if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
     return FAILURE;
@@ -1647,7 +1650,7 @@ static try check_ubound(g95_expr *array, g95_expr *dim) {
 
   if (array->rank == 0) return FAILURE;
 
-  if (check_arg_dim(array,dim,1) == FAILURE) {
+  if (check_arg_dim(array, dim, 1) == FAILURE) {
     return FAILURE;
   }
 
@@ -2024,7 +2027,7 @@ int di, dr, dd, dl, dc, dz;
 
   make_generic("aint");
 
-  add_sym("all", 1, 1, BT_LOGICAL, dl, NULL, check_all_any,
+  add_sym("all", 1, 1, BT_UNKNOWN, 0, g95_simplify_all, check_all_any,
 	  msk, BT_LOGICAL, dl, 0, dm, BT_INTEGER, di, 1, NULL);
 
   add_sym("allocated", 1, 1, BT_LOGICAL, dl, NULL, check_allocated,
@@ -2038,7 +2041,7 @@ int di, dr, dd, dl, dc, dz;
 
   make_generic("anint");
 
-  add_sym("any", 1, 1, BT_LOGICAL, dl, NULL, NULL, check_all_any,
+  add_sym("any", 1, 1, BT_UNKNOWN, 0, g95_simplify_any, check_all_any,
 	  msk, BT_LOGICAL, dl, 0, dm, BT_INTEGER, di, 1, NULL);
 
   add_sym("asin", 0, 1, BT_REAL, dr, g95_simplify_asin, NULL,
@@ -2449,7 +2452,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("set_exponent", 0, 1, BT_REAL, dr, g95_simplify_set_exponent, NULL,
 	  x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
-  add_sym("shape", 1, 1, BT_INTEGER, di, NULL, check_shape,
+  add_sym("shape", 1, 1, BT_INTEGER, di, g95_simplify_shape, check_shape,
 	  src, BT_REAL, dr, 0, NULL);
 
   add_sym("sign", 0, 1, BT_REAL,    dr, g95_simplify_sign, check_sign,

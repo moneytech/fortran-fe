@@ -380,11 +380,30 @@ int kind;
 
   mpf_trunc(rtrunc->value.real, e->value.real);
 
-  result=g95_real2real(rtrunc,kind);
+  result = g95_real2real(rtrunc,kind);
   g95_free_expr(rtrunc);
 
-  return range_check(result,"AINT");
+  return range_check(result, "AINT");
+}
 
+
+g95_expr *g95_simplify_all(g95_expr *mask, g95_expr *dim) {
+static char all0[] = "__all0", all1[] = "__all1";
+g95_expr *result;
+
+  result = g95_build_funcall(NULL, g95_copy_expr(mask),
+			     g95_copy_expr(dim), NULL);
+
+  result->ts = mask->ts;
+
+  if (dim == NULL || mask->rank == 1)
+    result->value.function.name = all0;
+  else {
+    result->value.function.name = all1;
+    result->rank = mask->rank - 1;
+  }
+
+  return result;
 }
 
 
@@ -397,7 +416,7 @@ g95_expr *rtrunc, *result;
 
   mpf_trunc(rtrunc->value.real, e->value.real);
 
-  result=g95_real2real(rtrunc,g95_default_double_kind());
+  result = g95_real2real(rtrunc,g95_default_double_kind());
   g95_free_expr(rtrunc);
 
   return range_check(result,"DINT");
@@ -424,12 +443,10 @@ int kind, cmp;
   if (cmp > 0) {
     mpf_add(rtrunc->value.real,e->value.real,mpf_half);
     mpf_trunc(result->value.real,rtrunc->value.real);
-  } 
-  else if (cmp < 0) {
+  } else if (cmp < 0) {
     mpf_sub(rtrunc->value.real,e->value.real,mpf_half);
     mpf_trunc(result->value.real,rtrunc->value.real);
-  } 
-  else 
+  } else 
     mpf_set_ui(result->value.real,0);
 
   g95_free_expr(rtrunc);
@@ -465,6 +482,26 @@ int cmp;
   g95_free_expr(rtrunc);
 
   return range_check(result, "DNINT");
+}
+
+
+g95_expr *g95_simplify_any(g95_expr *mask, g95_expr *dim) {
+static char any0[] = "__any0", any1[] = "__any1";
+g95_expr *result;
+
+  result = g95_build_funcall(NULL, g95_copy_expr(mask),
+			     g95_copy_expr(dim), NULL);
+
+  result->ts = mask->ts;
+
+  if (dim == NULL || mask->rank == 1)
+    result->value.function.name = any0;
+  else {
+    result->value.function.name = any1;
+    result->rank = mask->rank - 1;
+  }
+
+  return result;
 }
 
 
@@ -611,7 +648,7 @@ int kind;
   kind = get_kind(k, "CEILING", g95_default_integer_kind());
   if (kind == -1) return &g95_bad_expr;
 
-  if (e->ts.type != EXPR_CONSTANT) return NULL;
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   result = g95_constant_result(BT_INTEGER, kind);
   result->where = e->where;
@@ -2822,6 +2859,23 @@ unsigned long exp2;
   mpf_clear(frac);
 
   return range_check(result,"SET_EXPONENT");
+}
+
+
+g95_expr *g95_simplify_shape(g95_expr *source) {
+static char shape[] = "__shape";
+g95_expr *result;
+
+  result = g95_build_funcall(NULL, g95_copy_expr(source), NULL);
+
+  result->ts.type = BT_INTEGER;
+  result->ts.type = g95_default_integer_kind();
+
+  result->value.function.name = shape;
+
+  result->rank = 1;
+
+  return result;
 }
 
 
