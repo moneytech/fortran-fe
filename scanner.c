@@ -73,7 +73,7 @@ void g95_scanner_done_1(void) {
 linebuf *lp, *lp2;
 g95_file *fp, *fp2;
 
-  for(fp=g95_current_file; fp; fp = fp2) {
+  for(fp=first_file; fp; fp=fp2) {
 
     if (fp->start != NULL) {  /* Free linebuf blocks */
       for(fp2=fp; fp2; fp2 = fp2->next)
