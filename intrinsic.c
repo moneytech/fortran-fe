@@ -614,11 +614,11 @@ int di, dr, dd, dl, dc, dz;
   make_generic("atan");
 
   add_sym("atan2", 1, 1, BT_REAL, dr,
-	  g95_check_atan2, g95_simplify_atan2, NULL,
+	  NULL, g95_simplify_atan2, NULL,
 	  y, BT_REAL, dr, 0,   x, BT_REAL, dr, 0, NULL);
 
   add_sym("datan2", 1, 1, BT_REAL, dd,
-	  g95_check_atan2, g95_simplify_atan2, NULL,
+	  NULL, g95_simplify_atan2, NULL,
 	  y, BT_REAL, dd, 0,   x, BT_REAL, dd, 0, NULL);
 
   make_generic("atan2");

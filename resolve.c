@@ -1318,6 +1318,19 @@ try t;
 }
 
 
+/* resolve_values()-- Resolve initial values and make sure they are
+ * compatible with the variable */
+
+static void resolve_values(g95_symbol *sym) {
+
+  if (sym->value == NULL) return;
+
+  if (g95_resolve_expr(sym->value) == FAILURE) return;
+
+  g95_check_assign_symbol(sym, sym->value);
+}
+
+
 /* resolve_symbol()-- Do anything necessary to resolve a symbol.
  * Right now, we just assume that an otherwise unknown symbol is a
  * variable.  This sort of thing commonly happens for symbols in module. */
@@ -1356,14 +1369,6 @@ static void resolve_symbol(g95_symbol *sym) {
     g95_error("Assumed size array at %L must be a dummy argument",
 	      &sym->declared_at);
     return;
-  }
-
-  /* Resolve initial values and make sure they are compatible with the
-   * variable */
-
-  if (sym->value != NULL) {
-    if (g95_resolve_expr(sym->value) == FAILURE ||
-	g95_check_assign_symbol(sym, sym->value) == FAILURE) return;
   }
 
   /* Make sure the types of derived parameters are consistent.  This
@@ -1412,6 +1417,8 @@ g95_charlen *cl;
 
   for(n=ns->contained; n; n=n->sibling)
     g95_resolve(n);
+
+  g95_traverse_ns(ns, resolve_values);
 
   if (ns->save_all) g95_save_all(ns);
 

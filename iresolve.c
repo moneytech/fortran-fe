@@ -760,14 +760,12 @@ void g95_resolve_transfer(g95_expr *f, g95_expr *source, g95_expr *mold,
 			                                 g95_expr *size) {
 static char transfer0[] = "__transfer0", transfer1[] = "__transfer1";
 
-  f->ts.type = mold->ts.type;
-  f->ts.kind = mold->ts.kind;
+  f->ts = mold->ts;
 
   if (size == NULL && mold->rank == 0) {
     f->rank = 0;
     f->value.function.name = transfer0;
-  }
-  else {
+  } else {
     f->rank = 1;
     f->value.function.name = transfer1;
   }

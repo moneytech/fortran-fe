@@ -33,7 +33,6 @@ try g95_check_abs(g95_expr *);
 try g95_check_all_any(g95_expr *, g95_expr *);
 try g95_check_allocated(g95_expr *);
 try g95_check_associated(g95_expr *, g95_expr *);
-try g95_check_atan2(g95_expr *, g95_expr *);
 try g95_check_btest(g95_expr *, g95_expr *);
 try g95_check_char(g95_expr *, g95_expr *);
 try g95_check_cmplx(g95_expr *, g95_expr *, g95_expr *);

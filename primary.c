@@ -1503,6 +1503,7 @@ g95_actual_arglist *actual_arglist;
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_state_data *st;
 g95_symbol *sym;
+int parent_flag;
 locus where;
 g95_expr *e;
 match m;
@@ -1510,7 +1511,8 @@ match m;
   m = g95_match_name(name); 
   if (m != MATCH_YES) return m;
 
-  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
+  parent_flag = g95_find_state(COMP_INTERFACE) == FAILURE;
+  if (g95_findget_symbol(name, NULL, parent_flag, &sym)) return MATCH_ERROR;
 
   e = NULL;
   where = *g95_current_locus();

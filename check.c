@@ -352,20 +352,6 @@ symbol_attribute attr;
 }
 
 
-try g95_check_atan2(g95_expr *y, g95_expr *x) {
-
-  if (type_check(y, 0, BT_REAL) == FAILURE) return FAILURE;
-  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
-
-  if (x->ts.kind != y->ts.kind) {
-    must_be(x, 1, "of the same kind as 'y'");
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
 try g95_check_btest(g95_expr *i, g95_expr *pos) {
 
   if (type_check(i, 0, BT_INTEGER) == FAILURE) return FAILURE;

@@ -324,6 +324,9 @@ g95_symbol *sym;
 try g95_check_pointer_assign(g95_expr *lvalue, g95_expr *rvalue) {
 symbol_attribute attr;
 
+  if (rvalue->expr_type == EXPR_NULL && rvalue->ts.type == BT_UNKNOWN)
+    rvalue->ts = lvalue->ts;
+
   if (lvalue->symbol->ts.type == BT_UNKNOWN) {
     g95_error("Pointer assignment target is not a POINTER at %L",
 	      &lvalue->where);
@@ -1174,6 +1177,8 @@ g95_component *p;
   if (name == NULL) return NULL;
 
   sym = g95_use_derived(sym);
+
+  if (sym == NULL) return NULL;
 
   for(p=sym->components; p; p=p->next)
     if (strcmp(p->name, name) == 0) break;
