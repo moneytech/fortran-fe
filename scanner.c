@@ -625,7 +625,7 @@ int c, maxlen, i, trunc_flag;
 
       for(;;) {
 	c = fgetc(input);
-	if (c == '\n') break;
+	if (c == '\n' || c == EOF) break;
 
 	if (g95_option.line_truncation && trunc_flag &&
 	    !g95_is_whitespace(c)) {
