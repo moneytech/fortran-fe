@@ -107,7 +107,7 @@ void g95_set_locus(locus *lp) {
 }
 
 
-/* g95_at_end()-- Test to see if we're at the of the main source file. */
+/* g95_at_end()-- Test to see if we're at the end of the main source file. */
 
 int g95_at_end(void) {
 
