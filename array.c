@@ -680,6 +680,9 @@ error:
 }
 
 
+
+/****************** Array constructor functions ******************/
+
 /* g95_free_constructor()-- Free chains of g95_constructor structures */
 
 void g95_free_constructor(g95_constructor *p) {
@@ -692,9 +695,32 @@ g95_constructor *next;
 
     g95_free_constructor(p->child);
     g95_free_expr(p->expr);
-    if (p->iter != NULL) g95_free_iterator(p->iter, 1);
+    if (p->iterator != NULL) g95_free_iterator(p->iterator, 1);
     g95_free(p);
   }
+}
+
+
+/* check_iterators()-- Given a constructor node and a symbol, make
+ * sure than no iterators in this or child constructors use the symbol
+ * as an implied-DO iterator.  Returns nonzero if a duplicate was found. */
+
+static int check_duplicate_iterator(g95_constructor *cons,
+				    g95_symbol *master) {
+
+  for(; cons; cons=cons->next) {
+    if (check_duplicate_iterator(cons->child, master)) return 1;
+    if (cons->iterator == NULL) continue;
+
+    if (cons->iterator->var->symbol == master) {
+      g95_error("DO-iterator '%s' at %L is inside iterator of the same name",
+		master->name, &cons->where);
+
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 
@@ -715,7 +741,10 @@ match m;
   memset(&iter, '\0', sizeof(g95_iterator));
 
   m = match_array_cons_element(&head);
-  if (m != MATCH_YES) return m;
+  if (m != MATCH_YES) {
+    g95_set_locus(&old_loc);
+    return m;
+  }
 
   tail = head;
 
@@ -742,9 +771,12 @@ match m;
 
   if (g95_match(" )") != MATCH_YES) goto syntax;
 
+  if (check_duplicate_iterator(head, iter.var->symbol)) goto cleanup;
+
   p = g95_get_constructor();
-  p->iter = g95_get_iterator();
-  *p->iter = iter;
+  p->where = *g95_current_locus();
+  p->iterator = g95_get_iterator();
+  *p->iterator = iter;
 
   p->child = head;
   *result = p;
@@ -834,12 +866,8 @@ match m;
   m = g95_match_expr(&expr);
   if (m != MATCH_YES) return m;
 
-  if (check_constructor_type(expr)) {
-    g95_free_expr(expr);
-    return MATCH_ERROR;
-  }
-
   p = g95_get_constructor();
+  p->where = *g95_current_locus();
   p->expr = expr;
 
   *result = p;
@@ -903,6 +931,79 @@ cleanup:
 }
 
 
+typedef struct cons_stack {
+  g95_iterator *iterator;
+  struct cons_stack *previous;
+} cons_stack;
+
+static cons_stack *base;
+
+
+/* check_constructor()-- Recursive work function for
+ * g95_check_constructor().  This amounts to calling the check
+ * function for each expression in the constructor, giving variables
+ * with the names of iterators a pass.  */
+
+static match check_constructor(g95_constructor *cons,
+			       match (*check_function)(g95_expr *)) {
+cons_stack *c, element;
+g95_symbol *sym;
+match m;
+
+  for(; cons; cons=cons->next) {
+    if (cons->expr != NULL) {
+      if (cons->expr->expr_type == EXPR_VARIABLE) {
+	sym = cons->expr->symbol;
+
+	for(c=base; c; c=c->previous)
+	  if (sym == c->iterator->var->symbol) goto ok;
+
+	g95_error("Variable '%s' at %L isn't an implied DO-iterator.  "
+		  "Constructor is not constant", sym->name, &cons->where);
+
+	return MATCH_ERROR;
+      }
+
+      m = (*check_function)(cons->expr);
+      if (m != MATCH_YES) return m;
+    }
+
+  ok:
+    if (cons->iterator == NULL) continue;
+
+    element.previous = base;
+    element.iterator = cons->iterator;
+
+    base = &element;
+    check_constructor(cons->child, check_function);
+    base = element.previous;
+  }
+
+/* Nothing went wrong, so all OK */
+
+  return MATCH_YES;
+}
+
+
+/* g95_check_constructor()-- Checks a constructor to see if it is a
+ * particular kind of expression-- specification, restricted,
+ * or initialization as determined by the check_function.  */
+
+match g95_check_constructor(g95_expr *expr,
+			    match (*check_function)(g95_expr *)) {
+cons_stack *base_save;
+match m;
+
+  base_save = base; 
+  base = NULL;
+
+  m = check_constructor(expr->value.constructor, check_function);
+
+  base = base_save;
+  return m;
+}
+
+
 /* resolve_array_list()-- Recursive array list resolution function.
  * All of the elements must be of the same type. */
 
@@ -913,7 +1014,7 @@ try t;
 
     if (p->child != NULL) {
       if (resolve_array_list(p->child) == FAILURE) t = FAILURE;
-      if (g95_resolve_iterator(p->iter) == FAILURE) t = FAILURE;
+      if (g95_resolve_iterator(p->iterator) == FAILURE) t = FAILURE;
     }
 
     if (p->expr == NULL) continue;
@@ -975,9 +1076,9 @@ g95_constructor *dest;
   if (src == NULL) return NULL;
 
   dest = g95_get_constructor();
+  dest->where = src->where;
   dest->expr = g95_copy_expr(src->expr);
-
-  dest->iter = copy_iterator(src->iter);
+  dest->iterator = copy_iterator(src->iterator);
 
   dest->next = g95_copy_constructor(src->next);
   dest->child = g95_copy_constructor(dest->child);

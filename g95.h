@@ -804,7 +804,8 @@ extern g95_option_t g95_option;
 
 typedef struct g95_constructor {
   g95_expr *expr;
-  g95_iterator *iter;
+  g95_iterator *iterator;
+  locus where;
   struct g95_constructor *next, *child;
 } g95_constructor;
 
@@ -1179,6 +1180,8 @@ g95_expr *g95_logical_expr(int, locus *);
 g95_code *g95_build_call(g95_symbol *, ...);
 g95_expr *g95_copy_expr(g95_expr *);
 
+try g95_check_init_expr(g95_expr *);
+
 void g95_show_expr(g95_expr *);
 
 int g95_numeric_ts(g95_typespec *);
@@ -1221,6 +1224,8 @@ void g95_free_constructor(g95_constructor *);
 match g95_match_array_constructor(g95_expr **);
 try g95_resolve_array_constructor(g95_expr *);
 g95_constructor *g95_copy_constructor(g95_constructor *src);
+try g95_check_constructor(g95_expr *, try (*)(g95_expr *));
+
 
 /* interface.c */
 

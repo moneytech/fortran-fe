@@ -311,7 +311,7 @@ try t;
 			 "initializers yet");
 
     if (g95_match(" =") == MATCH_YES) {
-      m = g95_match_init_expr(&initializer);
+      m = g95_match_expr(&initializer);
       if (m == MATCH_NO)
 	g95_error("Expected an initialization expression at %C");
 

@@ -971,7 +971,7 @@ arith rc;
     break;
 
   case INTRINSIC_CONCAT:   /* Character binary */
-    if (op1->ts.type != BT_CHARACTER || op1->ts.type != BT_CHARACTER)
+    if (op1->ts.type != BT_CHARACTER || op2->ts.type != BT_CHARACTER)
       goto incompatible;
 
     unary = 0;

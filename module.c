@@ -1087,7 +1087,7 @@ g95_constructor *c, *tail;
     for(c=*cp; c; c=c->next) {
       mio_lparen();
       mio_expr(&c->expr);
-      mio_iterator(&c->iter);
+      mio_iterator(&c->iterator);
       mio_constructor(&c->child);
       mio_rparen();
     }
@@ -1108,7 +1108,7 @@ g95_constructor *c, *tail;
 
       mio_lparen();
       mio_expr(&c->expr);
-      mio_iterator(&c->iter);
+      mio_iterator(&c->iterator);
       mio_constructor(&c->child);
       mio_rparen();
     }

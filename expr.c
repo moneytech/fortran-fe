@@ -643,10 +643,10 @@ static int is_constant_constructor(g95_constructor *c) {
 
     if (!is_constant_constructor(c->child)) return 0;
     
-    if (c->iter != NULL) {
-      if (!is_constant_expr(c->iter->start)) return 0;
-      if (!is_constant_expr(c->iter->end))   return 0;
-      if (!is_constant_expr(c->iter->step))  return 0;
+    if (c->iterator != NULL) {
+      if (!is_constant_expr(c->iterator->start)) return 0;
+      if (!is_constant_expr(c->iterator->end))   return 0;
+      if (!is_constant_expr(c->iterator->step))  return 0;
     }
   }
 
@@ -691,11 +691,9 @@ int rv;
 
 /* simplify_expr()-- Given an expression, simplify it by collapsing
  * constant expressions.  Most simplification takes place when the
- * expression tree is being constructed.  The exception we take care
- * of here is when it is decided that a function call refers to an
- * intrinsic function that must be simplified, either after we've
- * parsed an initialization expression or after resolving a name to an
- * intrinsic.
+ * expression tree is being constructed.  If an intrinsic function is
+ * simplified at some point, we get called again to collapse the
+ * result against other constants.
  *
  * We work by recursively simplifying expression nodes, simplifying
  * intrinsic functions where possible, which can lead to further
@@ -703,9 +701,8 @@ int rv;
  * rip the expression apart, and rebuild it, hoping that it becomes
  * something simpler. */
 
-static void simplify_expr(g95_expr *p, int init_flag) {
+static void simplify_expr(g95_expr *p) {
 g95_expr *op1, *op2, *result;
-g95_actual_arglist *ap;
 
   if (p == NULL) return; 
 
@@ -717,16 +714,9 @@ g95_actual_arglist *ap;
     return;
   }
 
-/* Simplify a function.  First simplify the arguments */
+/* TODO: Simplify a function that has been resolved to be an intrinsic
+ * function. */
 
-  if (p->expr_type == EXPR_FUNCTION) {
-    for(ap=p->value.function.actual; ap; ap=ap->next)
-      if (ap->expr != NULL) simplify_expr(ap->expr, init_flag);
-
-    if (init_flag) g95_intrinsic_func_interface(p);
-
-    return;
-  }
 
 /* Arithmetic simplifications */
 
@@ -736,8 +726,8 @@ g95_actual_arglist *ap;
   op1 = p->op1;
   op2 = p->op2;
 
-  simplify_expr(op1, init_flag);
-  simplify_expr(op2, init_flag);
+  simplify_expr(op1);
+  simplify_expr(op2);
 
   if (!is_constant_expr(op1) || (op2 != NULL && !is_constant_expr(op2)))
     return;
@@ -1146,7 +1136,7 @@ try t;
     break;
   }
 
-  simplify_expr(e, 0);
+  simplify_expr(e);
 
   return t;
 
@@ -1203,6 +1193,163 @@ match m;
 }
 
 
+
+
+
+
+
+/* check_init_intrinsic()-- Check an intrinsic arithmetic operation to
+ * see if it is consistent with an initialization expression. */
+
+static try check_init_intrinsic(g95_expr *e) {
+
+  if (g95_check_init_expr(e->op1) == FAILURE) return FAILURE;
+
+  switch(e->operator) {
+  case INTRINSIC_UPLUS:
+  case INTRINSIC_UMINUS:
+    if (g95_numeric_ts(&e->op1->ts)) goto not_numeric;
+    break;
+
+  case INTRINSIC_EQ:  case INTRINSIC_NE:  case INTRINSIC_GT:
+  case INTRINSIC_GE:  case INTRINSIC_LT:  case INTRINSIC_LE:
+
+  case INTRINSIC_PLUS:    case INTRINSIC_MINUS:  case INTRINSIC_TIMES:
+  case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:
+
+    if (g95_check_init_expr(e->op2) == FAILURE) return FAILURE;
+
+    if (g95_numeric_ts(&e->op1->ts) == 0 ||
+	g95_numeric_ts(&e->op2->ts) == 0) goto not_numeric;
+
+    if (e->operator != INTRINSIC_POWER) break;
+    
+    if (e->op2->ts.type != BT_INTEGER) {
+      g95_error("Exponent at %L must be INTEGER for an initialization "
+		"expression", &e->op2->where);
+      return FAILURE;
+    }
+
+    break;
+
+  case INTRINSIC_CONCAT:
+    if (g95_check_init_expr(e->op2) == FAILURE) return FAILURE;
+
+    if (e->op1->ts.type != BT_CHARACTER || e->op2->ts.type != BT_CHARACTER) {
+      g95_error("Concatenation operator in initialization expression at %L "
+		"must have two CHARACTER operands", &e->op1->where);
+      return FAILURE;
+    }
+
+    if (e->op1->ts.kind != e->op2->ts.kind) {
+      g95_error("Concat operator at %L must concatenate strings of the "
+		"same kind", &e->where);
+      return FAILURE;
+    }
+
+    break;
+
+  case INTRINSIC_NOT:
+    if (e->op1->ts.type != BT_LOGICAL) {
+      g95_error(".NOT. operator in initialization expression at %L must have "
+		"a LOGICAL operand", &e->op1->where);
+      return FAILURE;
+    }
+
+    break;
+
+  case INTRINSIC_AND:    case INTRINSIC_OR:
+  case INTRINSIC_EQV:    case INTRINSIC_NEQV:
+    if (g95_check_init_expr(e->op2) == FAILURE) return FAILURE;
+
+    if (e->op1->ts.type != BT_LOGICAL || e->op2->ts.type != BT_LOGICAL) {
+      g95_error("Initialization expression at %L requires LOGICAL operands",
+		&e->where);
+      return FAILURE;
+    }
+
+    break;
+
+  default:
+    g95_error("Initialization expression at %L must use only intrinsic "
+	      "operators", &e->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+not_numeric:
+  g95_error("Initialization expression at %L requires numeric operands",
+	    &e->where);
+
+  return FAILURE;
+}
+
+
+/* g95_check_init_expr()-- Verify that an expression is an
+ * initialization expression.  A side effect is that the expression
+ * tree is reduced to a single constant node if all goes well.  This
+ * would normally happen when the expression is constructed but
+ * function references are assumed to be intrinsics in the context of
+ * initialization expressions.  If FAILURE is return an error message
+ * has been generated. */
+
+try g95_check_init_expr(g95_expr *e) {
+g95_actual_arglist *ap;
+try t;
+
+  if (e == NULL) return SUCCESS;
+
+  switch(e->expr_type) {
+  case EXPR_OP:
+    t = check_init_intrinsic(e);
+    if (t == SUCCESS) simplify_expr(e);
+
+    break;
+
+  case EXPR_FUNCTION:
+    t = SUCCESS;
+
+    for(ap=e->value.function.actual; ap; ap=ap->next)
+      if (g95_check_init_expr(ap->expr) == FAILURE) {
+	t = FAILURE;
+	break;
+      }
+
+    if (t == SUCCESS && g95_intrinsic_func_interface(e) == FAILURE)
+      t = FAILURE;
+
+    break;
+
+  case EXPR_VARIABLE:
+    g95_error("Variable '%s' at %L cannot appear in an initialization "
+	      "expression", e->symbol->name, &e->where);
+    t = FAILURE;
+    break;
+
+  case EXPR_CONSTANT:
+    t = SUCCESS;
+    break;
+
+  case EXPR_SUBSTRING:
+    t = g95_check_init_expr(e->op1);
+    if (t == FAILURE) break;
+
+    t = g95_check_init_expr(e->op2);
+    if (t == SUCCESS) simplify_expr(e);
+
+    break;
+
+  case EXPR_STRUCTURE:
+  case EXPR_ARRAY:
+    t = g95_check_constructor(e, g95_check_init_expr);
+    break;
+  }
+
+  return t;
+}
+
+
 /* g95_match_init_expr()-- Match an initialization expression.  We work
  * by first matching an expression, then reducing it to a constant */
 
@@ -1213,14 +1360,10 @@ match m;
   m = g95_match_expr(&expr);
   if (m != MATCH_YES) return m;
 
-/* Constant for now */
+  if (g95_check_init_expr(expr) == FAILURE) return MATCH_ERROR;
 
-  simplify_expr(expr, 1);
-
-  if (!is_constant_expr(expr)) {
-    g95_error("Expected an initialization expression at %C");
-    return MATCH_ERROR;
-  }
+  if (!is_constant_expr(expr))
+    g95_internal_error("Initialization expression didn't reduce %C");
 
   *result = expr;
 
@@ -1269,13 +1412,13 @@ static void show_constructor(g95_constructor *c) {
       show_constructor(c->child);
 
       g95_status_char(' ');
-      g95_show_expr(c->iter->var);
+      g95_show_expr(c->iterator->var);
       g95_status_char('=');
-      g95_show_expr(c->iter->start);
+      g95_show_expr(c->iterator->start);
       g95_status_char(',');
-      g95_show_expr(c->iter->end);
+      g95_show_expr(c->iterator->end);
       g95_status_char(',');
-      g95_show_expr(c->iter->step);
+      g95_show_expr(c->iterator->step);
 
       g95_status(" )");
     }
