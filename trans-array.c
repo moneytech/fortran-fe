@@ -2020,20 +2020,22 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
                                g95_ss * rss)
 {
   g95_ss *ss;
-  int temp_dim;
-  int same;
   g95_ref *lref;
   g95_ref *rref;
   g95_ref *aref;
   int depends[G95_MAX_DIMENSIONS];
   int n;
-  int dim;
+  int nDepend=0;
 
+  int temp_dim = 0;
+  
   loop->temp_ss = NULL;
   aref = dest->data.info.ref;
   temp_dim = 0;
   for (n = 0; n < loop->dimen; n++)
+  {
     depends[n] = 0;
+  }
 
   for (ss = rss; ss != g95_ss_terminator; ss = ss->next)
     {
@@ -2041,123 +2043,66 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
         continue;
 
       if (g95_could_be_alias (dest, ss))
-        temp_dim = -1;
-
-      if (temp_dim == -1)
-        break;
+      {
+         nDepend = 1;
+         break;
+      }
 
       if (dest->expr->symbol == ss->expr->symbol)
         {
           lref = dest->expr->ref;
           rref = ss->expr->ref;
 
-          /* Same specifies if both SS refer to the same array.  */
-          same = 1;
-          while (same && lref != aref)
-            {
-              assert (lref->type == rref->type);
-
-              switch (lref->type)
-                {
-                case REF_COMPONENT:
-                  if (lref->u.c.component != rref->u.c.component)
-                    same = 0;
-                  break;
-
-                case REF_ARRAY:
-                  assert (lref->u.ar.type == AR_ELEMENT);
-                  /* TODO: Not all elmental array refs conflict.  */
-                  /* We have a potential dependency.  */
-                  temp_dim = -1;
-                  same = 0;
-                  break;
-
-                default:
-                  abort();
-                }
-              lref = lref->next;
-              rref = rref->next;
-            }
-
-          /* Check the elemental dimensions.  */
-          if (same)
-            {
-              assert (lref->u.ar.dimen == rref->u.ar.dimen);
-              for (n = 0; n < dest->data.info.dimen; n++)
-                {
-                  /* eg. a(:, 1) = a(2, :).  */
-                  /* TODO: check dependencies of elemental vs section.  */
-                  if (lref->u.ar.dimen_type[n] != rref->u.ar.dimen_type[n])
-                    {
-                      temp_dim = -1;
-                      same = 0;
-                      break;
-                    }
-
-                  if (lref->u.ar.dimen_type[n] != DIMEN_ELEMENT)
-                    continue;
-
-                  /* If the elemental indices are different, there is no
-                     dependency.  */
-                  dim = g95_dep_compare_expr (lref->u.ar.start[n],
-                                              rref->u.ar.start[n]);
-                  if (dim == -1 || dim == 1)
-                    {
-                      same = 0;
-                      break;
-                    }
-                }
-            }
-
-          if (same)
-            {
-              for (n = 0; n < loop->dimen; n++)
-                {
-                  int dim;
-                  dim = dest->data.info.dim[n];
-                  if (lref->u.ar.dimen_type[dim] == DIMEN_VECTOR)
-                    depends[n] = 2;
-                  else if (! g95_is_same_range (&lref->u.ar,
+          nDepend = g95_dep_resolver(lref,rref,depends );
+#if 0
+/* TODO : loop shifting */
+	  if( nDepend  == 1 )
+	  {
+		      	/* Mark the dimensions for LOOP SHIFTING 
+              		for (n = 0; n < loop->dimen; n++)
+                	{
+                  		int dim;
+                  		dim = dest->data.info.dim[n];
+                  		if (lref->u.ar.dimen_type[dim] == DIMEN_VECTOR)
+                    			depends[n] = 2;
+                  		else if (! g95_is_same_range (&lref->u.ar,
                                                 &rref->u.ar, dim, 0))
-                    depends[n] = 1;
-                }
-            }
-        }
+                    			depends[n] = 1;
+                	} */
+      			/* Put all the dimensions with dependancies in the innermost loops.  
+      			dim = 0;
+      			for (n = 0; n < loop->dimen; n++)
+        		{
+          			assert (loop->order[n] == n);
+
+          			if (depends[n])
+            				loop->order[dim++] = n;
+       	 		}
+      			temp_dim = dim;
+      			for (n = 0; n < loop->dimen; n++)
+        		{
+          			if (! depends[n])
+            				loop->order[dim++] = n;
+        		}
+      			assert (dim == loop->dimen); */
+		      	break;
+	   }
+#endif
+    	}
     }
 
-  if (temp_dim == 0)
+  if (nDepend == 1 )
     {
-      /* Put all the dimensions with dependencies in the innermost loops.  */
-      dim = 0;
-      for (n = 0; n < loop->dimen; n++)
-        {
-          assert (loop->order[n] == n);
+	loop->temp_ss = g95_get_ss();
+	loop->temp_ss->type = G95_SS_TEMP;
+	loop->temp_ss->data.temp.type =
+	g95_get_element_type (TREE_TYPE (dest->data.info.descriptor));
+	loop->temp_ss->data.temp.string_length =
+		g95_conv_string_length (dest->data.info.descriptor);
+	loop->temp_ss->data.temp.dimen = loop->dimen;
+	loop->temp_ss->next = g95_ss_terminator;
+	g95_add_ss_to_loop (loop, loop->temp_ss);
 
-          if (depends[n])
-            loop->order[dim++] = n;
-        }
-      temp_dim = dim;
-      for (n = 0; n < loop->dimen; n++)
-        {
-          if (! depends[n])
-            loop->order[dim++] = n;
-        }
-      assert (dim == loop->dimen);
-    }
-  else
-    temp_dim = loop->dimen;
-
-  if (temp_dim)
-    {
-      loop->temp_ss = g95_get_ss();
-      loop->temp_ss->type = G95_SS_TEMP;
-      loop->temp_ss->data.temp.type =
-        g95_get_element_type (TREE_TYPE (dest->data.info.descriptor));
-      loop->temp_ss->data.temp.string_length =
-        g95_conv_string_length (dest->data.info.descriptor);
-      loop->temp_ss->data.temp.dimen = temp_dim;
-      loop->temp_ss->next = g95_ss_terminator;
-      g95_add_ss_to_loop (loop, loop->temp_ss);
     }
   else
     loop->temp_ss = NULL;
