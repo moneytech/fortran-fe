@@ -115,7 +115,7 @@ g95_symbol *sym;
       }
     }
 
-    g95_resolve_array_spec(sym->as);
+    g95_resolve_array_spec(sym->as, 0);
 
     /* If the flavor is unknown at this point, it has to be a variable.
      * A procedure specification would have already set the type */
@@ -2057,7 +2057,7 @@ static void resolve_values(g95_symbol *sym) {
 
 static void resolve_symbol(g95_symbol *sym) {
 static int formal_ns_flag = 1; /* Zero if we are checking a formal namespace */
-int formal_ns_save;
+int formal_ns_save, check_constant;
 
   if (sym->attr.flavor == FL_UNKNOWN) {
     if (sym->attr.external == 0 && sym->attr.intrinsic == 0)
@@ -2157,7 +2157,11 @@ int formal_ns_save;
     }
   }
 
-  g95_resolve_array_spec(sym->as);
+  /* Resolve array specifier. Check as well some constraints 
+   * on COMMON blocks */
+
+  check_constant = sym->attr.in_common && !sym->attr.pointer;
+  g95_resolve_array_spec(sym->as, check_constant);
 
   /* Resolve formal namespaces. */
 

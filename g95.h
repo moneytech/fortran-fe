@@ -1431,7 +1431,7 @@ g95_array_ref *g95_copy_array_ref(g95_array_ref *);
 
 try g95_set_array_spec(g95_symbol *, g95_array_spec *, locus *);
 g95_array_spec *g95_copy_array_spec(g95_array_spec *);
-try g95_resolve_array_spec(g95_array_spec *);
+try g95_resolve_array_spec(g95_array_spec *, int);
 match g95_match_array_spec(g95_array_spec **);
 match g95_match_array_ref(g95_array_ref *, g95_array_spec *, int);
 int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);

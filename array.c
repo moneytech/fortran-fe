@@ -246,11 +246,31 @@ int i;
 }
 
 
+/* resolve_array_bound()-- Takes an array bound, resolves the expression,
+ * that make up the shape and check associated constraints. */
+
+static try resolve_array_bound(g95_expr *e, int check_constant) {
+
+  if (e == NULL) return SUCCESS;
+
+  if (g95_resolve_expr(e) == FAILURE ||
+      g95_specification_expr(e) == FAILURE) return FAILURE;
+
+  if (check_constant && g95_is_constant_expr(e) == 0) {
+    g95_error("Variable '%s' at %L in this context must be constant",
+	      e->symbol->name, &e->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
 /* g95_resolve_array_spec()-- Takes an array specification, resolves
  * the expressions that make up the shape and make sure everything is
  * integral. */
 
-try g95_resolve_array_spec(g95_array_spec *as) {
+try g95_resolve_array_spec(g95_array_spec *as, int check_constant) {
 g95_expr *e;
 int i;
 
@@ -258,17 +278,10 @@ int i;
 
   for(i=0; i<as->rank; i++) {
     e = as->lower[i];
-
-    if (e != NULL) {
-      g95_resolve_expr(e);
-      if (g95_specification_expr(e) == FAILURE) return FAILURE;
-    }
+    if (resolve_array_bound(e, check_constant) == FAILURE) return FAILURE;
 
     e = as->upper[i];
-    if (e != NULL) {
-      g95_resolve_expr(e);
-      if (g95_specification_expr(e) == FAILURE) return FAILURE;
-    }
+    if (resolve_array_bound(e, check_constant) == FAILURE) return FAILURE;
   }
 
   return SUCCESS;
