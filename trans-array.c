@@ -158,6 +158,9 @@ g95_descriptor_data_type (tree desc)
    To understand these magic numbers, look at the comments
    before g95_build_array_type() in trans-types.c.
 
+   The code within these defines should be the only code which knows the format
+   or an array descriptor.
+
    Don't forget to #undef these!  */
 
 #define DATA_FIELD 0
@@ -289,10 +292,110 @@ g95_conv_descriptor_ubound (tree desc, tree dim)
   return tmp;
 }
 
+/* Build a static constructor for an array descriptor.  Also allocates storage
+   for the array data.  Return the offset.  */
+static tree
+g95_build_array_initializer (g95_symbol * sym)
+{
+  tree type;
+  tree field;
+  tree list;
+  tree init;
+  tree tmp;
+  tree dim;
+  tree data;
+  mpz_t val;
+  mpz_t s;
+  mpz_t offset;
+  int n;
+
+  mpz_init (val);
+  mpz_init_set_ui (s, 1);
+  mpz_init_set_ui (offset, 0);
+
+  dim = TYPE_FIELDS (TREE_TYPE (sym->backend_decl));
+  dim = g95_advance_chain (dim, DIMENSION_FIELD);
+  assert (TREE_CODE (TREE_TYPE (dim)) == ARRAY_TYPE);
+  type = TREE_TYPE (TREE_TYPE (dim));
+  init = NULL_TREE;
+  /* All the dimension fields.  */
+  for (n = 0; n < sym->as->rank; n++)
+    {
+      /* The list of fields is build reversed.  */
+      field = TYPE_FIELDS (type);
+      assert (STRIDE_SUBFIELD == 0 && LBOUND_SUBFIELD == 1
+              && UBOUND_SUBFIELD == 2);
+      list = tree_cons (field, g95_conv_mpz_to_tree (s, g95_array_index_kind),
+                        NULL_TREE);
+      assert (sym->as->lower[n]->expr_type == EXPR_CONSTANT);
+      field = TREE_CHAIN (field);
+      list = tree_cons (field, g95_conv_mpz_to_tree (
+                sym->as->lower[n]->value.integer, g95_array_index_kind),
+              list);
+      field = TREE_CHAIN (field);
+      assert (sym->as->upper[n]->expr_type == EXPR_CONSTANT);
+      list = tree_cons (field, g95_conv_mpz_to_tree (
+                sym->as->upper[n]->value.integer, g95_array_index_kind),
+              list);
+
+      list = build (CONSTRUCTOR, type, NULL_TREE, nreverse (list));
+      init = tree_cons (NULL_TREE, list, init);
+
+      mpz_addmul (offset, sym->as->lower[n]->value.integer, s);
+      mpz_sub (val, sym->as->upper[n]->value.integer,
+               sym->as->lower[n]->value.integer);
+      mpz_add_ui (val, val, 1);
+      mpz_mul (s, s, val);
+    }
+  init = build (CONSTRUCTOR, TREE_TYPE (dim), NULL_TREE, nreverse (init));
+  list = tree_cons (dim, init, NULL_TREE);
+
+  mpz_neg (offset, offset);
+  /* Now allocate the data for the array.  */
+  mpz_sub_ui (s, s, 1);
+  tmp = g95_conv_mpz_to_tree (s, g95_array_index_kind);
+  type = build_range_type (g95_array_index_type, integer_zero_node, tmp);
+  type = build_array_type (g95_get_element_type (
+          TREE_TYPE (sym->backend_decl)), type);
+  data = create_tmp_var (type, "A");
+  TREE_STATIC (data) = 1;
+  TREE_ADDRESSABLE (data) = 1;
+
+  /* TODO: array initializers.  */
+
+  field = TYPE_FIELDS (TREE_TYPE (sym->backend_decl));
+  field = g95_advance_chain (field, DTYPE_FIELD);
+  init = G95_TYPE_DESCRIPTOR_DTYPE (TREE_TYPE (sym->backend_decl));
+  list = tree_cons (field, init, list);
+
+  /* We can't set the base member at compile time because it may not point to
+     a valid address.  It may work with -O0, by really confuses -O2.  */
+  field = TYPE_FIELDS (TREE_TYPE (sym->backend_decl));
+  field = g95_advance_chain (field, BASE_FIELD);
+  list = tree_cons (field, integer_zero_node, list);
+
+  field = TYPE_FIELDS (TREE_TYPE (sym->backend_decl));
+  assert (DATA_FIELD == 0);
+  init = build1 (ADDR_EXPR, TREE_TYPE (field), data);
+  list = tree_cons (field, init, list);
+
+  init = build (CONSTRUCTOR, TREE_TYPE (sym->backend_decl), NULL_TREE, list);
+  TREE_CONSTANT (init) = 1;
+  DECL_INITIAL (sym->backend_decl) = init;
+
+  tmp = g95_conv_mpz_to_tree (offset, g95_array_index_kind);
+
+  mpz_clear (val);
+  mpz_clear (s);
+  mpz_clear (offset);
+
+  return tmp;
+}
+
 /* Cleanup those #defines.  */
 #undef DATA_FIELD
 #undef BASE_FIELD
-#undef RANK_FIELD
+#undef DTYPE_FIELD
 #undef DIMENSION_FIELD
 #undef STRIDE_SUBFIELD
 #undef LBOUND_SUBFIELD
@@ -2854,11 +2957,47 @@ g95_trans_auto_array_allocation (tree descriptor, g95_symbol * sym)
   tree tail;
   tree len;
   g95_array_spec *as;
+  int dynamic;
 
-  as = sym->as;
-  g95_start_stmt ();
+  if (sym->attr.use_assoc)
+    internal_error ("Use associated local array???");
 
+  assert (! sym->attr.pointer || sym->attr.allocatable);
+
+  if (TREE_STATIC (descriptor))
+    {
+      assert (G95_DESCRIPTOR_TYPE_P (TREE_TYPE (descriptor)));
+      offset = g95_build_array_initializer (sym);
+
+      if (sym->attr.use_assoc || sym->module[0] == 0)
+        {
+          g95_start_stmt();
+          head = tail = NULL_TREE;
+
+          /* We still need to set the base component.  */
+          tmp = g95_conv_descriptor_data (descriptor);
+          ref = g95_conv_descriptor_base (descriptor);
+          tmp = g95_simple_fold (tmp, &head, &tail, NULL);
+          tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
+          tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
+          tmp = build1 (ADDR_EXPR, TREE_TYPE (ref), tmp);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (ref), ref, tmp);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+
+          stmt = g95_finish_stmt (head, tail);
+          return stmt;
+        }
+      return NULL_TREE;
+    }
+
+  assert (! sym->module[0]);
+
+  g95_start_stmt();
   head = tail = NULL_TREE;
+
+  assert (! (sym->attr.save || sym->attr.use_assoc));
+  as = sym->as;
 
   if (sym->ts.type == BT_CHARACTER)
     {
@@ -2874,12 +3013,14 @@ g95_trans_auto_array_allocation (tree descriptor, g95_symbol * sym)
   size = g95_array_init_size (descriptor, as->rank, &offset,
                               as->lower, as->upper, &head, &tail, &len);
 
+
   /* Allocate the array.  */
   if (g95_can_put_var_on_stack (size))
     {
       /* Create a temporary variable to hold the data.  */
       tmp = g95_get_stack_array_type (size);
       tmpvar = create_tmp_alias_var (tmp, "A");
+      TREE_STATIC (tmpvar) = TREE_STATIC (descriptor);
 
       /* Store the address.  */
       tmp = g95_conv_descriptor_data (descriptor);
@@ -2921,7 +3062,6 @@ g95_trans_auto_array_allocation (tree descriptor, g95_symbol * sym)
     }
 
   /* Set the base of the array.  */
-
   if (! integer_zerop (offset))
     {
       tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pointer)), pointer);
@@ -2933,7 +3073,7 @@ g95_trans_auto_array_allocation (tree descriptor, g95_symbol * sym)
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_list (&head, &tail, stmt, stmt);
 
-  /* Initialize the pointers fo an array of character strings.  */
+  /* Initialize the pointers for an array of character strings.  */
   if (len)
     {
       stmt = g95_trans_init_character_array (descriptor, pointer, len);

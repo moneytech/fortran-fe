@@ -54,6 +54,10 @@ static GTY(()) tree current_function_return_label;
 static GTY (()) tree saved_function_decls = NULL_TREE;
 static GTY (()) tree saved_parent_function_decls = NULL_TREE;
 
+/* The namespace of the module we're currently generating.  Only used while
+   outputting decls for module variables.  Do not rely on this being set.  */
+static g95_namespace *module_namespace;
+
 /* List of static constructor functions.  */
 tree g95_static_ctors;
 
@@ -401,6 +405,7 @@ g95_get_symbol_decl (g95_symbol * sym)
 {
   tree decl;
   tree length;
+  g95_se se;
 
   if (sym->attr.dummy || sym->attr.result)
     {
@@ -436,8 +441,6 @@ g95_get_symbol_decl (g95_symbol * sym)
     g95_todo_error ("common variables");
   else if (sym->attr.entry)
      g95_todo_error ("alternate entry");
-  else if (sym->attr.intrinsic)
-    g95_todo_error ("intrinsic variables");
 
   /* Catch function declarations.  Only used for actual parameters.  */
   if (sym->attr.flavor == FL_PROCEDURE)
@@ -449,6 +452,9 @@ g95_get_symbol_decl (g95_symbol * sym)
       decl = g95_get_extern_function_decl (sym);
       return decl;
     }
+
+  if (sym->attr.intrinsic)
+    internal_error ("intrinsic variable which isn't a procedure");
 
   decl = build_decl (VAR_DECL,
                      g95_sym_identifier (sym),
@@ -473,9 +479,11 @@ g95_get_symbol_decl (g95_symbol * sym)
 
   g95_finish_var_decl (decl, sym);
 
-  /* Character variables need special handling.  */
-  if (sym->ts.type == BT_CHARACTER)
+  /* TODO: Initialization of pointer variables.  */
+  switch (sym->ts.type)
     {
+    case BT_CHARACTER:
+      /* Character variables need special handling.  */
       /* Character lengths are common for a whole array.  */
 
       g95_allocate_lang_decl (decl);
@@ -484,6 +492,14 @@ g95_get_symbol_decl (g95_symbol * sym)
       if (sym->ts.cl->length->expr_type == EXPR_CONSTANT)
         {
           length = g95_conv_mpz_to_tree (sym->ts.cl->length->value.integer, 4);
+          /* Static initializer.  */
+          if (sym->value)
+            {
+              assert (TREE_STATIC (decl));
+              if (sym->attr.pointer)
+                g95_todo_error ("initialization of pointers");
+              DECL_INITIAL (decl) = g95_conv_string_init (length, sym->value);
+            }
         }
       else
         {
@@ -507,28 +523,99 @@ g95_get_symbol_decl (g95_symbol * sym)
           g95_finish_var_decl (length, sym);
           /* Remember this variable for allocation/cleanup.  */
           g95_defer_symbol_init (sym);
+          assert (! sym->value);
         }
 
       G95_DECL_STRING_LENGTH (decl) = length;
-    }
+      break;
 
+    case BT_DERIVED:
+      g95_defer_symbol_init (sym);
+      break;
+
+    default:
+      /* Static initializers for SAVEd variables.  Arrays have already been
+         remembered.  */
+      if (sym->value && ! sym->attr.dimension)
+        {
+          assert (TREE_STATIC (decl));
+          g95_init_se (&se, NULL);
+          g95_conv_constant (&se, sym->value);
+          assert (se.pre == NULL_TREE && se.post == NULL_TREE);
+          DECL_INITIAL (decl) = se.expr;
+        }
+      break;
+    }
   sym->backend_decl = decl;
 
   return decl;
 }
 
+/* None of the specific intrinsics which can be passed as actual arguments
+   for dummy procedures has more then two parameters.  */
+#define G95_MAX_SPECIFIC_ARGS 2
 /* Get a basic decl for an external function.  */
 tree
 g95_get_extern_function_decl (g95_symbol *sym)
 {
   tree type;
   tree fndecl;
+  g95_expr e;
+  g95_intrinsic_sym *isym;
+  g95_intrinsic_arg *formal;
+  g95_expr argexpr[G95_MAX_SPECIFIC_ARGS];
+  int n;
+  char s[G95_MAX_SYMBOL_LEN];
+  tree name;
 
   if (sym->backend_decl)
     return sym->backend_decl;
 
+  if (sym->attr.intrinsic)
+    {
+      /* Call the resolution function to get the actual name.  */
+      isym = g95_find_function (sym->name);
+      assert (isym->resolve);
+
+      memset (&e, 0, sizeof(e));
+      memset (argexpr, 0, sizeof(argexpr));
+      e.expr_type = EXPR_FUNCTION;
+      formal = NULL;
+      n = 0;
+
+      for (formal = isym->formal, n = 0;
+           formal;
+           formal = formal->next, n++)
+        {
+          assert (n < G95_MAX_SPECIFIC_ARGS);
+          argexpr[n].ts = formal->ts;
+        }
+
+      switch (n)
+        {
+        case 0:
+          isym->resolve(&e);
+          break;
+
+        case 1:
+          isym->resolve(&e, &argexpr[0]);
+          break;
+
+        case 2:
+          isym->resolve(&e, &argexpr[0], &argexpr[1]);
+          break;
+
+        default:
+          abort ();
+        }
+      sprintf (s, "specific%s", e.value.function.name);
+      name = get_identifier (s);
+    }
+  else
+    name = g95_sym_identifier (sym);
+
   type = g95_get_function_type (sym);
-  fndecl = build_decl (FUNCTION_DECL, g95_sym_identifier (sym), type);
+  fndecl = build_decl (FUNCTION_DECL, name, type);
 
   if (sym->module[0])
     SET_DECL_ASSEMBLER_NAME (fndecl, g95_sym_mangled_identifier (sym));
@@ -1148,6 +1235,97 @@ g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
   body = chainon (body, stmt);
 
   return body;
+}
+
+static void
+g95_create_module_variable (g95_symbol * sym)
+{
+  tree decl;
+  g95_se se;
+
+  /* Only output symbols from this module.  */
+  if (sym->ns != module_namespace)
+    {
+      /* I don't think this should ever happen.  */
+      internal_error ("module symbol %d in wrong namespace", sym->name);
+    }
+
+  /* Only output variables.  */
+  if (sym->attr.flavor != FL_VARIABLE)
+    return;
+
+  /* Don't generate variables from other modules.  */
+  if (sym->attr.use_assoc)
+    return;
+
+  if (sym->backend_decl)
+    internal_error ("backend decl for module variable %s already exists");
+
+  /* Create the decl.  */
+  decl = g95_get_symbol_decl (sym);
+
+  /* We want to allocate storage for this variable.  */
+  TREE_STATIC (decl) = 1;
+
+  /* Create the variable.  */
+  pushdecl (decl);
+  rest_of_decl_compilation (decl, NULL, 1, 0);
+
+  /* Also add length of strings.  */
+  if (G95_DECL_STRING (decl))
+    {
+      tree length;
+
+      length = G95_DECL_STRING_LENGTH (decl);
+      pushdecl (length);
+      rest_of_decl_compilation (length, NULL, 1, 0);
+    }
+
+  if (sym->attr.dimension)
+    {
+      g95_todo_error ("Initialization of module arrays");
+     // DECL_INITIAL (decl) = g95_build_constructor ();
+    }
+  else if (sym->ts.type == BT_DERIVED)
+    {
+      g95_todo_error ("Derived type module variables");
+    }
+  else
+    {
+      if (sym->value)
+        {
+          g95_init_se (&se, NULL);
+          g95_conv_constant (&se, sym->value);
+          assert (se.pre == NULL_TREE && se.post == NULL_TREE);
+          DECL_INITIAL (decl) = se.expr;
+        }
+    }
+}
+
+/* Generate all the required code for module variables.  */
+void
+g95_generate_module_vars (g95_namespace * ns)
+{
+  g95_symbol *sym;
+
+  module_namespace = ns;
+
+  /* Check the frontend left the namespace in a reasonable state.  */
+  assert (ns->proc_name && ! ns->proc_name->tlink);
+
+  /* Create decls for all the module varuiables.  */
+  g95_traverse_ns (ns, g95_create_module_variable);
+
+  /* Generate initialization code.  */
+  for (sym = ns->proc_name->tlink; sym; sym = sym->tlink)
+    {
+      if (sym->attr.dimension)
+        {
+          g95_trans_auto_array_allocation (sym->backend_decl, sym);
+        }
+      else
+        g95_todo_error ("deferred initialization of module variable");
+    }
 }
 
 static void

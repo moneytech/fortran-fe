@@ -93,6 +93,38 @@ g95_build_string_const(int length, char *s)
   return str;
 }
 
+/* Return a string constant with the given length.  Used for static
+   initializers.  The constant will be padded to the full length.  */
+tree
+g95_conv_string_init (tree length, g95_expr * expr)
+{
+  char *s;
+  HOST_WIDE_INT len;
+  int slen;
+  tree str;
+
+  assert (expr->expr_type == EXPR_CONSTANT);
+  assert (expr->ts.type == BT_CHARACTER && expr->ts.kind == 1);
+  assert (INTEGER_CST_P (length));
+  assert (TREE_INT_CST_HIGH (length) == 0);
+
+  len = TREE_INT_CST_LOW (length);
+  slen = expr->value.character.length;
+  assert (len >= slen);
+  if (len != slen)
+    {
+      s = g95_getmem (len);
+      memcpy (s, expr->value.character.string, slen);
+      memset (&s[slen], ' ', len - slen);
+      str = g95_build_string_const (len, s);
+      g95_free (s);
+    }
+  else
+    str = g95_build_string_const (len, expr->value.character.string);
+
+  return str;
+}
+
 void
 g95_init_constants ()
 {

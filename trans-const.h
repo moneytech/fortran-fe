@@ -24,8 +24,11 @@ tree g95_conv_mpz_to_tree (mpz_t, int);
 /* Returns a REAL_CST.  */
 tree g95_conv_mpf_to_tree (mpf_t, int);
 
-/* only really for use by g95_trans_simple_expr */
+/* Translate a constant value.  Must be an EXPR_CONSTANT.  */
 void g95_conv_constant (g95_se *, g95_expr *);
+
+/* Translate a string constant for a static initializer.  */
+tree g95_conv_string_init (tree, g95_expr *);
 
 /* Initialise the nodes for constants.  */
 void g95_init_constants (void);

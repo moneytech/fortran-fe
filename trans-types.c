@@ -368,7 +368,8 @@ g95_get_stack_array_type (tree size)
     }
 
    Translation code should use g95_conv_descriptor_* rather than accessing
-   the descriptor directly.
+   the descriptor directly. Any changes to the array descriptor type will
+   require changes in g95_conv_descriptor_* and g95_build_array_initializer.
 
    This is represented internaly as a RECORD_TYPE. The index nodes are
    g95_array_index_type and the data node is a pointer to the data. See below
@@ -758,8 +759,9 @@ g95_sym_type (g95_symbol * sym)
     }
 
   /* We currently pass all parameters by reference.
-     See f95_get_function_decl.  */
-  if (sym->attr.dummy)
+     See f95_get_function_decl.  For dummy function parameters return the
+     function type.  */
+  if (sym->attr.dummy && ! sym->attr.function)
     type = build_reference_type (type);
 
   return (type);

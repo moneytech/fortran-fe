@@ -1,3 +1,16 @@
+2002-09-14  Paul Brook <paul@nowt.org>
+
+	* trans.c (g95_create_module_variable): Move to trans-decl.c.
+	* trans-const.c (g95_conv_string_init): New Function.
+	* trans-const.h: Declare it.
+	* trans-decl.c (g95_get_symbol_decl): Handle initializers for static
+	variables. Don't bail on intrinsic symbols.
+	(get_extern_function_decl): Handle specific intrinsic functions.
+	* trans-types.c (g95_sym_type): Dummy functions don't return
+	reference types.
+	* trans-array.c (g95_build_array_initializer): New Function.
+	(g95_trans_auto_array_allocation): Build initializer for static decls.
+	
 2002-09-12  Paul Brook  <paul@nowt.org>
 
 	* trans-decl.c (g95_generate_code): Fix thinko with return variable.

@@ -294,6 +294,8 @@ tree g95_simple_fold_tmp(tree, tree *, tree *, tree *);
 
 /* Generate the code for a function.  */
 void g95_generate_function_code (g95_namespace *);
+/* Output a decl for a module variable.  */
+void g95_generate_module_vars (g95_namespace *);
 
 /* Get and set the current location.  */
 void g95_set_backend_locus (locus *);

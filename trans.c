@@ -632,53 +632,10 @@ g95_generate_code (g95_namespace * ns)
       attr.access = ACCESS_PUBLIC;
       main_program->attr = attr;
       ns->proc_name = main_program;
+      g95_commit_symbols ();
     }
 
   g95_generate_function_code (ns);
-}
-
-static void
-g95_create_module_variable (g95_symbol * sym)
-{
-  tree decl;
-
-  /* Only output symbols from this module.  */
-  if (sym->ns != module_namespace)
-    {
-      /* I don't think this should ever happen.  */
-      internal_error ("module symbol %d in wrong namespace", sym->name);
-    }
-
-  /* Only output variables.  */
-  if (sym->attr.flavor != FL_VARIABLE)
-    return;
-
-  /* Don't generate variables from other modules.  */
-  if (sym->attr.use_assoc)
-    return;
-
-  if (sym->backend_decl)
-    internal_error ("backend decl for module variable %s already exists");
-
-  /* Create the decl.  */
-  decl = g95_get_symbol_decl (sym);
-  /* Create the variable.  */
-  pushdecl (decl);
-  rest_of_decl_compilation (decl, NULL, 1, 0);
-
-  /* Also add length of strings.  */
-  if (G95_DECL_STRING (decl))
-    {
-      tree length;
-
-      length = G95_DECL_STRING_LENGTH (decl);
-      pushdecl (length);
-      rest_of_decl_compilation (length, NULL, 1, 0);
-    }
-
-  /* TODO: initialise array variables.  */
-  if (sym->attr.dimension)
-    g95_todo_error ("Array variables in a module");
 }
 
 /* This function is called after a complete module has been parsed
@@ -688,8 +645,7 @@ g95_generate_module_code (g95_namespace * ns)
 {
   g95_namespace *n;
 
-  module_namespace = ns;
-  g95_traverse_ns (ns, g95_create_module_variable);
+  g95_generate_module_vars (ns);
 
   for (n = ns->contained ; n ; n = n->sibling)
     g95_generate_function_code (n);
