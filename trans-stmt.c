@@ -55,7 +55,7 @@ g95_trans_goto (g95_code *code)
 tree
 g95_trans_call (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("Statement not implemented: CALL");
 }
 
 tree
@@ -71,7 +71,7 @@ g95_trans_return (g95_code *code ATTRIBUTE_UNUSED)
 tree
 g95_trans_stop (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("Statement not implemented: STOP");
 }
 
 
@@ -180,7 +180,7 @@ g95_trans_if (g95_code * code)
 tree
 g95_trans_arithmetic_if (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("Statement not implemented: ARITHMETIC IF");
 }
 
 /* Currently calculates the loop count before entering the loop, but
@@ -452,19 +452,19 @@ g95_trans_do_while (g95_code * code)
 tree
 g95_trans_select (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("Statement not implemented: SELECT");
 }
 
 tree
 g95_trans_forall (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("Statement not implemented: FORALL");
 }
 
 tree
 g95_trans_where (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("Statement not implemented: WHERE");
 }
 
 /* CYCLE a DO loop. The label decl has already been created by
@@ -496,12 +496,12 @@ g95_trans_exit (g95_code *code)
 tree
 g95_trans_allocate (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("Statement not implemented: ALLOCATE");
 }
 
 tree
 g95_trans_deallocate (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("Statement not implemented: DEALLOCATE");
 }
 
