@@ -486,6 +486,7 @@ g95_expr *e;
   for(; arg; arg=arg->next) {
 
     e = arg->expr;
+    if (e == NULL) continue;
 
     if (e->ts.type != BT_PROCEDURE) {
       if (g95_resolve_expr(e) != SUCCESS) return FAILURE;
