@@ -1141,7 +1141,7 @@ g95_charlen *cl;
 
   old_ns = g95_current_ns;
 
-  g95_check_operator_interfaces(ns);
+  g95_check_interfaces(ns);
 
   resolve_contained_functions(ns);
 

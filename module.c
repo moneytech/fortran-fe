@@ -30,11 +30,19 @@ Boston, MA 02111-1307, USA.  */
  * usually a fortran 95 identifier, but can also start with '@' in
  * order to reference a hidden symbol.
  *
- * The first line of a module is a line warning people not to edit the
- * module.  The rest of the module looks like:
+ * The first line of a module is an informational message about what
+ * created the module, the file it came from and when it was created.
+ * The second line is a warning for people not to edit the module.
+ * The rest of the module looks like:
  *
  * ( ( <Interface info for UPLUS> )
  *   ( <Interface info for UMINUS> )
+ *   ...
+ * )
+ * ( ( <name of operator interface> <module of op interface> <i/f1> ... )
+ *   ...
+ * )
+ * ( ( <name of generic interface> <module of generic interface> <i/f1> ... )
  *   ...
  * )
  * ( <Symbol Number (in no particular order)>
@@ -51,8 +59,7 @@ Boston, MA 02111-1307, USA.  */
  *
  * In general, symbols refer to other symbols by their symbol number,
  * which are zero based.  Symbols are written to the module in no
- * particular order.  */
-
+ * particular order. */
 
 #include <string.h>
 #include <stdio.h>
@@ -224,15 +231,20 @@ cleanup:
 }
 
 
-/* find_use_name()-- Try to find the use name in the current list */
+/* find_use_name()-- Given a name, return the name under which to load
+ * this symbol.  Returns NULL if this symbol shouldn't be loaded. */
 
-static g95_use_rename *find_use_name(const char *name) {
+static char *find_use_name(char *name) {
 g95_use_rename *u;
 
   for(u=g95_rename_list; u; u=u->next)
-    if (strcmp(u->use_name, name) == 0) return u;
+    if (strcmp(u->use_name, name) == 0) break;
 
-  return NULL;
+  if (u == NULL) return only_flag ? NULL : name;
+
+  u->found = 1;
+
+  return (u->local_name[0] != '\0') ? u->local_name : name;
 }
 
 
@@ -1551,15 +1563,14 @@ g95_expr *e;
 }
 
 
-/* mio_interface()-- Save/restore lists of g95_interface stuctures.
- * When loading an interface, we are really appending to the existing
- * list of interfaces.  Checking for duplicate and ambiguous
- * interfaces has to be done later when all symbols have been loaded */
+/* mio_interface_rest()-- Save/restore lists of g95_interface
+ * stuctures.  When loading an interface, we are really appending to
+ * the existing list of interfaces.  Checking for duplicate and
+ * ambiguous interfaces has to be done later when all symbols have
+ * been loaded */
 
-static void mio_interface(g95_interface **ip) {
+static void mio_interface_rest(g95_interface **ip) {
 g95_interface *tail, *p;
-
-  mio_lparen();
 
   if (iomode == IO_OUTPUT) {
     if (ip != NULL)
@@ -1594,6 +1605,29 @@ g95_interface *tail, *p;
 }
 
 
+/* mio_interface()-- Save/restore a nameless operator interface */
+
+static void mio_interface(g95_interface **ip) {
+
+  mio_lparen();
+  mio_interface_rest(ip);
+}
+
+
+/* mio_symbol_interface()-- Save/restore a named operator interface */
+
+static void mio_symbol_interface(char *name, char *module,
+				 g95_interface **ip) {
+
+  mio_lparen();
+
+  mio_internal_string(name);
+  mio_internal_string(module);
+
+  mio_interface_rest(ip);
+}
+
+
 /* mio_symbol()-- Unlike most other routines, the address of the
  * symbol node is already fixed on input and the name/module has
  * already been filled in.  The append_interface() subroutines assumes
@@ -1606,9 +1640,6 @@ static void mio_symbol(g95_symbol *sym) {
 
   mio_symbol_attribute(&sym->attr);
   mio_typespec(&sym->ts);
-
-  mio_interface(&sym->operator);
-  mio_interface(&sym->generic);
 
   mio_symbol_ref(&sym->common_head);  /* Save/restore common block links */
   mio_symbol_ref(&sym->common_next);
@@ -1737,41 +1768,53 @@ g95_symbol *sym;
 }
 
 
-/* check_mod_interface()-- Given a pointer to an interface pointer,
- * remove duplace interfaces and make sure that no two interfaces are
- * ambiguous between an actual argument list */
+/* load_interfaces()-- Load interfaces from the module.  Interfaces
+ * are unusual in that they attach themselves to existing symbols.  */
 
-void check_mod_interface(g95_interface **ip, char *if_name) {
-g95_interface *p, *q, *qlast;
+void load_interfaces(int generic_flag) {
+char *p, name[G95_MAX_SYMBOL_LEN+1], module[G95_MAX_SYMBOL_LEN+1];
+g95_symbol *sym;
 
-  if (*ip == NULL) return;
+  mio_lparen();
 
-  for(p=*ip; p; p=p->next) {
-    qlast = p;
+  while(peek_atom() != ATOM_RPAREN) {
+    mio_lparen();
 
-    for(q=p->next; q;) {
-      if (p->sym == q->sym) {   /* Duplicate interface */
-	qlast->next = q->next;
-	g95_free(q);
+    mio_internal_string(name);
+    mio_internal_string(module);
 
-	q = qlast->next;
-	continue;
+    /* Decide if we need to load this one or not */
+
+    p = find_use_name(name);
+    if (p == NULL) goto eat_rest;
+
+    if (g95_find_symbol(p, NULL, 0, &sym)) goto eat_rest;
+
+    if (sym == NULL) {
+      g95_get_symbol(p, NULL, 0, &sym);
+
+      if (generic_flag) {
+	sym->attr.flavor = FL_PROCEDURE;
+	sym->attr.generic = 1;
       }
 
-      if (g95_compare_interfaces(p->sym, q->sym))
-	g95_error("Ambiguous interfaces '%s' and '%s' in %s loaded at %C",
-		  p->sym->name, q->sym->name, if_name);
-
-      qlast = q;
-      q = q->next;
+      sym->attr.use_assoc = 1;
     }
+
+    mio_interface_rest(generic_flag ? &sym->generic : &sym->operator);
+    continue;
+
+  eat_rest:
+    while(parse_atom() != ATOM_RPAREN);
   }
+
+  mio_rparen();
 }
 
 
 static void read_namespace(g95_namespace *ns) {
-char name[G95_MAX_SYMBOL_LEN+1], if_name[100];
-module_locus operator_interfaces, symbols;
+module_locus operator_interfaces, user_operators, symbols;
+char *p, name[G95_MAX_SYMBOL_LEN+1];
 int i, flag, ambiguous, symbol;
 symbol_info *info;
 g95_use_rename *u;
@@ -1779,6 +1822,10 @@ g95_symtree *st;
 g95_symbol *sym;
 
   get_module_locus(&operator_interfaces);  /* Skip these for now */
+  skip_list();
+
+  get_module_locus(&user_operators);
+  skip_list();
   skip_list();
 
   /* Figure out what the largest symbol number is */
@@ -1813,9 +1860,6 @@ g95_symbol *sym;
 
     mio_internal_string(info->true_name);
     mio_internal_string(info->module);
-
-    info->sym = g95_new_symbol(info->true_name, ns);
-    strcpy(info->sym->module, info->module);
 
     get_module_locus(&info->where);
     skip_list();
@@ -1864,21 +1908,16 @@ g95_symbol *sym;
 
     /* See what we need to do with this name. */
 
-    u = find_use_name(name);
-    if (u != NULL) u->found = 1;
+    p = find_use_name(name);
+    if (p == NULL) continue;
 
-    if (only_flag && u == NULL) continue;
-
-    if (u != NULL && u->local_name[0] != '\0')
-      strcpy(name, u->local_name);
-
-    st = g95_find_symtree(ns, name);
+    st = g95_find_symtree(ns, p);
 
     if (st != NULL) {
       if (st->sym != info->sym) st->ambiguous = 1;
     } else {
-      st = check_unique_name(name) ? get_unique_symtree(ns) :
-	g95_new_symtree(ns, name);
+      st = check_unique_name(p) ? get_unique_symtree(ns) :
+	g95_new_symtree(ns, p);
 
       st->sym = info->sym;
       st->ambiguous = ambiguous;
@@ -1911,14 +1950,16 @@ g95_symbol *sym;
     }
 
     mio_interface(&ns->operator[i]);
-
-    if (i == INTRINSIC_ASSIGN)
-      strcpy(if_name, "intrinsic assignment operator");
-    else
-      sprintf(if_name, "intrinsic %s operator", g95_op2string(i));
-
-    check_mod_interface(&ns->operator[i], if_name);
   }
+
+/* Load generic and user operator interfaces.  These must follow the
+ * loading of symtree because otherwise symbols can be marked as
+ * ambiguous */
+
+  set_module_locus(&user_operators);
+
+  load_interfaces(0);
+  load_interfaces(1);
 
   /* At this point, we read those symbols that are needed but haven't
    * been loaded yet.  If one symbol requires another, the other gets
@@ -1969,21 +2010,7 @@ g95_symbol *sym;
 	      "'%s'", g95_op2string(u->operator), &u->where, module_name);
   }
 
-/* Check generic and user operator interfaces for consistency and to
- * remove duplicate interfaces. */
-
-  info = sym_table;
-  for(i=0; i<sym_num; i++, info++) {
-    sym = info->sym;
-    if (sym == NULL) continue;
-
-    sprintf(if_name, "generic interface for '%s'", sym->name);
-    check_mod_interface(&sym->generic, if_name);
-
-    sprintf(if_name, "operator interface for '%s'", sym->name);
-    check_mod_interface(&sym->operator, if_name);
-  }
-
+  g95_check_interfaces(g95_current_ns);
 
 /* Clean up symbol nodes that were never loaded, create references to
  * hidden symbols. */
@@ -2055,6 +2082,8 @@ static void write_symbol(g95_symbol *sym) {
 
 static void write_symbol0(g95_symbol *sym) {
 
+  if (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic) return;
+
   if (sym->serial == -1) {
     if (!check_access(sym->attr.access, sym->ns->default_access)) return;
     sym->serial = sym_num++;
@@ -2064,11 +2093,34 @@ static void write_symbol0(g95_symbol *sym) {
 }
 
 
+/* write_operator()-- Write operator interfaces associated with a symbol. */
+
+static void write_operator(g95_symbol *sym) {
+
+  if (sym->operator == NULL ||
+      !check_access(sym->attr.access, sym->ns->default_access)) return;
+
+  mio_symbol_interface(sym->name, sym->module, &sym->operator);
+}
+
+
+/* write_generic()-- Write generic interfaces associated with a symbol. */
+
+static void write_generic(g95_symbol *sym) {
+
+  if (sym->generic == NULL ||
+      !check_access(sym->attr.access, sym->ns->default_access)) return;
+
+  mio_symbol_interface(sym->name, sym->module, &sym->generic);
+}
+
+
 static void write_symtree(g95_symtree *st) {
 g95_symbol *sym;
 
   sym = st->sym;
-  if (!check_access(sym->attr.access, sym->ns->default_access)) return;
+  if (!check_access(sym->attr.access, sym->ns->default_access) ||
+      (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic)) return;
 
   if (sym->serial == -1)
     g95_internal_error("write_symtree(): Symbol not written");
@@ -2095,7 +2147,16 @@ int i;
 		  ? &ns->operator[i] : NULL);
 
   mio_rparen();
+  write_char('\n');  write_char('\n');
 
+  mio_lparen();
+  g95_traverse_ns(ns, write_operator);
+  mio_rparen();
+  write_char('\n');  write_char('\n');
+
+  mio_lparen();
+  g95_traverse_ns(ns, write_generic);
+  mio_rparen();
   write_char('\n');  write_char('\n');
 
   /* Write symbol information.  First we traverse all symbols in the
