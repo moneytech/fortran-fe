@@ -572,6 +572,74 @@ g95_trans_allocate_temp_array (g95_loopinfo * loop, g95_ss_info * info,
   return size;
 }
 
+/* Make sure offset is a variable.  */
+static void
+g95_put_offset_into_var (stmtblock_t * pblock, tree * poffset,
+                         tree * offsetvar)
+{
+  tree tmp;
+
+  /* We should have already created the offset variable.  We cannot
+     create it here because we may be in an inner scopde.  */
+  assert (*offsetvar != NULL_TREE);
+  tmp = build (MODIFY_EXPR, g95_array_index_type, *offsetvar, *poffset);
+  g95_add_expr_to_block (pblock, tmp);
+  *poffset = *offsetvar;
+  TREE_USED (*offsetvar) = 1;
+}
+
+/* Add the contents of an array to the constructor.  */
+static void
+g95_trans_array_constructor_subarray (stmtblock_t * pblock, tree type,
+    tree pointer, g95_expr * expr, tree * poffset, tree * offsetvar)
+{
+  g95_se se;
+  g95_ss *ss;
+  g95_loopinfo loop;
+  stmtblock_t body;
+  tree tmp;
+
+  /* We need this to be a variable so we can increment it.  */
+  g95_put_offset_into_var (pblock, poffset, offsetvar);
+
+  g95_init_se (&se, NULL);
+
+  /* Walk the array expression.  */
+  ss = g95_walk_expr (g95_ss_terminator, expr);
+  assert (ss != g95_ss_terminator);
+  ss = g95_reverse_ss (ss);
+
+  /* Initialize the loop.  */
+  g95_init_loopinfo (&loop);
+  g95_add_ss_to_loop (&loop, ss);
+
+  /* Make the loop body.  */
+  g95_mark_ss_chain_used (ss, 1);
+  g95_start_scalarized_body (&loop, &body);
+  g95_copy_loopinfo_to_se (&se, &loop);
+  se.ss = ss;
+
+  g95_conv_expr (&se, expr);
+  g95_add_block_to_block (&body, &se.pre);
+
+  /* Store the value.  */
+  tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pointer)), pointer);
+  tmp = build (ARRAY_REF, type, tmp, *poffset);
+  g95_add_modify_expr (&body, tmp, se.expr);
+
+  /* Increment the offset.  */
+  tmp = build (PLUS_EXPR, g95_array_index_type, *poffset, integer_one_node);
+  g95_add_modify_expr (&body, *poffset, tmp);
+
+  /* Finish the loop.  */
+  g95_add_block_to_block (&body, &se.post);
+  assert (se.ss == g95_ss_terminator);
+  g95_trans_scalarizing_loops (&loop, &body);
+  g95_add_block_to_block (&loop.pre, &loop.post);
+  tmp = g95_finish_block (&loop.pre);
+  g95_add_expr_to_block (pblock, tmp);
+}
+
 /* Assign the values to the elements of an array constructor.  */
 static void
 g95_trans_array_constructor_value (stmtblock_t * pblock, tree type,
@@ -585,17 +653,10 @@ g95_trans_array_constructor_value (stmtblock_t * pblock, tree type,
 
   for (; c; c = c->next)
     {
-      /* If this is an iterator, the offset must be a variable.  */
-      if (c->iterator && INTEGER_CST_P (*poffset))
-        {
-          /* We should have already created the offset variable.  We cannot
-             create it here because we may be in an inner scopde.  */
-          assert (*offsetvar != NULL_TREE);
-          tmp = build (MODIFY_EXPR, g95_array_index_type, *offsetvar, *poffset);
-          g95_add_expr_to_block (pblock, tmp);
-          *poffset = *offsetvar;
-          TREE_USED (*offsetvar) = 1;
-        }
+      /* If this is an iterator or an array, the offset must be a variable.  */
+      if ((c->iterator || c->expr->rank > 0)
+          && INTEGER_CST_P (*poffset))
+        g95_put_offset_into_var (pblock, poffset, offsetvar);
 
       g95_start_block (&body);
 
@@ -604,6 +665,11 @@ g95_trans_array_constructor_value (stmtblock_t * pblock, tree type,
           /* Array constructors can be nested.  */
           g95_trans_array_constructor_value (&body, type, pointer,
               c->expr->value.constructor.head, poffset, offsetvar);
+        }
+      else if (c->expr->rank > 0)
+        {
+          g95_trans_array_constructor_subarray (&body, type, pointer,
+              c->expr, poffset, offsetvar);
         }
       else
         {
@@ -614,8 +680,6 @@ g95_trans_array_constructor_value (stmtblock_t * pblock, tree type,
           n = 0;
           while (p && ! (p->iterator || p->expr->expr_type != EXPR_CONSTANT))
             {
-              if (p->expr->rank > 0)
-                g95_todo_error ("Array expressions in constructors");
               p = p->next;
               n++;
             }
@@ -785,7 +849,12 @@ g95_get_array_cons_size (mpz_t *size, g95_constructor * c)
       else
         {
           if (c->expr->rank > 0)
-            g95_todo_error ("Array expressions in constructors");
+            {
+              mpz_set_si (*size, -1);
+              mpz_clear (len);
+              mpz_clear (val);
+              return;
+            }
           mpz_set_ui (len, 1);
         }
 
@@ -815,7 +884,7 @@ g95_get_array_cons_size (mpz_t *size, g95_constructor * c)
 }
 
 /* Array constructors are handled by constructing a temporary, then using that
-   within the scalarization loop.  This is not optimal, seems by far the
+   within the scalarization loop.  This is not optimal, but seems by far the
    simplest method.  */
 static void
 g95_trans_array_constructor (g95_loopinfo * loop, g95_ss * ss)
