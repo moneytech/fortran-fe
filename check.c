@@ -896,7 +896,7 @@ try g95_check_pack(g95_expr *array, g95_expr *mask, g95_expr *vector) {
 
   if (array_check(mask, 1) == FAILURE) return FAILURE;
 
-  if (type_check(mask, 1, BT_INTEGER) == FAILURE) return FAILURE;
+  if (type_check(mask, 1, BT_LOGICAL) == FAILURE) return FAILURE;
 
   if (vector != NULL) {
     if (same_type_check(array, 0, vector, 2) == FAILURE) return FAILURE;
