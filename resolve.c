@@ -999,8 +999,8 @@ static try check_dimension(int i, g95_array_ref *ar, g95_array_spec *as) {
   return SUCCESS;
 
 bound:
-  g95_warning("Array reference at %L is out of bounds", &ar->c_where[i]);
-  return SUCCESS;
+  g95_error("Array reference at %L is out of bounds", &ar->c_where[i]);
+  return FAILURE;
 }
 
 
@@ -1746,9 +1746,9 @@ try t;
 static try resolve_data_variables(g95_data_variable *d) {
 
   for(; d; d=d->next) {
-    if (d->list == NULL)
-      g95_resolve_expr(d->expr);
-    else {
+    if (d->list == NULL) {
+      if (g95_resolve_expr(d->expr) == FAILURE) return FAILURE;
+    } else {
       if (g95_resolve_iterator(&d->iter) == FAILURE) return FAILURE;
 
       if (d->iter.start->expr_type != EXPR_CONSTANT ||
