@@ -1504,8 +1504,14 @@ match m;
     break;
 
   case FL_DERIVED:
-    m = match_structure_constructor(sym, &e);
-    if (m == MATCH_YES) e->symbol = sym;
+    sym = g95_use_derived(sym);
+    if (sym == NULL)
+      m = MATCH_ERROR;
+    else {
+      m = match_structure_constructor(sym, &e);
+      if (m == MATCH_YES) e->symbol = sym;
+    }
+
     break;
 
 /* If we're here, then the name is known to be the name of a

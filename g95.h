@@ -1115,6 +1115,7 @@ try g95_missing_attr(symbol_attribute *, locus *);
 try g95_copy_attr(symbol_attribute *, symbol_attribute *, locus *);
 
 try g95_add_component(g95_symbol *, const char *, g95_component **);
+g95_symbol *g95_use_derived(g95_symbol *);
 g95_component *g95_find_component(g95_symbol *, const char *);
 void g95_show_components(g95_symbol *);
 

@@ -30,6 +30,7 @@ Boston, MA 02111-1307, USA.  */
 
 g95_namespace *g95_current_ns;
 
+static g95_symbol *changed = NULL;
 
 /*********** IMPLICIT NONE and IMPLICIT statement handlers ***********/
 
@@ -1054,55 +1055,74 @@ g95_component *p, *tail;
 }
 
 
-static void copy_components(g95_symbol *sym, g95_component *src) {
-g95_component *tail, *new;
-
-  tail = NULL;
-
-  for(; src; src=src->next) {    
-    new = g95_get_component();
-
-    *new = *src;
-    new->as = g95_copy_array_spec(src->as);
-    new->initializer = g95_copy_expr(src->initializer);
-
-    if (tail == NULL)
-      sym->components = new;
-    else
-      tail->next = new;
-
-    tail = new;
-  }
-}
-
-
-/* check_components()-- If the component has no components and is not
- * use-associated, we search for a derived type of the same name in
- * parent and grandparent program units.  If found, we copy the
- * component list, in effect defining an identical type.
+/* g95_use_derived()-- This subroutine is called when a derived type
+ * is used in order to make the final determination about which
+ * version to use.  The standard requires that a type be defined
+ * before it is 'used', but such types can appear in IMPLICIT
+ * statements before the actual definition.  'Using' in this context
+ * means declaring a variable to be that type or using the type
+ * constructor.
  *
- * This is how the local type is taken from the host type.  If there
- * is some way for a derived type member to be used before the type is
- * defined this mechanism won't work. */
+ * If a type is used and the components haven't been defined, then we
+ * have to have a derived type in a parent unit.  We find the node in
+ * the other namespace and point the symtree node in this namespace to
+ * that node.  Further reference to this name point to the correct
+ * node.  If we can't find the node in a parent namespace, then have
+ * an error.
+ *
+ * This subroutine takes a pointer to a symbol node and returns a
+ * pointer to the translated node or NULL for an error.  Usually there
+ * is no translation and we return the node we were passed.  */
 
-static void check_components(g95_symbol *sym) {
-g95_namespace *ns;
-g95_symbol *s;
+g95_symbol *g95_use_derived(g95_symbol *sym) {
+g95_symbol *s, *p;
+g95_typespec *t;
+g95_symtree *st;
+int i;
 
-  if (sym->components != NULL || sym->attr.use_assoc) return;
+  if (sym->components != NULL) return sym;   /* Already defined */
 
-  ns = sym->ns->parent;
+  if (sym->ns->parent == NULL) goto bad;
 
-  if (ns == NULL) return;
+  if (g95_find_symbol(sym->name, sym->ns->parent, 1, &s)) {
+    g95_error("Symbol '%s' at %C is ambiguous", sym->name);
+    return NULL;
+  }
 
-  if (g95_find_symbol(sym->name, ns, 0, &s) ||
-      s->attr.flavor != FL_DERIVED) return;
+  if (s == NULL || s->attr.flavor != FL_DERIVED) goto bad;
 
-  check_components(s); /* The real definition might be another level up */
+  /* Get rid of symbol sym, translating all references to s */
 
-  copy_components(sym, s->components);
+  for(i=0; i<G95_LETTERS; i++) {
+    t = &sym->ns->default_type[i];
+    if (t->derived == sym) t->derived = s;
+  }
+
+  st = g95_find_symtree(sym->ns, sym->name);
+  st->sym = s;
+
+  s->refs++;
+
+  /* Unlink from list of modified symbols */
+
+  if (changed == sym)
+    changed = sym->tlink;
+  else
+    for(p=changed;; p=p->tlink)
+      if (p->tlink == sym) {
+	p->tlink = sym->tlink;
+	break;
+      }
+
+  g95_free_symbol(sym);
+
+  return s;
+
+ bad:
+  g95_error("Derived type '%s' at %C is being used before it is defined",
+	    sym->name);
+  return NULL;
 }
-
 
 
 /* g95_find_component()-- Given a derived type node and a component
@@ -1112,8 +1132,6 @@ g95_symbol *s;
  
 g95_component *g95_find_component(g95_symbol *sym, const char *name) {
 g95_component *p;
-
-  check_components(sym);
 
   if (name == NULL) return NULL;
 
@@ -1368,8 +1386,6 @@ done:
  * A symtree may point to a symbol node outside of it's namespace.  In
  * this case, that symbol has been used as a host associated variable
  * at some previous time.  */
-
-static g95_symbol *changed = NULL;
 
 #define NIL &sentinel           /* all leaves are sentinels */
 static g95_symtree sentinel = { { '\0' }, 0, NULL, NIL, NIL, NIL, BLACK };

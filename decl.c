@@ -691,9 +691,14 @@ match m;
   m = g95_match(" type ( %n )", name);
   if (m != MATCH_YES) return m;
 
-  /* Allow the type to be defined later. */
+  /* Search for the name but allow the components to be defined later. */
 
-  if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+  if (g95_find_symbol(name, NULL, 0, &sym)) {
+    g95_error("Symbol '%s' at %C is an ambiguous reference", sym->name);
+    return MATCH_ERROR;
+  }
+
+  if (sym == NULL && g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
   if (sym->attr.flavor != FL_DERIVED &&
       g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
@@ -932,6 +937,17 @@ match m;
 
   m = g95_match_type_spec(&current_ts, 1, 1);
   if (m != MATCH_YES) return m;
+
+  if (current_ts.type == BT_DERIVED) {
+    sym = g95_use_derived(current_ts.derived);
+
+    if (sym == NULL) {
+      m = MATCH_ERROR;
+      goto cleanup;
+    }
+
+    current_ts.derived = sym;
+  }
 
   m = match_attr_spec();
   if (m == MATCH_ERROR) {
