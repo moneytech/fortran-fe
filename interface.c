@@ -859,6 +859,54 @@ int i, sub_flag;
 }
 
 
+/* g95_extend_assign()-- Tries to replace an assignment code node with
+ * a subroutine call to the subroutine associated with the assignment
+ * operator.  Return SUCCESS if the node was replaced.  On FAILURE, no
+ * error is generated. */
+
+try g95_extend_assign(g95_code *c, g95_namespace *ns) {
+g95_actual_arglist *actual;
+g95_expr *lhs, *rhs;
+g95_symbol *sym;
+
+  lhs = c->expr;
+  rhs = c->expr2;
+
+  /* Don't allow an intrinsic assignment to be replaced */
+
+  if (lhs->ts.type != BT_DERIVED && rhs->ts.type != BT_DERIVED && 
+      (lhs->ts.type == rhs->ts.type ||
+       (g95_numeric_ts(&lhs->ts) && g95_numeric_ts(&rhs->ts)))) return FAILURE;
+
+  actual = g95_get_actual_arglist();
+  actual->expr = lhs;
+
+  actual->next = g95_get_actual_arglist();
+  actual->next->expr = rhs;
+
+  for(; ns; ns=ns->parent) {
+    sym = g95_search_interface(ns->operator[INTRINSIC_ASSIGN], 1, actual);
+    if (sym != NULL) break;
+  }
+
+  if (sym == NULL) {
+    g95_free(actual->next);
+    g95_free(actual);
+    return FAILURE;
+  }
+
+  /* Replace the assignment with the call */
+
+  c->op = EXEC_CALL;
+  c->sym = sym;
+  c->expr = NULL;
+  c->expr2 = NULL;
+  c->ext.arglist = actual;
+
+  return SUCCESS;
+}
+
+
 /* g95_add_interface()-- Add a symbol to the current interface */
 
 try g95_add_interface(g95_symbol *new) {

@@ -679,8 +679,6 @@ bad_op:
 }
 
 
-
-
 static void resolve_call(g95_symbol *sym, g95_actual_arglist **arg) {
 g95_actual_arglist *a;
 
@@ -821,7 +819,11 @@ try t;
       break;
 
     case EXEC_ASSIGN:
-      if (t == SUCCESS) g95_check_assign(code->expr, code->expr2);
+      if (t == FAILURE) break;
+
+      if (g95_extend_assign(code, ns) == SUCCESS) break;
+
+      g95_check_assign(code->expr, code->expr2);
       break;
 
     case EXEC_POINTER_ASSIGN:
