@@ -2505,8 +2505,9 @@ int di, dr, dd, dl, dc, dz;
 
   make_generic("sqrt");
 
-  add_sym("sum", 1, 1, BT_REAL, dr, NULL, check_sum, ar, BT_REAL, dr, 0,
-	     dm, BT_INTEGER, di, 1,   msk, BT_LOGICAL, dl, 1, NULL);
+  add_sym("sum", 1, 1, BT_UNKNOWN, 0, g95_simplify_sum, check_sum,
+	  ar, BT_REAL, dr, 0,   dm, BT_INTEGER, di, 1,
+	  msk, BT_LOGICAL, dl, 1, NULL);
 
   add_sym("tan", 1, 1, BT_REAL, dr, g95_simplify_tan, check_tan,
 	  x, BT_REAL, dr, 0, NULL);

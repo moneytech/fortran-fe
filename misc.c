@@ -222,7 +222,7 @@ int g95_string2code(mstring *m, const char *string) {
 /* String Pool.  This is used to provide a stable location for various
  * string constants. */
 
-#define G95_STRINGPOOL_SIZE 300
+#define G95_STRINGPOOL_SIZE 400
 
 static char *pool_base, *pool_top;
 

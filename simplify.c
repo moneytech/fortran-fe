@@ -3141,6 +3141,28 @@ mpf_t ac, ad, s, t, w;
 }
 
 
+static char *sum_name(bt type, int kind) {
+static char buffer[20];
+
+  sprintf(buffer, "__sum_%c%d", g95_type_letter(type), kind);
+  return buffer;
+}
+
+
+g95_expr *g95_simplify_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  g95_current_function->ts = array->ts;
+
+  if (dim != NULL && array->rank != 1)
+    g95_current_function->rank = array->rank - 1;
+
+  g95_current_function->value.function.name = 
+    g95_get_string(sum_name(array->ts.type, array->ts.kind));
+
+  return NULL;
+}
+
+
 g95_expr *g95_simplify_tan(g95_expr *x) {
 g95_expr *result;
 mpf_t mpf_sin, mpf_cos, mag_cos;
@@ -3353,6 +3375,16 @@ int i, j;
     for(j=0; g95_integer_kinds[j].kind; j++)
       g95_add_string(scale_name(g95_real_kinds[i].kind,
 				g95_integer_kinds[j].kind));
+
+  /* Names of the SUM intrinsic */
+
+  for(i=0; g95_integer_kinds[i].kind; i++)
+    g95_add_string(sum_name(BT_INTEGER, g95_integer_kinds[i].kind));
+
+  for(i=0; g95_real_kinds[i].kind; i++) {
+    g95_add_string(sum_name(BT_REAL, g95_real_kinds[i].kind));
+    g95_add_string(sum_name(BT_COMPLEX, g95_real_kinds[i].kind));
+  }
 }
 
 

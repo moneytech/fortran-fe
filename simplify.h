@@ -121,6 +121,7 @@ g95_expr *g95_simplify_sinh(g95_expr *);
 g95_expr *g95_simplify_sngl(g95_expr *);
 g95_expr *g95_simplify_spacing(g95_expr *);
 g95_expr *g95_simplify_sqrt(g95_expr *);
+g95_expr *g95_simplify_sum(g95_expr *, g95_expr *, g95_expr *);
 g95_expr *g95_simplify_tan(g95_expr *);
 g95_expr *g95_simplify_tanh(g95_expr *);
 g95_expr *g95_simplify_tiny(g95_expr *);
