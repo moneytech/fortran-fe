@@ -166,6 +166,7 @@ int rc;
 
   sym = *result;
   st->n.sym = sym;
+  sym->refs++;
 
   /* See if the procedure should be a module procedure */
 
