@@ -1319,7 +1319,7 @@ static try check_numeric_inquiry(g95_expr *e) {
 char *name;
 static char *inquiry_function[] = {
   "digits", "epsilon", "huge", "maxexponent", "minexponent",
-  "precision", "radix", "range", "tiny", NULL
+  "precision", "radix", "range", "tiny", "bit_size", NULL
 };
 
 int i;
