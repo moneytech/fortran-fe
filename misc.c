@@ -342,10 +342,10 @@ void g95_done_2(void) {
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
 static void display_help(void) {
-int i;
+size_t i;
 
   g95_status("GNU Fortran 95 Compiler " G95_VERSION
-    " (C) 2000-2001 Free Software Foundation\n"
+    " (C) 2000-2002 Free Software Foundation\n"
     "Compiled " __DATE__ " " __TIME__ "\n\n"
     "Usage: g95 [options] file\n"
     "Options:\n");
