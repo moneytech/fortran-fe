@@ -915,6 +915,12 @@ g95_walk_function_expr (g95_ss * ss, g95_expr *expr)
   return ss;
 }
 
+static g95_ss *
+g95_walk_array_constructor (g95_ss * ss, g95_expr *expr)
+{
+  g95_todo_error ("array constructors");
+}
+
 g95_ss *
 g95_walk_expr (g95_ss * ss, g95_expr * expr)
 {
@@ -931,7 +937,7 @@ g95_walk_expr (g95_ss * ss, g95_expr * expr)
       return head;
 
     case EXPR_FUNCTION:
-      head = g95_walk_function_expr(ss, expr);
+      head = g95_walk_function_expr (ss, expr);
       return head;
 
     case EXPR_CONSTANT:
@@ -940,10 +946,16 @@ g95_walk_expr (g95_ss * ss, g95_expr * expr)
       /* Pass back and let the caller deal with it.  */
       break;
 
-    /* TODO: EXPR_SUBSTRING, EXPR_ARRAY.  */
-    default:
-      g95_todo_error("expr_type %d during walk", expr->expr_type);
+    case EXPR_ARRAY:
+      head = g95_walk_array_constructor (ss, expr);
+      return head;
+
+    case EXPR_SUBSTRING:
+      /* Pass back and let the caller deal with it.  */
       break;
+
+    default:
+      internal_error("bad expression type during walk (%d)", expr->expr_type);
     }
   return ss;
 }

@@ -673,7 +673,7 @@ g95_conv_simple_cond (g95_se * se, g95_expr * expr)
   assert (se->post == NULL_TREE);
 }
 
-/* Unary ops are easy... */
+/* Unary ops are easy... Or they would be if ! was a valid op.  */
 static void
 g95_conv_unary_op (enum tree_code code, g95_se * se, g95_expr * expr)
 {
@@ -684,10 +684,15 @@ g95_conv_unary_op (enum tree_code code, g95_se * se, g95_expr * expr)
   g95_init_se (&operand, se);
   g95_conv_simple_val (&operand, expr->op1);
 
-  /*SCALARIZE*/
   type = g95_typenode_for_spec(&expr->ts);
 
-  se->expr = build1 (code, type, operand.expr);
+ /* TRUTH_NOT_EXPR is not a "true" unary operator in GCC.
+    We must simplify it to a compare to 0 (e.g. EQ_EXPR (op1, 0)).
+    All other unary operators have an equivalent SIMPLE unary operator  */
+ if (code == TRUTH_NOT_EXPR)
+   se->expr = build (EQ_EXPR, type, operand.expr, integer_zero_node);
+ else
+   se->expr = build1 (code, type, operand.expr);
 
   /* combine the pre and post stmts */
   g95_add_stmt_to_pre (se, operand.pre, operand.pre_tail);

@@ -530,7 +530,8 @@ g95_trans_do_while (g95_code * code)
     tree var;
     var = NULL_TREE;
     g95_conv_simple_val (&cond, code->expr);
-    cond.expr = build1 (TRUTH_NOT_EXPR, TREE_TYPE (cond.expr), cond.expr);
+    cond.expr = build (EQ_EXPR, TREE_TYPE (cond.expr), cond.expr,
+                      integer_zero_node);
     cond.expr = g95_simple_fold (cond.expr, &cond.pre, &cond.pre_tail, &var);
   }
 #endif
