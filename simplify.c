@@ -663,7 +663,7 @@ int i, digits;
 
   default:
   bad:
-    g95_error("g95_simplify_digits(): Bad type");
+    g95_internal_error("g95_simplify_digits(): Bad type");
   }
 
   return g95_int_expr(digits);
@@ -857,11 +857,11 @@ int i;
 
   switch(e->ts.type) {
   case BT_INTEGER:
-    mpz_init_set(result->value.integer, g95_integer_kinds[i].maxval);
+    mpz_init_set(result->value.integer, g95_integer_kinds[i].huge);
     break;
 
   case BT_REAL:
-    mpf_init_set(result->value.real, g95_real_kinds[i].maxval);
+    mpf_init_set(result->value.real, g95_real_kinds[i].huge);
     break;
 
   bad_type:
@@ -1695,25 +1695,17 @@ g95_expr *g95_simplify_max(g95_expr *e) {
 
 
 
-g95_expr *g95_simplify_maxexponent(g95_expr *e) {
-g95_expr *arg;
+g95_expr *g95_simplify_maxexponent(g95_expr *x) {
+g95_expr *result;
+int i;
 
-  return NULL; 
+  i = g95_validate_kind(BT_REAL, x->ts.kind);
+  if (i < 0) g95_internal_error("g95_simplify_maxexponent(): Bad kind");
 
-/* Type checking */
+  result = g95_int_expr(g95_real_kinds[i].max_exponent);
+  result->where = x->where;
 
-  arg = FIRST_ARG(e);
-
-  if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of MAXEXPONENT at %L must be real",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
-  }
-
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  //  return SUCCESS;
-
+  return result;
 }
 
 
@@ -1723,25 +1715,18 @@ g95_expr *g95_simplify_min(g95_expr *e) {
 }
 
 
-g95_expr *g95_simplify_minexponent(g95_expr *e) {
-g95_expr *arg;
 
-  return NULL; 
+g95_expr *g95_simplify_minexponent(g95_expr *x) {
+g95_expr *result;
+int i;
 
-/* Type checking */
+  i = g95_validate_kind(BT_REAL, x->ts.kind);
+  if (i < 0) g95_internal_error("g95_simplify_minexponent(): Bad kind");
 
-  arg = FIRST_ARG(e);
+  result = g95_int_expr(g95_real_kinds[i].min_exponent);
+  result->where = x->where;
 
-  if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of MINEXPONENT at %L must be real",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
-  }
-
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  //  return SUCCESS;
-
+  return result;
 }
 
 
@@ -1996,26 +1981,52 @@ int i;
 
 
 g95_expr *g95_simplify_precision(g95_expr *e) {
+g95_expr *result;
 int i;
 
   i = g95_validate_kind(e->ts.type, e->ts.kind);
   if (i == -1) g95_internal_error("g95_simplify_precision(): Bad kind");
 
-  return g95_int_expr(g95_real_kinds[i].precision);
+  result = g95_int_expr(g95_real_kinds[i].precision);
+  result->where = e->where;
+
+  return result;
 }
 
 
 g95_expr *g95_simplify_radix(g95_expr *e) {
+g95_expr *result;
+int i;
 
-  return g95_int_expr(2);  /* TODO: This needs to be set from target config */
+  i = g95_validate_kind(e->ts.type, e->ts.kind);
+  if (i < 0) goto bad;
+
+  switch(e->ts.type) {
+  case BT_INTEGER:
+    i = g95_integer_kinds[i].radix;
+    break;
+
+  case BT_REAL:
+    i = g95_real_kinds[i].radix;
+    break;
+
+  default: bad:
+    g95_internal_error("g95_simplify_radix(): Bad type");
+  }
+
+  result = g95_int_expr(i);
+  result->where = e->where;
+
+  return result;
 }
 
 
 g95_expr *g95_simplify_range(g95_expr *e) {
+g95_expr *result;
 int i;
 
   i = g95_validate_kind(e->ts.type, e->ts.kind);
-  if (i == -1) goto bad_type;
+  if (i < 0) goto bad_type;
 
   switch(e->ts.type) {
   case BT_INTEGER:
@@ -2031,7 +2042,10 @@ int i;
     g95_internal_error("g95_simplify_range(): Bad kind");
   }
 
-  return g95_int_expr(i);
+  result = g95_int_expr(i);
+  result->where = e->where;
+
+  return result;
 }
 
 
@@ -2065,7 +2079,6 @@ int kind;
 }
 
 g95_expr *g95_simplify_repeat(g95_expr *e, g95_expr *n) {
-g95_expr *result;
 /*
 int ncopies;
 int i, len, m;
@@ -2460,16 +2473,12 @@ g95_expr *g95_simplify_tiny(g95_expr *e) {
 g95_expr *result;
 int i;
 
-  i = g95_validate_kind(e->ts.type, e->ts.kind);
-  if (i == -1) goto bad_type;
+  i = g95_validate_kind(BT_REAL, e->ts.kind);
+  if (i < 0) g95_internal_error("g95_simplify_error(): bad kind");
 
-  result = g95_constant_result(e->ts.type, e->ts.kind);
+  result = g95_constant_result(BT_REAL, e->ts.kind);
+  mpf_init_set(result->value.real, g95_real_kinds[i].tiny);
   result->where = e->where;
-
-  mpf_init_set(result->value.real, g95_real_kinds[i].epsilon);
-
-  bad_type:
-    g95_internal_error("g95_simplify_tiny(): Bad type");
 
   return result;
 }

@@ -617,21 +617,23 @@ typedef struct g95_expr {
 } g95_expr;
 
 
-/* Structures for information associated with different kinds of numbers */
+/* Structures for information associated with different kinds of
+ * numbers.  The first set of integer parameters define all there is
+ * to know about a particular kind.  The rest of the elements are
+ * computed from the first elements.  */
 
 typedef struct {
-  int kind;
-  char *max;
-  int bit_size, range, digits;
-  mpz_t maxval, minval;
+  int kind, radix, digits, bit_size;
+
+  int range;
+  mpz_t huge;
 } g95_integer_info;
 
-
 typedef struct {
-  int kind;
-  char *max, *eps;
-  int precision, range, digits; /* decimal digits, decimal exponent range */
-  mpf_t maxval, epsilon;
+  int kind, radix, digits, min_exponent, max_exponent;
+
+  int range, precision;
+  mpf_t epsilon, huge, tiny;  
 } g95_real_info;
 
 

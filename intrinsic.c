@@ -254,6 +254,14 @@ static try check_kind(g95_expr *x) {
 }
 
 
+static try check_min_max_exponent(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_modulo(g95_expr *a, g95_expr *p) {
 
   if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL) ||
@@ -667,7 +675,7 @@ int di, dr, dd, dl, dc, dz;
 
 /* KAH Input can be integer or real, scalar or array */
   add_sym("digits", 1, BT_INTEGER, di, g95_simplify_digits, check_digits,
-	  x, BT_REAL, dr, 0, NULL);
+	  x, BT_UNKNOWN, dr, 0, NULL);
 
   add_sym("dim",  0, BT_REAL,    dr, g95_simplify_dim, check_dim,
 	  x, BT_REAL,    dr, 0, y, BT_REAL,    dr, 0, NULL);
@@ -693,7 +701,7 @@ int di, dr, dd, dl, dc, dz;
 /* KAH Takes and returns real scalar or array */
 
   add_sym("epsilon", 1, BT_REAL, dr, g95_simplify_epsilon, check_epsilon,
-	  x, BT_REAL, dr, 0, NULL);
+	  x, BT_UNKNOWN, dr, 0, NULL);
 
   add_sym("exp",  0, BT_REAL,    dr, g95_simplify_exp, NULL,
 	  x, BT_REAL, dr, 0, NULL);
@@ -714,7 +722,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("huge", 1, BT_REAL, dr, g95_simplify_huge, check_huge,
-	  x, BT_REAL, dr, 0,  NULL);
+	  x, BT_UNKNOWN, dr, 0,  NULL);
 
   add_sym("iachar", 0, BT_INTEGER, di, g95_simplify_iachar, NULL,
 	  c, BT_CHARACTER, dc, 0, NULL);
@@ -832,7 +840,7 @@ int di, dr, dd, dl, dc, dz;
 
 /* KAH Takes scalar or array input */
   add_sym("maxexponent", 1, BT_INTEGER, di, g95_simplify_maxexponent,
-	  NULL, x, BT_REAL, dr, 0, NULL);
+	  check_min_max_exponent, x, BT_UNKNOWN, dr, 0, NULL);
 
 /* KAH Takes array argument of type integer or real.  The type of the
  * second argument must be checked to decide if it's dm or msk if called
@@ -868,7 +876,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("min");
 
   add_sym("minexponent", 1, BT_INTEGER, di, g95_simplify_minexponent,
-	  not_ready, x, BT_REAL, dr, 0, NULL);
+	  check_min_max_exponent, x, BT_UNKNOWN, dr, 0, NULL);
 
 /* KAH Takes array argument of type integer or real.  The type of the
  * second argument must be checked to decide if it's dm or msk if called
@@ -1029,7 +1037,8 @@ int di, dr, dd, dl, dc, dz;
   make_generic("tanh");
 
 /* KAH Input may be scalar or array */
-  add_sym("tiny", 0, BT_REAL, dr, NULL, check_tiny, x, BT_REAL, dr, 0, NULL);
+  add_sym("tiny", 0, BT_REAL, dr, g95_simplify_tiny, check_tiny,
+	  x, BT_UNKNOWN, dr, 0, NULL);
 
 /* KAH Array function */
   add_sym("transfer", 0, BT_REAL, dr, NULL, not_ready, src, BT_REAL, dr, 0,

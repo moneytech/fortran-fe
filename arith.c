@@ -27,26 +27,113 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include <string.h>
 
-/* The g95_integer_kinds[] structure has everything the front end
- * needs to know about integers on the target.  The other members of
- * the structure are calculated.  The first entry is the default kind,
- * the second entry of the real structure is the default double kind. */
+static mpf_t e;
+
+
+/* The g95_(integer|real)_kinds[] structures have everything the front
+ * end needs to know about integers and real numbers on the target.
+ * Other entries of the structure are calculated from these values.
+ * The first entry is the default kind, the second entry of the real
+ * structure is the default double kind. */
 
 g95_integer_info g95_integer_kinds[] = {
-    { 4, "2147483647",          32, 9 , 10 },   /* Default kind is first */
-    { 8, "9223372036854775807", 64, 18, 19 },
-    { 2, "32767",               16, 4 ,  5 },
-    { 1, "127",                 8,  2 ,  3 },
-    { 0, NULL, 0, 0 }
+  { 4,  2,  31,  32 },
+  { 8,  2,  63,  64 },
+  { 2,  2,  15,  16 },
+  { 1,  2,   7,   8 },
+  { 0,  0,   0,   0 }
 };
 
 g95_real_info g95_real_kinds[] = {
-    /*   max = 2**(128) - 2**(104),  eps = 2**(-149)           */
-    { 4, "3.40282346638528860e+38",  "1.40129846432481707e-45", 6, 37, 8 },
-    /*   max = 2**(1024) - 2**(971), eps = 2**(-1074)          */
-    { 8, "1.79769313486231571e+308", "4.94065645841246544e-324", 15, 307, 16 },
-    { 0, NULL, NULL, 0 }
+  { 4,  2,  24,  -148,  128 },
+  { 8,  2,  53, -1073, 1024 },
+  { 0,  0,   0,     0,    0 }
 };
+
+
+
+/* natural_logarithm()-- Compute a natural logarithm */
+
+static void natural_logarithm(mpf_t arg, mpf_t result) {
+mpf_t x, xp, t, log;
+int i, p;
+
+  mpf_init_set(x, arg);
+  mpf_init(t);
+
+  p = 0;
+
+  /* Get the argument into the range 0.5 to 1.5 by successive
+   * multiplications or divisions by e. */
+
+  mpf_set_str(t, "0.5", 10);
+  while(mpf_cmp(x, t) < 0) {
+    mpf_mul(x, x, e);
+    p--;
+  }
+
+  mpf_set_str(t, "1.5", 10);
+  while(mpf_cmp(x, t) > 0) {
+    mpf_div(x, x, e);
+    p++;
+  }
+
+  /* Compute the natural log of x.  We use the series:
+   *    ln(x) = (x-1) - (x-1)^/2 + (x-1)^3/3 - (x-1)^4/4 + ...
+   *
+   * Because we are expanding in powers of (x-1), and 0.5 < x < 1.5,
+   * we have -0.5 < (x-1) < 0.5.  Ignoring the harmonic term, this
+   * means that each term is at most 1/(2^i), meaning one bit is
+   * gained per iteration.
+   *
+   * Not very efficient, but it doesn't have to be. */
+
+  mpf_sub_ui(x, x, 1);
+  mpf_init_set_ui(log, 0);
+  mpf_init_set_ui(xp, 1);
+
+  for(i=1; i<G95_REAL_BITS; i++) {
+    mpf_mul(xp, xp, x);
+    mpf_div_ui(t, xp, i);
+
+    if (i % 2 == 0)
+      mpf_sub(log, log, t);
+    else
+      mpf_add(log, log, t); 
+  }
+
+  /* Add in the log (e^p) = p */
+
+  if (p < 0)
+    mpf_sub_ui(log, log, -p);
+  else
+    mpf_add_ui(log, log, p);
+
+  mpf_clear(x);
+  mpf_clear(xp);
+  mpf_clear(t);
+
+  mpf_set(result, log);
+  mpf_clear(log);
+}
+
+
+
+static void common_logarithm(mpf_t arg, mpf_t result) {
+mpf_t i10, log10;
+
+  natural_logarithm(arg, result);
+
+  mpf_init_set_ui(i10, 10);
+  mpf_init(log10);
+  natural_logarithm(i10, log10);
+
+  mpf_div(result, result, log10);
+  mpf_clear(i10);
+  mpf_clear(log10);
+}
+
+
 
 /* g95_arith_error()-- Given an arithmetic error code, return a
  * pointer to a string that explains the error. */
@@ -70,26 +157,108 @@ char *p;
 /* g95_arith_init_1()-- Get things ready to do math. */
 
 void g95_arith_init_1(void) {
+g95_integer_info *int_info;
+g95_real_info *real_info;
+mpf_t a, b;
+mpz_t r;
 int i;
+
+/* Calculate e, needed by the natural_logarithm() subroutine. */
+
+  mpf_init(b);
+  mpf_init_set_ui(e, 0);
+  mpf_init_set_ui(a, 1);   /* 1/(i!) */
+
+  for(i=1; i<100; i++) {
+    mpf_add(e, e, a);
+    mpf_div_ui(a, a, i);
+  }
 
 /* Convert the minimum/maximum values for each kind into their Gnu MP
  * representation. */
 
-  for(i=0; g95_integer_kinds[i].kind != 0; i++) {
-    mpz_init_set_str(g95_integer_kinds[i].maxval,
-		     g95_integer_kinds[i].max, 10);
+  mpz_init(r); 
 
-    mpz_init(g95_integer_kinds[i].minval);
-    mpz_neg(g95_integer_kinds[i].minval, g95_integer_kinds[i].maxval);
-    mpz_sub_ui(g95_integer_kinds[i].minval, g95_integer_kinds[i].minval, 1);
+  for(int_info=g95_integer_kinds; int_info->kind != 0; int_info++) {
+    /* Huge */
+
+    mpz_set_ui(r, int_info->radix);
+    mpz_pow_ui(r, r, int_info->digits);
+
+    mpz_init(int_info->huge);
+    mpz_sub_ui(int_info->huge, r, 1);
+
+    /* Range */
+
+    mpf_set_z(a, int_info->huge);
+    common_logarithm(a, a);
+    mpf_trunc(a, a);
+    mpz_set_f(r, a);
+    int_info->range = mpz_get_si(r);
   }
 
   mpf_set_default_prec(G95_REAL_BITS);
 
-  for(i=0; g95_real_kinds[i].kind != 0; i++) {
-    mpf_init_set_str(g95_real_kinds[i].maxval, g95_real_kinds[i].max, 10);
-    mpf_init_set_str(g95_real_kinds[i].epsilon, g95_real_kinds[i].eps, 10);
+  for(real_info=g95_real_kinds; real_info->kind != 0; real_info++) {
+    /* Huge */
+
+    mpf_set_ui(a, real_info->radix);
+    mpf_set_ui(b, real_info->radix);
+
+    mpf_pow_ui(a, a, real_info->max_exponent);
+    mpf_pow_ui(b, b, real_info->max_exponent - real_info->digits);
+
+    mpf_init(real_info->huge);
+    mpf_sub(real_info->huge, a, b);
+
+    /* Tiny */
+
+    mpf_set_ui(b, real_info->radix);
+    mpf_pow_ui(b, b, 1-real_info->min_exponent);
+
+    mpf_init(real_info->tiny);
+    mpf_ui_div(real_info->tiny, 1, b);
+
+    /* Epsilon */
+
+    mpf_set_ui(b, real_info->radix);
+    mpf_pow_ui(b, b, real_info->digits - 1);
+
+    mpf_init(real_info->epsilon);
+    mpf_ui_div(real_info->epsilon, 1, b);
+
+    /* Range */
+
+    common_logarithm(real_info->huge, a);
+    common_logarithm(real_info->tiny, b);
+    mpf_neg(b, b);
+
+    if (mpf_cmp(a, b) > 0) mpf_set(a, b);  /* a = min(a, b) */
+ 
+    mpf_trunc(a, a);
+    mpz_set_f(r, a);
+    real_info->range = mpz_get_si(r);
+
+    /* Precision */
+
+    mpf_set_ui(a, real_info->radix);
+    common_logarithm(a, a);
+
+    mpf_mul_ui(a, a, real_info->digits-1);
+    mpf_trunc(a, a);
+    mpz_set_f(r, a);
+    real_info->precision = mpz_get_si(r);
+
+    /* If the radix is an integral power of 10, add one to the precision. */
+
+    for(i=10; i<=real_info->radix; i*=10)
+      if (i == real_info->radix) real_info->precision++;
   }
+
+  mpz_clear(r);
+  mpf_clear(a);
+  mpf_clear(b);
+  mpf_clear(e);
 }
 
 
@@ -178,15 +347,21 @@ int rc;
  * ARITH_OK or ARITH_OVERFLOW. */
 
 arith g95_check_integer_range(mpz_t p, int kind) {
+arith result;
+mpz_t t;
 int i;
 
   i = validate_integer(kind);
   if (i == -1) g95_internal_error("g95_check_integer_range(): Bad kind");
 
-  if ((mpz_cmp(p, g95_integer_kinds[i].maxval) == 1) ||
-      (mpz_cmp(p, g95_integer_kinds[i].minval) == -1)) return ARITH_OVERFLOW;
+  mpz_init(t);
+  mpz_abs(t, p);
 
-  return ARITH_OK;
+  result = ARITH_OK;
+  if (mpz_cmp(p, g95_integer_kinds[i].huge) == 1) result = ARITH_OVERFLOW;
+  mpz_clear(t);
+
+  return result;
 }
 
 
@@ -200,9 +375,7 @@ mpf_t q;
 int i;
 
   mpf_init(q);
-
-  if (mpf_sgn(p) >= 0) mpf_set(q, p);
-   else mpf_neg(q, p);
+  mpf_abs(q, p);
 
   i = validate_real(kind);
   if (i == -1) g95_internal_error("g95_check_real_range(): Bad kind");
@@ -210,12 +383,12 @@ int i;
   retval = ARITH_OK;
   if (mpf_sgn(q) == 0) goto done;
 
-  if (mpf_cmp(q, g95_real_kinds[i].maxval) == 1) {
+  if (mpf_cmp(q, g95_real_kinds[i].huge) == 1) {
     retval = ARITH_OVERFLOW;
     goto done;
   }
 
-  if (mpf_cmp(q, g95_real_kinds[i].epsilon) == -1) retval = ARITH_UNDERFLOW;
+  if (mpf_cmp(q, g95_real_kinds[i].tiny) == -1) retval = ARITH_UNDERFLOW;
 
 done:
   mpf_clear(q);
