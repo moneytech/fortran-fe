@@ -890,7 +890,7 @@ int i, n, na;
 
     if (f->sym == NULL || a->expr == NULL) return 0;
 
-    if (g95_symbol_rank(f->sym) != actual->expr->rank ||
+    if (g95_symbol_rank(f->sym) != a->expr->rank ||
 	g95_compare_types(&f->sym->ts, &a->expr->ts) == 0)
       return 0;
 
