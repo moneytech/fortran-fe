@@ -1425,8 +1425,8 @@ new_attr:
 
     case REF_COMPONENT:
       g95_get_component_attr(&attr, ref->component);
-      ref = ref->next;
       if (ts != NULL) *ts = ref->component->ts;
+      ref = ref->next;
 
       goto new_attr;
 
