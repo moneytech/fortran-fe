@@ -120,19 +120,19 @@ char buffer[G95_MAX_SYMBOL_LEN+1];
 match m;
 int i;
  
-  if (g95_match("% assignment ( = )") == MATCH_YES) {
+  if (g95_match(" assignment ( = )") == MATCH_YES) {
     *type = INTERFACE_INTRINSIC_OP;
     *operator = INTRINSIC_ASSIGN;
     return MATCH_YES;
   }
 
-  if (g95_match("% operator ( %o )", &i) == MATCH_YES) { /* Operator i/f */
+  if (g95_match(" operator ( %o )", &i) == MATCH_YES) { /* Operator i/f */
     *type = INTERFACE_INTRINSIC_OP;
     *operator = fold_unary(i);
     return MATCH_YES;
   }
 
-  if (g95_match("% operator ( ") == MATCH_YES) {
+  if (g95_match(" operator ( ") == MATCH_YES) {
     m = g95_match_defined_op_name(buffer, 1);
     if (m == MATCH_NO) goto syntax;
     if (m != MATCH_YES) return MATCH_ERROR;
@@ -169,11 +169,15 @@ char name[G95_MAX_SYMBOL_LEN+1];
 interface_type type;
 g95_symbol *sym;
 int operator;
+match m;
+
+  m = g95_match_space();
 
   if (g95_match_generic_spec(&type, name, &operator) == MATCH_ERROR)
     return MATCH_ERROR;
 
-  if (g95_match_eos() != MATCH_YES) {
+  if (g95_match_eos() != MATCH_YES || 
+      (type != INTERFACE_NAMELESS && m != MATCH_YES)) {
     g95_syntax_error(ST_INTERFACE);
     return MATCH_ERROR;
   }
@@ -215,10 +219,13 @@ interface_type type;
 int operator;
 match m;
 
+  m = g95_match_space();
+
   if (g95_match_generic_spec(&type, name, &operator) == MATCH_ERROR)
     return MATCH_ERROR;
 
-  if (g95_match_eos() != MATCH_YES) {
+  if (g95_match_eos() != MATCH_YES ||
+      (type != INTERFACE_NAMELESS && m != MATCH_YES)) {
     g95_syntax_error(ST_END_INTERFACE);
     return MATCH_ERROR;
   }

@@ -1773,7 +1773,8 @@ g95_symbol *sym;
 int operator;
 match m;
 
-  g95_match(" ::");
+  if (g95_match(" ::") == MATCH_NO && g95_match_space() == MATCH_NO)
+    goto done;
 
   for(;;) {
     m = g95_match_generic_spec(&type, name, &operator);
