@@ -32,6 +32,49 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "trans.h"
 
+/*  Replaces T; by a COMPOUND_STMT containing {T;}.  */
+
+void
+tree_build_scope (t)
+     tree *t;
+{
+  tree comp_stmt, start_scope, end_scope;
+
+  /* If T already has a proper scope, do nothing.  */
+  if (*t
+      && TREE_CODE (*t) == COMPOUND_STMT
+      && COMPOUND_BODY (*t))
+    return;
+
+  /* Create a new empty scope.  */
+  comp_stmt = make_node (COMPOUND_STMT);
+
+  start_scope = make_node (SCOPE_STMT);
+  SCOPE_BEGIN_P (start_scope) = 1;
+
+  end_scope = make_node (SCOPE_STMT);
+  SCOPE_BEGIN_P (end_scope) = 0;
+
+  COMPOUND_BODY (comp_stmt) = start_scope;
+
+  if (*t)
+    {
+      /* If T is not empty, insert it inside the newly created scope.  Note
+	 that we can't just join TREE_CHAIN(*T) to the closing scope
+	 because even if T wasn't inside a scope, it might be a list of
+	 statements.  */
+      TREE_CHAIN (start_scope) = *t;
+      chainon (*t, end_scope);
+    }
+  else
+    {
+      /* T is empty.  Simply join the start/end nodes.  */
+      TREE_CHAIN (start_scope) = end_scope;
+    }
+
+  /* Set T to the newly constructed scope.  */
+  *t = comp_stmt;
+}
 /*  Copy every statement from the chain CHAIN by calling deep_copy_node().
     Return the new chain.  */
 
