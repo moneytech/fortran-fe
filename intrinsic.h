@@ -126,6 +126,7 @@ g95_expr *g95_simplify_cmplx(g95_expr *, g95_expr *, g95_expr *);
 g95_expr *g95_simplify_conjg(g95_expr *);
 g95_expr *g95_simplify_cos(g95_expr *);
 g95_expr *g95_simplify_cosh(g95_expr *);
+g95_expr *g95_simplify_dcmplx(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_dble(g95_expr *);
 g95_expr *g95_simplify_digits(g95_expr *);
 g95_expr *g95_simplify_dim(g95_expr *, g95_expr *);

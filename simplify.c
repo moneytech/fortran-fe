@@ -786,6 +786,22 @@ g95_expr *result;
 }
 
 
+g95_expr *g95_simplify_dcmplx(g95_expr *x, g95_expr *y) {
+g95_expr *result;
+
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL;
+
+  result = g95_constant_result(BT_COMPLEX, g95_default_double_kind());
+  result->where = x->where;
+
+  mpf_set(result->value.complex.r, x->value.real);
+  mpf_set(result->value.complex.i, y->value.real);
+
+  return result;
+}
+
+
 g95_expr *g95_simplify_dble(g95_expr *e) {
 g95_expr *result;
 

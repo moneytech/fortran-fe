@@ -640,8 +640,8 @@ int di, dr, dd, dl, dc, dz;
    * complex instead of the default complex.  */
 
   add_sym("dcmplx", 0, 1, BT_COMPLEX, dd,
-	  g95_check_cmplx, g95_simplify_cmplx, NULL,
-	  x, BT_UNKNOWN, dd, 0,   y, BT_UNKNOWN, dd, 1, NULL);  /* Extension */
+	  NULL, g95_simplify_dcmplx, NULL,
+	  x, BT_REAL, dd, 0,   y, BT_REAL, dd, 1, NULL);  /* Extension */
 
   add_sym("conjg", 0, 1, BT_COMPLEX, dz,
 	  NULL, g95_simplify_conjg, NULL,
