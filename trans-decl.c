@@ -405,7 +405,7 @@ g95_get_symbol_decl (g95_symbol * sym)
   else if (sym->attr.entry)
      g95_todo_error ("alternate entry");
   else if (sym->attr.intrinsic)
-    g95_todo_error ("intrinsics");
+    g95_todo_error ("intrinsic variables");
 
   /* Catch external function declarations.  */
   assert (! (sym->attr.function || sym->attr.subroutine));
@@ -426,10 +426,9 @@ g95_get_symbol_decl (g95_symbol * sym)
       sym->tlink = sym->ns->proc_name->tlink;
       sym->ns->proc_name->tlink = sym;
 
-      if (sym->attr.pointer
-          || sym->attr.allocatable
-          || sym->attr.target
-          || ! sym->attr.dummy)
+      if ((sym->attr.allocatable
+           || ! sym->attr.dummy)
+          && ! sym->attr.pointer)
         G95_DECL_PACKED_ARRAY (decl) = 1;
     }
 
@@ -955,6 +954,7 @@ g95_build_builtin_function_decls (void)
     }
 
   g95_build_intrinsic_function_decls ();
+  g95_build_intrinsic_lib_fndecls ();
   g95_build_io_library_fndecls ();
 }
 

@@ -40,12 +40,21 @@ tree g95_trans_auto_array_allocation (tree, g95_array_spec *);
 tree g95_trans_dummy_array_bias (g95_symbol *, tree, tree);
 /* Add initialisation for deferred arrays.  */
 tree g95_trans_deferred_array (g95_symbol *, tree);
+
 /* Generate scalarization information for an expression.  */
 g95_ss * g95_walk_expr (g95_ss *, g95_expr *);
+/* Walk the arguments of an intrinsic function.  */
+g95_ss * g95_walk_elemental_function_args (g95_ss *, g95_expr *, g95_ss_type);
+/* Walk an intrinsic function.  */
+g95_ss * g95_walk_intrinsic_function (g95_ss *, g95_expr *,
+                                      g95_intrinsic_sym *);
 
-
-/* Free a SS chain.  */
-void g95_free_ss (g95_ss *);
+/* Free the SS assocuated with a loop.  */
+void g95_cleanup_loop (g95_loopinfo *);
+/* Associate a SS chain with a loop.  */
+void g95_add_ss_to_loop (g95_loopinfo *, g95_ss *);
+/* Mark a SS chain as used in this loop.  */
+void g95_mark_ss_chain_used (g95_ss * ss);
 /* Add the pre and post chains from an SS chain to a loopinfo.  */
 void g95_add_ss_stmts (g95_loopinfo *, g95_ss *);
 /* Reverse a SS chain.  */
@@ -57,13 +66,17 @@ void g95_conv_ss_startstride (g95_loopinfo *);
 void g95_init_loopinfo (g95_loopinfo *);
 void g95_copy_loopinfo_to_se (g95_se *, g95_loopinfo *);
 
+/* Marks the start of a scalarized expression, and declares loop variables.  */
+void g95_start_scalarized_body (g95_loopinfo *);
 /* Generates the actual loops for a scalarized expression.  */
-tree g95_trans_scalarizing_loops (g95_loopinfo *, tree);
+void g95_trans_scalarizing_loops (g95_loopinfo *, tree, tree);
 /* Initialise the scalarization loop parameters.  */
-void g95_conv_loopvars (g95_loopinfo *);
+void g95_conv_loop_setup (g95_loopinfo *);
 
+/* Get a single array element.  */
+void g95_conv_array_ref (g95_se *, g95_array_ref *);
 /* Translate an array reference.  */
-void g95_conv_array_index_ref (g95_se *, tree, tree *, int, int);
+void g95_conv_scalarized_array_ref (g95_se *, g95_array_ref *);
 /* Translate a reference to an array temporary.  */
 void g95_conv_tmp_ref (g95_se *);
 
@@ -80,3 +93,6 @@ extern unsigned HOST_WIDE_INT g95_stack_space_left;
 /* Returns true if a variable of specified size should go on the stack.  */
 int g95_can_put_var_on_stack (tree);
 
+/* Add pre-loop scalarization code for intrinsic functions which require
+   special handling.  */
+void g95_add_intrinsic_ss_code (g95_loopinfo *, g95_ss *);

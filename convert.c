@@ -107,6 +107,8 @@ convert (tree type, tree expr)
     return fold (convert_to_integer (type, e));
   if (code == BOOLEAN_TYPE)
     {
+      internal_error ("BOOLEAN_TYPE conversion should never occur");
+#if 0
       tree t = g95_truthvalue_conversion (expr);
       /* If it returns a NOP_EXPR, we must fold it here to avoid
 	 infinite recursion between fold () and convert ().  */
@@ -114,6 +116,7 @@ convert (tree type, tree expr)
 	return fold (build1 (NOP_EXPR, type, TREE_OPERAND (t, 0)));
       else
 	return fold (build1 (NOP_EXPR, type, t));
+#endif
     }
   if (code == POINTER_TYPE || code == REFERENCE_TYPE)
     return fold (convert_to_pointer (type, e));

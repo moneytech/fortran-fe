@@ -206,10 +206,26 @@ g95_create_tmp_var (tree type)
   return create_tmp_var (type, NULL);
 }
 
+/* Identical to convert() in effect.  Generates an error if the conversion
+   causes the expression to violate SIMPLE grammar.  The initial expression
+   should be a simple_val, the result will be a simple_rhs.  */
+tree
+g95_simple_convert (tree type, tree expr)
+{
+  tree result;
+
+  assert (is_simple_val (expr));
+  result = convert (type, expr);
+  if (! is_simple_rhs (result))
+    internal_error ("convert broke SIMPLE");
+
+  return result;
+}
+
 /* SIMPLE constant folding helper, returns a simple_val.  If tmpvar does
    not point to an existing temporary a new one will be created as neccessary.
-   The expression should already be a simple_rhs.  Use with tmpvar=NULL is
-   safe.  Care must be taken when reusing temporary variables.  See below.  */
+   The expression should already be a simple_rhs.  Care must be taken when
+   reusing temporary variables.  See below.  */
 tree
 g95_simple_fold(tree expr, tree * phead, tree * ptail, tree * tmpvar)
 {
@@ -278,7 +294,7 @@ g95_simple_fold_tmp(tree expr, tree * phead, tree * ptail, tree * tmpvar)
   tmp = fold (expr);
   if (is_simple_val (tmp)
       && (is_simple_const (tmp)
-          || tmp == *tmpvar
+          || (tmpvar && tmp == *tmpvar)
           || ! g95_is_artificial_decl (tmp)))
     return tmp;
 
@@ -383,7 +399,7 @@ g95_finish_stmt (tree body, tree tail)
       stmt = TREE_CHAIN (stmt);
     }
 
-  block = poplevel (1, 0, 0);
+  block = poplevel (0, 0, 0);
 
   TREE_CHAIN (stmt) = body;
 
@@ -464,8 +480,15 @@ g95_trans_runtime_check (tree cond, tree msg, tree * phead, tree * ptail)
 
   head = g95_finish_stmt (head, tail);
 
-  stmt = build_stmt (IF_STMT, cond, head, NULL_TREE);
-  g95_add_stmt_to_list (phead, ptail, stmt, stmt);
+  if (integer_onep (cond))
+    {
+      g95_add_stmt_to_list (phead, ptail, head, NULL_TREE);
+    }
+  else
+    {
+      stmt = build_stmt (IF_STMT, cond, head, NULL_TREE);
+      g95_add_stmt_to_list (phead, ptail, stmt, stmt);
+    }
 }
 
 /* Chain two stmt chains. PHEAD is the head of the current stmt chain

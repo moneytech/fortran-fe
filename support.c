@@ -57,6 +57,13 @@ void g95_init_c_decl_hacks(void)
   boolean_true_node = integer_one_node;
   boolean_false_node = integer_zero_node;
 
+  intmax_type_node = integer_type_node;
+  uintmax_type_node = unsigned_type_node;
+  string_type_node = pchar_type_node;
+  const_string_type_node = build_pointer_type (build_qualified_type
+      (char_type_node, TYPE_QUAL_CONST));
+  c_size_type_node = g95_array_index_type;
+
   void_zero_node = build_int_2 (0, 0);
 }
 

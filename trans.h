@@ -40,26 +40,23 @@ typedef struct g95_se
 
   /* If not set 95_conv_variable will return an expression for the array
      descriptor.  Otherwise it will substitute scalarizing variables.  If no
-     scalarizing variables have been setup, it will throw an error.
-     Setting this also causes the pointer for non array POINTER or ALLOCATABLE
-     variables to be returned, rather than the value.  */
+     scalarizing variables have been setup, it will throw an error.  */
   unsigned descriptor_only:1;
+  /* When this is set the address or descriptor of a variable is returned.
+     Only applies to EXPR_VARIABLE nodes.  */
   unsigned want_pointer:1;
 
   /* Scalarization parameters.  */
   struct g95_se *parent;
-  tree loopvar[G95_MAX_DIMENSIONS];
   struct g95_ss *ss;
   struct g95_loopinfo *loop;
-  /* Only used for functions returning arrays.  */
-  tree data_pointer;
 } g95_se;
 
 /* Scalarisation State chain.  Created by walking an expression tree before
    creating the scalarization loops. Then passed as part of a g95_se structure
    to translate the expression inside the loop.  Note that these chains are
    terminated by g95_se_terminator, not NULL.  A NULL pointer in a g95_se
-   indicates to g95_conv_* that this should be a scalar expression.  */
+   indicates to g95_conv_* that this is a scalar expression.  */
 typedef struct g95_ss_info
 {
   int dimen;
@@ -70,8 +67,11 @@ typedef struct g95_ss_info
   /* holds the pointer to the data array.  */
   tree data;
   tree pdata;
-  /* holds the SS for a vector subscript.  */
-  struct g95_ss *vector[G95_MAX_DIMENSIONS];
+  /* To move some of the array index calculation out of the innermost loop.  */
+  tree offset;
+  tree stride0;
+  /* Holds the SS for a subscript.  */
+  struct g95_ss *subscript[G95_MAX_DIMENSIONS];
   /* stride and delta are used to acces this inside a scalarization loop.
      start is used in the calculation of these.  */
   tree start[G95_MAX_DIMENSIONS];
@@ -89,7 +89,9 @@ typedef enum
   G95_SS_SECTION,
   G95_SS_FUNCTION,
   G95_SS_CONSTRUCTOR,
-  G95_SS_VECTOR
+  G95_SS_VECTOR,
+  G95_SS_TEMP,
+  G95_SS_INTRINSIC
 } g95_ss_type;
 
 /* TODO: Use GCC Garbage Collection for g95_ss.
@@ -107,7 +109,12 @@ typedef struct g95_ss
     g95_ss_info info;
   } data;
 
+  /* All the SS in a loop and linked through loop_chain.  The SS for an
+     expression are linked by the next pointer.  */
+  struct g95_ss *loop_chain;
   struct g95_ss *next;
+
+  unsigned used:1;
 } g95_ss;
 #define g95_get_ss() g95_getmem(sizeof(g95_ss))
 
@@ -129,6 +136,9 @@ typedef struct g95_loopinfo
   tree from[G95_MAX_DIMENSIONS];
   tree to[G95_MAX_DIMENSIONS];
   g95_ss *specloop[G95_MAX_DIMENSIONS];
+
+  tree code[G95_MAX_DIMENSIONS];
+  tree code_tail[G95_MAX_DIMENSIONS];
 
   /* Order in which the dimensions should be looped, innermost first.  */
   int order[G95_MAX_DIMENSIONS];
@@ -270,6 +280,14 @@ void g95_generate_constructors (void);
 
 /* Generate a runtime error check.  */
 void g95_trans_runtime_check (tree, tree, tree *, tree *);
+
+/* Initialize function decls for library functions.  */
+void g95_build_intrinsic_lib_fndecls (void);
+
+/* Identical to convert() except it checks that the arguments are valid
+   SIMPLE expressions.
+   #define g95_simple_convert convert would also work.  */
+tree g95_simple_convert (tree, tree);
 
 /* somewhere! */
 tree pushdecl (tree);

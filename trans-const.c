@@ -34,6 +34,7 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include <gmp.h>
 #include <assert.h>
+#include <math.h>
 #define BACKEND_CODE
 #include "g95.h"
 #include "trans.h"
@@ -92,28 +93,68 @@ g95_conv_mpz_to_tree (mpz_t i, int kind)
   return (res);
 }
 
-/*TODO: Work out the required precision from the kind.  */
+#define foo
+/* Converts a real constant into backend form.  Uses an intermediate string
+   representation.  */
 static tree
 convert_mpf_to_tree (mpf_t f, int kind)
 {
   tree res;
   tree type;
   mp_exp_t exp;
-  char buff[53];
+  char buff[128];
+  char *p;
+  int n;
+  int digits;
+  int edigits;
 
-  /* convert via. a string. This should have enough space for 128 bit
-   * mantissa+32bit exponent */
-  mpf_get_str (&buff[1], &exp, 10, 39, f);
-  if (exp == 0)
-    strcpy (buff, "0");
+  for (n = 0; g95_real_kinds[n].kind != 0; n++)
+    {
+      if (g95_real_kinds[n].kind == kind)
+        break;
+    }
+  assert (g95_real_kinds[n].kind);
+
+  digits = g95_real_kinds[n].precision + 1;
+  assert (g95_real_kinds[n].radix == 2);
+
+  n = MAX (abs(g95_real_kinds[n].min_exponent),
+           abs(g95_real_kinds[n].min_exponent));
+#if 0
+  edigits = 2 + (int)(log (n) /
+                      log (g95_real_kinds[n].radix));
+#endif
+  edigits = 1;
+  while (n > 0)
+    {
+      n = n / 10;
+      edigits += 3;
+    }
+
+  /* We also have two mins signs, 'e', '.' and a null terminator.  */
+  if (digits + edigits + 5 > 128)
+    p = (char *)g95_getmem (digits + edigits + 3);
   else
+    p = buff;
+
+  mpf_get_str (&buff[1], &exp, 10, digits , f);
+  if (buff[1])
     {
       buff[0] = '.';
       strcat (buff, "e");
       sprintf (&buff[strlen (buff)], "%d", (int) exp);
     }
+  else
+    {
+      strcpy (buff, "0");
+    }
+
   type = g95_get_real_type (kind);
   res = build_real (type, REAL_VALUE_ATOF (buff, TYPE_MODE (type)));
+
+  if (p != buff)
+    g95_free (buff);
+
   return (res);
 }
 

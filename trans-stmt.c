@@ -516,23 +516,11 @@ g95_trans_do_while (g95_code * code)
 
   /* Create a SIMPLE version of the exit condition.  */
   g95_init_se (&cond, NULL);
-  /* What we rally want to do is
-      if (! simple_cond_val)
-     However this doesn't seem to be allowed under SIMPLE rules,
-     so we have to do
-      tmp = ! simple_cond_val;
-      if (tmp)  */
-#if 0
-  g95_conv_simple_val (&cond, code->expr);
-  cond.expr = build1 (TRUTH_NOT_EXPR, TREE_TYPE (cond.expr), cond.expr);
-#else
   {
     g95_conv_simple_val (&cond, code->expr);
     cond.expr = build (EQ_EXPR, TREE_TYPE (cond.expr), cond.expr,
                       integer_zero_node);
-    cond.expr = g95_simple_fold (cond.expr, &cond.pre, &cond.pre_tail, NULL);
   }
-#endif
 
   /* Build `IF (! cond) GOTO exit_label.  */
   stmt = build_stmt (IF_STMT,
@@ -664,6 +652,7 @@ g95_trans_allocate (g95_code * code)
 
       g95_init_se (&se, NULL);
       se.want_pointer = 1;
+      se.descriptor_only = 1;
       g95_conv_simple_rhs (&se, expr);
       assert (se.post == NULL_TREE);
 
@@ -681,13 +670,15 @@ g95_trans_allocate (g95_code * code)
 
       if (ref != NULL)
         {
+          /* An array.  */
           g95_array_allocate (&se, ref, pstat);
         }
       else
         {
+          /* A scalar or derived type.  */
+          /*TODO: allocation of derived types containing arrays.  */
           tree val;
 
-          /*TODO: allocation of derived types containing arrays.  */
           val = g95_create_tmp_var (ppvoid_type_node);
           tmp = build1 (ADDR_EXPR, TREE_TYPE (val), se.expr);
           tmp = build (MODIFY_EXPR, TREE_TYPE (val), val, tmp);
@@ -716,13 +707,14 @@ g95_trans_allocate (g95_code * code)
       head = chainon (head, stmt);
     }
 
+  /* Assign the value to the status variable.  */
   if (code->expr)
     {
       stmt = build_stmt (LABEL_STMT, error_label);
 
       g95_init_se (&se, NULL);
-      g95_conv_simple_rhs (&se, code->expr);
-      tmp = fold (convert (TREE_TYPE (se.expr), stat));
+      g95_conv_simple_lhs (&se, code->expr);
+      tmp = g95_simple_convert (TREE_TYPE (se.expr), stat);
       tmp = build (MODIFY_EXPR, TREE_TYPE (se.expr), se.expr, tmp);
       stmt = chainon (stmt, build_stmt (EXPR_STMT, tmp));
 

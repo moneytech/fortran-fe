@@ -101,6 +101,7 @@ void yyerror (const char *str);
 int yylex (void);
 
 static void g95_init_decl_processing (void);
+static void g95_init_builtin_functions (void);
 
 /* Each front end provides its own.  */
 static const char *g95_init (const char *);
@@ -347,6 +348,10 @@ g95_init (const char *filename)
 
   g95_init_decl_processing ();
 
+  /* GCC builtins.  */
+  g95_init_builtin_functions ();
+
+  /* Runtime/IO library functions.  */
   g95_build_builtin_function_decls ();
 
   g95_init_string_constants ();
@@ -740,6 +745,8 @@ g95_mark_addressable (tree exp)
 
 int ggc_p = 1;
 
+/* Builtin function initialisation.  */
+
 /* Return a definition for a builtin function named NAME and whose data type
    is TYPE.  TYPE should be a function type with argument types.
    FUNCTION_CODE tells later passes how to compile calls to this function.
@@ -767,7 +774,179 @@ builtin_function (const char *name,
   DECL_BUILT_IN_CLASS (decl) = class;
   DECL_FUNCTION_CODE (decl) = function_code;
 
+#if 0
+  if (attrs)
+    decl_attributes (&decl, attrs, ATTR_FLAG_BUILT_IN);
+  else
+    decl_attributes (&decl, NULL_TREE, 0);
+#endif
   return decl;
+}
+
+#define flag_isoc99 0
+enum built_in_attribute
+{
+#define DEF_ATTR_NULL_TREE(ENUM) ENUM,
+#define DEF_ATTR_INT(ENUM, VALUE) ENUM,
+#define DEF_ATTR_IDENT(ENUM, STRING) ENUM,
+#define DEF_ATTR_TREE_LIST(ENUM, PURPOSE, VALUE, CHAIN) ENUM,
+#define DEF_FN_ATTR(NAME, ATTRS, PREDICATE) /* No entry needed in enum.  */
+#include "builtin-attrs.def"
+#undef DEF_ATTR_NULL_TREE
+#undef DEF_ATTR_INT
+#undef DEF_ATTR_IDENT
+#undef DEF_ATTR_TREE_LIST
+#undef DEF_FN_ATTR
+  ATTR_LAST
+};
+
+/* Initialisation of builtin function nodes.  Copied from c-common.c.  */
+static void
+g95_init_builtin_functions (void)
+{
+  enum builtin_type
+  {
+#define DEF_PRIMITIVE_TYPE(NAME, VALUE) NAME,
+#define DEF_FUNCTION_TYPE_0(NAME, RETURN) NAME,
+#define DEF_FUNCTION_TYPE_1(NAME, RETURN, ARG1) NAME,
+#define DEF_FUNCTION_TYPE_2(NAME, RETURN, ARG1, ARG2) NAME,
+#define DEF_FUNCTION_TYPE_3(NAME, RETURN, ARG1, ARG2, ARG3) NAME,
+#define DEF_FUNCTION_TYPE_4(NAME, RETURN, ARG1, ARG2, ARG3, ARG4) NAME,
+#define DEF_FUNCTION_TYPE_VAR_0(NAME, RETURN) NAME,
+#define DEF_FUNCTION_TYPE_VAR_1(NAME, RETURN, ARG1) NAME,
+#define DEF_FUNCTION_TYPE_VAR_2(NAME, RETURN, ARG1, ARG2) NAME,
+#define DEF_POINTER_TYPE(NAME, TYPE) NAME,
+#include "builtin-types.def"
+#undef DEF_PRIMITIVE_TYPE
+#undef DEF_FUNCTION_TYPE_0
+#undef DEF_FUNCTION_TYPE_1
+#undef DEF_FUNCTION_TYPE_2
+#undef DEF_FUNCTION_TYPE_3
+#undef DEF_FUNCTION_TYPE_4
+#undef DEF_FUNCTION_TYPE_VAR_0
+#undef DEF_FUNCTION_TYPE_VAR_1
+#undef DEF_FUNCTION_TYPE_VAR_2
+#undef DEF_POINTER_TYPE
+    BT_LAST
+  };
+
+  typedef enum builtin_type builtin_type;
+
+  tree builtin_types[(int) BT_LAST];
+  tree va_list_ref_type_node;
+  tree va_list_arg_type_node;
+
+  if (TREE_CODE (va_list_type_node) == ARRAY_TYPE)
+    {
+      va_list_arg_type_node = va_list_ref_type_node =
+	build_pointer_type (TREE_TYPE (va_list_type_node));
+    }
+  else
+    {
+      va_list_arg_type_node = va_list_type_node;
+      va_list_ref_type_node = build_reference_type (va_list_type_node);
+    }
+
+#define DEF_PRIMITIVE_TYPE(ENUM, VALUE) \
+  builtin_types[(int) ENUM] = VALUE;
+#define DEF_FUNCTION_TYPE_0(ENUM, RETURN)		\
+  builtin_types[(int) ENUM]				\
+    = build_function_type (builtin_types[(int) RETURN],	\
+			   void_list_node);
+#define DEF_FUNCTION_TYPE_1(ENUM, RETURN, ARG1)				\
+  builtin_types[(int) ENUM]						\
+    = build_function_type (builtin_types[(int) RETURN],			\
+			   tree_cons (NULL_TREE,			\
+				      builtin_types[(int) ARG1],	\
+				      void_list_node));
+#define DEF_FUNCTION_TYPE_2(ENUM, RETURN, ARG1, ARG2)	\
+  builtin_types[(int) ENUM]				\
+    = build_function_type 				\
+      (builtin_types[(int) RETURN],			\
+       tree_cons (NULL_TREE,				\
+		  builtin_types[(int) ARG1],		\
+		  tree_cons (NULL_TREE,			\
+			     builtin_types[(int) ARG2],	\
+			     void_list_node)));
+#define DEF_FUNCTION_TYPE_3(ENUM, RETURN, ARG1, ARG2, ARG3)		 \
+  builtin_types[(int) ENUM]						 \
+    = build_function_type						 \
+      (builtin_types[(int) RETURN],					 \
+       tree_cons (NULL_TREE,						 \
+		  builtin_types[(int) ARG1],				 \
+		  tree_cons (NULL_TREE,					 \
+			     builtin_types[(int) ARG2],			 \
+			     tree_cons (NULL_TREE,			 \
+					builtin_types[(int) ARG3],	 \
+					void_list_node))));
+#define DEF_FUNCTION_TYPE_4(ENUM, RETURN, ARG1, ARG2, ARG3, ARG4)	\
+  builtin_types[(int) ENUM]						\
+    = build_function_type						\
+      (builtin_types[(int) RETURN],					\
+       tree_cons (NULL_TREE,						\
+		  builtin_types[(int) ARG1],				\
+		  tree_cons (NULL_TREE,					\
+			     builtin_types[(int) ARG2],			\
+			     tree_cons 					\
+			     (NULL_TREE,				\
+			      builtin_types[(int) ARG3],	 	\
+			      tree_cons (NULL_TREE,			\
+					 builtin_types[(int) ARG4],	\
+					 void_list_node)))));
+#define DEF_FUNCTION_TYPE_VAR_0(ENUM, RETURN)				\
+  builtin_types[(int) ENUM]						\
+    = build_function_type (builtin_types[(int) RETURN], NULL_TREE);
+#define DEF_FUNCTION_TYPE_VAR_1(ENUM, RETURN, ARG1)			 \
+   builtin_types[(int) ENUM]						 \
+    = build_function_type (builtin_types[(int) RETURN], 		 \
+			   tree_cons (NULL_TREE,			 \
+				      builtin_types[(int) ARG1],	 \
+				      NULL_TREE));
+
+#define DEF_FUNCTION_TYPE_VAR_2(ENUM, RETURN, ARG1, ARG2)	\
+   builtin_types[(int) ENUM]					\
+    = build_function_type 					\
+      (builtin_types[(int) RETURN],				\
+       tree_cons (NULL_TREE,					\
+		  builtin_types[(int) ARG1],			\
+		  tree_cons (NULL_TREE,				\
+			     builtin_types[(int) ARG2],		\
+			     NULL_TREE)));
+#define DEF_POINTER_TYPE(ENUM, TYPE)			\
+  builtin_types[(int) ENUM]				\
+    = build_pointer_type (builtin_types[(int) TYPE]);
+#include "builtin-types.def"
+#undef DEF_PRIMITIVE_TYPE
+#undef DEF_FUNCTION_TYPE_1
+#undef DEF_FUNCTION_TYPE_2
+#undef DEF_FUNCTION_TYPE_3
+#undef DEF_FUNCTION_TYPE_4
+#undef DEF_FUNCTION_TYPE_VAR_0
+#undef DEF_FUNCTION_TYPE_VAR_1
+#undef DEF_POINTER_TYPE
+
+#define DEF_BUILTIN(ENUM, NAME, CLASS, TYPE, LIBTYPE,			\
+		    BOTH_P, FALLBACK_P, NONANSI_P, ATTRS)		\
+  if (NAME)								\
+    {									\
+      tree decl;							\
+									\
+      if (strncmp (NAME, "__builtin_", strlen ("__builtin_")) != 0)	\
+	abort ();							\
+									\
+	decl = builtin_function (NAME, builtin_types[TYPE], ENUM,	\
+				 CLASS,					\
+				 (FALLBACK_P				\
+				  ? (NAME + strlen ("__builtin_"))	\
+				  : NULL),				\
+				 NULL);	                                \
+									\
+      built_in_decls[(int) ENUM] = decl;				\
+    }									
+#include "builtins.def"
+#undef DEF_BUILTIN
+
+  main_identifier_node = get_identifier ("main");
 }
 
 #include "gt-f95-f95-lang.h"

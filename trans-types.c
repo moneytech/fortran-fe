@@ -149,8 +149,7 @@ g95_get_int_type (int kind)
       return (95_int16_type_node);
 #endif
     default:
-      g95_todo_error ("integer kind=%d not available", kind);
-      return error_mark_node;	/* Should never happen... */
+      fatal_error ("integer kind=%d not available", kind);
     }
 }
 
@@ -169,8 +168,7 @@ g95_get_real_type (int kind)
       return (g95_real16_type_node);
 #endif
     default:
-      g95_todo_error ("real kind=%d not available", kind);
-      return error_mark_node;
+      fatal_error ("real kind=%d not available", kind);
     }
 }
 
@@ -189,8 +187,7 @@ g95_get_complex_type (int kind)
       return (g95_complex16_type_node);
 #endif
     default:
-      g95_todo_error ("complex kind=%d not available", kind);
-      return error_mark_node;
+      fatal_error ("complex kind=%d not available", kind);
     }
 }
 
@@ -715,7 +712,7 @@ g95_get_derived_type (g95_symbol * derived)
   tree typenode, field, field_type, fieldlist;
   g95_component * c;
 
-  assert (derived && derived->ts.type == BT_DERIVED);
+  assert (derived && derived->attr.flavor == FL_DERIVED);
 
   if (derived->backend_decl)
     return derived->backend_decl;
