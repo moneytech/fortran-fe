@@ -29,12 +29,13 @@ static char expression_syntax[] = "Syntax error in expression at %C";
 
 
 /* g95_match_defined_op_name()-- Match a user-defined operator name.
- * This is a normal name with a few restrictions. */
+ * This is a normal name with a few restrictions.  The error_flag
+ * controls whether an error is raised if 'true' or 'false' are used
+ * or not. */
 
-match g95_match_defined_op_name(char *result) {
+match g95_match_defined_op_name(char *result, int error_flag) {
 static char *badops[] = {
- "true", "false", "and", "or", "not", "eqv", "neqv", "eq", "ne",
- "ge", "le", "lt", "gt", NULL };
+ "and", "or", "not", "eqv", "neqv", "eq", "ne", "ge", "le", "lt", "gt", NULL };
 
 char name[G95_MAX_SYMBOL_LEN+1];
 locus old_loc;
@@ -46,14 +47,17 @@ int i;
   m = g95_match(" . %n .", name);
   if (m != MATCH_YES) return m;
 
-  for(i=0; badops[i]; i++)
-    if (strcmp(badops[i], name) == 0) {
-      g95_error("The name '%s' cannot be used as a defined operator at %C",
-		name);
+/* .true. and .false. have interpretations as constants.  Trying to
+ * use these as operators will fail at a later time */
 
-      g95_set_locus(&old_loc);
-      return MATCH_ERROR;
-    }
+  if (strcmp(name, "true") == 0 || strcmp(name, "false") == 0) {
+    if (error_flag) goto error;
+    g95_set_locus(&old_loc);
+    return MATCH_NO;
+  }
+
+  for(i=0; badops[i]; i++)
+    if (strcmp(badops[i], name) == 0) goto error;
 
   for(i=0; name[i]; i++)
     if (!isalpha(name[i])) {
@@ -62,6 +66,13 @@ int i;
     }
 
   return MATCH_YES;
+
+error:
+  g95_error("The name '%s' cannot be used as a defined operator at %C",
+	    name);
+
+  g95_set_locus(&old_loc);
+  return MATCH_ERROR;
 }
 
 
@@ -73,7 +84,7 @@ char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 match m;
 
-  m = g95_match_defined_op_name(name);
+  m = g95_match_defined_op_name(name, 0);
   if (m != MATCH_YES) return m;
 
   if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;

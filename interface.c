@@ -177,7 +177,7 @@ int i;
   }
 
   if (g95_match(" operator ( ") == MATCH_YES) {
-    m = g95_match_defined_op_name(buffer);
+    m = g95_match_defined_op_name(buffer, 1);
     if (m == MATCH_NO) goto syntax;
     if (m != MATCH_YES) return MATCH_ERROR;
 

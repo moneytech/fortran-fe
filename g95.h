@@ -1246,7 +1246,7 @@ match g95_match_format(void);
 
 /* matchexp.c */
 
-match g95_match_defined_op_name(char *);
+match g95_match_defined_op_name(char *, int);
 match g95_match_expr(g95_expr **);
 
 /* module.c */
