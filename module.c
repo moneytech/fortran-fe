@@ -1688,15 +1688,18 @@ int i;
 /* save_derived()-- Save a derived type as a hidden symbol.  This
  * function recurses into any subtypes */
 
-static void save_derived(g95_symbol *sym) {
-g95_component *c;
+static void save_derived(g95_component *c) {
+g95_symbol *sym;
 
-  if (sym->serial != -1) return;
+  for(; c; c=c->next) {
+    if (c->ts.type != BT_DERIVED) continue;
 
-  sym->serial = sym_num++;
+    sym = c->ts.derived;
+    if (sym->serial != -1) continue;
+    sym->serial = sym_num++;
 
-  for(c=sym->components; c; c=c->next)
-    if (c->ts.type == BT_DERIVED) save_derived(sym->ts.derived);
+    save_derived(sym->components);
+  }
 }
 
 
@@ -1715,7 +1718,7 @@ g95_interface *intr;
   for(intr=sym->generic; intr; intr=intr->next)
     if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
 
-  if (sym->ts.type == BT_DERIVED) save_derived(sym->ts.derived);
+  if (sym->attr.flavor == FL_DERIVED) save_derived(sym->components);
 }
 
 
