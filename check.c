@@ -179,11 +179,10 @@ char message[100];
 /* rank_check()-- Make sure that an expression has a certain (nonzero) rank */
 
 static try rank_check(g95_expr *e, int n, int rank) {
-char *message;
+char message[100];
 
   if (e->rank == rank) return SUCCESS;
 
-  message = alloca(100);
   sprintf(message, "of rank %d", rank);
 
   must_be(e, n, message);
@@ -212,11 +211,10 @@ static try nonoptional_check(g95_expr *e, int n) {
 /* kind_value_check()-- Check that an expression has a particular kind */
 
 static try kind_value_check(g95_expr *e, int n, int k) {
-char *message;
+char message[100];
 
   if (e->ts.kind == k) return SUCCESS;
 
-  message = alloca(100);
   sprintf(message, "of kind %d", k);
 
   must_be(e, n, message);

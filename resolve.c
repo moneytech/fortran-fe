@@ -638,9 +638,13 @@ try t;
       if (expr->value.function.esym) {
 	flag = g95_pure(expr->value.function.esym);
 	name = expr->value.function.esym->name;
-      } else {
+      } else if (expr->value.function.isym) {
 	flag = expr->value.function.isym->pure;
 	name = expr->value.function.isym->name;
+      } else {
+        /* function declared implicitly, hence not pure */
+        flag = 0;
+        name = expr->value.function.name;
       }
 
       if (!flag) {

@@ -371,13 +371,13 @@ try t;
 }
 
 
-/* g95_check_pointer_assign()-- Check that a pointer assignment is OK */
+/* g95_check_pointer_assign()-- Check that a pointer assignment is OK.
+ * We first check lvalue, and we only check rvalue if it's not an
+ * assignment to NULL() or a NULLIFY statement. */
 
 try g95_check_pointer_assign(g95_expr *lvalue, g95_expr *rvalue) {
 symbol_attribute attr;
-
-  if (rvalue->expr_type == EXPR_NULL && rvalue->ts.type == BT_UNKNOWN)
-    rvalue->ts = lvalue->ts;
+int is_pure;
 
   if (lvalue->symbol->ts.type == BT_UNKNOWN) {
     g95_error("Pointer assignment target is not a POINTER at %L",
@@ -385,51 +385,53 @@ symbol_attribute attr;
     return FAILURE;
   }
 
-  if (lvalue->ts.type == BT_DERIVED && rvalue->ts.type == BT_DERIVED &&
-      lvalue->ts.derived != rvalue->ts.derived) {
-    g95_error("Incompatible derived types in pointer assignment at %L",
-	      &lvalue->where);
-    return FAILURE;
-  }
-
-  if (lvalue->ts.type != rvalue->ts.type) {
-    g95_error("Different types in pointer assignment at %L",
-	      &lvalue->where);
-    return FAILURE;
-  }
-
-  if (lvalue->ts.kind != rvalue->ts.kind) {
-    g95_error("Different kind type parameters in pointer assignment at %L",
-	      &lvalue->where);
-    return FAILURE;
-  }
-
   attr = g95_variable_attr(lvalue, NULL);
-
   if (!attr.pointer) {
     g95_error("Pointer assignment to non-POINTER at %L",
 	      &lvalue->where);
     return FAILURE;
   }
 
-  if (!attr.target && !attr.pointer) {
-    g95_error("Pointer assignment target is neither TARGET nor POINTER at %L",
-	      &rvalue->where);
+  is_pure = g95_pure(NULL);
+
+  if (is_pure && g95_impure_variable(lvalue->symbol)) {
+    g95_error("Bad pointer object in PURE procedure at %L", &lvalue->where);
     return FAILURE;
   }
 
-  /* In pure functions, both lvalue and rvalue must be pure. An EXPR_NULL,
-   * which represents either the NULL() value or a NULLIFY statement, is
-   * always pure. */
+  /* If rvalue is a NULL() or NULLIFY, we're done. Otherwise the type,
+   * kind, etc for lvalue and rvalue must match, and rvalue must be a 
+   * pure variable if we're in a pure function. */
 
-  if (g95_pure(NULL)) {
-    if (g95_impure_variable(lvalue->symbol)) {
-      g95_error("Bad pointer object in PURE procedure at %L", &lvalue->where);
+  if (rvalue->expr_type != EXPR_NULL) {
+
+    if (lvalue->ts.type != rvalue->ts.type) {
+      g95_error("Different types in pointer assignment at %L",
+                &lvalue->where);
       return FAILURE;
     }
 
-    if ((rvalue->expr_type != EXPR_NULL)
-        && g95_impure_variable(rvalue->symbol)) {
+    if (lvalue->ts.type == BT_DERIVED
+	&& lvalue->ts.derived != rvalue->ts.derived) {
+      g95_error("Incompatible derived types in pointer assignment at %L",
+                &lvalue->where);
+      return FAILURE;
+    }
+
+    if (lvalue->ts.kind != rvalue->ts.kind) {
+      g95_error("Different kind type parameters in pointer assignment at %L",
+                &lvalue->where);
+      return FAILURE;
+    }
+
+    attr = g95_variable_attr(rvalue,NULL);
+    if (!attr.target && !attr.pointer) {
+      g95_error("Pointer assignment target is neither TARGET nor POINTER at %L",
+                 &rvalue->where);
+      return FAILURE;
+    }
+
+    if (is_pure && g95_impure_variable(rvalue->symbol)) {
       g95_error("Bad target in pointer assignment in PURE procedure at %L",
 		&rvalue->where);
     }
