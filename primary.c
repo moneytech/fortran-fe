@@ -96,6 +96,9 @@ int r;
   case 16:
     r = ('0' <= c && c <= '9') || ('a' <= c && c <= 'f');
     break;
+
+  default:
+    g95_internal_error("check_digit(): bad radix");
   }
 
   return r;

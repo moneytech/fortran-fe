@@ -786,6 +786,9 @@ int kx, ky;
 	      x->where);
   }
 
+  result = g95_constant_result(BT_REAL, g95_default_double_kind());
+  result->where = x->where;
+
   mult1 = g95_real2real(x, g95_default_double_kind());
   mult2 = g95_real2real(y, g95_default_double_kind());
 
@@ -1865,7 +1868,7 @@ int my_kind;
     break;
 
   default:
-    g95_internal_error("g95_simplify_max: bad type");
+    g95_internal_error("g95_simplify_max(): bad type");
   }
 
   while(arg != NULL) {
@@ -2031,19 +2034,21 @@ int my_kind;
 
   if (arg == NULL ) return NULL;
 
-  if ( x->ts.type == BT_INTEGER ) {
+  switch(x->ts.type) {
+  case BT_INTEGER:
     mpz_init_set(min_val, x->value.integer);
     my_type = BT_INTEGER;
     my_kind = x->ts.kind;
-  }
-  else if ( x->ts.type == BT_REAL ) {
+    break;
+
+  case BT_REAL:
     mpf_init_set(rmin_val, x->value.real);
     my_type = BT_REAL;
     my_kind = x->ts.kind;
-  }
-  else {
-    g95_internal_error("g95_simplify_min: bad type");
-    return &g95_bad_expr;
+    break;
+
+  default:
+    g95_internal_error("g95_simplify_min(): bad type"); /* noreturn */
   }
 
   while ( arg != NULL ) {
@@ -3355,6 +3360,7 @@ int index;
   else {
     if ( lenset == 0 ) {
        mpz_set_si(result->value.integer,1);
+       return result;
     }
     else {
       index = len-strspn(s->value.character.string,set->value.character.string);

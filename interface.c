@@ -606,6 +606,9 @@ g95_interface **head, *intr;
   case INTERFACE_USER_OP:
     head = &current_interface.sym->operator;
     break;
+
+  default:
+    g95_internal_error("g95_add_interface(): Bad interface type");
   }
 
   if (g95_check_interface(*head, new) == SUCCESS) {

@@ -898,8 +898,8 @@ void g95_warning_check(void);
 
 void g95_error(char *, ...);
 void g95_error_now(char *, ...);
-void g95_fatal_error(char *, ...);
-void g95_internal_error(char *, ...);
+void g95_fatal_error(char *, ...) __attribute__ ((noreturn));
+void g95_internal_error(char *, ...) __attribute__ ((noreturn));
 
 void g95_clear_error(void);
 int g95_error_check(void);

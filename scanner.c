@@ -537,14 +537,17 @@ int c;
 
 void g95_error_recovery(void) {
 char c, delim;
+  
+  if (g95_at_eof()) return; 
 
   for(;;) {
-    if (g95_at_eof()) break;
-
     c = g95_next_char();
     if (c == '\n' || c == ';') break;
 
-    if (c != '\'' && c != '"') continue;
+    if (c != '\'' && c != '"') {
+      if (g95_at_eof()) break;
+      continue;
+    }
     delim = c;
 
     for(;;) {
@@ -557,6 +560,7 @@ char c, delim;
 	if (c == '\n') goto done;
       }
     }
+    if (g95_at_eof()) break;
   }
 
 done:

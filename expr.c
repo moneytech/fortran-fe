@@ -660,6 +660,9 @@ int rv;
   case EXPR_ARRAY:
     rv = is_constant_constructor(e->value.constructor);
     break;
+
+  default:
+    g95_internal_error("is_constant_expr(): Unknown expression type");
   }
 
   return rv;
@@ -1463,6 +1466,9 @@ try t;
 
     t = g95_check_constructor_type(e);
     break;
+    
+  default:
+    g95_internal_error("check_init_expr(): Unknown expression type");
   }
 
   return t;
@@ -1586,6 +1592,9 @@ try t;
   case EXPR_ARRAY:
     t = g95_check_constructor(e, check_spec_expr);
     break;
+
+  default:
+    g95_internal_error("check_spec_expr(): Unknown expression type");
   }
 
   return t;

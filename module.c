@@ -478,6 +478,8 @@ char *p;
     case ATOM_RPAREN:   p = "Expected right parenthesis";  break;
     case ATOM_INTEGER:  p = "Expected integer";            break;
     case ATOM_STRING:   p = "Expected string";             break;
+    default: 
+      g95_internal_error("require_atom(): bad atom type required");
     }
 
     set_module_locus(&m);
@@ -562,6 +564,10 @@ int i, len;
     sprintf(buffer, "%d", i);
     p = buffer;
     break;
+    
+  default:
+    g95_internal_error("write_atom(): Trying to write dab atom");
+
   }
 
   len = strlen(p);

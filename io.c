@@ -672,6 +672,8 @@ char *name;
   case M_WRITE:    name = "WRITE";    break;
   case M_PRINT:    name = "PRINT";    break;
   case M_INQUIRE:  name = "INQUIRE";  break;
+  default:
+    g95_internal_error("io_kind_name(): bad I/O-kind");
   }
 
   return name;
@@ -937,6 +939,7 @@ get_io_list:
   if (g95_match_eos() != MATCH_YES) {
     if (comma_flag && g95_match(" ,") != MATCH_YES) {
       g95_error("Expected comma in I/O list at %C");
+      m = MATCH_ERROR;
       goto cleanup;
     }
 
