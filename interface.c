@@ -300,6 +300,8 @@ g95_component *dt1, *dt2;
 /* Compare type via the rules of the standard.  Both types must have
  * the SEQUENCE attribute to be equal */
 
+  if (strcmp(ts1->derived->name, ts2->derived->name)) return 0;
+
   dt1 = ts1->derived->components;
   dt2 = ts2->derived->components;
 
