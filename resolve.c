@@ -1364,17 +1364,17 @@ static try resolve_substring(g95_ref *ref) {
 }
 
 
-/* resolve_ref()-- Resolve subtype references */
+/* resolve_ref()-- Resolve subtype references. */
 
 static try resolve_ref(g95_expr *expr) {
+int current_part_dimension, n_components, seen_part_dimension;
 g95_ref *ref;
 
-  for(ref=expr->ref; ref; ref=ref->next) {
+  for(ref=expr->ref; ref; ref=ref->next)
     if (ref->type == REF_ARRAY && ref->u.ar.as == NULL) {
       find_array_spec(expr);
       break;
     }
-  }
 
   for(ref=expr->ref; ref; ref=ref->next)
     switch(ref->type) {
@@ -1389,6 +1389,61 @@ g95_ref *ref;
       resolve_substring(ref);
       break;
     }
+
+  /* Check constraints on part references. */
+
+  current_part_dimension = 0;
+  seen_part_dimension = 0;
+  n_components = 0;
+
+  for(ref=expr->ref; ref; ref=ref->next) {
+    switch(ref->type) {
+    case REF_ARRAY:
+      switch(ref->u.ar.type) {
+      case AR_FULL:
+      case AR_SECTION:
+	current_part_dimension = 1;
+	break;
+	
+      case AR_ELEMENT:
+	current_part_dimension = 0;
+	break;
+	
+      case AR_UNKNOWN:
+	g95_internal_error("resolve_ref(): Bad array reference");
+      }
+
+      break;
+      
+    case REF_COMPONENT:
+      if (current_part_dimension && ref->u.c.component->pointer) {
+	g95_error("Component to the right of a part reference with nonzero "
+		  "rank must not have the POINTER attribute at %L",
+		  &expr->where);
+	return FAILURE;
+      }
+
+      n_components++;
+      break;
+
+    case REF_SUBSTRING:
+      break;
+    }
+
+    if (((ref->type == REF_COMPONENT && n_components > 1) ||
+	 ref->next == NULL) && current_part_dimension && seen_part_dimension) {
+
+      g95_error("Two or more part references with nonzero rank must "
+		"not be specified at %L", &expr->where);
+      return FAILURE;
+    }
+
+    if (ref->type == REF_COMPONENT) {
+      if (current_part_dimension) seen_part_dimension = 1;
+
+      current_part_dimension = 0;   /* reset to make sure */
+    }
+  }
 
   return SUCCESS;
 }
