@@ -647,31 +647,35 @@ int i;
 /* g95_compare_array_spec()-- Does what it says.  MATCH_ERROR is never
  * returned. */
 
-match g95_compare_array_spec(g95_array_spec *as1, g95_array_spec *as2) {
+int g95_compare_array_spec(g95_array_spec *as1, g95_array_spec *as2) {
 int i, a1, a2;
 
-  if (as1->rank != as2->rank) return MATCH_NO;
+  if (as1 == NULL && as2 == NULL) return 1;
 
-  if (as1->rank == 0) return MATCH_YES;
+  if (as1 == NULL || as2 == NULL) return 0;
 
-  if (as1->type != as2->type) return MATCH_NO;
+  if (as1->rank != as2->rank) return 0;
+
+  if (as1->rank == 0) return 1;
+
+  if (as1->type != as2->type) return 0;
 
   if (as1->type == AS_EXPLICIT)
     for(i=0; i<as1->rank; i++) {
       if (g95_extract_int(as1->shape[i].lower, &a1) != NULL) goto error;
       if (g95_extract_int(as2->shape[i].lower, &a2) != NULL) goto error;
-      if (a1 != a2) return MATCH_NO;
+      if (a1 != a2) return 0;
 
       if (g95_extract_int(as1->shape[i].upper, &a1) != NULL) goto error;
       if (g95_extract_int(as2->shape[i].upper, &a2) != NULL) goto error;
-      if (a1 != a2) return MATCH_NO;
+      if (a1 != a2) return 0;
     }
 
-  return MATCH_YES;
+  return 1;
 
 error:
   g95_internal_error("g95_compare_type(): Array spec clobbered");
-  return MATCH_ERROR;   /* Keep the compiler happy */
+  return 0;        /* Keep the compiler happy */
 }
 
 

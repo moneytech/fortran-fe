@@ -65,6 +65,7 @@ int i;
       return MATCH_ERROR;
     }
 
+  strcpy(result, name);
   return MATCH_YES;
 
 error:

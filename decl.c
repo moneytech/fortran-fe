@@ -1011,7 +1011,12 @@ match m;
   }
 
 ok:
-  g95_add_interface(progname, head);
+  if (progname->formal != NULL) {
+    g95_error("Symbol %s at %C already has an explicit interface");
+    goto cleanup;
+  }
+
+  progname->formal = head;
   return MATCH_YES;
   
 cleanup:
@@ -1084,7 +1089,7 @@ match m;
   }
 
   ns = (g95_current_state() == COMP_INTERFACE) ?
-    current_interface.parent_ns : NULL;
+    current_interface.ns : NULL;
 
   if (g95_get_symbol(name, ns, 0, &sym)) return MATCH_ERROR;
 
@@ -1233,7 +1238,7 @@ match m;
   }
 
   ns = (g95_current_state() == COMP_INTERFACE) ?
-    current_interface.parent_ns : NULL;
+    current_interface.ns : NULL;
 
   if (g95_get_symbol(name, ns, 1, &sym)) return MATCH_ERROR;
 
@@ -1770,9 +1775,13 @@ syntax:
 }
 
 
-/* g95_match_modproc()-- Match a module procedure statement */
+/* g95_match_modproc()-- Match a module procedure statement.  Note
+ * that we have to modify symbols in the parent's namespace because
+ * the current one was there to receive symbols that are in a
+ * interface's formal argument list. */
 
 match g95_match_modproc(void) {
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym, *generic;
 match m;
 
@@ -1780,16 +1789,19 @@ match m;
       g95_state_stack->previous == NULL ||
       g95_state_stack->previous->state != COMP_MODULE ||
       current_interface.type != INTERFACE_GENERIC) {
-    g95_error("MODULE PROCEDURE at %C must be in a module interface");
+    g95_error("MODULE PROCEDURE at %C must be in a generic module interface");
     return MATCH_ERROR;
   }
 
   generic = g95_state_stack->previous->sym;
 
   for(;;) {
-    m = g95_match(" %s", &sym);
+    m = g95_match_name(name);
     if (m == MATCH_NO) goto syntax;
     if (m != MATCH_YES) return MATCH_ERROR;
+
+    if (g95_get_symbol(name, g95_current_ns->parent, 0, &sym))
+      return MATCH_ERROR;
 
     if (g95_add_flavor(&sym->attr, FL_MODULE_PROC, NULL) == FAILURE)
       return MATCH_ERROR;

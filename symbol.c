@@ -1052,7 +1052,6 @@ g95_component *q;
 void g95_show_components(g95_symbol *sym) {
 g95_component *c;
 
-  g95_status("(");
   for(c=sym->components; c; c=c->next) {
     g95_status("(%s", c->name);
     g95_show_typespec(&c->ts);
@@ -1060,8 +1059,6 @@ g95_component *c;
     g95_show_attr(&c->attr);
     g95_status(")");
   }
-
-  g95_status(")");
 }
 
 
@@ -1568,10 +1565,11 @@ void g95_free_symbol(g95_symbol *sym) {
 
   free_components(sym->components);
 
-  g95_free_interface(sym->interface);
   g95_free_expr(sym->value);
 
   g95_free_namelist(sym->namelist);
+
+  g95_free_namespace(sym->formal_ns);
 
   g95_free(sym);
 }
@@ -1753,10 +1751,8 @@ g95_symbol *p, *q, *old;
       p->as = old->as;
     }
 
-    if (p->interface != old->interface) {
-      g95_free_interface(p->interface);
-      p->interface = old->interface;
-    }
+    p->generic = old->generic;
+    p->operator = old->operator;
 
     if (p->namelist != NULL && old->namelist == NULL) {
       g95_free_namelist(p->namelist);
@@ -1883,48 +1879,93 @@ void g95_symbol_done_2(void) {
 }
 
 
+static int show_level=0;
+
+static void show_indent(void) {
+int i;
+
+  g95_status_char('\n');
+  for(i=0; i<2*show_level; i++)
+    g95_status_char(' ');
+}
+
+
 /* g95_show_symbol()-- Show a symbol.  If a symbol is an ENTRY,
  * SUBROUTINE or FUNCTION, we show the interface.  Information needed
  * to reconstruct the list of specific interfaces associated with a
  * generic symbol is done within that symbol. */
 
 void g95_show_symbol(g95_symbol *sym) {
+g95_formal_arglist *formal;
 g95_symbol *s;
 
-  if (sym == NULL) {
-    g95_status("()");
-    return;
-  }
+  if (sym == NULL) return;
 
-  g95_status("(symbol %s ", sym->name);
+  show_indent();
 
+  g95_status("symbol %s ", sym->name);
   g95_show_typespec(&sym->ts);
-
   g95_show_attr(&sym->attr);
 
-  if ((sym->attr.function || sym->attr.subroutine || sym->attr.entry) &&
-      sym->interface != NULL) g95_show_formal_arglist(sym->interface->formal);
-  else g95_status("()");
-
-  g95_show_expr(sym->value);
-
-  g95_show_array_spec(sym->as);
-
-  g95_status_char('(');
-  for(s=sym->common_head; s; s=s->common_next) {
-    g95_status("%s", s->name);
-
-    if (s->common_next != NULL)
-      g95_status_char(' ');
+  if (sym->value) {
+    show_indent();
+    g95_status("value: ");
+    g95_show_expr(sym->value);
   }
-  g95_status_char(')');
 
-  if (sym->result == NULL) g95_status(" () ");
-   else g95_status(" %s ", sym->result->name);
+  if (sym->as) {
+    show_indent();
+    g95_status("Array spec:");
+    g95_show_array_spec(sym->as);
+  }
 
-  g95_show_components(sym);
+  if (sym->operator) {
+    show_indent();
+    g95_status("Operator interfaces:");
+    for(s=sym->operator; s; s=s->next_if)
+      g95_status(" %s", s->name);
+  }
 
-  g95_status(")\n");
+  if (sym->generic) {
+    show_indent();
+    g95_status("Generic interfaces:");
+    for(s=sym->generic; s; s=s->next_if)
+      g95_status(" %s", s->name);
+  }
+
+  if (sym->common_head) {
+    show_indent();
+    g95_status("Common members:");
+    for(s=sym->common_head; s; s=s->common_next)
+      g95_status(" %s", s->name);
+  }
+
+  if (sym->result) {
+    show_indent();
+    g95_status("result: %s", sym->result->name);
+  }
+
+  if (sym->components) {
+    show_indent();
+    g95_status("components: ");
+    g95_show_components(sym);
+  }
+
+  if (sym->attr.function || sym->attr.subroutine || sym->attr.entry) {
+    show_indent();
+    g95_status("Formal arglist:");
+
+    for(formal=sym->formal; formal; formal=formal->next)
+      g95_status(" %s", formal->sym->name);
+  }
+
+  if (sym->formal_ns) {
+    show_indent();
+    g95_status("Formal namespace");
+    g95_show_namespace(sym->formal_ns);
+  }
+
+  g95_status_char('\n');
 }
 
 
@@ -1932,7 +1973,8 @@ g95_symbol *s;
 
 static void show_symtree(g95_symtree *st) {
 
-  g95_status("symtree: %s  Ambig %d\n", st->name, st->ambiguous);
+  show_indent();
+  g95_status("symtree: %s  Ambig %d", st->name, st->ambiguous);
   g95_show_symbol(st->sym);
 }
 
@@ -2043,64 +2085,51 @@ void g95_set_sym_defaults(g95_namespace *ns) {
 }
 
 
-/* show_generics()-- If a symbol is a generic interface symbol, run
- * through the list of specific symbols */
-
-static void show_generics(g95_symbol *sym) {
-g95_interface *ip;
-
-  if (sym->attr.flavor == FL_GENERIC) {
-    g95_status("(%s", sym->name);
-
-    for(ip=sym->generic; ip; ip=ip->next)
-      g95_status(" %s", ip->sym->name);
-
-    g95_status(")");
-  }
-}
-
-
 /* g95_show_namespace()-- Show a namespace */
 
 void g95_show_namespace(g95_namespace *ns) {
-g95_interface *ip;
+g95_symbol *sym;
 int i;
 
-  g95_status("(namespace (");
+  show_level++; 
+
+  show_indent();
+  g95_status("Namespace:");
 
   if (ns != NULL) {
-    for(i=0; i<G95_LETTERS; i++)
+    for(i=0; i<G95_LETTERS; i++) {
+      g95_status(" %c: ", i+'A');
       g95_show_typespec(&ns->default_type[i]);
-
-    g95_status(")\n");
+    }
 
     g95_traverse_symtree(ns, clear_sym_mark);
 
     g95_traverse_symtree(ns, show_symtree);
 
-    g95_status(" (");
-    g95_traverse_ns(ns, show_generics);   /* Generic interfaces */
-
     for(i=0; i<G95_INTRINSIC_OPS; i++) {    /* User operator interfaces */
-      ip = ns->operator[i];
-      if (ip == NULL) continue;
+      sym = ns->operator[i];
+      if (sym == NULL) continue;
 
-      g95_status("(%s", g95_op2string(i));
+      show_indent();
+      g95_status("Operator interfaces for %s:", g95_op2string(i));
 
-      for(; ip; ip=ip->next)
-	g95_status(" %s", ip->sym->name);
-
-      g95_status(")");
+      for(; sym; sym=sym->next_if)
+	g95_status(" %s", sym->name);
     }
   }
 
-  g95_status("))\n");
+  g95_status_char('\n');
+  g95_status_char('\n');
+
   g95_show_code(0, ns->code);
 
   for(ns=ns->contained; ns; ns=ns->sibling) {
     g95_status("CONTAINS\n");
     g95_show_namespace(ns);
   }
+
+  show_level--;
+  g95_status_char('\n');
 }
 
 
@@ -2117,3 +2146,4 @@ void g95_symbol_state(void) {
 }
 
 #endif
+

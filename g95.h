@@ -397,7 +397,10 @@ typedef struct g95_symbol {
  * symbol is a function or subroutine name.  If the symbol is a
  * generic name, the generic member points to the list of interfaces. */
 
-  struct g95_interface *operator, *interface, *generic;
+  struct g95_symbol *operator, *generic, *next_if;
+  struct g95_namespace *interface_ns;
+  g95_formal_arglist *formal;
+  struct g95_namespace *formal_ns;
 
   struct g95_expr *value;           /* Parameter/Initializer value */
   g95_array_spec *as;
@@ -457,7 +460,7 @@ typedef struct g95_namespace {
   int set_flag[G95_LETTERS];
   g95_typespec default_type[G95_LETTERS];    /* IMPLICIT typespecs */
 
-  struct g95_interface *operator[G95_INTRINSIC_OPS];
+  struct g95_symbol *operator[G95_INTRINSIC_OPS];
   struct g95_namespace *parent, *contained, *sibling;
   struct g95_code *code;
   g95_symbol *blank_common;
@@ -475,26 +478,12 @@ typedef struct g95_namespace {
 extern g95_namespace *g95_current_ns;
 
 
-/* Interfaces are essentially lists of formal argument lists. */
-
-typedef struct g95_interface {
-  interface_type type;
-  g95_namespace *ns;
-  locus defined_at;
-
-  g95_symbol *sym;          /* Symbol associated with arglist */
-
-  g95_formal_arglist *formal;
-  struct g95_interface *next;
-} g95_interface;
-
-
-/* Interfaces being built */
+/* Information on interfaces being built */
 
 typedef struct {
   interface_type type;
-  g95_symbol *generic;
-  g95_namespace *parent_ns;
+  g95_symbol *sym;
+  g95_namespace *ns;
   int op;
 } g95_interface_info;
 
@@ -1148,6 +1137,7 @@ g95_expr *g95_copy_expr(g95_expr *);
 void g95_show_expr(g95_expr *);
 
 int g95_numeric_ts(g95_typespec *);
+g95_expr *g95_int_expr(int);
 int g95_kind_max(g95_expr *, g95_expr *);
 
 /* st.c */
@@ -1180,7 +1170,7 @@ match g95_match_array_spec(g95_array_spec **);
 
 match g95_match_array_ref(g95_array_ref *);
 try g95_resolve_array_ref(g95_array_ref *, g95_array_spec *);
-match g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
+int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
 
 void g95_free_constructor(g95_constructor *);
 match g95_match_array_constructor(g95_expr **);
@@ -1189,15 +1179,11 @@ g95_constructor *g95_copy_constructor(g95_constructor *src);
 
 /* interface.c */
 
-void g95_add_interface(g95_symbol *, g95_formal_arglist *);
-void g95_free_interface(g95_interface *);
-void g95_show_formal_arglist(g95_formal_arglist *);
-void g95_show_interface(g95_interface *);
 match g95_match_interface(void);
 match g95_match_end_interface(void);
 void g95_start_interface(void);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
-try g95_check_interface(g95_interface *, g95_interface *);
+try g95_check_interface(g95_symbol *, g95_symbol *);
 try g95_extend_expr(g95_expr *);
 
 /* select.c */

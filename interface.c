@@ -20,54 +20,46 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-/* interface.c-- Deal with interfaces.  Interfaces amount to a list of
- * formal arguments much like C prototypes and are sufficiently
- * complicated that pictures are worthwhile.  An interface by itself
- * looks like:
+/* interface.c-- Deal with interfaces.  An explicit interface is
+   represented as a singly linked list of formal argument structures
+   attached to the relevant symbols.  For an implicit interface, the
+   arguments don't point to symbols.  Explicit interfaces point to
+   namespaces that contain the symbols within that interface.
 
-       Interface  -->  Namespace
-          |               |
-          v               v
-        Arg 1     -->   Symbol
-          |               |
-          v               v
-        Arg 2     -->   Symbol
+   Implicit interfaces are linked together in a singly linked list
+   along the next_if member of symbol nodes.  Since a particular
+   symbol can only have a single explicit interface, the symbol cannot
+   be part of multiple lists and a single next-member suffices.
 
-A namespace is required because we have to keep track of the names of
-the actual arguments.  The namespace also contains any symbols that
-are derived type names.  Interfaces are pointed to mostly by symbols,
-but intrisic operators associated with namespaces can also point to
-other interfaces.
+   This is not the case for general classes, though.  An operator
+   definition is independent of just about all other uses and has it's
+   own head pointer.
 
-Nameless interfaces:               Generic interfaces/defined operator
 
-                                   Symbol 1 is the generic or operator 
-                                   name, 2 and 3 are specific interfaces.
+Nameless interfaces:
+   Nameless interfaces create unlinked symbols within the current namespace.
 
-   Namespace                        Namespace
-       |                                |
-       v                                v   (via generic member)
-    Symbol  <-->  Interface          Symbol1 ----------+
-       |                                |              |
-    Symbol  <-->  Interface             v              v 
-                                     Symbol2  <-->  Interface
-                                        |              |
-                                        v              v
-                                     Symbol3  <-->  Interface
+Generic interfaces:
+   The generic name points to a linked list of symbols.  Each symbol
+   is an explicit interface.  Each explicit interface has it's own
+   namespace containing the arguments.  Module procedures are symbols in
+   which the interface is added later when the module procedure is parsed.
 
-Intrinsic operator interface
+User operators: 
+   If a symbol is a user-defined operator, the operator member heads up
+   the list of relevant interfaces.
 
-   Namespace ----------+
-      |                |
-      v                v
-    Symbol   <-->  Interface
-      |                |
-      v                v
-    Symbol   <-->  Interface
+Extended intrinsics and assignment:
+   The head of these interface lists are stored in the containing namespace.
+
+Implicit interfaces:
+   An implicit interface is represented as a singly linked list of
+   formal argument list structures that don't point to any symbol
+   nodes-- they just contain types.
 
 
 When a subprogram is defined, the program unit's name points to an
-interface as usual, but the link to the name space is NULL and the
+interface as usual, but the link to the namespace is NULL and the
 formal argument list points to symbols within the same namespace as
 the program unit name.
 
@@ -82,75 +74,6 @@ the program unit name.
  * restored during recursive interfaces. */
 
 g95_interface_info current_interface;
-
-
-/* g95_free_interface()-- Free an interface and everything "below" it. */
-
-void g95_free_interface(g95_interface *p) {
-
-  if (p == NULL) return; 
-
-  g95_free_formal_arglist(p->formal);
-  g95_free_namespace(p->ns);
-  g95_free(p);
-}
-
-
-/* g95_add_interface()-- Add an interface structure to a symbol */
-
-void g95_add_interface(g95_symbol *sym, g95_formal_arglist *formal) {
-g95_interface *interface;
-
-  interface = sym->interface = g95_getmem(sizeof(g95_interface));
-
-  interface->defined_at = *g95_current_locus();
-  interface->formal = formal;
-  interface->sym = sym;
-  interface->type = INTERFACE_NAMELESS;   /* Fixed later if wrong */
-}
-
-
-/* g95_show_formal_arglist()-- Show a formal argument list */
-
-void g95_show_formal_arglist(g95_formal_arglist *formal) {
-
-  g95_status("(");
-
-  for(; formal; formal=formal->next)
-    g95_show_symbol(formal->sym);
-
-  g95_status(")");
-}
-
-
-
-/* g95_show_interface()-- Dump an interface */
-
-void g95_show_interface(g95_interface *ip) {
-g95_formal_arglist *formal;
-
-  g95_status("(interface");
-
-  if (ip != NULL) {
-    g95_status(" ");
-    switch(ip->type) {
-    case INTERFACE_NAMELESS:      g95_status("NAMELESS ");   break;
-    case INTERFACE_GENERIC:       g95_status("GENERIC ");    break;
-    case INTERFACE_INTRINSIC_OP:  g95_status("INTRINSIC ");  break;
-    case INTERFACE_USER_OP:       g95_status("USER ");       break;
-    }	    
-
-    g95_show_namespace(ip->ns);
-    g95_status("(");
-
-    for(formal=ip->formal; formal; formal=formal->next)
-      g95_status((formal==ip->formal) ? "%s" : " %s", formal->sym->name);
-
-    g95_status(")");
-  }
-
-  g95_status(")");
-}
 
 
 /* g95_match_generic_spec()-- Match a generic specification.
@@ -231,13 +154,13 @@ int operator;
     if (g95_add_flavor(&sym->attr, FL_GENERIC, NULL) == FAILURE)
       return MATCH_ERROR;
 
-    current_interface.generic = g95_new_block = sym;
+    current_interface.sym = g95_new_block = sym;
     break;
 
   case INTERFACE_USER_OP:
     if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
-    current_interface.generic = sym;
+    current_interface.sym = sym;
     break;
 
   case INTERFACE_INTRINSIC_OP:
@@ -299,9 +222,9 @@ match m;
    * symbols can be renamed */
 
     if (type != current_interface.type || 
-	strcmp(current_interface.generic->name, name) != 0) {
+	strcmp(current_interface.sym->name, name) != 0) {
       g95_error("Expecting 'END INTERFACE OPERATOR (.%s.)' at %C",
-		current_interface.generic->name);
+		current_interface.sym->name);
       m = MATCH_ERROR;
     }
 
@@ -309,9 +232,9 @@ match m;
 
   case INTERFACE_GENERIC:
     if (type != current_interface.type ||
-	strcmp(current_interface.generic->name, name) != 0) {
+	strcmp(current_interface.sym->name, name) != 0) {
       g95_error("Expecting 'END INTERFACE %s' at %C",
-		current_interface.generic->name);
+		current_interface.sym->name);
       m = MATCH_ERROR;
     }
 
@@ -399,18 +322,19 @@ g95_symbol *s1, *s2;
  * For a generic interface, the interface must be unique within the
  * block.  For an intrinsic operator interface, the interface must not
  * conflict with the intrinsic operator itself and must have the
- * correct number of arguments. */
+ * correct number of arguments.  The 'base' pointer points to the
+ * first symbol node in the list of operators (which might be NULL) */
 
-try g95_check_interface(g95_interface *base, g95_interface *ip) {
+try g95_check_interface(g95_symbol *base, g95_symbol *new) {
 g95_formal_arglist *p, *arg1, *arg2;
 bt t1, t2;
 int args;
 try t;
 
-  for(; base; base=base->next)
-    if (g95_compare_formal_arglist(ip->formal, base->formal) == MATCH_YES) {
+  for(; base; base=base->next_if)
+    if (g95_compare_formal_arglist(new->formal, base->formal) == MATCH_YES) {
       g95_error("Interface ending at %C is the same as the interface at %L",
-		&base->defined_at);
+		&base->declared_at);
 
       return FAILURE;
     }
@@ -419,7 +343,7 @@ try t;
   t1 = BT_UNKNOWN;
   t2 = BT_UNKNOWN;
 
-  for(p=ip->formal; p; p=p->next) {
+  for(p=new->formal; p; p=p->next) {
     if (args == 0) { arg1 = p;  t1 = p->sym->ts.type; }
     if (args == 1) { arg2 = p;  t2 = p->sym->ts.type; }
 
@@ -438,13 +362,13 @@ try t;
 
   case INTERFACE_INTRINSIC_OP:
     if (current_interface.op == INTRINSIC_ASSIGN) {
-      if (!ip->sym->attr.subroutine) {
+      if (!new->attr.subroutine) {
 	g95_error("Assignment operator interface at %C must be a SUBROUTINE");
 	t = FAILURE;
 	break;
       }
     } else {
-      if (!ip->sym->attr.function) {
+      if (!new->attr.function) {
 	g95_error("Intrinsic operator interface at %C must be a FUNCTION");
 	t = FAILURE;
 	break;
@@ -561,17 +485,15 @@ g95_formal_arglist *f;
 }
 
 
-
-
 /* search_interface()-- Given an interface pointer and an actual
  * argument list, search for a formal argument list that matches the
  * actual.  If found, returns a pointer to the symbol of the correct
  * interface.  Returns NULL if not found. */
 
-g95_symbol *search_interface(g95_interface *ip, g95_actual_arglist *actual) {
+g95_symbol *search_interface(g95_symbol *p, g95_actual_arglist *actual) {
 
-  for(; ip; ip=ip->next)
-    if (g95_compare_actual_formal(actual, ip->formal)) return ip->sym;
+  for(; p; p=p->next_if)
+    if (g95_compare_actual_formal(actual, p->formal)) return p;
 
   return NULL;
 }
@@ -587,9 +509,8 @@ g95_symbol *search_interface(g95_interface *ip, g95_actual_arglist *actual) {
 
 try g95_extend_expr(g95_expr *e) {
 g95_actual_arglist *actual;
-g95_interface *ip;
+g95_symbol *ip, *sym;
 g95_namespace *ns;
-g95_symbol *sym;
 int i;
 
   actual = g95_get_actual_arglist();
@@ -616,14 +537,14 @@ int i;
     
   case INTRINSIC_USER:
     i = -1;
-    ip = e->symbol->interface;
+    ip = e->symbol;
     break;
 
   default:
     g95_internal_error("g95_extend_expr(): Bad operator");
   }
     
-  if (i == -1) sym = search_interface(ip, actual);
+  if (i == -1) sym = search_interface(ip->operator, actual);
   else {
     for(ns=g95_current_ns; ns; ns=ns->parent) {
       ip = ns->operator[i];

@@ -942,13 +942,17 @@ g95_state_data s;
   pop_state();
 }
 
+
+
 /* parse_interface()-- Parse an interface.  We must be able to deal
- * with the possibility of recursive interfaces. */
+ * with the possibility of recursive interfaces.  The parse_spec()
+ * subroutine is mutually recursive with parse_interface(). */
+
+static g95_statement parse_spec(g95_statement);
 
 static void parse_interface(void) {
-int seen_body, seen_implicit, seen_decl;
-g95_symbol *progname, *sym;
-g95_interface *base, *ip;
+g95_symbol *progname, *sym, *base;
+int seen_body, new_state;
 g95_interface_info save;
 g95_state_data s1, s2;
 g95_statement st;
@@ -963,127 +967,64 @@ g95_statement st;
   push_state(&s1, COMP_INTERFACE, sym);
 
   seen_body = 0;
-  current_interface.parent_ns = g95_current_ns;
+  current_interface.ns = g95_current_ns;
 
 loop:
-  do {
-    g95_current_ns = g95_get_namespace();
+  g95_current_ns = g95_get_namespace();
+  g95_current_ns->parent = current_interface.ns;
 
-    st = next_statement();
-    switch(st) {
-    case ST_NONE:
-      unexpected_eof();
+  st = next_statement();
+  switch(st) {
+  case ST_NONE:
+    unexpected_eof();
 
-    case ST_SUBROUTINE:
-      push_state(&s2, COMP_SUBROUTINE, g95_new_block);
-      accept_statement(st);
-      progname = g95_new_block;
-      break;
+  case ST_SUBROUTINE:
+    new_state = COMP_SUBROUTINE;
+    break;
 
-    case ST_FUNCTION: 
-      push_state(&s2, COMP_FUNCTION, g95_new_block);
-      accept_statement(st);
-      progname = g95_new_block;
-      break;
+  case ST_FUNCTION: 
+    new_state = COMP_FUNCTION;
+    break;
 
-    case ST_MODULE_PROC:  /* TODO: marked modprocs need to go to parent */
-      seen_body = 1;
-      accept_statement(st);
-      break;
+  case ST_MODULE_PROC:  /* The module procedure matcher makes sure the
+			 * context is correct */
+    seen_body = 1;
+    accept_statement(st);
+    g95_free_namespace(g95_current_ns);
+    goto loop;
 
-    case ST_END_INTERFACE:
-      goto done;
+  case ST_END_INTERFACE:
+    g95_free_namespace(g95_current_ns);
+    g95_current_ns = current_interface.ns;
+    goto done;
 
-    default:
-      g95_error("Unexpected %s statement in INTERFACE block at %C",
-		g95_ascii_statement(st));
-      g95_reject_statement();
-      break;
-    }
-  } while(st != ST_SUBROUTINE && st != ST_FUNCTION);
+  default:
+    g95_error("Unexpected %s statement in INTERFACE block at %C",
+	      g95_ascii_statement(st));
+    g95_reject_statement();
+    g95_free_namespace(g95_current_ns);
+    goto loop;
+  }
+
+  push_state(&s2, new_state, g95_new_block);
+  accept_statement(st);
+  progname = g95_new_block;
+  progname->formal_ns = g95_current_ns;
 
 /* Read data declaration statements */
 
-  seen_implicit = 0;
-  seen_decl = 0;
+ decl:
+  st = parse_spec(ST_NONE);
 
-  do {
-    st = next_statement();
-    switch(st) {
-    case ST_NONE:
-      unexpected_eof();
-
-    case ST_USE:
-      if (seen_implicit) {
-	g95_error("USE statement at %C follows previous IMPLICIT statement");
-	break;
-      }
-
-      if (seen_decl) {
-	g95_error("USE statement at %C follows previous data specification");
-	break;
-      }
-
-      accept_statement(st);
-      break;
-
-    case ST_IMPLICIT_NONE:
-      if (seen_decl) {
-	g95_error("IMPLICIT NONE at %C follows previous data specification");
-	break;
-      }
-
-      seen_implicit = 1;
-      accept_statement(st);
-      break;
-
-    case ST_IMPLICIT:
-      if (seen_decl) {
-	g95_error("IMPLICIT at %C follows previous data specification");
-	break;
-      }
-
-      seen_implicit = 1;
-      accept_statement(st);
-      break;
-
-    case ST_END_SUBROUTINE:
-    case ST_END_FUNCTION:
-      pop_state();
-      break;
-
-    case ST_DERIVED_DECL:
-      seen_decl = 1;
-      parse_derived();
-      break;
-
-    case ST_INTERFACE:
-      seen_decl = 1;
-      parse_interface();
-      current_interface = save;
-      break;
-
-    case ST_ATTR_DECL:
-    case ST_DATA_DECL:
-    case ST_COMMON:
-      seen_decl = 1;
-      accept_statement(st);
-      break;
-
-    default:
-      g95_error("Unexpected %s statement at %C in the body\n"
-		"       of an INTERFACE", g95_ascii_statement(st));
-      g95_reject_statement();
-      break;
-    }
-
-  } while(st != ST_END_SUBROUTINE && st != ST_END_FUNCTION);
+  if (st != ST_END_SUBROUTINE && st != ST_END_FUNCTION) {
+    g95_error("Unexpected %s statement at %C in INTERFACE body",
+	      g95_ascii_statement(st));
+    g95_reject_statement();
+    goto decl;
+  }
 
   seen_body = 1;
 
-  ip = progname->interface;
-  ip->type = current_interface.type;
-  ip->ns = g95_current_ns;
   g95_set_sym_defaults(g95_current_ns);
 
 /* Make sure this interface is unique within its block */
@@ -1094,49 +1035,55 @@ loop:
     break;
 
   case INTERFACE_INTRINSIC_OP:
-    base = current_interface.parent_ns->operator[current_interface.op];
+    base = current_interface.ns->operator[current_interface.op];
     break;
 
   case INTERFACE_GENERIC:
+    base = current_interface.sym->generic;
+    break;
+    
   case INTERFACE_USER_OP:
-    base = current_interface.generic->interface;
+    base = current_interface.sym->operator;
     break;
   }
 
-  if (g95_check_interface(base, ip) == FAILURE)
-    g95_free_interface(ip);
-  else {    /* Attach the interface to the current block */
-
+  if (g95_check_interface(base, progname) == SUCCESS) {
     switch(current_interface.type) {
     case INTERFACE_NAMELESS:
       break;
 
     case INTERFACE_INTRINSIC_OP:
-      ip->next = current_interface.parent_ns->operator[current_interface.op];
-      current_interface.parent_ns->operator[current_interface.op] = ip;
+      progname->next_if =
+	current_interface.ns->operator[current_interface.op];
+
+      current_interface.ns->operator[current_interface.op] = progname;
+      break;
+
+    case INTERFACE_USER_OP:
+      progname->next_if = current_interface.sym->operator;
+      current_interface.sym->operator = progname;
       break;
 
     case INTERFACE_GENERIC:
-    case INTERFACE_USER_OP:
-      ip->next = current_interface.generic->generic;
-      current_interface.generic->generic = ip;
+      progname->next_if = current_interface.sym->generic;
+      current_interface.sym->generic = progname;
       break;
     }
   }
 
+  pop_state();
   goto loop;
 
 done:
   if (!seen_body) g95_error("INTERFACE block at %C is empty");
-
-  g95_current_ns = current_interface.parent_ns;
+  current_interface = save;
 
   pop_state();
 }
 
 
 /* parse_spec()-- Parse a set of specification statements.  Returns
- * the statement that doesn't fit */
+ * the statement that doesn't fit. */
 
 static g95_statement parse_spec(g95_statement st) {
 st_state ss;
@@ -1149,11 +1096,13 @@ loop:
   case ST_NONE:
     unexpected_eof();
 
-  case ST_USE:
-  case ST_IMPLICIT_NONE:     case ST_IMPLICIT:
-  case ST_PARAMETER:         case ST_DATA:
-  case ST_PUBLIC:            case ST_PRIVATE:
-  case ST_FORMAT:            case ST_ENTRY:
+  case ST_FORMAT: case ST_ENTRY: case ST_DATA: /* Not allowed in interfaces */
+    if (g95_current_state() == COMP_INTERFACE) break;
+
+    /* Fall through */
+
+  case ST_USE:           case ST_IMPLICIT_NONE:   case ST_IMPLICIT:
+  case ST_PARAMETER:     case ST_PUBLIC:          case ST_PRIVATE:
   case ST_DERIVED_DECL:
   case_decl:
     if (verify_st_order(&ss, st) == FAILURE) {

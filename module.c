@@ -996,7 +996,7 @@ void mio_namespace(g95_namespace *ns) {
 
 
 
-static void mio_interface(g95_interface **p) {
+static void mio_interface(g95_symbol **p) {
 
 
 }
@@ -1341,7 +1341,6 @@ static void mio_symbol(g95_symbol *sym) {
   mio_typespec(&sym->ts);
 
   mio_interface(&sym->operator);
-  mio_interface(&sym->interface);
   mio_interface(&sym->generic);
 
   mio_expr(&sym->value);
