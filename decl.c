@@ -1841,6 +1841,8 @@ match m;
     return MATCH_ERROR;
   }
 
+  g95_match(" ::");
+
   for(;;) { 
     m = g95_match(" %s", &sym);
     switch(m) {
