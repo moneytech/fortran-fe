@@ -1758,7 +1758,7 @@ char *p;
 
 
 static void mio_gmp_real(mpf_t *real) {
-int exponent;
+mp_exp_t exponent;
 char *p;
 
   if (iomode == IO_INPUT) {
@@ -1769,10 +1769,10 @@ char *p;
     g95_free(atom_string);
 
   } else {
-    p = mpf_get_str(NULL, (mp_exp_t *) &exponent, 16, 0, *real);
+    p = mpf_get_str(NULL, &exponent, 16, 0, *real);
     atom_string = g95_getmem(strlen(p) + 20);
 
-    sprintf(atom_string, "0.%s@%d", p, exponent);
+    sprintf(atom_string, "0.%s@%ld", p, exponent);
     write_atom(ATOM_STRING, atom_string);
 
     g95_free(atom_string);
