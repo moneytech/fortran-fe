@@ -254,10 +254,10 @@ void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
 }
 
 
+void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
+			 g95_expr *pad, g95_expr *order) {
 
-void g95_resolve_reshape(g95_expr *f) {
-  /* Help me */
-
+  f->ts = source->ts;
 }
 
 

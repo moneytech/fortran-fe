@@ -217,7 +217,8 @@ void g95_resolve_max(g95_expr *, g95_expr *);
 void g95_resolve_maxval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_min(g95_expr *, g95_expr *);
 void g95_resolve_minval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
-void g95_resolve_reshape(g95_expr *);
+void g95_resolve_reshape(g95_expr *, g95_expr *, g95_expr *, g95_expr *,
+			 g95_expr *);
 void g95_resolve_set_exponent(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_scale(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_shape(g95_expr *, g95_expr *);

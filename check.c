@@ -130,7 +130,7 @@ static try logical_array_check(g95_expr *array, int n) {
 
 static try array_check(g95_expr *e, int n) {
 
-  if (e->rank == 0) return SUCCESS;
+  if (e->rank != 0) return SUCCESS;
 
   must_be(e, n, "an array");
 
@@ -1034,7 +1034,12 @@ try g95_check_size(g95_expr *array, g95_expr *dim) {
 
   if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
+  if (dim != NULL) {
+    if (type_check(dim, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+    if (kind_value_check(dim, 1, g95_default_integer_kind()) == FAILURE)
+      return FAILURE;
+  }
 
   return SUCCESS;
 }
