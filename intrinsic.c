@@ -1664,17 +1664,6 @@ static void resolve_intrinsic(g95_intrinsic_sym *specific, g95_expr *e) {
 g95_expr *a1, *a2, *a3, *a4, *a5;
 g95_actual_arglist *arg;
 
-  /* The rank of an elemental is the rank of its array argument(s) */
-
-  if ((e->value.function.actual != NULL) && specific->elemental) {
-    for(arg=e->value.function.actual; arg; arg=arg->next) {
-      if (arg->expr != NULL && arg->expr->rank > 0) {
-	e->rank = arg->expr->rank;
-	break;
-      }
-    }
-  }
-
   if (specific->resolve == NULL) {
     if (e->value.function.name == NULL)
       e->value.function.name = specific->lib_name;
@@ -1686,8 +1675,10 @@ g95_actual_arglist *arg;
   arg = e->value.function.actual;
 
 /* At present only the iargc extension intrinsic takes no arguments,
- * and it doesn't need a resolution function, but this is here for generality */
-  if ( arg == NULL ) {
+ * and it doesn't need a resolution function, but this is here for
+ * generality */
+
+  if (arg == NULL) {
     (*specific->resolve)(e);
     return;
   }

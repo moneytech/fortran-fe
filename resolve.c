@@ -573,6 +573,7 @@ g95_typespec ts;
  * to INTENT(OUT) or INTENT(INOUT).  */
 
 static try resolve_function(g95_expr *expr) {
+g95_actual_arglist *arg;
 char *name;
 int flag;
 try t;
@@ -613,8 +614,17 @@ try t;
 	((expr->value.function.esym != NULL &&
 	  expr->value.function.esym->attr.elemental) ||
 	 (expr->value.function.isym != NULL &&
-	  expr->value.function.isym->elemental)))
-      expr->rank = expr->value.function.actual->expr->rank;
+	  expr->value.function.isym->elemental))) {
+
+      /* The rank of an elemental is the rank of its array argument(s) */
+
+      for(arg=expr->value.function.actual; arg; arg=arg->next) {
+	if (arg->expr != NULL && arg->expr->rank > 0) {
+	  expr->rank = arg->expr->rank;
+	  break;
+	}
+      }
+    }
 
     if (g95_pure(NULL)) {
       if (expr->value.function.esym) {
