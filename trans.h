@@ -46,6 +46,9 @@ typedef struct g95_se
      Only applies to EXPR_VARIABLE nodes.  */
   unsigned want_pointer:1;
 
+  /* An array function call returning without a temporary.  */
+  unsigned direct_byref:1;
+
   /* Scalarization parameters.  */
   struct g95_se *parent;
   struct g95_ss *ss;
@@ -109,6 +112,13 @@ typedef struct g95_ss
       tree string_length;
     } scalar;
 
+    /* G95_SS_TEMP.  */
+    struct
+    {
+      int dimen;
+      tree type;
+      tree string_length;
+    } temp;
     /* All other types.  */
     g95_ss_info info;
   } data;
@@ -213,6 +223,9 @@ void g95_conv_simple_reference (g95_se *, g95_expr *);
 
 /* Intrinsic function handling.  */
 void g95_conv_intrinsic_function (g95_se *, g95_expr *);
+
+/* Does an intrinsic map directly to an external library call.  */
+int g95_is_intrinsic_libcall (g95_expr *);
 
 /* Also used to CALL subroutines.  */
 void g95_conv_function_call (g95_se *, g95_symbol *, g95_actual_arglist *);

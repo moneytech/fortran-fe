@@ -728,6 +728,11 @@ g95_sym_type (g95_symbol * sym)
       return TREE_TYPE (sym->backend_decl);
   }
 
+  /* The frontend doesn't set all the attributes for a function with an
+     explicit result value, so we use that instead when present.  */
+  if (sym->attr.function && sym->result)
+    sym = sym->result;
+
   type = g95_typenode_for_spec (&sym->ts);
 
   if (sym->ts.type == BT_CHARACTER)
@@ -845,6 +850,14 @@ g95_get_derived_type (g95_symbol * derived)
 int
 g95_return_by_reference (g95_symbol * sym)
 {
+  if (sym->attr.subroutine)
+    return 0;
+
+  assert (sym->attr.function);
+
+  if (sym->result)
+    sym = sym->result;
+
   if (sym->attr.dimension)
     return 1;
 
@@ -858,8 +871,11 @@ g95_return_by_reference (g95_symbol * sym)
 tree
 g95_get_function_type (g95_symbol * sym)
 {
-  tree type, typelist;
+  tree type;
+  tree typelist;
   g95_formal_arglist *f;
+  g95_symbol *arg;
+
   /* make sure this symbol is a function or a subroutine.  */
   assert (sym->attr.function || sym->attr.subroutine);
 
@@ -871,21 +887,26 @@ g95_get_function_type (g95_symbol * sym)
      return value.  */
   if (g95_return_by_reference (sym))
     {
-      type = build_reference_type (g95_sym_type (sym));
+      if (sym->result)
+        arg = sym->result;
+      else
+        arg = sym;
+      type = build_reference_type (g95_sym_type (arg));
       typelist = chainon (typelist, listify (type));
     }
   /* Build the argument types for the function */
   for (f = sym->formal; f; f = f->next)
     {
-      if (f->sym)
+      arg = f->sym;
+      if (arg)
         {
-          if (f->sym->attr.function || f->sym->attr.subroutine)
+          if (arg->attr.function || arg->attr.subroutine)
             {
-              type = g95_get_function_type (f->sym);
+              type = g95_get_function_type (arg);
               type = build_pointer_type (type);
             }
           else
-            type = g95_sym_type (f->sym);
+            type = g95_sym_type (arg);
 
           /* Parameter Passing Convention
 
@@ -898,10 +919,11 @@ g95_get_function_type (g95_symbol * sym)
              generate bad code.  Worse there would be no way of telling that
              this code wad bad, except that it would give incorrect results.
 
-             Module and contained procedures could pass by value as these are
-             never used without an explicit interface.
+             Contained procedures could pass by value as these are never
+             used without an explicit interface, and connot be passed as
+             actual parameters for a dummy procedure.
            */
-          if (f->sym->ts.type == BT_CHARACTER)
+          if (arg->ts.type == BT_CHARACTER)
             typelist = chainon (typelist, listify (g95_strlen_type_node));
           typelist = chainon (typelist, listify (type));
         }

@@ -133,7 +133,7 @@ g95_conv_intrinsic_function_args (g95_se * se, g95_expr * expr)
   return args;
 }
 
-/* Conversions between different types are outputed by the frontend as
+/* Conversions between different types are output by the frontend as
    intrinsic functions.  We implement these directly.  */
 static void
 g95_conv_intrinsic_conversion (g95_se * se, g95_expr * expr)
@@ -724,8 +724,26 @@ g95_get_symbol_for_expr (g95_expr * expr)
     }
 
   /* TODO: proper argument lists for external intrinsics.  */
-  /* TODO: free symbol for external intrinsic.  */
   return sym;
+}
+
+/* Generate a call to an external intrinsic function.  */
+static void
+g95_conv_intrinsic_funcall (g95_se * se, g95_expr * expr)
+{
+  g95_symbol *sym;
+
+  assert (! se->ss
+          || se->ss->expr == expr);
+
+  if (se->ss)
+    assert (expr->rank > 0);
+  else
+    assert (expr->rank == 0);
+
+  sym = g95_get_symbol_for_expr (expr);
+  g95_conv_function_call (se, sym, expr->value.function.actual);
+  g95_free (sym);
 }
 
 /* ANY and ALL intrinsics. ANY->op == NE_EXPR, ALL->op == EQ_EXPR.
@@ -760,18 +778,14 @@ g95_conv_intrinsic_anyall (g95_se * se, g95_expr * expr, int op)
   g95_actual_arglist *actual;
   g95_ss *arrayss;
   g95_se arrayse;
-  g95_symbol *sym;
 
-  actual = expr->value.function.actual;
   if (se->ss)
     {
-      assert (se->ss->expr == expr);
-
-      sym = g95_get_symbol_for_expr (expr);
-      g95_conv_function_call (se, sym, actual);
+      g95_conv_intrinsic_funcall (se, expr);
       return;
     }
 
+  actual = expr->value.function.actual;
   type = g95_typenode_for_spec (&expr->ts);
   /* Initialize the result.  */
   resvar = create_tmp_var (type, "test");
@@ -852,18 +866,14 @@ g95_conv_intrinsic_count (g95_se * se, g95_expr * expr)
   g95_actual_arglist *actual;
   g95_ss *arrayss;
   g95_se arrayse;
-  g95_symbol *sym;
-
-  actual = expr->value.function.actual;
 
   if (se->ss)
     {
-      assert (se->ss->expr == expr);
-
-      sym = g95_get_symbol_for_expr (expr);
-      g95_conv_function_call (se, sym, actual);
+      g95_conv_intrinsic_funcall (se, expr);
       return;
     }
+
+  actual = expr->value.function.actual;
 
   type = g95_typenode_for_spec (&expr->ts);
   /* Initialize the result.  */
@@ -929,14 +939,10 @@ g95_conv_intrinsic_arith (g95_se * se, g95_expr * expr, int op)
   g95_se maskse;
   g95_expr *arrayexpr;
   g95_expr *maskexpr;
-  g95_symbol *sym;
 
   if (se->ss)
     {
-      assert (se->ss->expr == expr);
-
-      sym = g95_get_symbol_for_expr (expr);
-      g95_conv_function_call (se, sym, expr->value.function.actual);
+      g95_conv_intrinsic_funcall (se, expr);
       return;
     }
 
@@ -1048,7 +1054,6 @@ g95_conv_intrinsic_minmaxloc (g95_se * se, g95_expr * expr, int op)
   g95_se maskse;
   g95_expr *arrayexpr;
   g95_expr *maskexpr;
-  g95_symbol *sym;
   tree pos;
   tree body;
   tree body_tail;
@@ -1056,10 +1061,7 @@ g95_conv_intrinsic_minmaxloc (g95_se * se, g95_expr * expr, int op)
 
   if (se->ss)
     {
-      assert (se->ss->expr == expr);
-
-      sym = g95_get_symbol_for_expr (expr);
-      g95_conv_function_call (se, sym, expr->value.function.actual);
+      g95_conv_intrinsic_funcall (se, expr);
       return;
     }
 
@@ -1213,15 +1215,11 @@ g95_conv_intrinsic_minmaxval (g95_se * se, g95_expr * expr, int op)
   g95_se maskse;
   g95_expr *arrayexpr;
   g95_expr *maskexpr;
-  g95_symbol *sym;
   int n;
 
   if (se->ss)
     {
-      assert (se->ss->expr == expr);
-
-      sym = g95_get_symbol_for_expr (expr);
-      g95_conv_function_call (se, sym, expr->value.function.actual);
+      g95_conv_intrinsic_funcall (se, expr);
       return;
     }
 
@@ -1668,6 +1666,13 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
   assert (strncmp (expr->value.function.name, "__", 2) == 0);
   name = &expr->value.function.name[2];
 
+  if (expr->rank > 0
+      && g95_is_intrinsic_libcall (expr))
+    {
+      g95_conv_intrinsic_funcall (se, expr);
+      return;
+    }
+
   switch (expr->value.function.isym->generic_id)
     {
     case G95_ISYM_NONE:
@@ -1686,7 +1691,6 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_CPU_TIME:
     case G95_ISYM_CSHIFT:
     case G95_ISYM_DATE_AND_TIME:
-    case G95_ISYM_DOT_PRODUCT:
     case G95_ISYM_EOSHIFT:
     case G95_ISYM_EXPONENT:
     case G95_ISYM_FLOOR:
@@ -1698,7 +1702,6 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_LGT:
     case G95_ISYM_LLE:
     case G95_ISYM_LLT:
-    case G95_ISYM_MATMUL:
     case G95_ISYM_MERGE:
     case G95_ISYM_MOD:
     case G95_ISYM_MODULO:
@@ -1860,6 +1863,11 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
       g95_conv_intrinsic_bound (se, expr, 1);
       break;
 
+    case G95_ISYM_DOT_PRODUCT:
+    case G95_ISYM_MATMUL:
+      g95_conv_intrinsic_funcall (se, expr);
+      break;
+
     default:
       g95_conv_intrinsic_lib_function (se, expr);
       break;
@@ -1885,8 +1893,8 @@ g95_add_intrinsic_ss_code (g95_loopinfo * loop ATTRIBUTE_UNUSED, g95_ss * ss)
   return;
 }
 
-/* UBOUND and LBOUND intrinsics with one parameter are expanded into a case
-   statement inside the scalarization loop.  */
+/* UBOUND and LBOUND intrinsics with one parameter are expanded into code
+   inside the scalarization loop.  */
 static g95_ss *
 g95_walk_intrinsic_bound (g95_ss * ss, g95_expr * expr)
 {
@@ -1904,14 +1912,13 @@ g95_walk_intrinsic_bound (g95_ss * ss, g95_expr * expr)
   return newss;
 }
 
+/* Walk an intrinsic array libcall.  */
 static g95_ss *
 g95_walk_intrinsic_libfunc (g95_ss * ss, g95_expr * expr)
 {
   g95_ss *newss;
 
-  /* Pass the scalar version back.  */
-  if (expr->rank == 0)
-    return ss;
+  assert (expr->rank > 0);
 
   newss = g95_get_ss ();
   newss->type = G95_SS_FUNCTION;
@@ -1919,6 +1926,35 @@ g95_walk_intrinsic_libfunc (g95_ss * ss, g95_expr * expr)
   newss->next = ss;
 
   return newss;
+}
+
+/* Returns true if the specified intrinsic function call maps directly to a
+   an external library call.  Should only be used for functions that return
+   arrays.  */
+int
+g95_is_intrinsic_libcall (g95_expr * expr)
+{
+  assert (expr->expr_type == EXPR_FUNCTION
+          && expr->value.function.isym);
+  assert (expr->rank > 0);
+
+  switch (expr->value.function.isym->generic_id)
+    {
+    case G95_ISYM_ALL:
+    case G95_ISYM_ANY:
+    case G95_ISYM_COUNT:
+    case G95_ISYM_MATMUL:
+    case G95_ISYM_MAXLOC:
+    case G95_ISYM_MAXVAL:
+    case G95_ISYM_MINLOC:
+    case G95_ISYM_MINVAL:
+    case G95_ISYM_PRODUCT:
+    case G95_ISYM_SUM:
+      return 1;
+
+    default:
+      return 0;
+    }
 }
 
 /* Walk an intrinsic function.  */
@@ -1931,28 +1967,18 @@ g95_walk_intrinsic_function (g95_ss * ss, g95_expr * expr,
   if (isym->elemental)
     return g95_walk_elemental_function_args (ss, expr, G95_SS_SCALAR);
 
+  if (expr->rank == 0)
+    return ss;
+
+  if (g95_is_intrinsic_libcall (expr))
+    return g95_walk_intrinsic_libfunc (ss, expr);
+
   /* Special cases.  */
   switch (isym->generic_id)
     {
     case G95_ISYM_LBOUND:
     case G95_ISYM_UBOUND:
       return g95_walk_intrinsic_bound (ss, expr);
-
-    case G95_ISYM_ALL:
-    case G95_ISYM_ANY:
-    case G95_ISYM_COUNT:
-    case G95_ISYM_MAXLOC:
-    case G95_ISYM_MAXVAL:
-    case G95_ISYM_MINLOC:
-    case G95_ISYM_MINVAL:
-    case G95_ISYM_PRODUCT:
-    case G95_ISYM_SUM:
-      return g95_walk_intrinsic_libfunc (ss, expr);
-      break;
-
-    case G95_ISYM_LEN:
-      /* Returns a single scalar value.  Pass it back.  */
-      return ss;
 
     default:
       /* Many of these can probably be handled in the same way as normal

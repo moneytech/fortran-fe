@@ -880,6 +880,8 @@ g95_add_loop_ss_code (g95_loopinfo * loop, g95_ss * ss)
 
   for (; ss != g95_ss_terminator; ss = ss->loop_chain)
     {
+      assert (ss);
+
       switch (ss->type)
         {
         case G95_SS_SCALAR:
@@ -2127,9 +2129,82 @@ g95_is_same_range (g95_array_ref * ar1, g95_array_ref * ar2, int n, int def)
   return 0;
 }
 
-/* Return true if the statement body redefines the condition.  Used for forall
-   and where statements.  Returns true if expr2 depends on expr1.  expr1
-   should be a single term suitable for the lhs of an assignment.  */
+/* Dependancy checking for direct function return by reference.  Returns true
+   if the arguments of the function depend on the destination.  This is
+   considerably less conservative than other dependancies because many
+   function arguments will already be copied into a temporary.  */
+int
+g95_check_fncall_dependancy (g95_expr * dest, g95_expr * fncall)
+{
+  g95_actual_arglist *actual;
+  g95_ref *ref;
+  g95_expr *expr;
+  int n;
+
+  assert (dest->expr_type == EXPR_VARIABLE
+          && fncall->expr_type == EXPR_FUNCTION);
+  assert (fncall->rank > 0);
+
+  for (actual = fncall->value.function.actual; actual; actual = actual->next)
+    {
+      expr = actual->expr;
+
+      /* Skip args which are not present.  */
+      if (! expr)
+        continue;
+
+      /* Non-variable expressions will be allocated temporaries anyway.  */
+      switch (expr->expr_type)
+        {
+        case EXPR_VARIABLE:
+          if (expr->rank > 1)
+            {
+              /* This is an array section.  */
+              for (ref = expr->ref; ref; ref = ref->next)
+                {
+                  if (ref->type == REF_ARRAY
+                      && ref->u.ar.type != AR_ELEMENT)
+                    break;
+                }
+              assert (ref);
+              /* AR_FULL can't contain vector subscripts.  */
+              if (ref->u.ar.type == AR_SECTION)
+                {
+                  for (n = 0; n < ref->u.ar.dimen; n++)
+                    {
+                      if (ref->u.ar.dimen_type[n] == DIMEN_VECTOR)
+                        break;
+                    }
+                  /* Vector subscript array sections will be copied to a
+                     temporary.  */
+                  if (n != ref->u.ar.dimen)
+                    continue;
+                }
+            }
+
+          if (g95_check_dependancy (dest, actual->expr, NULL, 0))
+            return 1;
+          break;
+
+        case EXPR_ARRAY:
+          if (g95_check_dependancy (dest, expr, NULL, 0))
+            return 1;
+          break;
+
+        default:
+          break;
+        }
+    }
+
+  return 0;
+}
+
+/* Return true if the statement body redefines the condition.  Returns true if
+   expr2 depends on expr1.  expr1 should be a single term suitable for the lhs
+   of an assignment.  The symbols listed in VARS must be considered to have
+   all possible values. All other scalar variables may be considered constant.
+   Used for forall and where statements.  Also used with functions returning
+   arrays without a temporary.  */
 int
 g95_check_dependancy (g95_expr * expr1, g95_expr * expr2, g95_expr ** vars,
                       int nvars)
@@ -2139,7 +2214,7 @@ g95_check_dependancy (g95_expr * expr1, g95_expr * expr2, g95_expr ** vars,
   g95_actual_arglist *actual;
 
   assert (expr1->expr_type == EXPR_VARIABLE);
-  /* -fassume-no-pointer-aliasing */
+  /* TODO: -fassume-no-pointer-aliasing */
   if (expr1->symbol->attr.pointer)
     return 1;
   for (ref = expr1->ref; ref; ref = ref->next)
@@ -2349,8 +2424,11 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
     {
       loop->temp_ss = g95_get_ss();
       loop->temp_ss->type = G95_SS_TEMP;
-      loop->temp_ss->data.info.descriptor = dest->data.info.descriptor;
-      loop->temp_ss->data.info.dimen = temp_dim;
+      loop->temp_ss->data.temp.type =
+        g95_get_element_type (TREE_TYPE (dest->data.info.descriptor));
+      loop->temp_ss->data.temp.string_length =
+        g95_conv_string_length (dest->data.info.descriptor);
+      loop->temp_ss->data.temp.dimen = temp_dim;
       loop->temp_ss->next = g95_ss_terminator;
       g95_add_ss_to_loop (loop, loop->temp_ss);
     }
@@ -2455,15 +2533,15 @@ g95_conv_loop_setup (g95_loopinfo * loop)
   /* If we want a temporary then create it.  */
   if (loop->temp_ss != NULL)
     {
-
       assert (loop->temp_ss->type == G95_SS_TEMP);
-      tmp = loop->temp_ss->data.info.descriptor;
-      len = g95_conv_string_length (tmp);
-
-      g95_trans_allocate_temp_array (loop, &loop->temp_ss->data.info,
-          g95_get_element_type (TREE_TYPE (tmp)), len);
-
+      tmp = loop->temp_ss->data.temp.type;
+      len = loop->temp_ss->data.temp.string_length;
+      n = loop->temp_ss->data.temp.dimen;
+      memset (&loop->temp_ss->data.info, 0, sizeof(g95_ss_info));
       loop->temp_ss->type = G95_SS_SECTION;
+      loop->temp_ss->data.info.dimen = n;
+      g95_trans_allocate_temp_array (loop, &loop->temp_ss->data.info,
+                                     tmp, len);
     }
 
   g95_add_loop_ss_code (loop, loop->ss);
@@ -3375,7 +3453,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
           if (n == 0)
             tmp = integer_one_node;
           else
-            tmp = strides[n - 1];
+            tmp = strides[n];
           tmp = build (MULT_EXPR, g95_array_index_type, tmp, lbound[n]);
           tmp = g95_simple_fold (tmp, &repack_stmt, &pack_tail,
                                 (n == 0) ? &offsetvar : &tmpvar);
@@ -3556,11 +3634,14 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
   if (need_tmp)
     {
       /* Tell the scalarizer to make a temporary.  */
+      if (expr->ts.type == BT_CHARACTER)
+        g95_todo_error ("Passing character string expressions");
       loop.temp_ss = g95_get_ss ();
       loop.temp_ss->type = G95_SS_TEMP;
       loop.temp_ss->next = g95_ss_terminator;
-      loop.temp_ss->data.info.descriptor = secss->data.info.descriptor;
-      loop.temp_ss->data.info.dimen = loop.dimen;
+      loop.temp_ss->data.temp.type = g95_typenode_for_spec (&expr->ts);
+      loop.temp_ss->data.temp.string_length = NULL;
+      loop.temp_ss->data.temp.dimen = loop.dimen;
       g95_add_ss_to_loop (&loop, loop.temp_ss);
     }
 

@@ -1,3 +1,27 @@
+2002-09-10  Paul Brook  <paul@nowt.org>
+
+	* trans-array.c: Change format of G95_SS_TEMP strictures.
+	(g95_check_fncall_dependancy): New function.
+	(trans_dummy_array_bias): stride[n], not stride[n-1]. for calculating
+	offsets.
+	* trans-decl.c (g95_get_symbol_decl): move assertion after handling of
+	result variables.
+	(g95_build_function_decl): Don't assume result arrays are packed.
+	(g95_trans-deferred-vars): Handle array result variables.
+	(g95_generate_fuction_code): Clear saved_function_decls.
+	* trans-expr.c (g95_conv_fnction_call): Handle direct array return by
+	reference.
+	(g95_trans_arrayfunc_assign): New function.
+	(g95_trans_assignment): Use it.
+	* trans.h (g95_ss): Add temp struct for G95_SS_TEMP.
+	(g95_se): Add direct_byref.
+	* trans-types.c: Use sym->result rather than sym where appropriate.
+	* trans-intrinsic.c (g95_conv_intrinsic_funcall): New function.
+	Update other functions to use this.
+	(g95_is_intrinsic_libcall): New function.
+	(g95_conv_intrinsic_function): Add MATMUL and PRODUCT intrinsics.
+	(g95_walk_intrinsic_function): Ditto.
+
 2002-09-08  Paul Brook  <paul@nowt.org>
 
 	* trans-types.c: Change rank field to dtype field in array descriptor.

@@ -1074,7 +1074,8 @@ g95_conv_function_val (g95_se * se, g95_symbol * sym)
     }
 }
 
-/* Generate code for a procedure call.  Note can return se->post != NULL.  */
+/* Generate code for a procedure call.  Note can return se->post != NULL.
+   If se->direct_byref is set then se->expr contains the return parameter.  */
 void
 g95_conv_function_call (g95_se * se, g95_symbol * sym,
                         g95_actual_arglist * arg)
@@ -1128,27 +1129,33 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   byref = g95_return_by_reference (sym);
   if (byref)
     {
-      /* Currently we only return arrays be reference, but we may
-         need to do derived types as well.  */
+      /* Currently we only return arrays by reference, but we may
+         need to do derived types and character strings as well.  */
       if (! sym->attr.dimension)
         abort();
-      assert (se->loop && se->ss);
-      /* Set the type of the array.  */
-      tmp = g95_typenode_for_spec (&sym->ts);
-      info->dimen = se->loop->dimen;
-      /* Allocate a temporary to store the result.  */
-      g95_trans_allocate_temp_array (se->loop, info, tmp, NULL_TREE);
 
-      /* Zero the first stride to indicate a temporary.  */
-      tmp = g95_conv_descriptor_stride (info->descriptor, g95_rank_cst[0]);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, integer_zero_node);
-      stmt = build_stmt (EXPR_STMT, tmp);
-      g95_add_stmt_to_pre (se, stmt, stmt);
-      /* Pass the temporary as the first argument.  */
-      tmp = info->descriptor;
-      tmp = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (tmp)), tmp);
-      tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
-      arglist = g95_chainon_list (arglist, tmp);
+      if (se->direct_byref)
+        arglist = g95_chainon_list (arglist, se->expr);
+      else
+        {
+          assert (se->loop && se->ss);
+          /* Set the type of the array.  */
+          tmp = g95_typenode_for_spec (&sym->ts);
+          info->dimen = se->loop->dimen;
+          /* Allocate a temporary to store the result.  */
+          g95_trans_allocate_temp_array (se->loop, info, tmp, NULL_TREE);
+
+          /* Zero the first stride to indicate a temporary.  */
+          tmp = g95_conv_descriptor_stride (info->descriptor, g95_rank_cst[0]);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, integer_zero_node);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (se, stmt, stmt);
+          /* Pass the temporary as the first argument.  */
+          tmp = info->descriptor;
+          tmp = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (tmp)), tmp);
+          tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
+          arglist = g95_chainon_list (arglist, tmp);
+        }
     }
 
   /* Evaluate the arguments.  */
@@ -1204,7 +1211,7 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   if (! sym->attr.pure)
     TREE_SIDE_EFFECTS (se->expr) = 1;
 
-  if (byref)
+  if (byref && ! se->direct_byref)
     {
       stmt = build_stmt (EXPR_STMT, se->expr);
       g95_add_stmt_to_pre (se, stmt, stmt);
@@ -1230,7 +1237,6 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
 }
 
 /* Translate a function expression.  */
-/* TODO: dummy function arguments.  */
 static void
 g95_conv_function_expr (g95_se * se, g95_expr * expr)
 {
@@ -1386,6 +1392,53 @@ g95_trans_scalar_assign (g95_se * lse, g95_se * rse, bt type)
     }
 }
 
+/* Try to translate array(:) = func (...), where func is a transformational
+   array function, without using a temporary.  Returns NULL is this isn't the
+   case.  */
+static tree
+g95_trans_arrayfunc_assign (g95_expr * expr1, g95_expr * expr2)
+{
+  g95_se se;
+  g95_ss *ss;
+  tree stmt;
+  /* The caller has already checked rank>0 and expr_type == EXPR_FUNCTION.  */
+
+  /* Elemental functions don't need a temporary anyway.  */
+  if (expr2->symbol->attr.elemental)
+    return NULL;
+
+  if (expr2->value.function.isym
+      && ! g95_is_intrinsic_libcall (expr2))
+    return NULL;
+
+  /* Check for a dependancy.  */
+  if (g95_check_fncall_dependancy (expr1, expr2))
+    return NULL;
+
+  /* The frontend doesn't seem to bother filling in expr->symbol for intrinsic
+     functions.  */
+  assert (expr2->value.function.isym ||
+          g95_return_by_reference (expr2->symbol));
+
+  g95_start_stmt ();
+
+  ss = g95_walk_expr (g95_ss_terminator, expr1);
+  assert (ss != g95_ss_terminator);
+  g95_init_se (&se, NULL);
+  g95_conv_array_parameter (&se, expr1, ss);
+
+  se.direct_byref = 1;
+  se.ss = g95_walk_expr (g95_ss_terminator, expr2);
+  assert (se.ss != g95_ss_terminator);
+  g95_conv_function_expr (&se, expr2);
+  stmt = build_stmt (EXPR_STMT, se.expr);
+  g95_add_stmt_to_pre (&se, stmt, stmt);
+  g95_add_stmt_to_pre (&se, se.post, se.post_tail);
+  stmt = g95_finish_stmt (se.pre, se.pre_tail);
+
+  return stmt;
+}
+
 /* Translate an assignment.  Most of the code is concerned with
    setting up the scalarizer.  */
 tree
@@ -1399,6 +1452,14 @@ g95_trans_assignment (g95_expr * expr1, g95_expr * expr2)
   g95_loopinfo loop;
   tree assign;
   tree body;
+
+  /* Special case a single function returning an array.  */
+  if (expr2->expr_type == EXPR_FUNCTION && expr2->rank > 0)
+    {
+      body = g95_trans_arrayfunc_assign (expr1, expr2);
+      if (body)
+        return body;
+    }
 
   /* Assignment of the form lhs = rhs.  */
   g95_start_stmt ();

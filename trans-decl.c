@@ -403,8 +403,6 @@ g95_get_symbol_decl (g95_symbol * sym)
 
   if (sym->attr.dummy || sym->attr.result)
     {
-      assert (sym->backend_decl);
-
       /* Return via extra parameter.  */
       if (sym->attr.result && g95_return_by_reference (sym->ns->proc_name)
           && ! sym->backend_decl)
@@ -413,6 +411,8 @@ g95_get_symbol_decl (g95_symbol * sym)
             DECL_ARGUMENTS (sym->ns->proc_name->backend_decl);
 
         }
+
+      assert (sym->backend_decl);
 
       /* Use a copy of the descriptor for dummy arrays.  */
       if (sym->attr.dimension
@@ -670,7 +670,6 @@ g95_build_function_decl (g95_symbol * sym)
           DECL_CONTEXT (parm) = fndecl;
           DECL_ARG_TYPE (parm) = type;
           TREE_READONLY (parm) = 1;
-          G95_DECL_PACKED_ARRAY (parm) = 1;
           g95_finish_decl (parm, NULL_TREE);
 
           arglist = chainon (arglist, parm);
@@ -1086,7 +1085,7 @@ g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
           switch (sym->as->type)
             {
             case AS_EXPLICIT:
-              if (sym->attr.dummy)
+              if (sym->attr.dummy || sym->attr.result)
                 body =
                   g95_trans_dummy_array_bias (sym, sym->backend_decl, body);
               else
@@ -1273,11 +1272,7 @@ g95_generate_function_code (g95_namespace * ns)
       if (result == NULL_TREE)
         warning ("Function return value not set");
       else
-        {
-          /* Return the result.  */
-          body = chainon (body, build_stmt (RETURN_STMT, build (MODIFY_EXPR,
-                    TREE_TYPE (result), DECL_RESULT (fndecl), result)));
-        }
+        pushdecl (result);
     }
 
   if (g95_current_io_state)
@@ -1297,6 +1292,7 @@ g95_generate_function_code (g95_namespace * ns)
       pushdecl (decl);
       decl = next;
     }
+  saved_function_decls = NULL_TREE;
 
   DECL_SAVED_TREE (fndecl) = g95_finish_stmt (body, NULL_TREE);
 

@@ -100,8 +100,10 @@ tree g95_conv_descriptor_stride (tree, tree);
 tree g95_conv_descriptor_lbound (tree, tree);
 tree g95_conv_descriptor_ubound (tree, tree);
 
-/* Entry point for dependancy checking code.  */
+/* Dependancy checking for WHERE and FORALL.  */
 int g95_check_dependancy (g95_expr *, g95_expr *, g95_expr **, int);
+/* Dependancy checking for function calls.  */
+int g95_check_fncall_dependancy (g95_expr *, g95_expr *);
 
 /* Add pre-loop scalarization code for intrinsic functions which require
    special handling.  */
