@@ -1583,6 +1583,7 @@ arith rc;
     r->expr_type = EXPR_ARRAY;
     r->value.constructor = head;
     r->ts = op->ts;
+    r->where = op->where;
 
     *result = r;
   }
@@ -1618,6 +1619,7 @@ arith rc;
     r->expr_type = EXPR_ARRAY;
     r->value.constructor = head;
     r->ts = op1->ts;
+    r->where = op1->where;
 
     *result = r;
   }
@@ -1651,6 +1653,7 @@ arith rc;
     r->expr_type = EXPR_ARRAY;
     r->value.constructor = head;
     r->ts = op2->ts;
+    r->where = op2->where;
 
     *result = r;
   }
@@ -1693,6 +1696,7 @@ arith rc;
     r->expr_type = EXPR_ARRAY;
     r->value.constructor = head;
     r->ts = op1->ts;
+    r->where = op1->where;
 
     *result = r;
   }

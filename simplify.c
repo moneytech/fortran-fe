@@ -2100,8 +2100,10 @@ g95_expr *result;
 
   if (mold == NULL)
     result->ts.type = BT_UNKNOWN;
-  else
+  else {
     result->ts = mold->ts;
+    result->where = mold->where;
+  }
 
   return result;
 }
