@@ -1411,8 +1411,8 @@ g95_trans_arrayfunc_assign (g95_expr * expr1, g95_expr * expr2)
       && ! g95_is_intrinsic_libcall (expr2))
     return NULL;
 
-  /* Check for a dependancy.  */
-  if (g95_check_fncall_dependancy (expr1, expr2))
+  /* Check for a dependency.  */
+  if (g95_check_fncall_dependency (expr1, expr2))
     return NULL;
 
   /* The frontend doesn't seem to bother filling in expr->symbol for intrinsic
@@ -1505,7 +1505,7 @@ g95_trans_assignment (g95_expr * expr1, g95_expr * expr2)
 
       /* Calculate the bounds of the scalarization.  */
       g95_conv_ss_startstride (&loop);
-      /* Resolve any data dependancies in the statement.  */
+      /* Resolve any data dependencies in the statement.  */
       g95_conv_resolve_dependencies (&loop, lss_section, rss);
       /* Setup the scalarizing loops.  */
       g95_conv_loop_setup (&loop);

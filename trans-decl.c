@@ -103,6 +103,7 @@ static void
 g95_add_decl_to_function (tree decl)
 {
   assert (decl);
+  TREE_USED (decl) = 1;
   DECL_CONTEXT (decl) = current_function_decl;
   TREE_CHAIN (decl) = saved_function_decls;
   saved_function_decls = decl;
@@ -769,7 +770,7 @@ g95_get_fake_result_decl (g95_symbol * sym)
     }
   else
     {
-      sprintf (name, "__result_%s",
+      sprintf (name, "__result_%.20s",
                IDENTIFIER_POINTER (DECL_NAME (current_function_decl)));
 
       decl = build_decl (VAR_DECL, get_identifier (name),
@@ -1272,7 +1273,12 @@ g95_generate_function_code (g95_namespace * ns)
       if (result == NULL_TREE)
         warning ("Function return value not set");
       else
-        pushdecl (result);
+        {
+          /* Set the return value to the the dummy result variable.  */
+          result = build (MODIFY_EXPR, TREE_TYPE (result),
+                          DECL_RESULT (fndecl), result);
+          body = chainon (body, build_stmt (RETURN_STMT, result));
+        }
     }
 
   if (g95_current_io_state)

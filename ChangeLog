@@ -1,3 +1,12 @@
+2002-09-12  Paul Brook  <paul@nowt.org>
+
+	* trans-decl.c (g95_generate_code): Fix thinko with return variable.
+
+2002-09-11  Tobias Schlueter  <Tobias.Schlueter@physik.uni-muenchen.de>
+
+	* trans-array.c,h trans-expr.c, trans-stmt.c: Correct spelling of
+	dependency/
+
 2002-09-10  Paul Brook  <paul@nowt.org>
 
 	* trans-array.c: Change format of G95_SS_TEMP strictures.

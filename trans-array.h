@@ -67,7 +67,7 @@ void g95_trans_scalarizing_loops (g95_loopinfo *, tree, tree);
 void g95_trans_scalarized_loop_boundary (g95_loopinfo *, tree, tree);
 /* Initialise the scalarization loop parameters.  */
 void g95_conv_loop_setup (g95_loopinfo *);
-/* Resolve array assignment dependancies.  */
+/* Resolve array assignment dependencies.  */
 void g95_conv_resolve_dependencies (g95_loopinfo *, g95_ss *, g95_ss *);
 
 /* Get a single array element.  */
@@ -100,10 +100,10 @@ tree g95_conv_descriptor_stride (tree, tree);
 tree g95_conv_descriptor_lbound (tree, tree);
 tree g95_conv_descriptor_ubound (tree, tree);
 
-/* Dependancy checking for WHERE and FORALL.  */
-int g95_check_dependancy (g95_expr *, g95_expr *, g95_expr **, int);
-/* Dependancy checking for function calls.  */
-int g95_check_fncall_dependancy (g95_expr *, g95_expr *);
+/* Dependency checking for WHERE and FORALL.  */
+int g95_check_dependency (g95_expr *, g95_expr *, g95_expr **, int);
+/* Dependency checking for function calls.  */
+int g95_check_fncall_dependency (g95_expr *, g95_expr *);
 
 /* Add pre-loop scalarization code for intrinsic functions which require
    special handling.  */

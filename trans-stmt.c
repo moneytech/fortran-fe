@@ -814,7 +814,7 @@ g95_trans_forall (g95_code * code)
       switch (block->op)
         {
         case EXEC_ASSIGN:
-          need_temp = g95_check_dependancy (block->expr, block->expr2,
+          need_temp = g95_check_dependency (block->expr, block->expr2,
                                             varexpr, nvar);
           if (need_temp)
             g95_todo_error ("Forall with temporary");

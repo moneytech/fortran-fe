@@ -36,7 +36,7 @@ Boston, MA 02111-1307, USA.  */
    g95_conv_ss_startstride.  During this process the expressions for the array
    descriptors and data pointers are also translated.
 
-   If the expression is an assignment, we must then resolve and dependancies.
+   If the expression is an assignment, we must then resolve and dependencies.
    In fortran all the rhs values of an assignment must be evaluated before
    any assignments take place.  This can require a temporary array to store the
    values.  We also require a temporary when we are passing array expressions
@@ -2129,12 +2129,12 @@ g95_is_same_range (g95_array_ref * ar1, g95_array_ref * ar2, int n, int def)
   return 0;
 }
 
-/* Dependancy checking for direct function return by reference.  Returns true
+/* Dependency checking for direct function return by reference.  Returns true
    if the arguments of the function depend on the destination.  This is
-   considerably less conservative than other dependancies because many
+   considerably less conservative than other dependencies because many
    function arguments will already be copied into a temporary.  */
 int
-g95_check_fncall_dependancy (g95_expr * dest, g95_expr * fncall)
+g95_check_fncall_dependency (g95_expr * dest, g95_expr * fncall)
 {
   g95_actual_arglist *actual;
   g95_ref *ref;
@@ -2182,12 +2182,12 @@ g95_check_fncall_dependancy (g95_expr * dest, g95_expr * fncall)
                 }
             }
 
-          if (g95_check_dependancy (dest, actual->expr, NULL, 0))
+          if (g95_check_dependency (dest, actual->expr, NULL, 0))
             return 1;
           break;
 
         case EXPR_ARRAY:
-          if (g95_check_dependancy (dest, expr, NULL, 0))
+          if (g95_check_dependency (dest, expr, NULL, 0))
             return 1;
           break;
 
@@ -2206,7 +2206,7 @@ g95_check_fncall_dependancy (g95_expr * dest, g95_expr * fncall)
    Used for forall and where statements.  Also used with functions returning
    arrays without a temporary.  */
 int
-g95_check_dependancy (g95_expr * expr1, g95_expr * expr2, g95_expr ** vars,
+g95_check_dependency (g95_expr * expr1, g95_expr * expr2, g95_expr ** vars,
                       int nvars)
 {
   g95_ref *ref;
@@ -2227,11 +2227,11 @@ g95_check_dependancy (g95_expr * expr1, g95_expr * expr2, g95_expr ** vars,
   switch (expr2->expr_type)
     {
     case EXPR_OP:
-      n = g95_check_dependancy (expr1, expr2->op1, vars, nvars);
+      n = g95_check_dependency (expr1, expr2->op1, vars, nvars);
       if (n)
         return n;
       if (expr2->op2)
-        return g95_check_dependancy (expr1, expr2->op2, vars, nvars);
+        return g95_check_dependency (expr1, expr2->op2, vars, nvars);
       return 0;
 
     case EXPR_VARIABLE:
@@ -2265,7 +2265,7 @@ g95_check_dependancy (g95_expr * expr1, g95_expr * expr2, g95_expr ** vars,
         {
           if (! actual->expr)
             continue;
-          n = g95_check_dependancy (expr1, actual->expr, vars, nvars);
+          n = g95_check_dependency (expr1, actual->expr, vars, nvars);
           if (n)
             return n;
         }
@@ -2283,9 +2283,9 @@ g95_check_dependancy (g95_expr * expr1, g95_expr * expr2, g95_expr ** vars,
     }
 }
 
-/* Resolve array data dependancies.  This will eventualy do dependancy analysis
-   and maybe loop shifting, etc.  Currently it allocates a temporary if
-   there are any possible dependancies.  */
+/* Resolve array data dependencies.  This will eventually do dependency
+   analysis and maybe loop shifting, etc.  Currently it allocates a
+   temporary if there are any possible dependencies.  */
 void
 g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
                                g95_ss * rss)
@@ -2340,7 +2340,7 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
                 case ARRAY_REF:
                   assert (lref->u.ar.type == AR_ELEMENT);
                   /* TODO: Not all elmental array refs conflict.  */
-                  /* We have a potential dependancy.  */
+                  /* We have a potential dependency.  */
                   temp_dim = -1;
                   same = 0;
                   break;
@@ -2359,7 +2359,7 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
               for (n = 0; n < dest->data.info.dimen; n++)
                 {
                   /* eg. a(:, 1) = a(2, :).  */
-                  /* TODO: check dependancies of elemental vs section.  */
+                  /* TODO: check dependencies of elemental vs section.  */
                   if (lref->u.ar.dimen_type[n] != rref->u.ar.dimen_type[n])
                     {
                       temp_dim = -1;
@@ -2371,7 +2371,7 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
                     continue;
 
                   /* If the elemental indices are different, there is no
-                     dependancy.  */
+                     dependency.  */
                   dim = g95_dep_compare_expr (lref->u.ar.start[n],
                                               rref->u.ar.start[n]);
                   if (dim == -1 || dim == 1)
@@ -2400,7 +2400,7 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
 
   if (temp_dim == 0)
     {
-      /* Put all the dimensions with dependancies in the innermost loops.  */
+      /* Put all the dimensions with dependencies in the innermost loops.  */
       dim = 0;
       for (n = 0; n < loop->dimen; n++)
         {
