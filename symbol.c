@@ -825,12 +825,14 @@ try g95_add_procedure(symbol_attribute *attr, procedure_type t, locus *loc) {
   if (attr->flavor != FL_PROCEDURE &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
+  if (loc == NULL) loc = g95_current_locus();
+
   if (attr->proc != PROC_UNKNOWN) {
     g95_error("%s procedure at %L is already %s %s procedure",
-	      g95_code2string(procedures, t),
+	      g95_code2string(procedures, t), loc,
 	      g95_article(g95_code2string(procedures, attr->proc)),
 	      g95_code2string(procedures, attr->proc));
-    
+
     return FAILURE;
   }
 
