@@ -317,6 +317,7 @@ g95_symbol *sym;
 /* g95_check_pointer_assign()-- Check that a pointer assignment is OK */
 
 try g95_check_pointer_assign(g95_expr *lvalue, g95_expr *rvalue) {
+symbol_attribute attr;
 
   if (lvalue->symbol->ts.type == BT_UNKNOWN) {
     g95_error("Pointer assignment target is not a POINTER at %L",
@@ -343,21 +344,23 @@ try g95_check_pointer_assign(g95_expr *lvalue, g95_expr *rvalue) {
     return FAILURE;
   }
 
-  if (!lvalue->symbol->attr.pointer) {
+  attr = g95_variable_attr(lvalue, NULL);
+
+  if (!attr.pointer) {
     g95_error("Pointer assignment to non-POINTER at %L",
 	      &lvalue->where);
     return FAILURE;
   }
 
-  if (!lvalue->symbol->attr.target && !lvalue->symbol->attr.pointer) {
+  if (!attr.target && !attr.pointer) {
     g95_error("Pointer assignment target is neither TARGET nor POINTER at %L",
 	      &rvalue->where);
     return FAILURE;
   }
 
-/* TODO: further checks required */
-
-  g95_warning("Checks for pointer assignment are incomplete.");
+/* TODO: further checks required
+   g95_warning("Checks for pointer assignment are incomplete.");
+*/
 
   return SUCCESS;
 }
