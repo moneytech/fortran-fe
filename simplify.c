@@ -225,7 +225,7 @@ int index;
 
 /* FIXME This is a limited and stupid implementation, but it's a start. */
 
-    result = g95_constant_result(BT_CHARACTER, e->ts.kind);
+    result = g95_constant_result(BT_CHARACTER, g95_default_character_kind());
     result->where = e->where;
 
     result->value.character.string = g95_getmem(2);
