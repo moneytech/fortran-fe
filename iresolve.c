@@ -655,8 +655,6 @@ void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
 
   f->ts = source->ts;
   f->rank = g95_array_size(shape);
-  g95_status("Array rank = %d\n", f->rank);
-
   f->value.function.name =
     get_string("__reshape_%c%d", g95_type_letter(source->ts.type),
 	       source->ts.kind);

@@ -573,25 +573,6 @@ int i, total;
 }
 
 
-/* size_constuctor()-- Given an expression node that represents an
- * array constructor, attempt to figure out how large the array is.
- * Constructors are always rank-1 arrays. */
-
-static void size_constructor(g95_expr *e) {
-
-#if 0
-g95_array_shape *shape;
-int size;
-
-  size = count_elements(e->value.constructor);
-  if (size == -1) return;
-
-  if (e->rank != 0) g95_free_array_shape(e->shape);
-  e->rank = 1;
-#endif
-}
-
-
 /****************** Array constructor functions ******************/
 
 /* g95_free_constructor()-- Free chains of g95_constructor structures */
@@ -693,7 +674,6 @@ match m;
   e->expr_type = EXPR_ARRAY;
   e->where = old_loc;
   e->value.constructor = head;
-  size_constructor(e);
 
   p = g95_get_constructor();
   p->where = *g95_current_locus();
@@ -779,7 +759,6 @@ empty:
   expr->value.constructor = head;
   expr->where = where;
   expr->rank = 1;
-  size_constructor(expr);
 
   *result = expr;
   return MATCH_YES;
@@ -1121,9 +1100,7 @@ try g95_expand_constructor(g95_expr *e) {
   }
 
   g95_free_constructor(e->value.constructor);
-
   e->value.constructor = new_head;
-  size_constructor(e);
 
   return SUCCESS;
 }
@@ -1311,12 +1288,16 @@ int d, start, end, stride;
  * argument (>0) or a negative number to indicate an error. */
 
 int g95_array_size(g95_expr *shape) {
+int flag, size;
 g95_ref *ref;
-int size;
 
   switch(shape->expr_type) {
   case EXPR_ARRAY:
-    if (g95_expand_constructor(shape) == FAILURE) return -1;
+    flag = g95_suppress_error;
+    g95_suppress_error = 1;
+    g95_expand_constructor(shape);   /* Errors can be OK */
+    g95_suppress_error = flag;
+
     size = count_elements(shape->value.constructor);
     break;
 

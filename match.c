@@ -508,7 +508,6 @@ locus where;
  *
  * %%  Literal percent sign
  * %e  Expression, pointer to a pointer is set
- * %E  Like %e, but allows array values expressions
  * %s  Symbol, pointer to the symbol is set
  * %n  Name, character buffer is set to name
  * %t  Matches end of statement.
@@ -544,7 +543,7 @@ loop:
     switch(c) {
     case 'e':
       vp = va_arg(argp, void **);
-      n = g95_match_scalar_expr((g95_expr **) vp);
+      n = g95_match_expr((g95_expr **) vp);
       if (n != MATCH_YES) { m = n; goto not_yes; }
 
       matches++;
@@ -553,14 +552,6 @@ loop:
     case 'v':
       vp = va_arg(argp, void **);
       n = g95_match_variable((g95_expr **) vp, 0);
-      if (n != MATCH_YES) { m = n; goto not_yes; }
-
-      matches++;
-      goto loop;
-
-    case 'E':
-      vp = va_arg(argp, void **);
-      n = g95_match_expr((g95_expr **) vp);
       if (n != MATCH_YES) { m = n; goto not_yes; }
 
       matches++;
@@ -701,7 +692,7 @@ match m;
   m = g95_match(" %v =", &lvalue);
   if (m != MATCH_YES) goto cleanup;
 
-  m = g95_match(" %E%t", &rvalue);
+  m = g95_match(" %e%t", &rvalue);
   if (m != MATCH_YES) goto cleanup;
 
   new_st.op = EXEC_ASSIGN;
@@ -732,7 +723,7 @@ match m;
   m = g95_match(" %v =>", &lvalue);
   if (m != MATCH_YES) { m = MATCH_NO; goto cleanup; }
 
-  m = g95_match(" %E%t", &rvalue);
+  m = g95_match(" %e%t", &rvalue);
   if (m != MATCH_YES) goto cleanup;
 
   new_st.op = EXEC_POINTER_ASSIGN;
@@ -1959,7 +1950,7 @@ match m;
 
   if (g95_match_formal_arglist(sym, 1) != MATCH_YES) goto undo_error;
 
-  m = g95_match(" = %E%t", &expr);
+  m = g95_match(" = %e%t", &expr);
   if (m == MATCH_NO) goto undo_error;
   if (m == MATCH_ERROR) return m;
 
@@ -2244,7 +2235,7 @@ g95_code *c;
   m0 = g95_match_label();
   if (m0 == MATCH_ERROR) return m0;
 
-  m = g95_match(" where ( %E )", &expr);
+  m = g95_match(" where ( %e )", &expr);
   if (m != MATCH_YES) return m;
 
   if (g95_match_eos() == MATCH_YES) {

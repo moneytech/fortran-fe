@@ -1289,7 +1289,6 @@ match g95_match_target(void);
 match g95_match_substring(g95_ref **, int);
 match g95_match_rvalue(g95_expr **);
 match g95_match_variable(g95_expr **, int);
-match g95_match_scalar_expr(g95_expr **);
 match g95_match_actual_arglist(int, g95_actual_arglist **);
 void g95_free_actual_arglist(g95_actual_arglist *);
 int g95_next_string_char(char);
@@ -1399,24 +1398,24 @@ void g95_resolve_select(g95_code *, g95_namespace *ns);
 
 void g95_free_open(g95_open *);
 match g95_match_open(void);
-void g95_resolve_open(g95_open *);
+try g95_resolve_open(g95_open *);
 
 void g95_free_close(g95_close *);
 match g95_match_close(void);
-void g95_resolve_close(g95_close *);
+try g95_resolve_close(g95_close *);
 
 void g95_free_filepos(g95_filepos *);
-void g95_resolve_filepos(g95_filepos *);
+try g95_resolve_filepos(g95_filepos *);
 match g95_match_endfile(void);
 match g95_match_backspace(void);
 match g95_match_rewind(void);
 
 void g95_free_inquire(g95_inquire *);
 match g95_match_inquire(void);
-void g95_resolve_inquire(g95_inquire *);
+try g95_resolve_inquire(g95_inquire *);
 
 void g95_free_dt(g95_dt *);
-void g95_resolve_dt(g95_dt *);
+try g95_resolve_dt(g95_dt *);
 match g95_match_read(void);
 match g95_match_write(void);
 match g95_match_print(void);

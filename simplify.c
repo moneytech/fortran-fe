@@ -2337,12 +2337,11 @@ int i, j, len, ncopies, nlen;
 g95_expr *g95_simplify_reshape(g95_expr *source, g95_expr *shape_exp,
 			       g95_expr *pad, g95_expr *order_exp) {
 
+int order[G95_MAX_DIMENSIONS], shape[G95_MAX_DIMENSIONS];
+int i, rank, npad, x[G95_MAX_DIMENSIONS];
+g95_constructor *head, *tail;
 unsigned long j;
 size_t nsource;
-int i, rank, npad, x[G95_MAX_DIMENSIONS];
-int order[G95_MAX_DIMENSIONS], shape[G95_MAX_DIMENSIONS];
-g95_constructor *head, *tail;
-g95_array_shape *s;
 mpz_t index;
 g95_expr *e;
 
@@ -2523,17 +2522,6 @@ g95_expr *e;
   e->ts = head->expr->ts;
 
   e->rank = rank;
-
-  /* TODO: Reshape is broken-- need to be able to specify the shape of
-   * array constants */
-
-  s = NULL;
-
-#if 0
-  for(i=0; i<rank; i++)
-    s->shape[i] = g95_int_expr(shape[i]);
-#endif
-
 
   return e;
 

@@ -880,27 +880,6 @@ g95_actual_arglist *ap;
 }
 
 
-/* g95_match_scalar_expr()-- Match an expression and require it to be
- * scalar */
-
-match g95_match_scalar_expr(g95_expr **result) {
-g95_expr *e;
-match m;
-
-  m = g95_match_expr(&e);
-  if (m != MATCH_YES) return m;
-
-  if (e->rank != 0) {
-    g95_error("Expression at %C must be scalar valued, not array valued");
-    g95_free_expr(e);
-    return MATCH_ERROR;
-  }
-
-  *result = e;
-  return MATCH_YES;
-}
-
-
 /* check_intrinsic_op()-- Check an intrinsic arithmetic operation to
  * see if it is consistent with some type of expression. */
 

@@ -950,10 +950,8 @@ g95_ref *ref;
 int i, rank;
 
   if (e->ref == NULL) {
-    if (e->expr_type == EXPR_ARRAY) {
-      e->rank = 1;
-      return;
-    }
+    if (e->expr_type == EXPR_ARRAY) return;
+    /* Constructors can have a rank different from one via RESHAPE() */
 
     if (e->symbol == NULL) {
       e->rank = 0; 
@@ -970,7 +968,7 @@ int i, rank;
     if (ref->type != REF_ARRAY) continue;
 
     if (ref->ar.type == AR_FULL) {
-      rank = ref->ar.as->rank;
+      rank = ref->ar.rank;
       break;
     }
 

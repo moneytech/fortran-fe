@@ -304,7 +304,7 @@ match m;
   c = g95_get_case();
 
   if (g95_match_char(':') == MATCH_YES) {
-    m = g95_match_scalar_expr(&c->high);
+    m = g95_match_expr(&c->high);
     if (m == MATCH_NO) goto need_expr;
     if (m == MATCH_ERROR) goto cleanup;
 
@@ -312,14 +312,14 @@ match m;
     goto done;
   }
 
-  m = g95_match_scalar_expr(&c->low);
+  m = g95_match_expr(&c->low);
   if (m == MATCH_ERROR) goto cleanup;
   if (m == MATCH_NO) goto need_expr;
 
   if (g95_match_char(':') != MATCH_YES)
     c->high = c->low;      /* Make a range out of a single target */
   else {
-    m = g95_match_scalar_expr(&c->high);
+    m = g95_match_expr(&c->high);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto done;   /* It's OK if nothing is there! */
 
@@ -437,6 +437,12 @@ static try check_case_expr(g95_expr *e, bt type) {
   if (e->ts.type != type) {
     g95_error("Expression in CASE statement at %L must be of type %s",
 	      &e->where, g95_basic_typename(type));
+    return FAILURE;
+  }
+
+  if (e->rank != 0) {
+    g95_error("Expression in CASE statement at %L must be scalar",
+	      &e->where);
     return FAILURE;
   }
 

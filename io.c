@@ -76,6 +76,8 @@ static io_tag
   tag_eor = { "EOR", " eor = %l", BT_UNKNOWN };
   
 
+#define RESOLVE_TAG(x, y) if (resolve_tag(x, y) == FAILURE) return FAILURE;
+
 /* match_etag()-- Match an expression I/O tag of some sort. */
 
 static match match_etag(io_tag *tag, g95_expr **v) {
@@ -142,13 +144,22 @@ int old;
 /* resolve_tag()-- Do expression resolution and type-checking on an
  * expression tag */
 
-static void resolve_tag(io_tag *tag, g95_expr *e) {
+static try resolve_tag(io_tag *tag, g95_expr *e) {
 
-  if (e == NULL || g95_resolve_expr(e) == FAILURE) return;
+  if (e == NULL || g95_resolve_expr(e) == FAILURE) return FAILURE;
 
-  if (e->ts.type != tag->type)
+  if (e->ts.type != tag->type) {
     g95_error("%s tag at %L must be of type %s", tag->name, &e->where,
 	      g95_basic_typename(tag->type));
+    return FAILURE;
+  }
+
+  if (e->rank != 0) {
+    g95_error("%s tag at %L must be scalar", tag->name, &e->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
 }
 
 
@@ -201,22 +212,25 @@ void g95_free_open(g95_open *open) {
 
 /* g95_resolve_open()-- resolve everything in a g95_open structure */
 
-void g95_resolve_open(g95_open *open) {
+try g95_resolve_open(g95_open *open) {
 
-  resolve_tag(&tag_unit, open->unit);
-  resolve_tag(&tag_iostat, open->iostat);
-  resolve_tag(&tag_file, open->file);
-  resolve_tag(&tag_status, open->status);
-  resolve_tag(&tag_e_form, open->form);
-  resolve_tag(&tag_e_recl, open->recl);
+  RESOLVE_TAG(&tag_unit, open->unit);
+  RESOLVE_TAG(&tag_iostat, open->iostat);
+  RESOLVE_TAG(&tag_file, open->file);
+  RESOLVE_TAG(&tag_status, open->status);
+  RESOLVE_TAG(&tag_e_form, open->form);
+  RESOLVE_TAG(&tag_e_recl, open->recl);
   
-  resolve_tag(&tag_e_blank, open->blank);
-  resolve_tag(&tag_e_position, open->position);
-  resolve_tag(&tag_e_action, open->action);
-  resolve_tag(&tag_e_delim, open->delim);
-  resolve_tag(&tag_e_pad, open->pad);
+  RESOLVE_TAG(&tag_e_blank, open->blank);
+  RESOLVE_TAG(&tag_e_position, open->position);
+  RESOLVE_TAG(&tag_e_action, open->action);
+  RESOLVE_TAG(&tag_e_delim, open->delim);
+  RESOLVE_TAG(&tag_e_pad, open->pad);
 
-  g95_reference_st_label(open->err, ST_LABEL_TARGET);
+  if (g95_reference_st_label(open->err, ST_LABEL_TARGET) == FAILURE)
+    return FAILURE;
+
+  return SUCCESS;
 }
 
 
@@ -338,13 +352,16 @@ cleanup:
 
 /* g95_resolve_close()-- Resolve everything in a g95_close structure */
 
-void g95_resolve_close(g95_close *close) {
+try g95_resolve_close(g95_close *close) {
 
-  resolve_tag(&tag_unit, close->unit);
-  resolve_tag(&tag_iostat, close->iostat);
-  resolve_tag(&tag_status, close->status);
+  RESOLVE_TAG(&tag_unit, close->unit);
+  RESOLVE_TAG(&tag_iostat, close->iostat);
+  RESOLVE_TAG(&tag_status, close->status);
 
-  g95_reference_st_label(close->err, ST_LABEL_TARGET);
+  if (g95_reference_st_label(close->err, ST_LABEL_TARGET) == FAILURE)
+    return FAILURE;
+
+  return SUCCESS;
 }
 
 
@@ -422,10 +439,13 @@ cleanup:
 }
 
 
-void g95_resolve_filepos(g95_filepos *fp) {
+try g95_resolve_filepos(g95_filepos *fp) {
 
-  resolve_tag(&tag_unit, fp->unit);
-  g95_reference_st_label(fp->err, ST_LABEL_TARGET);
+  RESOLVE_TAG(&tag_unit, fp->unit);
+  if (g95_reference_st_label(fp->err, ST_LABEL_TARGET) == FAILURE)
+    return FAILURE;
+
+  return SUCCESS;
 }
 
 
@@ -629,14 +649,14 @@ void g95_free_dt(g95_dt *dt) {
 
 /* g95_resolve_dt()-- Resolve everything in a g95_dt structure */
 
-void g95_resolve_dt(g95_dt *dt) {
+try g95_resolve_dt(g95_dt *dt) {
 g95_expr *e;
 
-  resolve_tag(&tag_format, dt->format_expr);
-  resolve_tag(&tag_rec, dt->rec);
-  resolve_tag(&tag_advance, dt->advance);
-  resolve_tag(&tag_iostat, dt->iostat);
-  resolve_tag(&tag_size, dt->size);
+  RESOLVE_TAG(&tag_format, dt->format_expr);
+  RESOLVE_TAG(&tag_rec, dt->rec);
+  RESOLVE_TAG(&tag_advance, dt->advance);
+  RESOLVE_TAG(&tag_iostat, dt->iostat);
+  RESOLVE_TAG(&tag_size, dt->size);
 
   e = dt->io_unit;
   if (g95_resolve_expr(e) == SUCCESS &&
@@ -644,54 +664,79 @@ g95_expr *e;
        (e->ts.type != BT_CHARACTER || e->expr_type != EXPR_VARIABLE))) {
     g95_error("UNIT specification at %L must be an INTEGER expression or a "
 	      "CHARACTER variable", &e->where);
-    return;
+    return FAILURE;
   }
 
 /* Sanity checks on data transfer statements */
 
   if (e->ts.type == BT_CHARACTER) {
-    if (dt->rec != NULL)
+    if (dt->rec != NULL) {
       g95_error("REC tag at %L is incompatible with internal file",
 		&dt->rec->where);
+      return FAILURE;
+    }
 
-    if (dt->namelist != NULL)
+    if (dt->namelist != NULL) {
       g95_error("Internal file at %L is incompatible with namelist",
 		&dt->io_unit->where);
+      return FAILURE;
+    }
 
-    if (dt->advance != NULL)
+    if (dt->advance != NULL) {
       g95_error("ADVANCE tag at %L is incompatible with internal file",
 		&dt->advance->where);
+      return FAILURE;
+    }
   }
 
   if (dt->rec != NULL) {
-    if (dt->end != 0) g95_error("REC tag at %L is incompatible with END tag",
-				&dt->rec->where);
+    if (dt->end != 0) {
+      g95_error("REC tag at %L is incompatible with END tag", &dt->rec->where);
+      return FAILURE;
+    }
 
-    if (dt->format_label == -1)
+    if (dt->format_label == -1) {
       g95_error("END tag at %L is incompatible with list directed format (*)",
 		&dt->end_where);
+      return FAILURE;
+    }
 
-    if (dt->namelist != NULL)
+    if (dt->namelist != NULL) {
       g95_error("REC tag at %L is incompatible with namelist",
 		&dt->rec->where);
+      return FAILURE;
+    }
   }
 
-  if (dt->advance != NULL && dt->format_label == -1)
+  if (dt->advance != NULL && dt->format_label == -1) {
     g95_error("ADVANCE tag at %L is incompatible with list directed "
 	      "format (*)", &dt->advance->where);
+    return FAILURE;
+  }
 
-  if (dt->eor != 0 && dt->advance == NULL)
+  if (dt->eor != 0 && dt->advance == NULL) {
     g95_error("EOR tag at %L requires an ADVANCE tag", &dt->eor_where);
+    return FAILURE;
+  }
 
-  if (dt->size != NULL && dt->advance == NULL)
+  if (dt->size != NULL && dt->advance == NULL) {
     g95_error("SIZE tag at %L requries an ADVANCE tag", &dt->size->where);
+    return FAILURE;
+  }
 
 /* TODO: Make sure the ADVANCE tag is 'yes' or 'no' if it is a string
  * constant */
 
-  g95_reference_st_label(dt->err, ST_LABEL_TARGET);
-  g95_reference_st_label(dt->end, ST_LABEL_TARGET);
-  g95_reference_st_label(dt->eor, ST_LABEL_TARGET);
+  if (g95_reference_st_label(dt->err, ST_LABEL_TARGET) == FAILURE)
+    return FAILURE;
+
+  if (g95_reference_st_label(dt->end, ST_LABEL_TARGET) == FAILURE)
+    return FAILURE;
+
+  if (g95_reference_st_label(dt->eor, ST_LABEL_TARGET) == FAILURE)
+    return FAILURE;
+
+  return SUCCESS;
 }
 
 
@@ -1195,31 +1240,35 @@ cleanup:
 
 /* g95_resolve_inquire()-- Resolve everything in a g95_inquire structure */
 
-void g95_resolve_inquire(g95_inquire *inquire) {
-  resolve_tag(&tag_unit, inquire->unit);
-  resolve_tag(&tag_file, inquire->file);
-  resolve_tag(&tag_iostat, inquire->iostat);
-  resolve_tag(&tag_exist, inquire->exist);
-  resolve_tag(&tag_opened, inquire->opened);
-  resolve_tag(&tag_number, inquire->number);
-  resolve_tag(&tag_named, inquire->named);
-  resolve_tag(&tag_name, inquire->name);
-  resolve_tag(&tag_s_access, inquire->access);
-  resolve_tag(&tag_sequential, inquire->sequential);
-  resolve_tag(&tag_direct, inquire->direct);
-  resolve_tag(&tag_s_form, inquire->form);
-  resolve_tag(&tag_formatted, inquire->formatted);
-  resolve_tag(&tag_unformatted, inquire->unformatted);
-  resolve_tag(&tag_s_recl, inquire->recl);
-  resolve_tag(&tag_nextrec, inquire->nextrec);
-  resolve_tag(&tag_s_blank, inquire->blank);
-  resolve_tag(&tag_s_position, inquire->position);
-  resolve_tag(&tag_s_action, inquire->action);
-  resolve_tag(&tag_read, inquire->read);
-  resolve_tag(&tag_write, inquire->write);
-  resolve_tag(&tag_readwrite, inquire->readwrite);
-  resolve_tag(&tag_s_delim, inquire->delim);
-  resolve_tag(&tag_s_pad, inquire->pad);
+try g95_resolve_inquire(g95_inquire *inquire) {
 
-  g95_reference_st_label(inquire->err, ST_LABEL_TARGET);
+  RESOLVE_TAG(&tag_unit, inquire->unit);
+  RESOLVE_TAG(&tag_file, inquire->file);
+  RESOLVE_TAG(&tag_iostat, inquire->iostat);
+  RESOLVE_TAG(&tag_exist, inquire->exist);
+  RESOLVE_TAG(&tag_opened, inquire->opened);
+  RESOLVE_TAG(&tag_number, inquire->number);
+  RESOLVE_TAG(&tag_named, inquire->named);
+  RESOLVE_TAG(&tag_name, inquire->name);
+  RESOLVE_TAG(&tag_s_access, inquire->access);
+  RESOLVE_TAG(&tag_sequential, inquire->sequential);
+  RESOLVE_TAG(&tag_direct, inquire->direct);
+  RESOLVE_TAG(&tag_s_form, inquire->form);
+  RESOLVE_TAG(&tag_formatted, inquire->formatted);
+  RESOLVE_TAG(&tag_unformatted, inquire->unformatted);
+  RESOLVE_TAG(&tag_s_recl, inquire->recl);
+  RESOLVE_TAG(&tag_nextrec, inquire->nextrec);
+  RESOLVE_TAG(&tag_s_blank, inquire->blank);
+  RESOLVE_TAG(&tag_s_position, inquire->position);
+  RESOLVE_TAG(&tag_s_action, inquire->action);
+  RESOLVE_TAG(&tag_read, inquire->read);
+  RESOLVE_TAG(&tag_write, inquire->write);
+  RESOLVE_TAG(&tag_readwrite, inquire->readwrite);
+  RESOLVE_TAG(&tag_s_delim, inquire->delim);
+  RESOLVE_TAG(&tag_s_pad, inquire->pad);
+
+  if (g95_reference_st_label(inquire->err, ST_LABEL_TARGET) == FAILURE)
+    return FAILURE;
+
+  return FAILURE;
 }
