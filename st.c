@@ -426,6 +426,18 @@ static void resolve_symbol(g95_symbol *sym) {
       !g95_compare_types(&sym->ts, &sym->value->ts))
     g95_error("Incompatible derived type in PARAMETER at %L",
 	      &sym->value->where);
+
+  /* Make sure symbols with known intent or optional are really dummy
+   * variable.  Because of ENTRY statement, this has to be deferred
+   * until resolution time. */
+
+  if ((sym->attr.optional || sym->attr.intent != INTENT_UNKNOWN) &&
+      sym->attr.dummy == 0) {
+
+    g95_error("Symbol at %L is not a DUMMY variable", &sym->declared_at);
+    return;
+  }
+
 }
 
 

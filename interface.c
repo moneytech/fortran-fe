@@ -167,8 +167,7 @@ int operator;
   case INTERFACE_GENERIC:
     if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
-    if (sym->attr.flavor != FL_GENERIC &&
-	g95_add_flavor(&sym->attr, FL_GENERIC, NULL) == FAILURE)
+    if (!sym->attr.generic && g95_add_generic(&sym->attr, NULL) == FAILURE)
       return MATCH_ERROR;
 
     current_interface.sym = g95_new_block = sym;
@@ -624,7 +623,6 @@ g95_interface **head, *intr;
 }
 
 
-
 /* find_modproc()-- Work function for g95_parent_procedure(). */
 
 static g95_symbol *module_procedure;
@@ -633,7 +631,7 @@ static try modproc_return;
 static void find_modproc(g95_symbol *generic_sym) {
 g95_interface *ip;
 
-  if (generic_sym->attr.flavor != FL_GENERIC) return;
+  if (!generic_sym->attr.generic) return;
 
   for(ip=generic_sym->generic; ip; ip=ip->next)
     if (ip->sym == module_procedure) break;

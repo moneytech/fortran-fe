@@ -1533,8 +1533,8 @@ int i;
 
   if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
-  if (sym->attr.flavor != FL_GENERIC && !sym->attr.subroutine &&
-      g95_add_subroutine(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
+  if (!sym->attr.subroutine && g95_add_subroutine(&sym->attr, NULL) == FAILURE)
+    return MATCH_ERROR;
 
   if (g95_match_eos() != MATCH_YES) {
     m = g95_match_actual_arglist(1, &arglist, &head);

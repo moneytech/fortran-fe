@@ -1484,6 +1484,8 @@ match m;
   if (sym->attr.function || sym->attr.external || sym->attr.intrinsic)
     goto function0;
 
+  if (sym->attr.generic) goto function1;
+
   switch(sym->attr.flavor) {
   case FL_VARIABLE:
     e = g95_get_expr();
@@ -1667,8 +1669,8 @@ match m;
 
     break;
 
-  case FL_GENERIC:
   case FL_MODULE_PROC:
+  function1:
     g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
 
     e = g95_get_expr();

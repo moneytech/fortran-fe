@@ -385,8 +385,8 @@ static mstring flavors[] = {
   minit("LABEL",       FL_LABEL),        minit("ST-FUNCTION", FL_ST_FUNCTION),
   minit("MODULE-PROC", FL_MODULE_PROC),  minit("DUMMY-PROC",  FL_DUMMY_PROC),
   minit("PROCEDURE",   FL_PROCEDURE),    minit("DERIVED",     FL_DERIVED),
-  minit("NAMELIST",    FL_NAMELIST),     minit("GENERIC",     FL_GENERIC),
-  minit(NULL, -1) },
+  minit("NAMELIST",    FL_NAMELIST),     minit(NULL, -1)
+},
 
 intents[] = {
   minit("UNKNOWN", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
@@ -536,7 +536,6 @@ static const char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
 
   case FL_VARIABLE:
   case FL_NAMELIST:
-  case FL_GENERIC:
     break;
 
   case FL_MODULE_PROC:
@@ -770,7 +769,7 @@ try g95_add_entry(symbol_attribute *attr, locus *loc) {
 try g95_add_function(symbol_attribute *attr, locus *loc) {
 
   if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_DUMMY_PROC &&
-      attr->flavor != FL_MODULE_PROC && attr->flavor != FL_GENERIC &&
+      attr->flavor != FL_MODULE_PROC && !attr->generic &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
   attr->function = 1;
@@ -780,10 +779,16 @@ try g95_add_function(symbol_attribute *attr, locus *loc) {
 try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
 
   if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_MODULE_PROC &&
-      attr->flavor != FL_GENERIC &&
-      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+      !attr->generic && g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE)
+    return FAILURE;
 
   attr->subroutine = 1;
+  return check_conflict(attr, loc);
+}
+
+try g95_add_generic(symbol_attribute *attr, locus *loc) {
+
+  attr->generic = 1;
   return check_conflict(attr, loc);
 }
 
@@ -797,11 +802,6 @@ try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
   if ((f == FL_PROGRAM || f == FL_BLOCK_DATA || f == FL_MODULE ||
        f == FL_PARAMETER || f == FL_LABEL || f == FL_DERIVED ||
        f == FL_NAMELIST) && check_used(attr, loc)) return FAILURE;
-
-  if (attr->flavor == FL_PROCEDURE && f == FL_GENERIC) {
-    attr->flavor = FL_GENERIC;
-    return check_conflict(attr, loc);
-  }
 
   if (attr->flavor == f && f == FL_VARIABLE) return SUCCESS;
 
@@ -875,7 +875,8 @@ int g95_compare_attr(symbol_attribute *a1, symbol_attribute *a2) {
     a1->sequence == a2->sequence   && a1->elemental == a2->elemental &&
     a1->pure == a2->pure           && a1->recursive == a2->recursive &&
     a1->access == a2->access       && a1->intent == a2->intent &&
-    a1->flavor == a2->flavor       && a1->scope == a2->scope;
+    a1->flavor == a2->flavor       && a1->scope == a2->scope &&
+    a1->generic == a2->generic;
 }
 
 
@@ -903,6 +904,7 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->saved_common = 0;
   attr->function = 0;
   attr->subroutine = 0;
+  attr->generic = 0;
   attr->implicit_type = 0;
   attr->sequence = 0;
   attr->elemental = 0;
@@ -916,18 +918,11 @@ void g95_clear_attr(symbol_attribute *attr) {
 }
 
 
-/* g95_missing_attr()-- Check for missing attributes in the new symbol */
+/* g95_missing_attr()-- Check for missing attributes in the new
+ * symbol.  Currently does nothing, but it's not clear that it is
+ * unnecessary yet.  AEV 7/4/01 */
 
 try g95_missing_attr(symbol_attribute *attr, locus *loc) {
-
-  if ((attr->optional || attr->intent != INTENT_UNKNOWN) &&
-      attr->dummy == 0) {
-
-    if (loc == NULL) loc = g95_current_locus();
-
-    g95_error("Symbol at %L is not a DUMMY variable", loc);
-    return FAILURE;
-  }
 
   return SUCCESS;
 }
@@ -955,6 +950,7 @@ try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src, locus *loc) {
   if (src->in_common && g95_add_in_common(dest, loc) == FAILURE) goto fail;
   if (src->saved_common && g95_add_saved_common(dest, loc)==FAILURE) goto fail;
 
+  if (src->generic && g95_add_generic(dest, loc) == FAILURE) goto fail;
   if (src->function && g95_add_function(dest, loc) == FAILURE) goto fail;
   if (src->subroutine && g95_add_subroutine(dest, loc) == FAILURE) goto fail;
 

@@ -174,8 +174,8 @@ typedef enum {
 typedef enum {
   FL_UNKNOWN=0, FL_PROGRAM, FL_BLOCK_DATA, FL_MODULE, FL_VARIABLE,
   FL_PARAMETER, FL_LABEL, FL_ST_FUNCTION, FL_MODULE_PROC, FL_DUMMY_PROC,
-  FL_PROCEDURE, FL_DERIVED, FL_NAMELIST, FL_GENERIC
-} sym_flavor;   /* 14 elements = 4 bits */
+  FL_PROCEDURE, FL_DERIVED, FL_NAMELIST
+} sym_flavor;   /* 13 elements = 4 bits */
 
 
 /* Scopes of functions and subroutines */
@@ -200,7 +200,7 @@ typedef struct {
            use_assoc:1;   /* Symbol has been use-associated */
 
   unsigned in_namelist:1, in_common:1, saved_common:1;
-  unsigned function:1, subroutine:1;
+  unsigned function:1, subroutine:1, generic:1;
   unsigned implicit_type:1;    /* Type defined via implicit rules */
 
 /* Function/subroutine attributes */
@@ -1043,6 +1043,7 @@ try g95_add_pure(symbol_attribute *, locus *);
 try g95_add_recursive(symbol_attribute *, locus *);
 try g95_add_function(symbol_attribute *, locus *);
 try g95_add_subroutine(symbol_attribute *, locus *);
+try g95_add_generic(symbol_attribute *, locus *);
 
 try g95_add_access(symbol_attribute *, g95_access, locus *);
 try g95_add_flavor(symbol_attribute *, sym_flavor, locus *);

@@ -720,7 +720,7 @@ enum { AB_ALLOCATABLE, AB_DIMENSION, AB_EXTERNAL, AB_INTRINSIC, AB_OPTIONAL,
        AB_POINTER, AB_SAVE, AB_TARGET, AB_DUMMY, AB_COMMON, AB_RESULT,
        AB_ENTRY, AB_DATA, AB_IN_NAMELIST, AB_IN_COMMON, AB_SAVED_COMMON,
        AB_FUNCTION, AB_SUBROUTINE, AB_SEQUENCE, AB_ELEMENTAL, AB_PURE,
-       AB_RECURSIVE
+       AB_RECURSIVE, AB_GENERIC
 } attribute_bits;
 
 
@@ -731,8 +731,8 @@ static mstring flavors[] = {
   minit("LABEL",       FL_LABEL),        minit("ST-FUNCTION", FL_ST_FUNCTION),
   minit("MODULE-PROC", FL_MODULE_PROC),  minit("DUMMY-PROC",  FL_DUMMY_PROC),
   minit("PROCEDURE",   FL_PROCEDURE),    minit("DERIVED",     FL_DERIVED),
-  minit("NAMELIST",    FL_NAMELIST),     minit("GENERIC",     FL_GENERIC),
-  minit(NULL, -1) },
+  minit("NAMELIST",    FL_NAMELIST),     minit(NULL, -1)
+},
 
 intents[] = {
   minit("UNKNOWN", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
@@ -758,7 +758,7 @@ attr_bits[] = {
   minit("FUNCTION",    AB_FUNCTION),    minit("SUBROUTINE",   AB_SUBROUTINE),
   minit("SEQUENCE",    AB_SEQUENCE),    minit("ELEMENTAL",    AB_ELEMENTAL),
   minit("PURE",        AB_PURE),        minit("RECURSIVE",    AB_RECURSIVE),
-  minit(NULL, -1)
+  minit("GENERIC",     AB_GENERIC),     minit(NULL, -1)
 },
 
 access_types[] = {
@@ -805,6 +805,7 @@ atom_type t;
 
     if (attr->function)      mio_name(AB_FUNCTION, attr_bits);
     if (attr->subroutine)    mio_name(AB_SUBROUTINE, attr_bits);
+    if (attr->generic)       mio_name(AB_GENERIC, attr_bits);
 
     if (attr->sequence)      mio_name(AB_SEQUENCE, attr_bits);
     if (attr->elemental)     mio_name(AB_ELEMENTAL, attr_bits);
@@ -839,6 +840,7 @@ atom_type t;
       case AB_SAVED_COMMON:  attr->saved_common = 1;  break;
       case AB_FUNCTION:      attr->function = 1;      break;
       case AB_SUBROUTINE:    attr->subroutine = 1;    break;
+      case AB_GENERIC:       attr->generic = 1;       break;
       case AB_SEQUENCE:      attr->sequence = 1;      break;
       case AB_ELEMENTAL:     attr->elemental = 1;     break;
       case AB_PURE:          attr->pure = 1;          break;
@@ -1851,7 +1853,7 @@ g95_interface *intr;
     break;
 
   case FL_VARIABLE:     case FL_PARAMETER:  case FL_ST_FUNCTION:
-  case FL_MODULE_PROC:  case FL_GENERIC:
+  case FL_MODULE_PROC:
     if (sym->ts.type != BT_DERIVED || sym->ts.derived->serial != -1) break;
 
     sym->ts.derived->serial = sym_num++;
@@ -1884,7 +1886,6 @@ static void find_writables(g95_symbol *sym) {
 
   case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
   case FL_PROCEDURE:    case FL_DERIVED:     case FL_NAMELIST:
-  case FL_GENERIC:
     if (sym->attr.access == ACCESS_PUBLIC ||
 	(g95_current_ns->default_access != ACCESS_PRIVATE &&
 	 sym->attr.access == ACCESS_UNKNOWN))
@@ -1911,7 +1912,7 @@ static void write_symbol(g95_symbol *sym) {
     return;
 
   case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
-  case FL_PROCEDURE:    case FL_NAMELIST:    case FL_GENERIC:
+  case FL_PROCEDURE:    case FL_NAMELIST:
     if (phase == 2) break;
     return;
 
