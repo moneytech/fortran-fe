@@ -175,8 +175,8 @@ int offset, flag, i, m, c1, c2;
 separate:
   offset = 0;
 
-  if (c1 > terminal_width - 20) {
-    offset = c1 - 20;
+  if (c1 > terminal_width - 5) {
+    offset = c1 - 5;
     if (offset < 0) offset = 0;
     c1 = c1 - offset;
   }
