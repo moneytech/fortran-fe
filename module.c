@@ -22,6 +22,8 @@ Boston, MA 02111-1307, USA.  */
 /* module.c-- Handle modules, which amount to loading and saving symbols */
 
 #include <string.h>
+#include <stdio.h>
+#include <ctype.h>
 
 #include "g95.h"
 
@@ -41,6 +43,10 @@ typedef struct g95_use_rename {
 static char module_name[G95_MAX_SYMBOL_LEN+1];
 static g95_use_rename *g95_rename_list;
 static int only_flag;
+
+
+static FILE *input;
+static int module_line, module_column;
 
 
 /* g95_free_rename()-- Free the rename list left behind by a USE
@@ -122,6 +128,215 @@ cleanup:
   g95_free_rename();
   return MATCH_ERROR;
 }
+
+
+
+
+
+/* Module reading and writing */
+
+typedef enum {
+  ATOM_NAME, ATOM_LPAREN, ATOM_RPAREN, ATOM_INTEGER, ATOM_STRING, ATOM_EOF
+} atom_type;
+
+
+typedef struct {
+  int column, line;
+  fpos_t pos;
+} module_locus;
+
+
+/* The name buffer must be at least as long as a symbol name.  Right
+ * now it's not clear how we're going to store numeric constants--
+ * probably as a hexadecimal string, since this will allow the exact
+ * numeric representation to be preserved (this can't be done by
+ * a decimal representation).  Worry about that later. */
+
+#define MAX_ATOM_SIZE 100
+
+static int atom_int;
+static char *current_module, *atom_string, atom_name[MAX_ATOM_SIZE];
+
+
+
+/* bad_module()-- Report problems with a module.  Error reporting is
+ * not very elaborate, since this sorts of errors shouldn't really
+ * happen. */
+
+static void bad_module(char *message) {
+
+  g95_fatal_error("Reading module %s at line %d column %d: %s",
+		  current_module, module_line, module_column, message);
+}
+
+
+/* set_module_locus()-- Set the module's input pointer */
+
+static void set_module_locus(module_locus *m) {
+
+  module_column = m->column;
+  module_line = m->line;
+  fsetpos(input, &m->pos);
+}
+
+
+/* get_module_locus()-- Get the module's input pointer so that we can
+ * restore it later. */
+
+static void get_module_locus(module_locus *m) {
+
+  m->column = module_column;
+  m->line = module_line;
+  fgetpos(input, &m->pos);
+}
+
+
+/* module_char()-- Get the next character in the module, updating our
+ * reckoning of where we are. */
+
+static int module_char(void) {
+int c;
+
+  c = fgetc(input);
+
+  if (c == '\n') {
+    module_line++;
+    module_column = 0;
+  }
+
+  module_column++;
+  return c;
+}
+
+
+/* parse_string()-- Parse a string constant.  The delimiter is
+ * guaranteed to be a single quote. */
+
+void parse_string(void) {
+module_locus start;
+int len, c;
+char *p;
+
+  get_module_locus(&start);
+
+  len = 0;
+
+/* See how long the string is */
+
+ loop:
+  c = module_char();
+  if (c == EOF) bad_module("Unexpected end of module in string constant");
+
+  if (c != '\'') {
+    len++;
+    goto loop;
+  }
+
+  c = module_char();
+  if (c == '\'') {
+    len++;
+    goto loop;
+  }
+
+  set_module_locus(&start);
+
+  atom_string = p = g95_getmem(len+1);
+
+  while(len > 0) {
+    c = module_char();
+    if (c == '\'') module_char();  /* Guaranteed to be another \' */
+    *p++ = c;
+  }
+
+  module_char();        /* Terminating \' */
+  *p++ = '\0';          /* C-style string for debug purposes */
+}
+
+
+/* parse_integer()-- Parse a small integer. */
+
+static void parse_integer(int c) {
+module_locus m;
+
+  atom_int = c - '0';
+
+  for(;;) {
+    get_module_locus(&m);
+
+    c = module_char();
+    if (!isdigit(c)) break;
+
+    atom_int = 10*atom_int + c - '0';
+    if (atom_int > 99999999) bad_module("Integer overflow");
+  }
+
+  set_module_locus(&m);
+}
+
+
+
+/* parse_name()-- Parse a name.  */
+
+static void parse_name(int c) {
+module_locus m;
+char *p;
+int len;
+
+  p = atom_name;
+
+  *p++ = c;
+  len = 1;
+
+  for(;;) {
+    get_module_locus(&m);
+
+    c = module_char();
+    if (!isalnum(c) && c != '_') break;
+
+    *p++ = c;
+    if (++len > G95_MAX_SYMBOL_LEN) bad_module("Name too long");
+  }
+
+  set_module_locus(&m);
+}
+
+
+
+/* parse_atom()-- Read the next atom in the module's input stream. */
+
+static atom_type parse_atom(void) {
+int c;
+
+  do {
+    c = module_char();
+  } while (c != ' ' && c != '\n');
+
+  if (c == EOF) return ATOM_EOF;
+  if (c == '(') return ATOM_LPAREN;
+  if (c == ')') return ATOM_RPAREN;
+
+  if (c == '\'') {
+    parse_string();
+    return ATOM_STRING;
+  }
+
+  if (c >= '0' && c <= '9') {
+    parse_integer(c);
+    return ATOM_INTEGER;
+  }
+
+  if (!isalnum(c)) bad_module("Bad name");
+
+  parse_name(c);
+  return ATOM_NAME;
+}
+
+
+
+
+
+
+
 
 
 /* g95_dump_module()-- Given module, dump it to disk */
