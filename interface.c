@@ -890,6 +890,7 @@ int g95_symbol_rank(g95_symbol *sym) {
  * nonzero if the same, zero if different.  */
 
 static int compare_parameter(g95_symbol *formal, g95_expr *actual) {
+g95_ref *ref;
 
   if (actual->ts.type == BT_PROCEDURE) {
     if (formal->attr.flavor != FL_PROCEDURE) return 0;
@@ -897,25 +898,59 @@ static int compare_parameter(g95_symbol *formal, g95_expr *actual) {
     if (formal->attr.function &&
 	!compare_type_rank(formal, actual->symbol)) return 0;
 
+    if (formal->attr.if_source == IFSRC_UNKNOWN) return 1;  /* Assume match */
+
     return compare_interfaces(formal, actual->symbol, 1);
   }
 
-  if (g95_symbol_rank(formal) != actual->rank) return 0;
+  if (!g95_compare_types(&formal->ts, &actual->ts)) return 0;
 
-  return g95_compare_types(&formal->ts, &actual->ts);
+#if 0
+  if (formal->attr.pointer) {
+    if (formal->rank != actual->rank) return 0;
+    return 1;
+  }
+#endif
+
+
+#if 0
+  /* Ranks can disagree if we are passing an array element into an
+   * array that is not assumed shape nor a pointer array. */
+
+  if (g95_symbol_rank(formal) != actual->rank) {
+    if (!formal->attr.dimension) return 0;
+
+    if (formal->as->type == AS_ASSUMED_SHAPE || formal->attr.pointer) return 0;
+
+    for(ref=actual->ref; ref; ref=ref->next)
+      if (ref->type == REF_SUBSTRING) return 0;
+
+    for(ref=actual->ref; ref; ref=ref->next)
+      if (ref->type == REF_ARRAY && ref->u.ar.type == AR_ELEMENT) break;
+
+    if (ref == NULL) return 0;
+  }
+#endif
+
+  return 1;
 }
 
 
 /* compare_actual_formal()-- Given formal and actual argument lists,
  * see if they are compatible.  If they are compatible, the actual
  * argument list is sorted to correspond with the formal list, and
- * elements for missing optional arguments are inserted.  */
+ * elements for missing optional arguments are inserted.
+ *
+ * If the 'where' pointer is nonnull, then we issue errors when things
+ * don't match instead of just returning the status code. */
 
-static int compare_actual_formal(g95_actual_arglist *actual,
-			  g95_formal_arglist *formal) {
-g95_actual_arglist **new, *a, temp;
+static int compare_actual_formal(g95_actual_arglist **ap,
+				 g95_formal_arglist *formal, locus *where) {
+g95_actual_arglist **new, *a, *actual, temp;
 g95_formal_arglist *f;
 int i, n, na;
+
+  actual = *ap;
 
   if (actual == NULL && formal == NULL) return 1;
 
@@ -940,18 +975,50 @@ int i, n, na;
 	if (strcmp(f->sym->name, a->name) == 0) break;
       }
 
-      if (f == NULL) return 0;       /* Keyword not found */
+      if (f == NULL) {
+	if (where)
+	  g95_error("Keyword argument '%s' at %L is not in the procedure",
+		    a->name, &a->expr->where);
+	return 0;
+      }
 
-      if (new[i] != NULL) return 0;  /* Actual already matched to formal */
+      if (new[i] != NULL) {
+	if (where)
+	  g95_error("Keyword argument '%s' at %L is already associated "
+		    "with another actual argument", a->name, &a->expr->where);
+	return 0;
+      }
     }
 
-    if (f == NULL) return 0;
+    if (f == NULL) {
+      if (where)
+	g95_error("More actual than formal arguments in procedure call at %L",
+		  where);
+
+      return 0;
+    }
 
     if (f->sym == NULL && a->expr == NULL) goto match;
 
-    if (f->sym == NULL || a->expr == NULL) return 0;
+    if (f->sym == NULL) {
+      if (where)
+	g95_error("Missing alternate return spec in subroutine call at %L",
+		  where);
+      return 0;
+    }
 
-    if (compare_parameter(f->sym, a->expr) == 0) return 0;
+    if (a->expr == NULL) {
+      if (where)
+	g95_error("Unexpected alternate return spec in subroutine call at %L",
+		  where);
+      return 0;
+    }
+
+    if (compare_parameter(f->sym, a->expr) == 0) {
+      if (where) g95_error("Type/rank mismatch in argument '%s' at %L",
+			   f->sym->name, &a->expr->where);
+      return 0;
+    }
 
   match:
     if (a == actual) na = i;
@@ -989,23 +1056,23 @@ int i, n, na;
 
   new[i]->next = NULL;
 
+  if (*ap == NULL && n > 0) *ap = new[0];
+
   return 1;
 }
 
 
-/* g95_check_intents()-- Given formal and actual argument lists that
+/* check_intents()-- Given formal and actual argument lists that
  * correspond to one another, check that they are compatible in the
  * sense that intents are not mismatched.  */
 
-try g95_check_intents(g95_formal_arglist *f, g95_actual_arglist *a) {
+static try check_intents(g95_formal_arglist *f, g95_actual_arglist *a) {
 sym_intent a_intent, f_intent;
 
   for(;; f=f->next, a=a->next) {
     if (f == NULL && a == NULL) break;
-    if (f == NULL || a == NULL) {
-      g95_status("g95_check_intents(): List mismatch");
-      return SUCCESS;
-    }
+    if (f == NULL || a == NULL)
+      g95_internal_error("check_intents(): List mismatch");
 
     if (a->expr == NULL || a->expr->expr_type != EXPR_VARIABLE) continue;
 
@@ -1041,20 +1108,33 @@ sym_intent a_intent, f_intent;
 }
 
 
+/* g95_procedure_use()-- Check how a procedure is used against its
+ * interface.  If all goes well, the actual argument list will also
+ * end up being properly sorted. */
+
+void g95_procedure_use(g95_symbol *sym, g95_actual_arglist **ap, locus *where){
+
+  if (sym->attr.if_source == IFSRC_UNKNOWN ||
+      !compare_actual_formal(ap, sym->formal, where)) return;
+
+  check_intents(sym->formal, *ap);
+}
+
+
 /* g95_search_interface()-- Given an interface pointer and an actual
  * argument list, search for a formal argument list that matches the
  * actual.  If found, returns a pointer to the symbol of the correct
  * interface.  Returns NULL if not found. */
 
 g95_symbol *g95_search_interface(g95_interface *intr, int sub_flag,
-				 g95_actual_arglist *actual) {
+				 g95_actual_arglist **ap) {
 
   for(; intr; intr=intr->next) {
     if (sub_flag && intr->sym->attr.function) continue;
     if (!sub_flag && intr->sym->attr.subroutine) continue;
 
-    if (compare_actual_formal(actual, intr->sym->formal)) {
-      g95_check_intents(intr->sym->formal, actual);
+    if (compare_actual_formal(ap, intr->sym->formal, NULL)) {
+      check_intents(intr->sym->formal, *ap);
       return intr->sym;
     }
   }
@@ -1095,12 +1175,12 @@ int i;
       uop = g95_find_uop(e->uop->name, ns);
       if (uop == NULL) continue;
 
-      sym = g95_search_interface(uop->operator, 0, actual);
+      sym = g95_search_interface(uop->operator, 0, &actual);
       if (sym != NULL) break;
     }
   } else {
     for(ns=g95_current_ns; ns; ns=ns->parent) {
-      sym = g95_search_interface(ns->operator[i], 0, actual);
+      sym = g95_search_interface(ns->operator[i], 0, &actual);
       if (sym != NULL) break;
     }
   }
@@ -1157,7 +1237,7 @@ g95_symbol *sym;
   sym = NULL;
 
   for(; ns; ns=ns->parent) {
-    sym = g95_search_interface(ns->operator[INTRINSIC_ASSIGN], 1, actual);
+    sym = g95_search_interface(ns->operator[INTRINSIC_ASSIGN], 1, &actual);
     if (sym != NULL) break;
   }
 

@@ -1014,13 +1014,15 @@ loop:
 
   case ST_SUBROUTINE:
     new_state = COMP_SUBROUTINE;
-    g95_new_block->attr.interface = 1;
+    g95_add_explicit_interface(g95_new_block, IFSRC_IFBODY,
+			       g95_new_block->formal, NULL);
     proc = g95_new_block;
     break;
 
   case ST_FUNCTION: 
     new_state = COMP_FUNCTION;
-    g95_new_block->attr.interface = 1;
+    g95_add_explicit_interface(g95_new_block, IFSRC_IFBODY,
+			       g95_new_block->formal, NULL);
     proc = g95_new_block;
     break;
 

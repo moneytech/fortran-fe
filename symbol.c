@@ -954,6 +954,27 @@ try g95_add_access(symbol_attribute *attr, g95_access access, locus *loc) {
 }
 
 
+try g95_add_explicit_interface(g95_symbol *sym, ifsrc source,
+			       g95_formal_arglist *formal, locus *loc) {
+
+  if (check_used(&sym->attr, loc)) return FAILURE;
+
+  if (loc == NULL) loc = g95_current_locus();
+
+  if (sym->attr.if_source != IFSRC_UNKNOWN &&
+      sym->attr.if_source != IFSRC_DECL) {
+    g95_error("Symbol '%s' at %L already has an explicit interface",
+	      sym->name, loc);
+    return FAILURE;
+  }
+
+  sym->formal = formal;
+  sym->attr.if_source = source;
+
+  return SUCCESS;
+}
+
+
 /* g95_compare_attr()-- Compares two attributes */
 
 int g95_compare_attr(symbol_attribute *a1, symbol_attribute *a2) {
@@ -995,7 +1016,6 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->data = 0;
   attr->use_assoc = 0;
   attr->in_namelist = 0;
-  attr->interface = 0;
   
   attr->in_common = 0;
   attr->saved_common = 0;
@@ -1012,6 +1032,7 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->intent = INTENT_UNKNOWN;
   attr->flavor = FL_UNKNOWN;
   attr->proc = PROC_UNKNOWN;
+  attr->if_source = IFSRC_UNKNOWN;
 }
 
 

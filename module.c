@@ -792,7 +792,7 @@ enum { AB_ALLOCATABLE, AB_DIMENSION, AB_EXTERNAL, AB_INTRINSIC, AB_OPTIONAL,
        AB_POINTER, AB_SAVE, AB_TARGET, AB_DUMMY, AB_COMMON, AB_RESULT,
        AB_ENTRY, AB_DATA, AB_IN_NAMELIST, AB_IN_COMMON, AB_SAVED_COMMON,
        AB_FUNCTION, AB_SUBROUTINE, AB_SEQUENCE, AB_ELEMENTAL, AB_PURE,
-       AB_RECURSIVE, AB_GENERIC, AB_INTERFACE
+       AB_RECURSIVE, AB_GENERIC
 } attribute_bits;
 
 
@@ -823,8 +823,7 @@ attr_bits[] = {
   minit("FUNCTION",    AB_FUNCTION),    minit("SUBROUTINE",   AB_SUBROUTINE),
   minit("SEQUENCE",    AB_SEQUENCE),    minit("ELEMENTAL",    AB_ELEMENTAL),
   minit("PURE",        AB_PURE),        minit("RECURSIVE",    AB_RECURSIVE),
-  minit("GENERIC",     AB_GENERIC),     minit("INTERFACE",    AB_INTERFACE),
-  minit(NULL, -1)
+  minit("GENERIC",     AB_GENERIC),     minit(NULL, -1)
 },
 
 procedures[] = {
@@ -839,6 +838,13 @@ access_types[] = {
   minit("PRIVATE",   ACCESS_PRIVATE),
   minit("PUBLIC",    ACCESS_PUBLIC),
   minit(NULL, -1)
+},
+
+ifsrc_types[] = {
+  minit("UNKNOWN",  IFSRC_UNKNOWN),
+  minit("DECL",     IFSRC_DECL),
+  minit("BODY",     IFSRC_IFBODY),
+  minit("USAGE",    IFSRC_USAGE)
 };
 
 
@@ -856,6 +862,7 @@ atom_type t;
   attr->flavor = mio_name(attr->flavor, flavors);
   attr->intent = mio_name(attr->intent, intents);
   attr->proc = mio_name(attr->proc, procedures);
+  attr->if_source = mio_name(attr->if_source, ifsrc_types);
 
   if (iomode == IO_OUTPUT) {
     if (attr->allocatable)   mio_name(AB_ALLOCATABLE, attr_bits);
@@ -875,7 +882,6 @@ atom_type t;
     if (attr->in_namelist)   mio_name(AB_IN_NAMELIST, attr_bits);
     if (attr->in_common)     mio_name(AB_IN_COMMON, attr_bits);
     if (attr->saved_common)  mio_name(AB_SAVED_COMMON, attr_bits);
-    if (attr->interface)     mio_name(AB_INTERFACE, attr_bits);
 
     if (attr->function)      mio_name(AB_FUNCTION, attr_bits);
     if (attr->subroutine)    mio_name(AB_SUBROUTINE, attr_bits);
@@ -919,7 +925,6 @@ atom_type t;
       case AB_ELEMENTAL:     attr->elemental = 1;     break;
       case AB_PURE:          attr->pure = 1;          break;
       case AB_RECURSIVE:     attr->recursive = 1;     break;
-      case AB_INTERFACE:     attr->interface = 1;     break;
       }
     }
   }

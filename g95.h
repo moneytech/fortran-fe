@@ -208,6 +208,10 @@ typedef enum { PROC_UNKNOWN, PROC_MODULE, PROC_INTERNAL, PROC_DUMMY,
 } procedure_type;   /* 7 elements = 3 bits */
 
 
+typedef enum { IFSRC_UNKNOWN=0, IFSRC_DECL, IFSRC_IFBODY, IFSRC_USAGE
+} ifsrc;   /* 4 elements = 2 bits */
+
+
 /************************* Structures *****************************/
 
 /* Symbol attribute structure. */
@@ -220,8 +224,7 @@ typedef struct {
            dummy:1,       common:1,    result:1,    entry:1;
 
   unsigned data:1,        /* Symbol is named in a DATA statement */
-           use_assoc:1,   /* Symbol has been use-associated */
-           interface:1;   /* Symbol appears in an interface body */
+           use_assoc:1;   /* Symbol has been use-associated */
 
   unsigned in_namelist:1, in_common:1, saved_common:1;
   unsigned function:1, subroutine:1, generic:1;
@@ -236,6 +239,7 @@ typedef struct {
   g95_access access:2;
   sym_intent intent:2;
   sym_flavor flavor:4;
+  ifsrc if_source:2;
 
   procedure_type proc:3;
 
@@ -901,7 +905,6 @@ typedef struct g95_code {
 
 #define g95_get_code() g95_getmem(sizeof(g95_code))
 
-
 extern g95_code new_st;
 
 
@@ -1193,6 +1196,8 @@ try g95_add_flavor(symbol_attribute *, sym_flavor, locus *);
 try g95_add_entry(symbol_attribute *, locus *);
 try g95_add_procedure(symbol_attribute *, procedure_type, locus *);
 try g95_add_intent(symbol_attribute *, sym_intent, locus *);
+try g95_add_explicit_interface(g95_symbol *, ifsrc, g95_formal_arglist *,
+			       locus *);
 
 int g95_compare_attr(symbol_attribute *, symbol_attribute *);
 void g95_clear_attr(symbol_attribute *);
@@ -1449,8 +1454,8 @@ void g95_start_interface(void);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
 int g95_compare_types(g95_typespec *, g95_typespec *);
 void g95_check_interfaces(g95_namespace *);
-try g95_check_intents(g95_formal_arglist *, g95_actual_arglist *);
-g95_symbol *g95_search_interface(g95_interface *, int, g95_actual_arglist *);
+void g95_procedure_use(g95_symbol *, g95_actual_arglist **, locus *);
+g95_symbol *g95_search_interface(g95_interface *, int, g95_actual_arglist **);
 try g95_extend_expr(g95_expr *);
 void g95_free_formal_arglist(g95_formal_arglist *);
 try g95_extend_assign(g95_code *, g95_namespace *);

@@ -76,7 +76,7 @@ g95_symbol *sym;
       continue;
     }
 
-    if (sym->formal) resolve_formal_arglist(sym);
+    if (sym->attr.if_source != IFSRC_UNKNOWN) resolve_formal_arglist(sym);
 
     if (sym->attr.subroutine || sym->attr.external || sym->attr.intrinsic) {
       if (g95_pure(proc) && !g95_pure(sym)) {
@@ -153,7 +153,8 @@ g95_symbol *sym;
 
 static void find_arglists(g95_symbol *sym) {
 
-  if (sym->formal == NULL || sym->ns != g95_current_ns) return;
+  if (sym->attr.if_source == IFSRC_UNKNOWN || sym->ns != g95_current_ns)
+    return;
 
   resolve_formal_arglist(sym);
 }
@@ -277,7 +278,7 @@ char *name;
 
   /* Not generic, see if it is specific */
 
-  if (sym->attr.interface || sym->attr.proc == PROC_MODULE ||
+  if (sym->attr.if_source == IFSRC_IFBODY || sym->attr.proc == PROC_MODULE ||
       sym->attr.proc == PROC_INTERNAL || sym->attr.proc == PROC_ST_FUNCTION ||
       (sym->attr.intrinsic && g95_specific_intrinsic(name)) ||
       sym->attr.external)
@@ -285,7 +286,8 @@ char *name;
 
   /* Check parent scopes */
 
-  if (s != NULL && (s->attr.interface || s->attr.proc == PROC_MODULE ||
+  if (s != NULL && (s->attr.if_source == IFSRC_IFBODY ||
+		    s->attr.proc == PROC_MODULE ||
 		    s->attr.proc == PROC_INTERNAL ||
 		    s->attr.proc == PROC_ST_FUNCTION ||
 		    (s->attr.intrinsic && g95_specific_intrinsic(name)) ||
@@ -396,7 +398,7 @@ static match resolve_generic_f0(g95_expr *expr, g95_symbol *sym) {
 g95_symbol *s;
 
   if (sym->attr.generic) {
-    s = g95_search_interface(sym->generic, 0, expr->value.function.actual);
+    s = g95_search_interface(sym->generic, 0, &expr->value.function.actual);
     if (s != NULL) {
       expr->value.function.name = s->name;
       expr->value.function.esym = s;
@@ -456,7 +458,7 @@ match m;
 static match resolve_specific_f0(g95_symbol *sym, g95_expr *expr) {
 match m;
 
-  if (sym->attr.external || sym->attr.interface) {
+  if (sym->attr.external || sym->attr.if_source == IFSRC_IFBODY) {
     if (sym->attr.dummy) {
       sym->attr.proc = PROC_DUMMY;
       goto found;
@@ -482,8 +484,7 @@ match m;
   return MATCH_NO;
 
 found:
-  if (sym->attr.interface)
-    g95_check_intents(sym->formal, expr->value.function.actual);
+  g95_procedure_use(sym, &expr->value.function.actual, &expr->where);
 
   expr->ts = sym->ts;
   expr->value.function.name = sym->name;
@@ -547,8 +548,7 @@ g95_typespec ts;
   expr->value.function.name = sym->name;
   if (sym->as != NULL) expr->rank = sym->as->rank;
 
-  if (sym->attr.interface)
-    g95_check_intents(sym->formal, expr->value.function.actual);
+  g95_procedure_use(sym, &expr->value.function.actual, &expr->where);
 
   /* Type of the expression is either the type of the symbol or the
    * default type of the symbol */
@@ -665,7 +665,7 @@ static match resolve_generic_s0(g95_code *c, g95_symbol *sym) {
 g95_symbol *s;
 
   if (sym->attr.generic) {
-    s = g95_search_interface(sym->generic, 1, c->ext.actual);
+    s = g95_search_interface(sym->generic, 1, &c->ext.actual);
     if (s != NULL) {
       c->sub_name = s->name;
       pure_subroutine(c, s);
@@ -723,7 +723,7 @@ match m;
 static match resolve_specific_s0(g95_code *c, g95_symbol *sym) {
 match m;
 
-  if (sym->attr.external || sym->attr.interface) {
+  if (sym->attr.external || sym->attr.if_source == IFSRC_IFBODY) {
     if (sym->attr.dummy) {
       sym->attr.proc = PROC_DUMMY;
       goto found;
@@ -749,7 +749,8 @@ match m;
   return MATCH_NO;
 
 found:
-  if (sym->attr.interface) g95_check_intents(sym->formal, c->ext.actual);
+  g95_procedure_use(sym, &c->ext.actual, &c->loc);
+
   c->sub_name = sym->name;
   pure_subroutine(c, sym);
 
@@ -805,7 +806,8 @@ g95_symbol *sym;
 
   /* The reference is to an external name */
 
-  if (sym->attr.interface) g95_check_intents(sym->formal, c->ext.actual);
+  g95_procedure_use(sym, &c->ext.actual, &c->loc);
+
   c->sub_name = sym->name;
 
   pure_subroutine(c, sym);

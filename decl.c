@@ -1180,16 +1180,13 @@ match m;
   }
 
 ok:
-  if (progname->formal != NULL) {
-    g95_error("Symbol '%s' at %C already has an explicit interface",
-	      progname->name);
+  if (g95_add_explicit_interface(progname, IFSRC_DECL, head, NULL)==FAILURE) {
     m = MATCH_ERROR;
     goto cleanup;
   }
 
-  progname->formal = head;
   return MATCH_YES;
-  
+
 cleanup:
   g95_free_formal_arglist(head);
   return m;
@@ -1643,6 +1640,13 @@ match m;
   }
 
   if (g95_set_array_spec(sym, as, &var_locus) == FAILURE) {
+    m = MATCH_ERROR;
+    goto cleanup;
+  }
+
+  if ((current_attr.external || current_attr.intrinsic) &&
+      sym->attr.flavor != FL_PROCEDURE &&
+      g95_add_flavor(&sym->attr, FL_PROCEDURE, NULL) == FAILURE) {
     m = MATCH_ERROR;
     goto cleanup;
   }
