@@ -1,3 +1,7 @@
+2002-09-18  Steven Bosscher <s.bosscher@student.tudelft.nl>
+
+	* Make-lang.in (F95_ADDITIONAL_OBJS): Add tree-ssa-dce.o
+
 2002-09-14  Paul Brook <paul@nowt.org>
 
 	* trans.c (g95_create_module_variable): Move to trans-decl.c.

@@ -68,9 +68,9 @@ F95_OBJS = $(F95_PARSER_OBJS) \
 
 F95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o c-dump.o \
 	tree-cfg.o tree-dfa.o tree-optimize.o tree-simple.o \
-	tree-ssa.o tree-ssa-pre.o tree-ssa-ccp.o disjoint-set.o \
-	tree-alias-common.o tree-alias-ecr.o tree-alias-type.o \
-	tree-alias-steen.o tree-dchain.o
+	tree-ssa.o tree-ssa-pre.o tree-ssa-ccp.o tree-ssa-dce.o \
+	disjoint-set.o tree-alias-common.o tree-alias-ecr.o \
+	tree-alias-type.o tree-alias-steen.o tree-dchain.o
 
 # G95 uses GMP for its internal arithmetics.
 F95_LIBS = $(LIBS) -lgmp
