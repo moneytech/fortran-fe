@@ -1646,7 +1646,7 @@ g95_ref *ref;
  * reference that gives the size of the array. */
 
 static try resolve_allocate_expr(g95_expr *e) {
-int i, pointer, allocatable;
+int i, pointer, allocatable, dimension;
 symbol_attribute attr;
 g95_ref *ref, *ref2;
 g95_array_ref *ar;
@@ -1663,10 +1663,12 @@ g95_array_ref *ar;
 
     attr = g95_expr_attr(e);
     pointer = attr.pointer;
+    dimension = attr.dimension;
 
   } else {
     allocatable = e->symbol->attr.allocatable;
     pointer = e->symbol->attr.pointer;
+    dimension = e->symbol->attr.dimension;
 
     for(ref=e->ref; ref; ref2=ref, ref=ref->next)
       switch(ref->type) {
@@ -1679,6 +1681,7 @@ g95_array_ref *ar;
 		       ref->u.c.component->as->type == AS_DEFERRED);
 
 	pointer = ref->u.c.component->pointer;
+	dimension = ref->u.c.component->dimension;
 	break;
 
       case REF_SUBSTRING:
@@ -1694,7 +1697,7 @@ g95_array_ref *ar;
     return FAILURE;
   }
 
-  if (pointer) return SUCCESS;
+  if (pointer && dimension == 0) return SUCCESS;
 
   /* Make sure the next-to-last reference node is an array specification. */
 
