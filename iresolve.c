@@ -122,6 +122,18 @@ void g95_resolve_abs(g95_expr *f, g95_expr *a) {
 }
 
 
+void g95_resolve_aint(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = a->ts.type;
+  f->ts.kind = (kind == NULL) ? a->ts.kind
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__aint%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
+}
+
+
 void g95_resolve_all(g95_expr *f, g95_expr *mask, g95_expr *dim) {
 static char all0[] = "__all0", all1[] = "__all1";
 
@@ -136,6 +148,18 @@ static char all0[] = "__all0", all1[] = "__all1";
 }
 
 
+void g95_resolve_anint(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = a->ts.type;
+  f->ts.kind = (kind == NULL) ? a->ts.kind
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__anint%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
+}
+
+
 void g95_resolve_any(g95_expr *f, g95_expr *mask, g95_expr *dim) {
 static char any0[] = "__any0", any1[] = "__any1";
 
@@ -147,6 +171,60 @@ static char any0[] = "__any0", any1[] = "__any1";
     f->value.function.name = any1;
     f->rank = mask->rank - 1;
   }
+}
+
+
+void g95_resolve_btest(g95_expr *f, g95_expr *i, g95_expr *pos) {
+
+  f->ts.type = BT_LOGICAL;
+  f->ts.kind = g95_default_logical_kind();
+
+  f->value.function.name = get_string("__btest_%d_%d", i->ts.kind,
+				      pos->ts.kind);
+}
+
+
+void g95_resolve_ceiling(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = BT_INTEGER;
+  f->ts.kind = (kind == NULL) ? g95_default_integer_kind()
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__ceiling%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
+}
+
+
+void g95_resolve_char(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = BT_CHARACTER;
+  f->ts.kind = (kind == NULL) ? g95_default_character_kind()
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__char%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
+}
+
+
+void g95_resolve_cmplx(g95_expr *f, g95_expr *x, g95_expr *y, g95_expr *kind) {
+
+  f->ts.type = BT_COMPLEX;
+  f->ts.kind = (kind == NULL) ? g95_default_real_kind()
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__cmplx%d_%c%d_%c%d", f->ts.kind, g95_type_letter(x->ts.type),
+	       x->ts.kind, g95_type_letter(y->ts.type), y->ts.kind);
+}
+
+
+void g95_resolve_dim(g95_expr *f, g95_expr *x, g95_expr *y) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    get_string("__dim_%c_%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -168,30 +246,24 @@ g95_expr temp;
 }
 
 
-void g95_resolve_btest(g95_expr *f, g95_expr *i, g95_expr *pos) {
-
-  f->ts.type = BT_LOGICAL;
-  f->ts.kind = g95_default_logical_kind();
-
-  f->value.function.name = get_string("__btest_%d_%d", i->ts.kind,
-				      pos->ts.kind);
-}
-
-
-void g95_resolve_dim(g95_expr *f, g95_expr *x, g95_expr *y) {
-
-  f->ts = x->ts;
-  f->value.function.name =
-    get_string("__dim_%c_%d", g95_type_letter(x->ts.type), x->ts.kind);
-}
-
-
 void g95_resolve_exponent(g95_expr *f, g95_expr *x) {
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
 
   f->value.function.name = get_string("__exponent_%d", x->ts.kind);
+}
+
+
+void g95_resolve_floor(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = BT_INTEGER;
+  f->ts.kind = (kind == NULL) ? g95_default_integer_kind()
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__floor%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
 }
 
 
@@ -231,6 +303,18 @@ int s_kind;
   f->ts = i->ts;
   f->value.function.name =
     get_string("__ishftc_%d_%d_%d", i->ts.kind, shift->ts.kind, s_kind);
+}
+
+
+void g95_resolve_logical(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = BT_LOGICAL;
+  f->ts.kind = (kind == NULL) ? g95_default_logical_kind()
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__logical%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
 }
 
 
@@ -309,6 +393,18 @@ void g95_resolve_modulo(g95_expr *f, g95_expr *a, g95_expr *p) {
   f->ts = a->ts;
   f->value.function.name =
     get_string("__modulo_%c_%d", g95_type_letter(a->ts.type), a->ts.kind);
+}
+
+
+void g95_resolve_nint(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = BT_INTEGER;
+  f->ts.kind = (kind == NULL) ? g95_default_integer_kind()
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__nint%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
 }
 
 

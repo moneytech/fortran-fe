@@ -534,7 +534,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("aimag");
 
   add_sym("aint", 1, 1, BT_REAL, dr,
-	  g95_check_a_kind, g95_simplify_aint, NULL,
+	  g95_check_a_kind, g95_simplify_aint, g95_resolve_aint,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("dint", 1, 1, BT_REAL, dd,
@@ -552,7 +552,7 @@ int di, dr, dd, dl, dc, dz;
 	  ar, BT_UNKNOWN, 0, 0, NULL);
 
   add_sym("anint", 1, 1, BT_REAL, dr,
-	  g95_check_a_kind, g95_simplify_anint, NULL,
+	  g95_check_a_kind, g95_simplify_anint, g95_resolve_anint,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("dnint", 1, 1, BT_REAL, dd,
@@ -608,7 +608,7 @@ int di, dr, dd, dl, dc, dz;
 	  i, BT_INTEGER, di, 0,   pos, BT_INTEGER, di, 0, NULL);
 
   add_sym("ceiling", 1, 1, BT_INTEGER, di,
-	  g95_check_a_kind, g95_simplify_ceiling, NULL,
+	  g95_check_a_kind, g95_simplify_ceiling, g95_resolve_ceiling,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("char", 1, 0, BT_CHARACTER, dc,
@@ -618,7 +618,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("char");
 
   add_sym("cmplx", 1, 1, BT_COMPLEX, dz,
-	  g95_check_cmplx, g95_simplify_cmplx, NULL,
+	  g95_check_cmplx, g95_simplify_cmplx, g95_resolve_cmplx,
 	  x, BT_UNKNOWN, dr, 0,   y, BT_UNKNOWN, dr, 1,
 	  kind, BT_INTEGER, di, 1, NULL);
 
@@ -750,7 +750,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("floor", 1, 1, BT_INTEGER, di,
-	  g95_check_a_kind, g95_simplify_floor, NULL,
+	  g95_check_a_kind, g95_simplify_floor, g95_resolve_floor,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("fraction", 1, 1, BT_REAL, dr,
@@ -907,7 +907,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("log10");
 
   add_sym("logical", 0, 1, BT_LOGICAL, dl,
-	  g95_check_logical, g95_simplify_logical, NULL,
+	  g95_check_logical, g95_simplify_logical, g95_resolve_logical,
 	  l, BT_LOGICAL, dl, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("matmul", 0, 1, BT_REAL, dr,
@@ -1027,7 +1027,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dr, 0,   s, BT_REAL, dr, 0, NULL);
 
   add_sym("nint", 1, 1, BT_INTEGER, di,
-	  g95_check_a_kind, g95_simplify_nint, NULL,
+	  g95_check_a_kind, g95_simplify_nint, g95_resolve_nint,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("idnint", 1, 1, BT_INTEGER, di,
