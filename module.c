@@ -1554,35 +1554,43 @@ g95_expr *e;
 }
 
 
-/* mio_interface()-- Save/restore lists of g95_interface stuctures */
+/* mio_interface()-- Save/restore lists of g95_interface stuctures.
+ * When loading an interface, we are really appending to the existing
+ * list of interfaces.  Checking for duplicate and ambiguous
+ * interfaces has to be done later when all symbols have been loaded */
 
 static void mio_interface(g95_interface **ip) {
-g95_interface *head, *tail, *new;
+g95_interface *tail, *p;
 
   mio_lparen();
 
   if (iomode == IO_OUTPUT) {
     if (ip != NULL)
-      for(head=*ip; head; head=head->next)
-	mio_symbol_ref(&head->sym);
+      for(p=*ip; p; p=p->next)
+	mio_symbol_ref(&p->sym);
   } else {
-    head = tail = NULL;
+
+    if (*ip == NULL)
+      tail = NULL;
+    else {
+      tail = *ip;
+      while(tail->next)
+	tail = tail->next;
+    }
 
     for(;;) {
       if (peek_atom() == ATOM_RPAREN) break;
 
-      new = g95_get_interface();
-      mio_symbol_ref(&new->sym);
+      p = g95_get_interface();
+      mio_symbol_ref(&p->sym);
 
       if (tail == NULL)
-	head = new;
+	*ip = p;
       else
-	tail->next = new;
+	tail->next = p;
 
-      tail = new;
+      tail = p;
     }
-
-    *ip = head;
   }
 
   mio_rparen();
@@ -1591,7 +1599,9 @@ g95_interface *head, *tail, *new;
 
 /* mio_symbol()-- Unlike most other routines, the address of the
  * symbol node is already fixed on input and the name/module has
- * already been filled in */
+ * already been filled in.  The append_interface() subroutines assumes
+ * that the first five elements of symbol information are as they are
+ * here. */
 
 static void mio_symbol(g95_symbol *sym) {
 
@@ -1702,12 +1712,65 @@ g95_namespace *ns;
 }
 
 
+/* append_interface()-- This subroutine is called when we load a
+ * symbol, but the symbol is already present.  We still have to append
+ * the interface information found in the module to the symbol in
+ * memory, since additional interfaces could have been picked up along
+ * the way.  This subroutine makes assumptions about where
+ * mio_symbol() puts the interfaces with the symbol data. */
+
+void append_interface(symbol_info *info) {
+g95_symbol *sym;
+
+  set_module_locus(&info->where);
+  sym = info->sym;
+
+  mio_lparen();
+
+  skip_list();
+  skip_list();
+
+  mio_interface(&sym->operator);
+  mio_interface(&sym->generic);
+}
+
+
+/* check_mod_interface()-- Given a pointer to an interface pointer,
+ * remove duplace interfaces and make sure that no two interfaces are
+ * ambiguous between an actual argument list */
+
+void check_mod_interface(g95_interface **ip, char *if_name) {
+g95_interface *p, *q, *qlast;
+
+  if (*ip == NULL) return;
+
+  for(p=*ip; p; p=p->next) {
+    qlast = p;
+
+    for(q=p->next; q;) {
+      if (p->sym == q->sym) {   /* Duplicate interface */
+	qlast->next = q->next;
+	g95_free(q);
+
+	q = qlast->next;
+	continue;
+      }
+
+      if (g95_compare_interfaces(p->sym, q->sym))
+	g95_error("Ambiguous interfaces '%s' and '%s' in %s loaded at %C",
+		  p->sym->name, q->sym->name, if_name);
+
+      qlast = q;
+      q = q->next;
+    }
+  }
+}
+
 
 static void read_namespace(g95_namespace *ns) {
+char name[G95_MAX_SYMBOL_LEN+1], if_name[100];
 module_locus operator_interfaces, symbols;
-char name[G95_MAX_SYMBOL_LEN+1];
 int i, flag, ambiguous, symbol;
-g95_interface *head, *tail;
 symbol_info *info;
 g95_use_rename *u;
 g95_symtree *st;
@@ -1760,6 +1823,7 @@ g95_symbol *sym;
      * being loaded again. */
 
     sym = bf_sym_search(info);
+
     if (sym != NULL) {
       info->state = USED;
       info->sym = sym;
@@ -1769,6 +1833,14 @@ g95_symbol *sym;
 
     info->sym = g95_new_symbol(info->true_name, ns);
     strcpy(info->sym->module, info->module);
+  }
+
+  /* Append to interfaces of existing symbols */
+
+  info = sym_table;
+  for(i=0; i<sym_num; i++, info++) {
+    if (info->state != USED) continue;
+    append_interface(info);
   }
 
   mio_rparen();
@@ -1804,7 +1876,6 @@ g95_symbol *sym;
     if (st != NULL) {
       if (st->sym != info->sym) st->ambiguous = 1;
     } else {
-
       st = check_unique_name(name) ? get_unique_symtree(ns) :
 	g95_new_symtree(ns, name);
 
@@ -1825,6 +1896,8 @@ g95_symbol *sym;
   mio_lparen();
 
   for(i=0; i<G95_INTRINSIC_OPS; i++) {
+    if (i == INTRINSIC_USER) continue;
+
     if (only_flag) {
       u = find_use_operator(i);
 
@@ -1836,16 +1909,14 @@ g95_symbol *sym;
       u->found = 1;
     }
 
-    mio_interface(&head);
+    mio_interface(&ns->operator[i]);
 
-    if (head != NULL) {
-      for(tail=head; tail->next; tail=tail->next);
+    if (i == INTRINSIC_ASSIGN)
+      strcpy(if_name, "intrinsic assignment operator");
+    else
+      sprintf(if_name, "intrinsic %s operator", g95_op2string(i));
 
-/* TODO: Make sure new interfaces don't conflict with others already loaded */
-
-      tail->next = ns->operator[i];
-      ns->operator[i] = head;
-    }
+    check_mod_interface(&ns->operator[i], if_name);
   }
 
   /* At this point, we read those symbols that are needed but haven't
@@ -1896,6 +1967,22 @@ g95_symbol *sym;
     g95_error("Intrinsic operator '%s' referenced at %L not found in module "
 	      "'%s'", g95_op2string(u->operator), &u->where, module_name);
   }
+
+/* Check generic and user operator interfaces for consistency and to
+ * remove duplicate interfaces. */
+
+  info = sym_table;
+  for(i=0; i<sym_num; i++, info++) {
+    sym = info->sym;
+    if (sym == NULL) continue;
+
+    sprintf(name, "generic interface for '%s'", sym->name);
+    check_mod_interface(&sym->generic, if_name);
+
+    sprintf(name, "operator interface for '%s'", sym->name);
+    check_mod_interface(&sym->operator, if_name);
+  }
+
 
 /* Clean up symbol nodes that were never loaded, create references to
  * hidden symbols. */
