@@ -407,9 +407,10 @@ g95_typespec ts;
 
   /* See if we have an intrinsic function reference */
 
-  if (g95_intrinsic_name(sym->name, 0) && 
-      g95_intrinsic_func_interface(expr, 1) == MATCH_YES)
-    return SUCCESS;
+  if (g95_intrinsic_name(sym->name, 0)) {
+    if (g95_intrinsic_func_interface(expr, 1) == MATCH_YES) return SUCCESS;
+    return FAILURE;
+  }
 
   /* The reference is to an external name */
 

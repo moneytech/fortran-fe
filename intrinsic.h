@@ -32,6 +32,8 @@ try g95_check_all_any(g95_expr *, g95_expr *);
 try g95_check_allocated(g95_expr *);
 try g95_check_associated(g95_expr *, g95_expr *);
 try g95_check_atan2(g95_expr *, g95_expr *);
+try g95_check_bit_size(g95_expr *);
+try g95_check_btest(g95_expr *, g95_expr *);
 try g95_check_char(g95_expr *, g95_expr *);
 try g95_check_cmplx(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_count(g95_expr *, g95_expr *);
@@ -201,6 +203,7 @@ g95_expr *g95_simplify_verify(g95_expr *, g95_expr *, g95_expr *);
 
 void g95_resolve_all(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_any(g95_expr *, g95_expr *, g95_expr *);
+void g95_resolve_btest(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_dot_product(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_max(g95_expr *, g95_expr *);
 void g95_resolve_maxval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);

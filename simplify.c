@@ -577,12 +577,17 @@ mpf_t term;
 
 
 g95_expr *g95_simplify_bit_size(g95_expr *e) {
+g95_expr *result;
 int i;
 
   i = g95_validate_kind(e->ts.type, e->ts.kind);
   if (i < 0) g95_internal_error("In g95_simplify_bit_size(): bad kind");
 
-  return g95_int_expr(g95_integer_kinds[i].bit_size);
+  result = g95_constant_result(BT_INTEGER, e->ts.kind);
+  mpz_set_ui(result->value.integer, g95_integer_kinds[i].bit_size);
+  result->where = e->where;
+
+  return result;
 }
 
 

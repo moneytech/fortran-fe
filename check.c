@@ -310,7 +310,6 @@ symbol_attribute attr;
 try g95_check_a_kind(g95_expr *a, g95_expr *kind) {
 
   if (type_check(a, 0, BT_REAL) == FAILURE) return FAILURE;
-
   if (kind_check(kind, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
@@ -320,7 +319,6 @@ try g95_check_a_kind(g95_expr *a, g95_expr *kind) {
 try g95_check_atan2(g95_expr *y, g95_expr *x) {
 
   if (type_check(y, 0, BT_REAL) == FAILURE) return FAILURE;
-
   if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
 
   if (x->ts.kind != y->ts.kind) {
@@ -332,10 +330,26 @@ try g95_check_atan2(g95_expr *y, g95_expr *x) {
 }
 
 
-try g95_check_char(g95_expr *i, g95_expr *kind) {
+try g95_check_bit_size(g95_expr *i) {
 
   if (type_check(i, 0, BT_INTEGER) == FAILURE) return FAILURE;
 
+  return SUCCESS;
+}
+
+
+try g95_check_btest(g95_expr *i, g95_expr *pos) {
+
+  if (type_check(i, 0, BT_INTEGER) == FAILURE) return FAILURE;
+  if (type_check(pos, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+try g95_check_char(g95_expr *i, g95_expr *kind) {
+
+  if (type_check(i, 0, BT_INTEGER) == FAILURE) return FAILURE;
   if (kind_check(kind, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
@@ -364,7 +378,6 @@ try g95_check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
 try g95_check_count(g95_expr *mask, g95_expr *dim) {
 
   if (logical_array_check(mask, 0) == FAILURE) return FAILURE;
-
   if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
@@ -706,11 +719,12 @@ try g95_check_matmul(g95_expr *matrix_a, g95_expr *matrix_b) {
 
   switch(matrix_a->rank) {
   case 1:
-    if (rank_check(matrix_b, 2, 2) == FAILURE) return FAILURE;
+    if (rank_check(matrix_b, 1, 2) == FAILURE) return FAILURE;
     break;
 
   case 2:
-    if (rank_check(matrix_b, 2, 1) == FAILURE) return FAILURE;
+    if (matrix_b->rank == 2) break;
+    if (rank_check(matrix_b, 1, 1) == FAILURE) return FAILURE;
     break;
 
   default:

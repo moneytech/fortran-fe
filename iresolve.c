@@ -33,7 +33,7 @@ static char temp_name[30];
 /* String Pool.  This is used to provide a stable location for various
  * string constants. */
 
-#define G95_STRINGPOOL_SIZE 600
+#define G95_STRINGPOOL_SIZE 800
 
 static char *pool_base, *pool_top;
 
@@ -68,7 +68,7 @@ char *p;
     p = strchr(p, '\0') + 1;
   }
 
-  g95_internal_error("get_string(): string not found");
+  g95_internal_error("get_string(): string '%s' not found", string);
   return NULL;
 }
 
@@ -115,7 +115,6 @@ static char *dot_name(bt type, int kind) {
 }
 
 
-
 void g95_resolve_dot_product(g95_expr *f, g95_expr *a, g95_expr *b) {
 g95_expr temp;
 
@@ -132,6 +131,21 @@ g95_expr temp;
   f->value.function.name = get_string(dot_name(f->ts.type, f->ts.kind));
 }
 
+
+static char *btest_name(int k1, int k2) {
+
+  sprintf(temp_name, "__btest_%d_%d", k1, k2);
+  return temp_name;
+}
+
+
+void g95_resolve_btest(g95_expr *f, g95_expr *i, g95_expr *pos) {
+
+  f->ts.type = BT_LOGICAL;
+  f->ts.kind = g95_default_logical_kind();
+
+  f->value.function.name = get_string(btest_name(i->ts.kind, pos->ts.kind));
+}
 
 
 static char *max_name(bt type, int kind) {
@@ -283,6 +297,13 @@ int i, j, k, ik, rk;
 
     add_string(min_name(BT_INTEGER, k));
     add_string(max_name(BT_INTEGER, k));
+
+
+    for(j=0; g95_integer_kinds[j].kind; j++) {
+      ik = g95_integer_kinds[j].kind;
+
+      add_string(btest_name(k, ik));
+    }
   }
 
   /* Generate names of real and complex names */
@@ -321,4 +342,3 @@ void g95_iresolve_done_1(void) {
 
   g95_free(pool_base);
 }
-

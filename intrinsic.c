@@ -612,11 +612,11 @@ int di, dr, dd, dl, dc, dz;
   make_generic("atan2");
 
   add_sym("bit_size", 1, 1, BT_INTEGER, di,
-	  NULL, g95_simplify_bit_size, NULL,
+	  g95_check_bit_size, g95_simplify_bit_size, NULL,
 	  i, BT_INTEGER, di, 0, NULL);
 
   add_sym("btest", 0, 1, BT_LOGICAL, dl,
-	  NULL, g95_simplify_btest, NULL,
+	  g95_check_btest, g95_simplify_btest, g95_resolve_btest,
 	  i, BT_INTEGER, di, 0,   pos, BT_INTEGER, di, 0, NULL);
 
   add_sym("ceiling", 0, 1, BT_INTEGER, di,
@@ -1586,19 +1586,11 @@ g95_actual_arglist *actual;
 intrinsic_arg *formal;
 int i;
 
-  i = 0; 
-  for(formal=sym->arg; formal; formal=formal->next) {
-    if (i >= MAX_INTRINSIC_ARGS)
-      g95_internal_error("check_arglist(): MAX_INTRINSICS_ARGS too small");
-
-    g95_intrinsic_arg[i++] = formal->name;
-  }
-
   formal = sym->arg;
   actual = *ap;
 
   i = 0;
-  for(; formal; formal=formal->next, actual=actual->next) {
+  for(; formal; formal=formal->next, actual=actual->next, i++) {
     if (actual->expr == NULL) continue;
 
     if (!g95_compare_types(&formal->ts, &actual->expr->ts)) {
@@ -1777,7 +1769,9 @@ g95_actual_arglist *arg;
 static try check_specific(intrinsic_sym *specific, g95_expr *expr,
 			  int error_flag) {
 g95_actual_arglist **ap;
+intrinsic_arg *formal;
 try t;
+int i;
 
   ap = &expr->value.function.actual;
   lib_name = NULL;
@@ -1790,13 +1784,21 @@ try t;
       specific->check == g95_check_min_max_double)
     return (*specific->check)(*ap);
 
+  i = 0; 
+  for(formal=specific->arg; formal; formal=formal->next) {
+    if (i >= MAX_INTRINSIC_ARGS)
+      g95_internal_error("check_arglist(): MAX_INTRINSICS_ARGS too small");
+
+    g95_intrinsic_arg[i++] = formal->name;
+  }
+
   if (sort_actual(specific->name, ap, specific->arg, &expr->where) == FAILURE)
     return FAILURE;
 
   if (specific->check == NULL) {
     t = check_arglist(ap, specific, error_flag);
     if (t == SUCCESS) expr->ts = specific->ts;
-  } else 
+  } else
     t = do_check(specific, *ap);
 
   if (t == FAILURE) remove_nullargs(ap);
