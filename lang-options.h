@@ -27,6 +27,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
 { "-Wimplicit",
       N_("Warn whenever a variable, array, or function is implicitly "
 	 "declared") },
+{ "-Wsurprising",
+      N_("Warn about \"suspicious\" constructs") },
 { "-F",
       N_("Parse an F program") },
 { "-d8",

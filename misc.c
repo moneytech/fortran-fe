@@ -383,6 +383,11 @@ int i;
     return 1;
   }
 
+  if (strcmp(option, "-Wsurprising") == 0) {
+    g95_option.surprising = 1;
+    return 1;
+  }
+
   if (strcmp(option, "-F") == 0) {
     g95_option.fmode = 1;
     return 1;
@@ -532,6 +537,7 @@ void g95_init_options(void) {
   g95_option.module_dir = NULL;
   g95_option.verbose = 0;
   g95_option.pedantic = 0;
+  g95_option.surprising = 0;
   g95_option.line_truncation = 0;
   g95_option.implicit_none = 0;
   g95_option.fixed_line_length = 72;

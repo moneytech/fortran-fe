@@ -234,6 +234,32 @@ overlap:
   return FAILURE;  
 }
 
+/* sane_logical_select() -- Make sure there are only two CASE labels for
+ * a SELECT CASE construct if the selector expression is of type
+ * LOGICAL. */
+
+static try sane_logical_select(case_tree *tree) {
+g95_case *t;
+int deflt, leaves;
+try result;
+ 
+  result = SUCCESS;
+  t = tree->root.link[0];
+
+  /* deflt is nonzero if we have a default case. */
+  deflt = (tree->default_case != NULL);
+
+  /* See what other cases we have.  */
+  if (t)  /* could have been empty tree.  */
+    leaves = (t->link[0] == NULL && t->link[1] == NULL) ? 1 : 2;
+  else
+    leaves = 0;
+
+  if (leaves == 2 && deflt) result = FAILURE; /* 3 cases for logical... */
+
+  return result;
+}
+
 #if 0
 /* traverse_tree() -- visits root, then left, then right (RLN).
  * This is a first step towards generating code for CHARACTER cases. */
@@ -559,6 +585,12 @@ try t;
     }
   }
 
+  /* More than two cases is insane for logical selects.  */
+  if (g95_option.surprising && type == BT_LOGICAL &&
+      sane_logical_select (tree) != SUCCESS)
+    g95_warning("Logical SELECT CASE block at %L has more that two cases",
+		&code->loc);
+  
   if ((t == FAILURE) || overlap) goto done;
 
 #if 0
