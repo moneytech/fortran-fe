@@ -246,7 +246,7 @@ match m;
   if (g95_match_eos() == MATCH_NO) goto syntax;
 
   new_st.op = EXEC_OPEN;
-  new_st.ext = open;
+  new_st.ext.open = open;
   return MATCH_YES;
 
 syntax:
@@ -318,7 +318,7 @@ match m;
   if (g95_match_eos() == MATCH_NO) goto syntax;
 
   new_st.op = EXEC_CLOSE;
-  new_st.ext = close;
+  new_st.ext.close = close;
   return MATCH_YES;
 
 syntax:
@@ -404,7 +404,7 @@ done:
   if (g95_match_eos() != MATCH_YES) goto syntax;
 
   new_st.op = op;
-  new_st.ext = fp;
+  new_st.ext.filepos = fp;
   return MATCH_YES;
 
 syntax:
@@ -793,7 +793,7 @@ match m;
 
   new = g95_get_code();
   new->op = EXEC_DO;
-  new->ext = iter;
+  new->ext.iterator = iter;
 
   new->block = g95_get_code();
   new->block->op = EXEC_DO;
@@ -961,7 +961,7 @@ get_io_list:
     g95_check_format_string(expr);
 
   new_st.op = (k == M_READ) ? EXEC_READ : EXEC_WRITE;
-  new_st.ext = dt;
+  new_st.ext.dt = dt;
   new_st.next = io_code;
 
   return MATCH_YES;
@@ -1115,7 +1115,7 @@ match m;
   if (g95_match_eos() != MATCH_YES) goto syntax;
 
   new_st.op = EXEC_INQUIRE;
-  new_st.ext = inquire;
+  new_st.ext.inquire = inquire;
   return MATCH_YES;
 
 syntax:

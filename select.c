@@ -156,7 +156,7 @@ match m;
     if (m == MATCH_ERROR) goto cleanup;
 
     new_st.op = EXEC_SELECT;
-    new_st.ext = g95_get_case();
+    new_st.ext.case_list = g95_get_case();
     return MATCH_YES;
   }
 
@@ -181,7 +181,7 @@ match m;
   if (m == MATCH_ERROR) goto cleanup;
 
   new_st.op = EXEC_SELECT;
-  new_st.ext = head;
+  new_st.ext.case_list = head;
 
   return MATCH_YES;
 
@@ -250,7 +250,7 @@ try t;
 
     if (t == FAILURE) continue;
 
-    for(cp=body->ext; cp; cp=cp->next) {
+    for(cp=body->ext.case_list; cp; cp=cp->next) {
       if (cp->low != NULL) {
 	if (g95_resolve_expr(cp->low) == FAILURE) {
 	  t = FAILURE;

@@ -663,36 +663,6 @@ typedef struct g95_equiv {
 
 #define g95_get_equiv() g95_getmem(sizeof(g95_equiv))
 
-
-/* Executable statements that fill g95_code structures */
-
-typedef enum {
-  EXEC_NOP=1, EXEC_ASSIGN, EXEC_POINTER_ASSIGN, EXEC_GOTO, EXEC_CALL,
-  EXEC_RETURN, EXEC_STOP,
-  EXEC_IF, EXEC_ARITHMETIC_IF, EXEC_DO, EXEC_DO_WHILE, EXEC_SELECT,
-  EXEC_FORALL, EXEC_WHERE, EXEC_CYCLE, EXEC_EXIT,
-  EXEC_ALLOCATE, EXEC_DEALLOCATE, EXEC_NULLIFY,
-  EXEC_OPEN, EXEC_CLOSE, EXEC_READ, EXEC_WRITE, EXEC_IOLENGTH,
-  EXEC_BACKSPACE, EXEC_ENDFILE, EXEC_INQUIRE, EXEC_REWIND
-} g95_exec_op;
-
-typedef struct g95_code {
-  g95_exec_op op;
-
-  struct g95_code *block, *next;
-  locus loc;
-
-  int here, label, label2, label3;
-  g95_symbol *sym;
-  g95_expr *expr, *expr2;
-
-  void *ext;     /* Points to additional structures required by statement */
-
-} g95_code;
-
-extern g95_code new_st;
-#define g95_get_code() g95_getmem(sizeof(g95_code))
-
 /* g95_case stores the selector list of a case statement.  The *low
  * and *high pointers can point to the same expression in the case of
  * a single value.  If *high is NULL, the selection is from *low
@@ -702,7 +672,7 @@ typedef struct g95_case {
   g95_expr *low, *high;
 
   struct g95_case *left, *right, *next;
-  g95_code *back;
+  struct g95_code *back;
  
 } g95_case;
 
@@ -788,6 +758,46 @@ typedef struct g95_forall_iterator {
   struct g95_forall_iterator *next;
 } g95_forall_iterator;
 
+
+/* Executable statements that fill g95_code structures */
+
+typedef enum {
+  EXEC_NOP=1, EXEC_ASSIGN, EXEC_POINTER_ASSIGN, EXEC_GOTO, EXEC_CALL,
+  EXEC_RETURN, EXEC_STOP,
+  EXEC_IF, EXEC_ARITHMETIC_IF, EXEC_DO, EXEC_DO_WHILE, EXEC_SELECT,
+  EXEC_FORALL, EXEC_WHERE, EXEC_CYCLE, EXEC_EXIT,
+  EXEC_ALLOCATE, EXEC_DEALLOCATE, EXEC_NULLIFY,
+  EXEC_OPEN, EXEC_CLOSE, EXEC_READ, EXEC_WRITE, EXEC_IOLENGTH,
+  EXEC_BACKSPACE, EXEC_ENDFILE, EXEC_INQUIRE, EXEC_REWIND
+} g95_exec_op;
+
+typedef struct g95_code {
+  g95_exec_op op;
+
+  struct g95_code *block, *next;
+  locus loc;
+
+  int here, label, label2, label3;
+  g95_symbol *sym;
+  g95_expr *expr, *expr2;
+
+  union {
+    g95_actual_arglist *arglist;
+    g95_case *case_list;
+    g95_iterator *iterator;
+    g95_alloc *alloc_list;
+    g95_open *open;
+    g95_close *close;
+    g95_filepos *filepos;
+    g95_inquire *inquire;
+    g95_dt *dt;
+    g95_forall_iterator *forall_iterator;
+  } ext;     /* Points to additional structures required by statement */
+
+} g95_code;
+
+extern g95_code new_st;
+#define g95_get_code() g95_getmem(sizeof(g95_code))
 
 /* Storage for DATA statements */
 

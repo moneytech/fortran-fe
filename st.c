@@ -45,7 +45,7 @@ void g95_clear_new_st(void) {
 g95_code *g95_add_statement(void) {
 g95_code *p;
 
-  p = g95_getmem(sizeof(g95_code));
+  p = g95_get_code();
   *p = new_st;
 
   p->loc = *g95_current_locus();
@@ -114,48 +114,48 @@ static void free_statement(g95_code *p) {
     break;
 
   case EXEC_CALL:
-    g95_free_actual_arglist(p->ext);
+    g95_free_actual_arglist(p->ext.arglist);
     break;
 
   case EXEC_SELECT:
-    if (p->ext) g95_free_case_list(p->ext);
+    if (p->ext.case_list) g95_free_case_list(p->ext.case_list);
     break;
 
   case EXEC_DO:
-    g95_free_iterator(p->ext, 1);
+    g95_free_iterator(p->ext.iterator, 1);
     break;
 
   case EXEC_ALLOCATE:
   case EXEC_DEALLOCATE:
   case EXEC_NULLIFY:
-    g95_free_alloc_list(p->ext);
+    g95_free_alloc_list(p->ext.alloc_list);
     break;
 
   case EXEC_OPEN:
-    g95_free_open(p->ext);
+    g95_free_open(p->ext.open);
     break;
 
   case EXEC_CLOSE:
-    g95_free_close(p->ext);
+    g95_free_close(p->ext.close);
     break;
 
   case EXEC_BACKSPACE:
   case EXEC_ENDFILE:
   case EXEC_REWIND:
-    g95_free_filepos(p->ext);
+    g95_free_filepos(p->ext.filepos);
     break;
 
   case EXEC_INQUIRE:
-    g95_free_inquire(p->ext);
+    g95_free_inquire(p->ext.inquire);
     break;
 
   case EXEC_READ:
   case EXEC_WRITE:
-    g95_free_dt(p->ext);
+    g95_free_dt(p->ext.dt);
     break;
 
   case EXEC_FORALL:
-    g95_free_forall_iterator(p->ext);
+    g95_free_forall_iterator(p->ext.forall_iterator);
     break;
 
   default:
@@ -332,7 +332,7 @@ g95_alloc *a;
     case EXEC_DO:
       g95_reference_st_label(code->label, ST_LABEL_TARGET);
 
-      if (code->ext != NULL) g95_resolve_iterator(code->ext);
+      if (code->ext.iterator != NULL) g95_resolve_iterator(code->ext.iterator);
       break;
 
     case EXEC_DO_WHILE:
@@ -346,7 +346,7 @@ g95_alloc *a;
 	g95_error("STAT tag in ALLOCATE statement at %L must be "
 		  "of type INTEGER", &code->expr->where);
 
-      for(a=code->ext; a; a=a->next)
+      for(a=code->ext.alloc_list; a; a=a->next)
 	g95_resolve_expr(a->expr);
       break;
 
@@ -355,35 +355,35 @@ g95_alloc *a;
 	g95_error("STAT tag in DEALLOCATE statement at %L must be of type "
 		  "INTEGER", &code->expr->where);
 
-      for(a=code->ext; a; a=a->next)
+      for(a=code->ext.alloc_list; a; a=a->next)
 	g95_resolve_expr(a->expr);
       break;
 
     case EXEC_OPEN:
-      g95_resolve_open(code->ext);
+      g95_resolve_open(code->ext.open);
       break;
 
     case EXEC_CLOSE:
-      g95_resolve_close(code->ext);
+      g95_resolve_close(code->ext.close);
       break;
 
     case EXEC_BACKSPACE:
     case EXEC_ENDFILE:
     case EXEC_REWIND:
-      g95_resolve_filepos(code->ext);
+      g95_resolve_filepos(code->ext.filepos);
       break;
 
     case EXEC_INQUIRE:
-      g95_resolve_inquire(code->ext);
+      g95_resolve_inquire(code->ext.inquire);
       break;
 
     case EXEC_READ:
     case EXEC_WRITE:
-      g95_resolve_dt(code->ext);
+      g95_resolve_dt(code->ext.dt);
       break;
 
     case EXEC_FORALL:
-      resolve_forall_iterators(code->ext);
+      resolve_forall_iterators(code->ext.forall_iterator);
       if (code->expr != NULL && code->expr->ts.type != BT_LOGICAL)
 	g95_error("FORALL mask clause at %L requires a LOGICAL expression",
 		  &code->expr->where);
@@ -530,7 +530,7 @@ g95_dt *dt;
 
   case EXEC_CALL:
     g95_status("CALL %s ", c->sym->name);
-    g95_show_actual_arglist(c->ext);
+    g95_show_actual_arglist(c->ext.arglist);
     break;
 
   case EXEC_RETURN:
@@ -592,7 +592,7 @@ g95_dt *dt;
       code_indent(level, 0);
 
       g95_status("CASE ");
-      for(cp=d->ext; cp; cp=cp->next) {
+      for(cp=d->ext.case_list; cp; cp=cp->next) {
 	g95_status_char('(');
 	g95_show_expr(cp->low);
 	g95_status_char(' ');
@@ -640,7 +640,7 @@ g95_dt *dt;
 
   case EXEC_FORALL:
     g95_status("FORALL ");
-    for(fa=c->ext; fa; fa=fa->next) {
+    for(fa=c->ext.forall_iterator; fa; fa=fa->next) {
       g95_show_expr(fa->var);
       g95_status_char(' ');
       g95_show_expr(fa->start);
@@ -666,13 +666,13 @@ g95_dt *dt;
     
   case EXEC_DO:
     g95_status("DO ");
-    g95_show_expr(((g95_iterator *) (c->ext))->var);
+    g95_show_expr(((g95_iterator *) (c->ext.forall_iterator))->var);
     g95_status_char('=');
-    g95_show_expr(((g95_iterator *) (c->ext))->start);
+    g95_show_expr(((g95_iterator *) (c->ext.forall_iterator))->start);
     g95_status_char(' ');
-    g95_show_expr(((g95_iterator *) (c->ext))->end);
+    g95_show_expr(((g95_iterator *) (c->ext.forall_iterator))->end);
     g95_status_char(' ');
-    g95_show_expr(((g95_iterator *) (c->ext))->step);
+    g95_show_expr(((g95_iterator *) (c->ext.forall_iterator))->step);
     g95_status_char('\n');
 
     g95_show_code(level+1, c->block->next);
@@ -709,7 +709,7 @@ g95_dt *dt;
       g95_show_expr(c->expr);
     }
 
-    for(a=c->ext; a; a=a->next) {
+    for(a=c->ext.alloc_list; a; a=a->next) {
       g95_status_char(' ');
       g95_show_expr(a->expr);
     }
@@ -718,7 +718,7 @@ g95_dt *dt;
 
   case EXEC_NULLIFY:
     g95_status("NULLIFY");
-    for(a=c->ext; a; a=a->next) {
+    for(a=c->ext.alloc_list; a; a=a->next) {
       g95_status_char(' ');
       g95_show_expr(a->expr);
     }
@@ -732,7 +732,7 @@ g95_dt *dt;
       g95_show_expr(c->expr);
     }
 
-    for(a=c->ext; a; a=a->next) {
+    for(a=c->ext.alloc_list; a; a=a->next) {
       g95_status_char(' ');
       g95_show_expr(a->expr);
     }
@@ -741,7 +741,7 @@ g95_dt *dt;
 
   case EXEC_OPEN:
     g95_status("OPEN");
-    open = c->ext;
+    open = c->ext.open;
 
     if (open->unit) { g95_status(" UNIT="); g95_show_expr(open->unit); }
     if (open->iostat) { g95_status(" IOSTAT="); g95_show_expr(open->iostat); }
@@ -762,7 +762,7 @@ g95_dt *dt;
 
   case EXEC_CLOSE:
     g95_status("CLOSE");
-    close = c->ext;
+    close = c->ext.close;
 
     if (close->unit) { g95_status(" UNIT="); g95_show_expr(close->unit); }
     if (close->iostat) { g95_status(" IOSTAT="); g95_show_expr(close->iostat);}
@@ -782,7 +782,7 @@ g95_dt *dt;
     g95_status("REWIND");
 
   show_filepos:
-    fp = c->ext;
+    fp = c->ext.filepos;
 
     if (fp->unit) { g95_status(" UNIT="); g95_show_expr(fp->unit); }
     if (fp->iostat) { g95_status(" IOSTAT="); g95_show_expr(fp->iostat); }
@@ -791,7 +791,7 @@ g95_dt *dt;
 
   case EXEC_INQUIRE:
     g95_status("INQUIRE");
-    i = c->ext;
+    i = c->ext.inquire;
 
     if (i->unit) { g95_status(" UNIT="); g95_show_expr(i->unit); }
     if (i->file) { g95_status(" FILE="); g95_show_expr(i->file); }
@@ -841,7 +841,7 @@ g95_dt *dt;
     g95_status("WRITE");
 
   show_dt:
-    dt = c->ext;
+    dt = c->ext.dt;
     if (dt->io_unit) {
       g95_status(" UNIT="); g95_show_expr(dt->io_unit); }
 

@@ -471,11 +471,11 @@ g95_code *c;
     expr = va_arg(argp, g95_expr *);
     if (expr == NULL) break;
 
-    if (c->ext == NULL) {
-      tail = g95_get_code();
-      c->ext = tail;
+    if (c->ext.arglist == NULL) {
+      tail = g95_get_actual_arglist();
+      c->ext.arglist = tail;
     } else {
-      tail->next = g95_get_code();
+      tail->next = g95_get_actual_arglist();
       tail = tail->next;
     }
 

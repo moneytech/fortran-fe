@@ -1005,7 +1005,7 @@ done:
   if (new_st.op == EXEC_DO_WHILE)
     new_st.expr = iter.end;
   else {
-    new_st.ext = ip = g95_get_iterator();
+    new_st.ext.iterator = ip = g95_get_iterator();
     *ip = iter;
   }
 
@@ -1240,9 +1240,9 @@ match m;
     tail->label = label;
     tail->op = EXEC_SELECT;
 
-    cp = g95_getmem(sizeof(g95_case));
+    cp = g95_get_case();
     cp->low = cp->high = g95_int_expr(i++);
-    tail->ext = cp;
+    tail->ext.case_list = cp;
 
     tail->next = g95_get_code();
     tail->next->op = EXEC_GOTO;
@@ -1343,7 +1343,7 @@ match m;
 
   new_st.op = EXEC_ALLOCATE;
   new_st.expr = stat;
-  new_st.ext = head;
+  new_st.ext.alloc_list = head;
 
   return MATCH_YES;
 
@@ -1390,7 +1390,7 @@ match m;
   }
 
   new_st.op = EXEC_NULLIFY;
-  new_st.ext = head;
+  new_st.ext.alloc_list = head;
 
   return MATCH_YES;
 
@@ -1446,7 +1446,7 @@ match m;
 
   new_st.op = EXEC_DEALLOCATE;
   new_st.expr = stat;
-  new_st.ext = head;
+  new_st.ext.alloc_list = head;
 
   return MATCH_YES;
 
@@ -1558,7 +1558,7 @@ int i;
 
       new_case = g95_get_case();
       new_case->high = new_case->low = g95_int_expr(i);
-      c->ext = new_case;
+      c->ext.case_list = new_case;
 
       c->next = g95_get_code();
       c->next->op = EXEC_GOTO;
@@ -1572,7 +1572,7 @@ int i;
 
   new_st.op = EXEC_CALL;
   new_st.sym = sym;
-  new_st.ext = arglist;
+  new_st.ext.arglist = arglist;
 
   return MATCH_YES;
 
@@ -2395,7 +2395,7 @@ match m0, m;
 
     new_st.op = EXEC_FORALL;
     new_st.expr = mask;
-    new_st.ext = head;
+    new_st.ext.forall_iterator = head;
 
     return MATCH_YES;
   }
@@ -2416,7 +2416,7 @@ match m0, m;
   g95_clear_new_st();
   new_st.op = EXEC_FORALL;
   new_st.expr = mask;
-  new_st.ext = head;
+  new_st.ext.forall_iterator = head;
   new_st.block = g95_get_code();
 
   new_st.block->op = EXEC_FORALL;
