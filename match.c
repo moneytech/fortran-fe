@@ -200,7 +200,10 @@ match m;
   m = g95_match(" %n :", name);
   if (m != MATCH_YES) return m;
 
-  if (g95_findget_symbol(name, NULL, 0, &g95_new_block)) return MATCH_ERROR;
+  if (g95_findget_symbol(name, NULL, 0, &g95_new_block)) {
+    g95_error("Label name '%s' at %C is ambiguous", name);
+    return MATCH_ERROR;
+  }
 
   if (g95_new_block->attr.flavor != FL_LABEL &&
       g95_add_flavor(&g95_new_block->attr, FL_LABEL, NULL) == FAILURE)
@@ -1550,7 +1553,10 @@ int i;
   if (m == MATCH_NO) goto syntax;
   if (m != MATCH_YES) return m;
 
-  if (g95_findget_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+  if (g95_findget_symbol(name, NULL, 0, &sym)) {
+    g95_error("Procedure name '%s' at %C is ambiguous", name);
+    return MATCH_ERROR;
+  }
 
   if (!sym->attr.generic &&
       !sym->attr.subroutine &&

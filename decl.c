@@ -717,7 +717,10 @@ match m;
 
   /* Search for the name but allow the components to be defined later. */
 
-  if (g95_findget_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+  if (g95_findget_symbol(name, NULL, 0, &sym)) {
+    g95_error("Type name '%s' at %C is ambiguous", name);
+    return MATCH_ERROR;
+  }
 
   if (sym->attr.flavor != FL_DERIVED &&
       g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
@@ -985,7 +988,7 @@ match m;
     if (current_attr.pointer && g95_current_state() == COMP_DERIVED) goto ok;
 
     if (g95_find_symbol(current_ts.derived->name,
-			current_ts.derived->ns->parent, 1, &sym)) goto ok;
+			current_ts.derived->ns->parent, 1, &sym) == 0) goto ok;
 
     /* Hope that an ambiguous symbol is itself masked by a type definition */
 
