@@ -561,7 +561,7 @@ g95_expr *op1, *op2;
 
   if (op1->ts.type == BT_INTEGER && op2->ts.type == BT_REAL) {
     e->ts.type = BT_REAL;
-    e->ts.kind = op1->ts.kind;
+    e->ts.kind = op2->ts.kind;
 
     g95_convert_type(e->op1, &e->ts, 2);
     goto done;
