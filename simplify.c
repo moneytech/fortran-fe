@@ -2034,64 +2034,47 @@ mpf_t quot, iquot, term;
 
   switch (a->ts.type) {
   case BT_INTEGER:
-    if (p->ts.type != BT_INTEGER ) {
-      g95_error("Type of arguments of MOD at %L must agree",
-		&a->where);
+    if (g95_compare_expr(p, integer_zero) == 0) {
+      /* Result is processor-dependent */
+      g95_error("Second argument MOD at %L is zero", &a->where);
       return &g95_bad_expr;
+    }
 
-    		}
-    		else {
-	      	  if (g95_compare_expr(p, integer_zero) != 0) {
-			result =g95_constant_result(BT_INTEGER,a->ts.kind);
-			result->where = a->where;
-       		 	mpz_tdiv_r(result->value.integer, a->value.integer, 
-                                                       p->value.integer);
-			return range_check(result, "MOD");
-      		  }
-      		  else {
-		  /* Result is processor-dependent */
-       		 	g95_error("Second argument MOD at %L is zero",
-  		       		  &a->where);
-			return &g95_bad_expr;
-      		  }
-		}
-    	case BT_REAL:
-	    	if (p->ts.type != BT_REAL ) {
-		      g95_error("Type of arguments of MOD at %L must agree",
-  				&a->where);
-		      return &g95_bad_expr;
-    		}
-	    	else {
-      		  if (g95_compare_expr(p, real_zero) != 0) {
-			result =g95_constant_result(BT_REAL,a->ts.kind);
-			result->where = a->where;
-			mpf_init(quot);
-			mpf_init(iquot);
-			mpf_init(term);
-			mpf_div(quot, a->value.real,p->value.real);
-			mpf_trunc(iquot, quot);
-			mpf_mul(term, iquot, p->value.real);
-			mpf_sub(result->value.real, a->value.real, term);
-			mpf_clear(quot);
-			mpf_clear(iquot);
-			mpf_clear(term);
-			return range_check(result, "MOD");
-      		  }
-      		  else {
-		  /* Result is processor-dependent */
-       		 	g95_error("Second argument of MOD at %L is zero",
-  	       			  &p->where);
-			return &g95_bad_expr;
-      		  }
-		}
-    		break;
-	    default:
-       		g95_error("Type of arguments of MOD at %L must be real or integer",
-	 	       	&a->where);
-		return &g95_bad_expr;
+    result = g95_constant_result(BT_INTEGER,a->ts.kind);
+    result->where = a->where;
+    mpz_tdiv_r(result->value.integer, a->value.integer, p->value.integer);
+    break;
+
+  case BT_REAL:
+    if (g95_compare_expr(p, real_zero) == 0) {
+      /* Result is processor-dependent */
+
+      g95_error("Second argument of MOD at %L is zero", &p->where);
+      return &g95_bad_expr;
+    }
+
+    result =g95_constant_result(BT_REAL,a->ts.kind);
+    result->where = a->where;
+    
+    mpf_init(quot);
+    mpf_init(iquot);
+    mpf_init(term);
+    mpf_div(quot, a->value.real,p->value.real);
+    mpf_trunc(iquot, quot);
+    mpf_mul(term, iquot, p->value.real);
+    mpf_sub(result->value.real, a->value.real, term);
+    mpf_clear(quot);
+    mpf_clear(iquot);
+    mpf_clear(term);
+    break;
+
+  default:
+    g95_internal_error("g95_simplify_mod(): Bad arguments");
   }
 
+  return range_check(result, "MOD");
 }
+
 
 
 g95_expr *g95_simplify_modulo(g95_expr *a, g95_expr *p) {
@@ -2102,64 +2085,51 @@ mpf_t quot, iquot, term;
     return NULL;
 
   switch (a->ts.type) {
-    	case BT_INTEGER:
-	    	if (p->ts.type != BT_INTEGER ) {
-	     	        g95_error("Type of arguments of MODULO at %L must agree",
-  				&a->where);
-			return &g95_bad_expr;
-    		}
-    		else {
-	      	  if (g95_compare_expr(p, integer_zero) != 0) {
-			result =g95_constant_result(BT_INTEGER,a->ts.kind);
-			result->where = a->where;
-			mpz_fdiv_r(result->value.integer, a->value.integer, 
-                                                       p->value.integer);
-			return range_check(result, "MODULO");
-      		  }
-      		  else {
-		  /* Result is processor-dependent */
-       		 	g95_error("Second argument MODULO at %L is zero",
-  		       		  &a->where);
-			return &g95_bad_expr;
-      		  }
-		}
-    	case BT_REAL:
-	    	if (p->ts.type != BT_REAL ) {
-		      g95_error("Type of arguments of MODULO at %L must agree",
-  				&a->where);
-		      return &g95_bad_expr;
-    		}
-	    	else {
-      		  if (g95_compare_expr(p, real_zero) != 0) {
-			result =g95_constant_result(BT_REAL,a->ts.kind);
-			result->where = a->where;
-			mpf_init(quot);
-			mpf_init(iquot);
-			mpf_init(term);
-			mpf_div(quot, a->value.real,p->value.real);
-			mpf_floor(iquot, quot);
-			mpf_mul(term, iquot, p->value.real);
-			mpf_clear(quot);
-			mpf_clear(iquot);
-			mpf_clear(term);
-			mpf_sub(result->value.real, a->value.real, term);
-			return range_check(result, "MODULO");
-      		  }
-      		  else {
-		  /* Result is processor-dependent */
-       		 	g95_error("Second argument of MODULO at %L is zero",
-  	       			  &p->where);
-			return &g95_bad_expr;
-      		  }
-		}
-    		break;
-	    default:
-       		g95_error("Type of arguments of MODULO at %L must be real or integer",
-	 	       	&a->where);
-		return &g95_bad_expr;
+  case BT_INTEGER:
+    if (g95_compare_expr(p, integer_zero) == 0) {
+      /* Result is processor-dependent */
+      g95_error("Second argument MODULO at %L is zero", &a->where);
+      return &g95_bad_expr;
+    }
+
+    result =g95_constant_result(BT_INTEGER,a->ts.kind);
+    result->where = a->where;
+    mpz_fdiv_r(result->value.integer, a->value.integer, p->value.integer);
+
+    break;
+
+  case BT_REAL:
+    if (g95_compare_expr(p, real_zero) == 0) {
+      /* Result is processor-dependent */
+      g95_error("Second argument of MODULO at %L is zero", &p->where);
+      return &g95_bad_expr;
+    }
+
+    result =g95_constant_result(BT_REAL,a->ts.kind);
+    result->where = a->where;
+
+    mpf_init(quot);
+    mpf_init(iquot);
+    mpf_init(term);
+
+    mpf_div(quot, a->value.real,p->value.real);
+    mpf_floor(iquot, quot);
+    mpf_mul(term, iquot, p->value.real);
+
+    mpf_clear(quot);
+    mpf_clear(iquot);
+    mpf_clear(term);
+
+    mpf_sub(result->value.real, a->value.real, term);
+    break;
+
+  default:
+    g95_internal_error("g95_simplify_modulo(): Bad arguments");
   }
 
+  return range_check(result, "MODULO");
 }
+
 
 /* simplify_mvbits() */
 g95_expr *g95_simplify_mvbits(g95_expr *f, g95_expr *fp, g95_expr *l, g95_expr *to, g95_expr *tp) {
@@ -2169,7 +2139,6 @@ g95_expr *g95_simplify_mvbits(g95_expr *f, g95_expr *fp, g95_expr *l, g95_expr *
 g95_expr *g95_simplify_nearest(g95_expr *e) {
 
   return NULL; 
-
 }
 
 
@@ -2186,7 +2155,7 @@ int kind;
 
   if ( mpf_cmp_si(e->value.real,0) > 0 ) {
     mpf_ceil(rtrunc->value.real,e->value.real);
-    }
+  }
   else if ( mpf_cmp_si(e->value.real,0) < 0 ) {
     mpf_floor(rtrunc->value.real,e->value.real);
   }
@@ -2196,16 +2165,14 @@ int kind;
 
   result = g95_real2int(rtrunc, kind);
 
-  if ( result == NULL ) {
+  if (result == NULL) {
     g95_error("Result of NINT() overflows its kind at %L", &e->where);
     g95_free_expr(rtrunc);
     return &g95_bad_expr;
   }
-  else {
-    g95_free_expr(rtrunc);
-    return range_check(result,"NINT");
-  }
 
+  g95_free_expr(rtrunc);
+  return range_check(result,"NINT");
 }
 
 

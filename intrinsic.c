@@ -276,20 +276,20 @@ static try check_kind(g95_expr *x) {
 static try check_min_max(g95_actual_arglist *arg) {
 g95_expr *x, *y;
 
-  x=arg->expr;
+  x = arg->expr;
   arg = arg->next;
 
-  if ( arg == NULL ) {
+  if (arg == NULL) {
     g95_error("Too few arguments to intrinsic at %L",x->where);
     return FAILURE;
   }
 
-  while ( arg != NULL ) {
-    y=arg->expr;
+  while(arg != NULL) {
+    y = arg->expr;
     if ((x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) ||
          x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
-    x=y;
-    arg=arg->next;
+    x = y;
+    arg = arg->next;
   }
 
   return SUCCESS;
@@ -299,7 +299,7 @@ g95_expr *x, *y;
 static try check_min0_max0(g95_actual_arglist *arg) {
 g95_expr *x, *y;
 
-  x=arg->expr;
+  x = arg->expr;
   arg = arg->next;
 
   if ( arg == NULL ) {
@@ -322,20 +322,20 @@ g95_expr *x, *y;
 static try check_min1_max1(g95_actual_arglist *arg) {
 g95_expr *x, *y;
 
-  x=arg->expr;
+  x = arg->expr;
   arg = arg->next;
 
-  if ( arg == NULL ) {
+  if (arg == NULL) {
     g95_error("Too few arguments to intrinsic at %L",x->where);
     return FAILURE;
   }
 
-  while ( arg != NULL ) {
+  while(arg != NULL) {
     y=arg->expr;
     if (x->ts.type != BT_REAL ||
         x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
-    x=y;
-    arg=arg->next;
+    x = y;
+    arg = arg->next;
   }
 
   return SUCCESS;
