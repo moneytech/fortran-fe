@@ -262,8 +262,17 @@ static char *atom_string, atom_name[MAX_ATOM_SIZE];
  * happen.  This subroutine never returns.  */
 
 static void bad_module(char *message) {
+char *p;
 
-  g95_fatal_error("Reading module %s at line %d column %d: %s",
+  switch(iomode) {
+  case IO_INPUT:   p = "Reading";  break;
+  case IO_OUTPUT:  p = "Writing";  break;
+  default:         p = "???";      break;
+  }    
+
+  fclose(module_fp);
+
+  g95_fatal_error("%s module %s at line %d column %d: %s", p,
 		  module_name, module_line, module_column, message);
 }
 
@@ -509,10 +518,10 @@ static void write_char(char out) {
   if (fputc(out, module_fp) == EOF)
     g95_fatal_error("Error writing modules file: %s", strerror(errno));
 
-  if (out == '\n')
-    module_column = 1;
-  else {
+  if (out != '\n')
     module_column++;
+  else {
+    module_column = 1;
     module_line++;
   }
 }
@@ -959,6 +968,8 @@ g95_component *c, *tail;
       c = g95_get_component();
       mio_component(c);
 
+      if (c->ts.type == BT_DERIVED) c->ts.derived->mark = 0;
+
       if (tail == NULL)
 	*cp = c;
       else
@@ -1037,11 +1048,15 @@ void mio_namespace(g95_namespace *ns) {
  * address is matched definition of the entity */
 
 static void mio_symbol_ref(g95_symbol **symp) {
+int i;
 
   if (iomode == IO_OUTPUT) {
-    if (*symp != NULL)
-      write_atom(ATOM_INTEGER, &((*symp)->serial));
-    else {
+    if (*symp != NULL) {
+      i = (*symp)->serial;
+      if (i < 0 || i >= sym_num) bad_module("Symbol number out of range");
+      write_atom(ATOM_INTEGER, &i);
+
+    } else {
       mio_lparen();
       mio_rparen();
     }
@@ -1906,6 +1921,7 @@ char filename[PATH_MAX];
   fputs("G95 Module: Do not edit\n\n", module_fp);
 
   iomode = IO_OUTPUT;
+  strcpy(module_name, name);
 
   write_namespace(g95_current_ns);
 
