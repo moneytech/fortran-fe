@@ -475,51 +475,13 @@ try t;
 }
 
 
+/* resolve_operator()-- Resolve an operator expression node.  This can
+ * involve replacing the operation with a user defined function call. */
 
-/* g95_resolve_expr()-- Resolve an expression.  That is, make sure
- * that types of operands agree with their operators, intrinsic
- * operators are converted to function calls for overloaded types and
- * unresolved function references are resolved. */
-
-try g95_resolve_expr(g95_expr *e) {
+static try resolve_operator(g95_expr *e) {
 g95_expr *op1, *op2;
 const char *msg;
 try t;
-
-  if (e == NULL) return SUCCESS;
-
-  t = SUCCESS;
-  if (e->ref && resolve_ref(e) == FAILURE) t = FAILURE;
-
-  switch(e->expr_type) {
-  case EXPR_OP:
-    break;
-
-  case EXPR_FUNCTION:
-    return resolve_function(e);
-
-  case EXPR_VARIABLE:
-    if (e->ts.type == BT_UNKNOWN) g95_variable_attr(e, &e->ts);
-
-    /* Fall through */
-
-  case EXPR_SUBSTRING:
-  case EXPR_CONSTANT:
-  case EXPR_NULL:
-    return t;
-
-  case EXPR_ARRAY:
-    if (g95_resolve_array_constructor(e) == FAILURE) t = FAILURE;
-    return t;
-
-  case EXPR_STRUCTURE:
-    if (resolve_structure_cons(e) == FAILURE) t = FAILURE;
-    return t;
-
-  default:
-    g95_internal_error("g95_resolve_expr(): Bad expression type");
-  }
-
 
 /* Resolve all subnodes-- give them types. */
 
@@ -636,6 +598,8 @@ try t;
 
 /* Deal with arrayness of an operand through an operator */
 
+  t = SUCCESS;
+
   switch(e->operator) {
   case INTRINSIC_PLUS:    case INTRINSIC_MINUS:  case INTRINSIC_TIMES:
   case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:  case INTRINSIC_CONCAT:
@@ -653,6 +617,7 @@ try t;
       else {
 	g95_error("Inconsistent ranks for operator at %L and %L",
 		  &op1->where, &op2->where);
+	t = FAILURE;
 
 	e->rank = 0;   /* Allow higher level expressions to work */
       }
@@ -671,14 +636,72 @@ try t;
   }
 
   if (t == SUCCESS) t = g95_simplify_expr(e, 0);
-
   return t;
 
 bad_op:
-  if (g95_extend_expr(e) == SUCCESS) return t;
+  if (g95_extend_expr(e) == SUCCESS) return SUCCESS;
 
   g95_error(msg, &e->where);
   return FAILURE;
+}
+
+
+/* g95_resolve_expr()-- Resolve an expression.  That is, make sure
+ * that types of operands agree with their operators, intrinsic
+ * operators are converted to function calls for overloaded types and
+ * unresolved function references are resolved. */
+
+try g95_resolve_expr(g95_expr *e) {
+try t;
+
+  if (e == NULL) return SUCCESS;
+
+  switch(e->expr_type) {
+  case EXPR_OP:
+    t = resolve_operator(e);
+    break;
+
+  case EXPR_FUNCTION:
+    t = resolve_function(e);
+    break;
+
+  case EXPR_VARIABLE:
+    t = FAILURE;
+
+    if (e->ref && resolve_ref(e) == FAILURE) break;
+
+    if (e->symbol->ts.type != BT_UNKNOWN)
+      g95_variable_attr(e, &e->ts);
+    else {     /* Must be a simple variable reference */
+      if (g95_set_default_type(e->symbol, 1, NULL) == FAILURE) break;
+      e->ts = e->symbol->ts;
+    }
+
+    t = SUCCESS;
+    break;
+
+  case EXPR_SUBSTRING:
+    t = resolve_ref(e);
+    break;
+
+  case EXPR_CONSTANT:
+  case EXPR_NULL:
+    t = SUCCESS;
+    break;
+
+  case EXPR_ARRAY:
+    t = g95_resolve_array_constructor(e);
+    break;
+
+  case EXPR_STRUCTURE:
+    t = resolve_structure_cons(e);
+    break;
+
+  default:
+    g95_internal_error("g95_resolve_expr(): Bad expression type");
+  }
+
+  return t;
 }
 
 
@@ -707,21 +730,21 @@ try t;
 
   if (g95_resolve_expr(iter->start) == SUCCESS &&
       iter->start->ts.type != BT_INTEGER) {
-    g95_error("Start expression in DO loop at %L must be INTEGER in Fortran 95",
+    g95_error("Start expression in DO loop at %L must be INTEGER",
 	      &iter->start->where);
     t = FAILURE;
   }
 
   if (g95_resolve_expr(iter->end) == SUCCESS &&
       iter->end->ts.type != BT_INTEGER) {
-    g95_error("End expression in DO loop at %L must be INTEGER in Fortran 95",
+    g95_error("End expression in DO loop at %L must be INTEGER",
 	      &iter->end->where);
     t = FAILURE;
   }
 
   if (g95_resolve_expr(iter->step) == SUCCESS &&
       iter->step->ts.type != BT_INTEGER) {
-    g95_error("Step expression in DO loop at %L must be INTEGER in Fortran 95",
+    g95_error("Step expression in DO loop at %L must be INTEGER",
 	      &iter->step->where);
     t = FAILURE;
   }
