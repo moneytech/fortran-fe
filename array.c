@@ -915,8 +915,6 @@ empty:
   expr->value.constructor = head;
   expr->where = where;
 
-  if (cons_state == CONS_GOOD) expr->ts = constructor_ts;
-
   *result = expr;
   return MATCH_YES;
 
