@@ -484,7 +484,7 @@ match m;
     m = g95_intrinsic_func_interface(expr, 1);
     if (m == MATCH_YES) return MATCH_YES;
     if (m == MATCH_NO)
-      g95_error("Symbol '%s' at %L is INTRINSIC but is not compatible with "
+      g95_error("Function '%s' at %L is INTRINSIC but is not compatible with "
 		"an intrinsic", sym->name, &expr->where);
       
     return MATCH_ERROR;
@@ -708,8 +708,7 @@ g95_symbol *s;
     /* TODO: Need to search for elemental references in generic interface */
   }
 
-  if (sym->attr.intrinsic)
-    return g95_intrinsic_sub_interface(c) == SUCCESS ? MATCH_YES : MATCH_ERROR;
+  if (sym->attr.intrinsic) return g95_intrinsic_sub_interface(c, 0);
 
   return MATCH_NO;
 }
@@ -742,13 +741,20 @@ match m;
     return FAILURE;
   }
 
-  return g95_intrinsic_sub_interface(c) == SUCCESS ? MATCH_YES : MATCH_ERROR;
+  m = g95_intrinsic_sub_interface(c, 0);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_NO)
+    g95_error("Generic subroutine '%s' at %L is not consistent with an "
+	      "intrinsic subroutine interface", sym->name, &c->loc);
+
+  return FAILURE;
 }
 
 
 /* resolve_specific_s0()-- Resolve a subroutine call known to be specific */
 
 static match resolve_specific_s0(g95_code *c, g95_symbol *sym) {
+match m;
 
   if (sym->attr.external || sym->attr.if_source == IFSRC_IFBODY) {
     if (sym->attr.dummy) {
@@ -764,10 +770,11 @@ static match resolve_specific_s0(g95_code *c, g95_symbol *sym) {
     goto found;
 
   if (sym->attr.intrinsic) {
-    if (g95_intrinsic_sub_interface(c) == SUCCESS) return MATCH_YES;
-
-    g95_error("Symbol '%s' at %L is INTRINSIC but is not compatible with "
-	      "an intrinsic", sym->name, &c->loc);
+    m = g95_intrinsic_sub_interface(c, 1);
+    if (m == MATCH_YES) return MATCH_YES;
+    if (m == MATCH_NO)
+      g95_error("Subroutine '%s' at %L is INTRINSIC but is not compatible "
+		"with an intrinsic", sym->name, &c->loc);
 
     return MATCH_ERROR;
   }
@@ -805,7 +812,7 @@ match m;
   g95_error("Unable to resolve the specific subroutine '%s' at %L",
 	    sym->name, &c->loc);
 
-  return SUCCESS;
+  return FAILURE;
 }
 
 
@@ -825,7 +832,10 @@ g95_symbol *sym;
 
   /* See if we have an intrinsic function reference */
 
-  if (g95_intrinsic_name(sym->name, 1)) return g95_intrinsic_sub_interface(c);
+  if (g95_intrinsic_name(sym->name, 1)) {
+    if (g95_intrinsic_sub_interface(c, 1) == MATCH_YES) return SUCCESS;
+    return FAILURE;
+  }
 
   /* The reference is to an external name */
 

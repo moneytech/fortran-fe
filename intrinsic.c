@@ -2144,38 +2144,49 @@ got_specific:
 
 
 /* g95_intrinsic_sub_interface()-- see if a CALL statement corresponds
- * to an intrinsic subroutine */
+ * to an intrinsic subroutine.  Returns MATCH_YES if the subroutine
+ * corresponds to an intrinsic, MATCH_NO if not, and MATCH_ERROR if
+ * there was an error (but did correspond). */
 
-try g95_intrinsic_sub_interface(g95_code *c) {
+match g95_intrinsic_sub_interface(g95_code *c, int error_flag) {
 g95_intrinsic_sym *isym;
 char *name;
 
   name = c->sym->name;
 
   isym = find_subroutine(name);
-  if (isym == NULL) {
-    g95_error("Subroutine '%s' at %L is not a valid intrinsic", name, &c->loc);
-    return FAILURE;
-  }
+  if (isym == NULL) return MATCH_NO;
+
+  g95_suppress_error = !error_flag;
 
   init_arglist(isym);
 
   if (sort_actual(name, &c->ext.actual, isym->formal, &c->loc) == FAILURE)
-    return FAILURE;
+    goto fail;
 
   if (isym->check != NULL) {
-    if (do_check(isym, c->ext.actual) == FAILURE) return FAILURE;
+    if (do_check(isym, c->ext.actual) == FAILURE) goto fail;
   } else {
-    if (check_arglist(&c->ext.actual, isym, 1) == FAILURE) return FAILURE;
+    if (check_arglist(&c->ext.actual, isym, 1) == FAILURE) goto fail;
   }
 
+  /* The subroutine corresponds to an intrinsic.  Allow errors to be
+   * seen at this point. */
+
+  g95_suppress_error = 0;
   c->sub_name = isym->lib_name;
 
-  if (g95_pure(NULL) && !isym->elemental)
+  if (g95_pure(NULL) && !isym->elemental) {
     g95_error("Subroutine call to intrinsic '%s' at %L is not PURE", name,
 	      &c->loc);
+    return MATCH_ERROR;
+  }
 
-  return SUCCESS;
+  return MATCH_YES;
+
+fail:
+  g95_suppress_error = 0;
+  return MATCH_NO;
 }
 
 

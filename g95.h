@@ -1507,7 +1507,7 @@ match g95_match_print(void);
 /* intrinsic.c */
 
 match g95_intrinsic_func_interface(g95_expr *, int);
-try g95_intrinsic_sub_interface(g95_code *);
+match g95_intrinsic_sub_interface(g95_code *, int);
 
 /* format.c */
 
