@@ -1571,16 +1571,20 @@ g95_symtree *st;
  * symbol itself! */
 
 static void delete_symtree(g95_symtree **root, char *name) {
-g95_symtree st;
+g95_symtree st, *st0;
+
+  st0 = g95_find_symtree(*root, name); 
 
   strcpy(st.name, name);
-
   g95_delete_bbt(root, &st, g95_compare_symtree);
+
+  g95_free(st0);
 }
 
 
-/* g95_find_symtree()-- Given a namespace and a name, try to find the
- * symbol within the namespace.  Returns NULL if the symbol is not found. */
+/* g95_find_symtree()-- Given a root symtree node and a name, try to
+ * find the symbol within the namespace.  Returns NULL if the symbol
+ * is not found. */
 
 g95_symtree *g95_find_symtree(g95_symtree *st, char *name) {
 int c;
@@ -1895,6 +1899,7 @@ g95_symtree *v, *w;
     w = v->link;
 
     g95_delete_bbt(&g95_current_ns->sym_root, v, g95_compare_symtree);
+    g95_free(v);
   }
 
   changed_st = NULL;
