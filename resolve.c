@@ -1608,7 +1608,7 @@ g95_ref *ref;
 
   if (g95_resolve_expr(e) == FAILURE) return FAILURE;
 
-  attr = g95_variable_attr(e, NULL);
+  attr = g95_expr_attr(e);
   if (attr.pointer) return SUCCESS;
 
   if (e->expr_type != EXPR_VARIABLE) goto bad;
@@ -1630,7 +1630,7 @@ g95_ref *ref;
       break;
     }
 
-  if (attr.allocatable == 0) {
+  if (allocatable == 0) {
   bad:
     g95_error("Expression in DEALLOCATE statement at %L must be "
 	      "ALLOCATABLE or a POINTER", &e->where);
@@ -1646,43 +1646,55 @@ g95_ref *ref;
  * reference that gives the size of the array. */
 
 static try resolve_allocate_expr(g95_expr *e) {
+int i, pointer, allocatable;
 symbol_attribute attr;
 g95_ref *ref, *ref2;
-int i, allocatable;
 g95_array_ref *ar;
 
   if (g95_resolve_expr(e) == FAILURE) return FAILURE;
 
-  attr = g95_expr_attr(e);
-
-  /* See if this is a pointer to a scalar variable */
-
-  if (attr.pointer && !attr.dimension) return SUCCESS;
-
-  /* Make sure the expression is allocatable */
+  /* Make sure the expression is allocatable or a pointer.  If it is
+   * pointer, the next-to-last reference must be a pointer. */
 
   ref2 = NULL;
 
-  if (e->expr_type != EXPR_VARIABLE)
+  if (e->expr_type != EXPR_VARIABLE) {
     allocatable = 0;
-  else {
+
+    attr = g95_expr_attr(e);
+    pointer = attr.pointer;
+
+  } else {
     allocatable = e->symbol->attr.allocatable;
+    pointer = e->symbol->attr.pointer;
 
     for(ref=e->ref; ref; ref2=ref, ref=ref->next)
       switch(ref->type) {
       case REF_ARRAY:
+	if (ref->next != NULL) pointer = 0;
        	break;
 
       case REF_COMPONENT:
 	allocatable = (ref->u.c.component->as != NULL &&
 		       ref->u.c.component->as->type == AS_DEFERRED);
+
+	pointer = ref->u.c.component->pointer;
 	break;
 
       case REF_SUBSTRING:
 	allocatable = 0;
+	pointer = 0;
 	break;
       }
   }
+
+  if (allocatable == 0 && pointer == 0) {
+    g95_error("Expression in ALLOCATE statement at %L must be "
+	      "ALLOCATABLE or a POINTER", &e->where);
+    return FAILURE;
+  }
+
+  if (pointer) return SUCCESS;
 
   /* Make sure the next-to-last reference node is an array specification. */
 
