@@ -155,6 +155,9 @@ static void free_statement(g95_code *p) {
     break;
 
   case EXEC_FORALL:
+    g95_free_forall_iterator(p->ext);
+    break;
+
   default:
     g95_internal_error("free_statement(): Bad statement");
   }
