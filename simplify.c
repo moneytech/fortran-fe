@@ -749,16 +749,13 @@ int i;
 /* simplify_exp */
 g95_expr *g95_simplify_exp(g95_expr *x) {
   return NULL;
-/* Not ready yet
+/* Not ready yet -- extension, will need to flag under pendantic
 g95_expr *result;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-  if (g95_option.pedantic == 1) 
-    g95_warning("Evaluation of exp function at %L for constant parameter is an extension", x->where);
-
-  result = g95_constant_result(BT_REAL,g95_default_real_kind());
-  result->where = x->where;
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
 
   switch (x->ts.type) {
   case BT_REAL: 
@@ -1607,45 +1604,70 @@ int tv;
 }
 
 
-g95_expr *g95_simplify_log(g95_expr *e) {
+g95_expr *g95_simplify_log(g95_expr *x) {
+g95_expr *result;
+/* Extension -- need to add pedantic warning*/
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-/*
-  if (e->ts.type == BT_REAL ) {
-    if ( g95_compare_expr(e, real_zero) <= 0 ) {
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  if (x->ts.type == BT_REAL ) {
+    if ( mpf_cmp(x->value.real, mpf_zero) <= 0 ) {
       g95_error("Argument of LOG at %L cannot be less than or equal to zero",
-  		  &e->where);
+                  &x->where);
       return &g95_bad_expr;
     }
+
+  natural_logarithm(&x->value.real,&result->value.real);
   }
 
-  if (e->ts.type == BT_COMPLEX ) {
-    if ( (mpf_cmp(e->value.complex.r, mpf_zero) == 0) && 
-         (mpf_cmp(e->value.complex.i, mpf_zero) == 0) ) {
+  if (x->ts.type == BT_COMPLEX ) {
+    if ( (mpf_cmp(x->value.complex.r, mpf_zero) == 0) &&
+         (mpf_cmp(x->value.complex.i, mpf_zero) == 0) ) {
       g95_error("Complex argument of LOG at %L cannot be zero",
-  		  &e->where);
+                  &x->where);
       return &g95_bad_expr;
     }
+  g95_warning("LOG at %L not done for complex expressions yet",x->where);
   }
-*/
+
+  return range_check(result,"LOG");
 
 }
 
 
-g95_expr *g95_simplify_log10(g95_expr *e) {
+g95_expr *g95_simplify_log10(g95_expr *x) {
+g95_expr *result;
+/* Extension -- need to add pedantic warning*/
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-/* Transcendentals not yet implemented as extension 
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
 
-  if ( g95_compare_expr(e, real_zero) <= 0 ) {
+  if (x->ts.type == BT_REAL ) {
+    if ( mpf_cmp(x->value.real, mpf_zero) <= 0 ) {
     g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
-    	        &e->where);
+                &x->where);
     return &g95_bad_expr;
+    }
+  common_logarithm(&x->value.real,&result->value.real);
   }
-*/
+
+  if (x->ts.type == BT_COMPLEX ) {
+    if ( (mpf_cmp(x->value.complex.r, mpf_zero) == 0) &&
+         (mpf_cmp(x->value.complex.i, mpf_zero) == 0) ) {
+      g95_error("Complex argument of LOG at %L cannot be zero",
+                  &x->where);
+      return &g95_bad_expr;
+    }
+  g95_warning("LOG10 at %L not done for complex expressions yet",x->where);
+      return &g95_bad_expr;
+  }
+
+  return range_check(result,"LOG10");
 
 }
 

@@ -875,21 +875,21 @@ int di, dr, dd, dl, dc, dz;
   add_sym("llt", 0, BT_LOGICAL, dl, g95_simplify_llt, NULL,
 	  sta, BT_CHARACTER, dc, 0, stb, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("log",  0, BT_REAL,    dr, g95_simplify_log, not_ready,
+  add_sym("log",  0, BT_REAL,    dr, g95_simplify_log, NULL,
 	  x, BT_REAL,    dr, 0, NULL);
-  add_sym("alog", 0, BT_REAL,    dr, g95_simplify_log, not_ready,
+  add_sym("alog", 0, BT_REAL,    dr, g95_simplify_log, NULL,
 	  x, BT_REAL,    dr, 0, NULL);
-  add_sym("dlog", 0, BT_REAL,    dd, g95_simplify_log, not_ready,
+  add_sym("dlog", 0, BT_REAL,    dd, g95_simplify_log, NULL,
 	  x, BT_REAL,    dd, 0, NULL);
-  add_sym("clog", 0, BT_COMPLEX, dz, g95_simplify_log, not_ready,
+  add_sym("clog", 0, BT_COMPLEX, dz, g95_simplify_log, NULL,
 	  x, BT_COMPLEX, dz, 0, NULL);
   make_generic("log");
 
-  add_sym("log10",  0, BT_REAL, dr, g95_simplify_log10, not_ready,
+  add_sym("log10",  0, BT_REAL, dr, g95_simplify_log10, NULL,
 	  x, BT_REAL, dr, 0, NULL);
-  add_sym("alog10", 0, BT_REAL, dr, g95_simplify_log10, not_ready,
+  add_sym("alog10", 0, BT_REAL, dr, g95_simplify_log10, NULL,
 	  x, BT_REAL, dr, 0, NULL);
-  add_sym("dlog10", 0, BT_REAL, dd, g95_simplify_log10, not_ready,
+  add_sym("dlog10", 0, BT_REAL, dd, g95_simplify_log10, NULL,
 	  x, BT_REAL, dd, 0, NULL);
   make_generic("log10");
 
