@@ -822,7 +822,7 @@ extern g95_code new_st;
 /* Storage for DATA statements */
 
 typedef struct g95_data_variable {
-  g95_symbol *sym;
+  g95_expr *expr;
   g95_iterator iter;
   struct g95_data_variable *list, *next;
 

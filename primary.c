@@ -23,6 +23,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 #include "g95.h"
 
 /* match_kind_param()-- Matches a kind-parameter expression, which is
@@ -160,18 +161,20 @@ g95_expr *e;
   g95_set_locus(&old_loc);
   if (length == -1) return MATCH_NO;
 
-  buffer = g95_getmem(length+1);
+  buffer = alloca(length+1);
+  memset(buffer, '\0', length+1);
+
   g95_gobble_whitespace();
 
   match_digits(signflag, 10, buffer);
 
   kind = get_kind();
   if (kind == -2) kind = g95_default_integer_kind();
-  if (kind == -1) goto error;
+  if (kind == -1) return MATCH_ERROR;
 
   if (g95_validate_kind(BT_INTEGER, kind) == -1) {
     g95_error("Integer kind %d at %C not available", kind);
-    goto error;
+    return MATCH_ERROR;
   }
 
   e = g95_convert_integer(buffer, kind, 10);
@@ -181,17 +184,11 @@ g95_expr *e;
     g95_error("Integer too big for its kind at %C");
 
     g95_free_expr(e);
-    goto error;
+    return MATCH_ERROR;
   }
-
-  g95_free(buffer);
 
   *result = e;
   return MATCH_YES;
-
-error:
-  g95_free(buffer);
-  return MATCH_ERROR;
 }
 
 
@@ -235,15 +232,14 @@ g95_expr *e;
 
   g95_set_locus(&old_loc);
 
-  buffer = g95_getmem(length+1);
+  buffer = alloca(length+1);
+  memset(buffer, '\0', length+1);
 
   match_digits(0, radix, buffer);
   g95_next_char();
 
   e = g95_convert_integer(buffer, g95_default_integer_kind(), radix);
   e->where = *g95_current_locus();
-
-  g95_free(buffer);
 
   if (g95_check_integer_range(e->value.integer, g95_default_integer_kind())
       != ARITH_OK) {
@@ -359,7 +355,8 @@ done:
   g95_set_locus(&old_loc);
   g95_gobble_whitespace();
 
-  buffer = g95_getmem(count+1);
+  buffer = alloca(count+1);
+  memset(buffer, '\0', count+1);
 
   p = buffer;
   while(count>0) {
@@ -401,9 +398,6 @@ done:
   e = g95_convert_real(buffer, kind);
   e->where = *g95_current_locus();
 
-  g95_free(buffer);
-  buffer = NULL;
-
   switch(g95_check_real_range(e->value.real, kind)) {
     case ARITH_OK: break;
     case ARITH_OVERFLOW:
@@ -422,7 +416,6 @@ done:
   return MATCH_YES;
 
 cleanup:
-  if (buffer != NULL) g95_free(buffer);
   g95_free_expr(e);
   return MATCH_ERROR;
 }
@@ -715,9 +708,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  e = g95_copy_expr(sym->value);
-
-  switch(e->ts.type) {
+  switch(sym->value->ts.type) {
   case BT_REAL:
     e = g95_copy_expr(sym->value);
     break;
@@ -819,7 +810,8 @@ done:
   g95_set_locus(&old_loc);
   g95_gobble_whitespace();
 
-  buffer = g95_getmem(count+1);
+  buffer = alloca(count+1);
+  memset(buffer, '\0', count+1);
 
   p = buffer;
   while(count>0) {
@@ -832,7 +824,7 @@ done:
   *p = '\0';
 
   kind = get_kind();
-  if (kind == -1) goto cleanup;
+  if (kind == -1) return MATCH_ERROR;
 
 /* If the number looked like an integer, forget about a kind we may
  * have seen, otherwise validate the kind against real kinds. */
@@ -844,7 +836,7 @@ done:
     if (exp_char == 'd') {
       if (kind != -2) {
 	g95_error("Real number at %C has a 'd' exponent and an explicit kind");
-	goto cleanup;
+	return MATCH_ERROR;
       }
       kind = g95_default_double_kind();
       
@@ -854,22 +846,16 @@ done:
 
     if (g95_validate_kind(BT_REAL, kind) == -1) {
       g95_error("Invalid real kind %d at %C", kind);
-      goto cleanup;
+      return MATCH_ERROR;
     }
   }
 
   *result = g95_convert_real(buffer, kind);
-  g95_free(buffer);
-
   return MATCH_YES;
 
 no_match:
   g95_set_locus(&old_loc);
   return MATCH_NO;
-
-cleanup:
-  g95_free(buffer);
-  return MATCH_ERROR;
 }
 
 

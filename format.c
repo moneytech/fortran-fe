@@ -602,6 +602,7 @@ locus start;
   }
 
   g95_set_locus(&start);      /* Back to the beginning */
+
   p = format_string = g95_getmem(format_length+1);
 
   mode = MODE_COPY;
@@ -612,6 +613,8 @@ locus start;
 /* More here later */
 
   new_st.op = EXEC_NOP;
+  g95_free(p);
+
   return MATCH_YES;
 }
 

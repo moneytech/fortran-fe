@@ -183,11 +183,10 @@ static void free_statement(g95_code *p) {
 void g95_free_statements(g95_code *p) {
 g95_code *q;
 
-  if (p == NULL) return; 
-  if (p->block) g95_free_statements(p->block);
-
   for(; p; p=q) {
     q = p->next;
+
+    if (p->block) g95_free_statements(p->block);
     free_statement(p);
     g95_free(p);
   }

@@ -76,7 +76,7 @@ g95_file *fp, *fp2;
   for(fp=first_file; fp; fp=fp2) {
 
     if (fp->start != NULL) {  /* Free linebuf blocks */
-      for(fp2=fp; fp2; fp2 = fp2->next)
+      for(fp2=fp->next; fp2; fp2 = fp2->next)
 	if (fp->start == fp2->start) fp2->start = NULL;
 
       for(lp=fp->start; lp; lp = lp2) {

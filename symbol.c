@@ -2052,6 +2052,7 @@ int i;
   for(cl=ns->cl_list; cl; cl=cl2) {
     cl2 = cl->next;
     g95_free_expr(cl->length);
+    g95_free(cl);
   }
 
   free_st_labels(ns->st_labels);

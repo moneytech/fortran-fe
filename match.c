@@ -1934,6 +1934,7 @@ g95_data_variable *q;
 
   for(; p; p=q) {
     q = p->next;
+    g95_free_expr(p->expr);
     g95_free_iterator(&p->iter, 0);
     free_variable(p->list);
     
@@ -2025,7 +2026,7 @@ static match var_element(g95_data_variable *new) {
 
   if (g95_match(" (") == MATCH_YES) return var_list(new);
 
-  return g95_match(" %v", &new->sym);
+  return g95_match(" %v", &new->expr);
 }
 
 
