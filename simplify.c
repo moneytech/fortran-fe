@@ -1233,191 +1233,184 @@ g95_expr *arg;
   //  return SUCCESS;
 }
 
+/* Caveat: I have not accounted for possibility of non-ASCII character sets
+ * in lge, lgt, lle, llt */
 
-g95_expr *g95_simplify_lge(g95_expr *e) {
-g95_expr *arg1, *arg2;
+g95_expr *g95_simplify_lge(g95_expr *a, g95_expr *b) {
+int tv;
 
-  return NULL; 
+  if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
+    return NULL;
 
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
-    g95_warning("Arguments of LGE at %L must be character",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (a->ts.type != BT_CHARACTER || b->ts.type != BT_CHARACTER ) {
+    g95_error("Arguments of LGE at %L must be character", &a->where);
+    return &g95_bad_expr;
   }
 
-  //  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
-
-  //  return SUCCESS;
-} /* end simplify_lge */
-
-
-g95_expr *g95_simplify_lgt(g95_expr *e) {
-g95_expr *arg1, *arg2;
-
-  return NULL; 
-
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
-    g95_warning("Arguments of LGT at %L must be character",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (a->value.character.length == 0 && b->value.character.length == 0 ) {
+    return g95_logical_expr( 1, &a->where);
   }
 
-  //  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
+  if ( strcmp(a->value.character.string, b->value.character.string) >= 0 ) 
+    tv = 1;
+  else tv = 0;
 
-  //  return SUCCESS;
+  return g95_logical_expr( tv, &a->where);
 }
 
 
-g95_expr *g95_simplify_lle(g95_expr *e) {
-g95_expr *arg1, *arg2;
+g95_expr *g95_simplify_lgt(g95_expr *a, g95_expr *b) {
+int tv;
 
-  return NULL; 
+  if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
+    return NULL;
 
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
-    g95_warning("Arguments of LLE at %L must be character",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (a->ts.type != BT_CHARACTER || b->ts.type != BT_CHARACTER ) {
+    g95_error("Arguments of LGT at %L must be character", &a->where);
+    return &g95_bad_expr;
   }
 
-  //  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
+  if (a->value.character.length == 0 && b->value.character.length == 0 ) {
+    return g95_logical_expr( 0, &a->where);
+  }
 
-  //  return SUCCESS;
+  if ( strcmp(a->value.character.string, b->value.character.string) > 0 )
+    tv = 1;
+  else tv = 0;
+
+  return g95_logical_expr( tv, &a->where);
 }
 
 
+g95_expr *g95_simplify_lle(g95_expr *a, g95_expr *b) {
+int tv;
 
-g95_expr *g95_simplify_llt(g95_expr *e) {
-g95_expr *arg1, *arg2;
+  if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
+    return NULL;
 
-  return NULL; 
-
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
-    g95_warning("Arguments of LLE at %L must be character",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (a->ts.type != BT_CHARACTER || b->ts.type != BT_CHARACTER ) {
+    g95_error("Arguments of LGT at %L must be character", &a->where);
+    return &g95_bad_expr;
   }
 
-  //  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
+  if (a->value.character.length == 0 && b->value.character.length == 0 ) {
+    return g95_logical_expr( 1, &a->where);
+  }
 
-  //  return SUCCESS;
+  if ( strcmp(a->value.character.string, b->value.character.string) <= 0 )
+    tv = 1;
+  else tv = 0;
+
+  return g95_logical_expr( tv, &a->where);
+}
+
+
+g95_expr *g95_simplify_llt(g95_expr *a, g95_expr *b) {
+int tv;
+
+  if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
+    return NULL;
+
+  if (a->ts.type != BT_CHARACTER || b->ts.type != BT_CHARACTER ) {
+    g95_error("Arguments of LGT at %L must be character", &a->where);
+    return &g95_bad_expr;
+  }
+
+  if (a->value.character.length == 0 && b->value.character.length == 0 ) {
+    return g95_logical_expr( 0, &a->where);
+  }
+
+  if ( strcmp(a->value.character.string, b->value.character.string) < 0 )
+    tv = 1;
+  else tv = 0;
+
+  return g95_logical_expr( tv, &a->where);
 }
 
 
 g95_expr *g95_simplify_log(g95_expr *e) {
-g95_expr *arg;
 
   return NULL; 
-
-  arg = FIRST_ARG(e);
+  //  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
 /* Type checking */
 
-  if (arg->ts.type != BT_REAL || arg->ts.type != BT_COMPLEX) {
-    g95_warning("Argument of LOG at %L must be real or complex",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (e->ts.type != BT_REAL || e->ts.type != BT_COMPLEX) {
+    g95_error("Argument of LOG at %L must be real or complex",
+		&e->where);
+    return &g95_bad_expr;
   }
 
 /* Range checking */
 /* If x is real, x must be >zero. If complex, its value must not be zero */
 
-  if (arg->ts.type == BT_REAL ) {
-    if ( g95_compare_expr(arg, real_zero) <= 0 ) {
-      g95_warning("Argument of LOG at %L cannot be less than or equal to zero",
-  		  &FIRST_ARG(e)->where);
-      //      return FAILURE;
+  if (e->ts.type == BT_REAL ) {
+    if ( g95_compare_expr(e, real_zero) <= 0 ) {
+      g95_error("Argument of LOG at %L cannot be less than or equal to zero",
+  		  &e->where);
+      return &g95_bad_expr;
     }
   }
 
-  if (arg->ts.type == BT_COMPLEX ) {
-    if ( (mpf_cmp(arg->value.complex.r, mpf_zero) == 0) && 
-         (mpf_cmp(arg->value.complex.i, mpf_zero) == 0) ) {
-      g95_warning("Complex argument of LOG at %L cannot be zero",
-  		  &FIRST_ARG(e)->where);
-      //      return FAILURE;
+  if (e->ts.type == BT_COMPLEX ) {
+    if ( (mpf_cmp(e->value.complex.r, mpf_zero) == 0) && 
+         (mpf_cmp(e->value.complex.i, mpf_zero) == 0) ) {
+      g95_error("Complex argument of LOG at %L cannot be zero",
+  		  &e->where);
+      return &g95_bad_expr;
     }
   }
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  //  return SUCCESS;
-} /* end simplify_log */
-
+}
 
 
 g95_expr *g95_simplify_log10(g95_expr *e) {
-g95_expr *arg;
 
   return NULL; 
 
-  arg = FIRST_ARG(e);
+  //  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
 /* Type checking */
 
-  if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of LOG10 at %L must be real",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (e->ts.type != BT_REAL) {
+    g95_error("Argument of LOG10 at %L must be real",
+		&e->where);
+    return &g95_bad_expr;
   }
 
 /* Range checking */
 /* Argument must be >zero */
 
-  if ( g95_compare_expr(arg, real_zero) <= 0 ) {
-    g95_warning("Argument of LOG10 at %L cannot be less than or equal to zero",
-    	        &FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if ( g95_compare_expr(e, real_zero) <= 0 ) {
+    g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
+    	        &e->where);
+    return &g95_bad_expr;
   }
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  //  return SUCCESS;
 }
 
 
-g95_expr *g95_simplify_logical(g95_expr *e) {
-g95_expr *arg;
-int knd;
+g95_expr *g95_simplify_logical(g95_expr *e, g95_expr *k) {
+g95_expr *result;
+int kind;
 
-  return NULL; 
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-/* Takes optional argument, not handled yet */
-
-/* Type checking */
-
-  arg = FIRST_ARG(e);
-
-  if (arg->ts.type != BT_LOGICAL) {
-    g95_warning("Argument of LOGICAL at %L must be logical",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (e->ts.type != BT_LOGICAL) {
+    g95_error("Argument of LOGICAL at %L must be logical", &e->where);
+    return &g95_bad_expr;
   }
 
-  knd = g95_validate_kind(BT_INTEGER, arg->ts.type);
+  kind = get_kind(k, "LOGICAL", g95_default_logical_kind()); 
+  if (kind == -1) return &g95_bad_expr;
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+  result = g95_constant_result(BT_LOGICAL, kind);
+  result->where = e->where; 
 
-  //  return SUCCESS;
+  result->value.logical = e->value.logical;
+
+  return result;
+
 }
 
 
@@ -1478,133 +1471,129 @@ g95_expr *arg;
 }
 
 
-g95_expr *g95_simplify_mod(g95_expr *e) {
-g95_expr *arg1, *arg2, *rmid1, *rmid2, *result;
+g95_expr *g95_simplify_mod(g95_expr *a, g95_expr *p) {
+g95_expr *result;
+mpf_t quot, iquot, term;
 
-  return NULL; 
+  if (a->expr_type != EXPR_CONSTANT && p->expr_type != EXPR_CONSTANT) 
+    return NULL;
 
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  //  if (arg1->expr_type != EXPR_CONSTANT && arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
-
-  switch (arg1->ts.type) {
+  switch (a->ts.type) {
     	case BT_INTEGER:
-	    	if (arg2->ts.type != BT_INTEGER ) {
-	     	        g95_warning("Type of arguments of MOD at %L must agree",
-  				&FIRST_ARG(e)->where);
-			//      		        return FAILURE;
+	    	if (p->ts.type != BT_INTEGER ) {
+	     	        g95_error("Type of arguments of MOD at %L must agree",
+  				&a->where);
+			return &g95_bad_expr;
     		}
     		else {
-	      	  if (g95_compare_expr(arg2, integer_zero) != 0) {
-			result = g95_copy_expr(e);
-       		 	mpz_init(result->value.integer);
-       		 	mpz_mod(result->value.integer, arg1->value.integer, 
-                                                       arg2->value.integer);
-			g95_replace_expr(e, result);
-			//			return SUCCESS;
+	      	  if (g95_compare_expr(p, integer_zero) != 0) {
+			result =g95_constant_result(BT_INTEGER,a->ts.kind);
+       		 	mpz_mod(result->value.integer, a->value.integer, 
+                                                       p->value.integer);
+			return range_check(result, "MOD");
       		  }
       		  else {
 		  /* Result is processor-dependent */
-       		 	g95_warning("Second argument MOD at %L is zero",
-  		       		  &FIRST_ARG(e)->where);
-			//       		 	return FAILURE;
+       		 	g95_error("Second argument MOD at %L is zero",
+  		       		  &a->where);
+			return &g95_bad_expr;
       		  }
 		}
-	    	break;
     	case BT_REAL:
-	    	if (arg2->ts.type != BT_REAL ) {
-		      g95_warning("Type of arguments of MOD at %L must agree",
-  				&FIRST_ARG(e)->where);
-		      //      		      return FAILURE;
+	    	if (p->ts.type != BT_REAL ) {
+		      g95_error("Type of arguments of MOD at %L must agree",
+  				&a->where);
+		      return &g95_bad_expr;
     		}
 	    	else {
-      		  if (g95_compare_expr(arg2, real_zero) != 0) {
-			rmid1 = g95_get_expr();
-			rmid2 = g95_get_expr();
-			result =g95_copy_expr(e);
-			rmid1 = g95_real2int(arg1, g95_default_integer_kind());
-			rmid2 = g95_real2int(arg2, g95_default_integer_kind());
- 			mpz_init(result->value.integer);
-                    	mpz_mod (result->value.integer, arg1->value.integer,
-			                                arg2->value.integer);
-			g95_replace_expr(e, result);
-			g95_free_expr(rmid1);
-			g95_free_expr(rmid2);
-			//	                return SUCCESS;
+      		  if (g95_compare_expr(p, real_zero) != 0) {
+			result =g95_constant_result(BT_REAL,a->ts.kind);
+			mpf_div(quot, a->value.real,p->value.real);
+			mpf_trunc(iquot, quot);
+			mpf_mul(term, iquot, p->value.real);
+			mpf_sub(result->value.real, a->value.real, term);
+			return range_check(result, "MOD");
       		  }
       		  else {
 		  /* Result is processor-dependent */
-       		 	g95_warning("Second argument of MOD at %L is zero",
-  	       			  &FIRST_ARG(e)->where);
-			//	        	return FAILURE;
+       		 	g95_error("Second argument of MOD at %L is zero",
+  	       			  &p->where);
+			return &g95_bad_expr;
       		  }
 		}
     		break;
 	    default:
        		g95_warning("Type of arguments of MOD at %L must be real or integer",
-	 	       	&FIRST_ARG(e)->where);
-		//		return FAILURE;
+	 	       	&a->where);
+		return &g95_bad_expr;
   }
 
-/* If we get to here something went wrong */
-  //  return FAILURE;
-
 }
 
 
-g95_expr *g95_simplify_modulo(g95_expr *e) {
+g95_expr *g95_simplify_modulo(g95_expr *a, g95_expr *p) {
+g95_expr *result;
+mpf_t quot, iquot, term;
 
-  return NULL; 
+  if (a->expr_type != EXPR_CONSTANT && p->expr_type != EXPR_CONSTANT) 
+    return NULL;
+
+  switch (a->ts.type) {
+    	case BT_INTEGER:
+	    	if (p->ts.type != BT_INTEGER ) {
+	     	        g95_error("Type of arguments of MODULO at %L must agree",
+  				&a->where);
+			return &g95_bad_expr;
+    		}
+    		else {
+	      	  if (g95_compare_expr(p, integer_zero) != 0) {
+			result =g95_constant_result(BT_INTEGER,a->ts.kind);
+			mpz_fdiv_r(result->value.integer, a->value.integer, 
+                                                       p->value.integer);
+			return range_check(result, "MODULO");
+      		  }
+      		  else {
+		  /* Result is processor-dependent */
+       		 	g95_error("Second argument MODULO at %L is zero",
+  		       		  &a->where);
+			return &g95_bad_expr;
+      		  }
+		}
+    	case BT_REAL:
+	    	if (p->ts.type != BT_REAL ) {
+		      g95_error("Type of arguments of MODULO at %L must agree",
+  				&a->where);
+		      return &g95_bad_expr;
+    		}
+	    	else {
+      		  if (g95_compare_expr(p, real_zero) != 0) {
+			result =g95_constant_result(BT_REAL,a->ts.kind);
+			mpf_div(quot, a->value.real,p->value.real);
+			mpf_floor(iquot, quot);
+			mpf_mul(term, iquot, p->value.real);
+			mpf_sub(result->value.real, a->value.real, term);
+			return range_check(result, "MODULO");
+      		  }
+      		  else {
+		  /* Result is processor-dependent */
+       		 	g95_error("Second argument of MODULO at %L is zero",
+  	       			  &p->where);
+			return &g95_bad_expr;
+      		  }
+		}
+    		break;
+	    default:
+       		g95_warning("Type of arguments of MODULO at %L must be real or integer",
+	 	       	&a->where);
+		return &g95_bad_expr;
+  }
+
 }
-
 
 /* simplify_mvbits() */
-g95_expr *g95_simplify_mvbits(g95_expr *e) {
-g95_expr *arg1, *arg2, *arg3, *arg4, *arg5;
-
-  return NULL; 
- 
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-  arg3 = THIRD_ARG(e);
-
-  arg4 = e->value.function.actual->next->next->expr;
-  arg5 = e->value.function.actual->next->next->expr;
-
-  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER 
-		  || arg3->ts.type != BT_INTEGER 
-		  || arg4->ts.type != BT_INTEGER 
-		  || arg5->ts.type != BT_INTEGER ) {
-    g95_warning("Arguments of MVBITS at %L must be integer",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
-  }
-
-  if (g95_compare_expr(arg2, integer_zero) < 0) {
-    g95_warning("Second argument of MVBITS at %L must be nonnegative",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
-  }
-
-  if (g95_compare_expr(arg3, integer_zero) < 0) {
-    g95_warning("Third argument of MVBITS at %L must be nonnegative",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
-  }
-
-  if (g95_compare_expr(arg5, integer_zero) < 0) {
-    g95_warning("Third argument of MVBITS at %L must be nonnegative",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
-  }
-
-  //  return SUCCESS;
-
+g95_expr *g95_simplify_mvbits(g95_expr *f, g95_expr *fp, g95_expr *l, g95_expr *to, g95_expr *tp) {
+  return NULL;
 }
-
 
 g95_expr *g95_simplify_nearest(g95_expr *e) {
 g95_expr *arg1, *arg2;
