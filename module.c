@@ -41,16 +41,15 @@ typedef struct g95_use_rename {
 #define g95_get_use_rename() g95_getmem(sizeof(g95_use_rename))
 
 
-static char module_name[G95_MAX_SYMBOL_LEN+1];
-static g95_use_rename *g95_rename_list;
-static int only_flag;
+/* Local variables */
 
 static FILE *module_fp;
-static int module_line, module_column;
+
+static char module_name[G95_MAX_SYMBOL_LEN+1];
+static int module_line, module_column, sym_num, only_flag;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
 
-static int sym_num;
-
+static g95_use_rename *g95_rename_list;
 static g95_symbol **sym_table;
 
 
@@ -60,7 +59,7 @@ static g95_symbol **sym_table;
 void g95_free_rename(void) {
 g95_use_rename *next;
 
-  for( ;g95_rename_list; g95_rename_list=next) {
+  for(;g95_rename_list; g95_rename_list=next) {
     next = g95_rename_list->next;
     g95_free(g95_rename_list);
   }
@@ -195,10 +194,10 @@ g95_module *m;
 }
 
 
-/* save_modules()-- Concatenate the new_modules list with the
+/* save_module_names()-- Concatenate the new_modules list with the
  * loaded_modules lists.  Called after a USE is complete. */
 
-static void save_modules(void) {
+static void save_module_names(void) {
 g95_module *m;
 
   if (new_modules == NULL) return; 
@@ -253,7 +252,7 @@ typedef struct {
 #define MAX_ATOM_SIZE 100
 
 static int atom_int;
-static char *current_module, *atom_string, atom_name[MAX_ATOM_SIZE];
+static char *atom_string, atom_name[MAX_ATOM_SIZE];
 
 
 
@@ -264,7 +263,7 @@ static char *current_module, *atom_string, atom_name[MAX_ATOM_SIZE];
 static void bad_module(char *message) {
 
   g95_fatal_error("Reading module %s at line %d column %d: %s",
-		  current_module, module_line, module_column, message);
+		  module_name, module_line, module_column, message);
 }
 
 
@@ -405,7 +404,7 @@ int c;
 
   do {
     c = module_char();
-  } while (c != ' ' && c != '\n');
+  } while (c == ' ' || c == '\n');
 
   if (c == EOF) return ATOM_EOF;
   if (c == '(') return ATOM_LPAREN;
@@ -504,7 +503,7 @@ int i;
 static void write_char(char out) {
 
   if (fputc(out, module_fp) == EOF)
-    g95_fatal_error("Error writing modules file: %s", sys_errlist[errno]);
+    g95_fatal_error("Error writing modules file: %s", strerror(errno));
 
   if (out == '\n')
     module_column = 1;
@@ -1668,7 +1667,7 @@ char filename[PATH_MAX];
   module_fp = fopen(filename, "w");
   if (module_fp == NULL)
     g95_fatal_error("Can't open module file '%s' for writing: %s", 
-		    filename, sys_errlist[errno]);
+		    filename, strerror(errno));
 
   fputs("G95 Module: Do not edit\n\n", module_fp);
 
@@ -1680,26 +1679,28 @@ char filename[PATH_MAX];
 
   if (fclose(module_fp))
     g95_fatal_error("Error writing module file '%s' for writing: %s", 
-		    filename, sys_errlist[errno]);
+		    filename, strerror(errno));
 }
-
 
 
 /* g95_use_module()-- Process a USE directive. */
 
-void g95_use_module(char *name) {
+void g95_use_module() {
 char filename[G95_MAX_SYMBOL_LEN+5];
 g95_state_data *p;
 int c;
 
-  strcpy(filename, name);
+  strcpy(filename, module_name);
   strcat(filename, MODULE_EXTENSION);
 
-  module_fp = fopen(filename, "r");
-
+  module_fp = g95_open_included_file(filename);
   if (module_fp == NULL)
     g95_fatal_error("Can't open module file '%s' for reading: %s", 
-		    filename, sys_errlist[errno]);
+		    filename, strerror(errno));
+
+  iomode = IO_INPUT;
+  module_line = 1;
+  module_column = 1;
 
 /* Skip the first line of the module */
 
@@ -1709,19 +1710,17 @@ int c;
     if (c == '\n') break;
   }
 
-  iomode = IO_INPUT;
-
   /* Make sure we're not reading the same module that we may be building */
 
   for(p=g95_state_stack; p; p=p->previous)
-    if (p->state == COMP_MODULE && strcmp(p->sym->name, name) == 0)
+    if (p->state == COMP_MODULE && strcmp(p->sym->name, module_name) == 0)
       g95_fatal_error("Can't USE the same module we're building!");
 
   read_module();
 
   fclose(module_fp);
 
-  save_modules();
+  save_module_names();
 }
 
 
@@ -1738,4 +1737,6 @@ void g95_module_done_2(void) {
 
   free_module_list(loaded_modules);
   free_module_list(new_modules);
+
+  g95_free_rename();
 }

@@ -1257,3 +1257,4 @@ match g95_match_module(void);
 void g95_free_rename(void);
 match g95_match_use(void);
 void g95_dump_module(char *);
+void g95_use_module(void);

@@ -55,39 +55,38 @@ void g95_free(void *p) {
 /* add_path()-- adds path to the list pointed to by list */
 
 static void add_path(g95_directorylist **list, const char *path) {
-g95_directorylist *this;
+g95_directorylist *dir;
 const char *p;
 
   p = path; 
   while (*p == ' ' || *p == '\t') /* someone might do 'g95 "-I include"' */
     if (*p++ == '\0') return;
 
-  this = *list; 
-  if (!this) {
-    this = *list = (g95_directorylist *)g95_getmem(sizeof(g95_directorylist));
+  dir = *list; 
+  if (!dir) {
+    dir = *list = g95_getmem(sizeof(g95_directorylist));
   } else {
-    while(this->next) {
-      this = this->next;
+    while(dir->next) {
+      dir = dir->next;
     }
-    this->next = (g95_directorylist *)g95_getmem(sizeof(g95_directorylist));
-    this = this->next;
+    dir->next = g95_getmem(sizeof(g95_directorylist));
+    dir = dir->next;
   }
 
-  this->next = NULL;
-  this->path = (char *)g95_getmem(strlen(p)+1);
-  strcpy(this->path, p);
-  strcpy(&this->path[strlen(p)], "/"); /* make '/' last character */ 
+  dir->next = NULL;
+  dir->path = g95_getmem(strlen(p)+1);
+  strcpy(dir->path, p);
+  strcat(dir->path, "/");     /* make '/' last character */ 
 }
 
 
-
-/* g95_open_included_file()-- opens file for reading, searching through 
-   the include directories given if necessary */
+/* g95_open_included_file()-- opens file for reading, searching
+ * through the include directories given if necessary */
 
 FILE *g95_open_included_file(const char *name) {
+char fullname[PATH_MAX];
 g95_directorylist *p;
 FILE *f;
-char fullname[PATH_MAX];
 
   f = fopen(name, "r"); 
   if (f != NULL) return f;
@@ -96,14 +95,15 @@ char fullname[PATH_MAX];
   while(p != NULL) {
     strcpy(fullname, p->path);
     strcat(fullname, name);
+
     f = fopen(fullname, "r");
     if (f != NULL) return f;
+
     p = p->next;
   }
 
   return NULL;
 }
-    
 
 
 /* g95_typename()-- Return a string for each type */

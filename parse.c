@@ -654,6 +654,10 @@ static void accept_statement(g95_statement st) {
   }
 
   switch(st) {
+  case ST_USE:
+    g95_use_module();
+    break;
+
   case ST_IMPLICIT_NONE:
     g95_set_implicit_none();
     break;

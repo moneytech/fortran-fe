@@ -623,6 +623,11 @@ static mstring array_specs[] = {
 void g95_show_array_spec(g95_array_spec *as) {
 int i;
 
+  if (as == NULL) {
+    g95_status("()");
+    return;
+  }
+
   g95_status("(%d", as->rank);
 
   if (as->rank != 0) {

@@ -1492,6 +1492,8 @@ g95_symtree *p;
 
 void g95_free_symbol(g95_symbol *sym) {
 
+  if (sym == NULL) return;
+
   g95_free_array_spec(sym->as);
 
   free_components(sym->components);
