@@ -355,6 +355,7 @@ match m;
 /* resolve_specific()-- Resolve a procedure call known to be specific */
 
 static match resolve_specific0(g95_symbol *sym, g95_expr *expr) {
+match m;
 
   if (sym->attr.external || sym->attr.interface) {
     if (sym->attr.dummy) {
@@ -369,7 +370,17 @@ static match resolve_specific0(g95_symbol *sym, g95_expr *expr) {
   if (sym->attr.proc == PROC_MODULE || sym->attr.proc == PROC_ST_FUNCTION ||
       sym->attr.proc == PROC_INTERNAL) goto found;
 
-  return g95_intrinsic_func_interface(expr, 1);
+  if (sym->attr.intrinsic) {
+    m = g95_intrinsic_func_interface(expr, 1);
+    if (m == MATCH_YES) return MATCH_YES;
+    if (m == MATCH_NO)
+      g95_error("Symbol '%s' at %L is INTRINSIC but is not compatible with "
+		"an intrinsic", sym->name, &expr->where);
+      
+    return MATCH_ERROR;
+  }
+
+  return MATCH_NO;
 
 found:
   expr->ts = sym->ts;
