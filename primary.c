@@ -1233,8 +1233,9 @@ match m;
 
   if (g95_match(" (") != MATCH_YES) goto syntax;
 
-  for(comp=sym->components; comp; comp=comp->next) {
+  g95_find_component(sym, NULL);
 
+  for(comp=sym->components; comp; comp=comp->next) {
     if (head == NULL)
       tail = head = g95_get_constructor();
     else {
@@ -1246,10 +1247,24 @@ match m;
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
 
-    if (comp->next != NULL && g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match(" ,") == MATCH_YES) {
+      if (comp->next == NULL) {
+	g95_error("Too many components in structure constructor at %C");
+	goto cleanup;
+      }
+
+      continue;
+    }
+
+    break;
   }
 
   if (g95_match(" )") != MATCH_YES) goto syntax;
+
+  if (comp->next != NULL) {
+    g95_error("Too few components in structure constructor at %C");
+    goto cleanup;
+  }
 
   e = g95_get_expr();
 

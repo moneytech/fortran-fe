@@ -1074,6 +1074,8 @@ g95_symbol *s;
     copy_components(sym, s->components);
   }
 
+  if (name == NULL) return NULL;
+
   for(p=sym->components; p; p=p->next)
     if (strcmp(p->name, name) == 0) break;
 
