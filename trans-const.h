@@ -38,7 +38,7 @@ void g95_init_constants (void);
 /* Build a constant with given type from an int_cst.  */
 tree g95_build_const (tree, tree);
 
-/* Strinng constants.  */
+/* String constants.  */
 extern GTY(()) tree g95_strconst_current_filename;
 extern GTY(()) tree g95_strconst_bounds;
 extern GTY(()) tree g95_strconst_fault;

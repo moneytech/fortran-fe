@@ -37,7 +37,7 @@ Boston, MA 02111-1307, USA.  */
 #include "trans-const.h"
 #include "trans-types.h"
 
-/* Strinng constants.  */
+/* String constants.  */
 tree g95_strconst_bounds;
 tree g95_strconst_fault;
 tree g95_strconst_wrong_return;
