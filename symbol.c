@@ -416,15 +416,8 @@ int is_pure;
 
   if (rvalue->expr_type != EXPR_NULL) {
 
-    if (lvalue->ts.type != rvalue->ts.type) {
+    if (!g95_compare_types(&lvalue->ts, &rvalue->ts)) {
       g95_error("Different types in pointer assignment at %L",
-                &lvalue->where);
-      return FAILURE;
-    }
-
-    if (lvalue->ts.type == BT_DERIVED
-	&& lvalue->ts.derived != rvalue->ts.derived) {
-      g95_error("Incompatible derived types in pointer assignment at %L",
                 &lvalue->where);
       return FAILURE;
     }
@@ -588,6 +581,7 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
 
   conf(external, intrinsic);
   conf(allocatable, pointer);
+  conf(allocatable, intent);   /* Allowed in Fortran 2000 */
   conf(elemental, recursive);
 
   conf(in_common, dummy);

@@ -314,10 +314,9 @@ va_list argp;
 
   for(;;) {
     name = va_arg(argp, char *);
-
     if (name == NULL) break;
 
-    type = va_arg(argp, bt);
+    type = (bt) va_arg(argp, int);
     kind = va_arg(argp, int);
     optional = va_arg(argp, int);
 
@@ -2216,7 +2215,7 @@ int rank;
   if (expr->ts.type == BT_UNKNOWN) goto bad;
 
   if (expr->ts.type == BT_DERIVED && ts->type == BT_DERIVED &&
-      expr->ts.derived == ts->derived) return SUCCESS;
+      g95_compare_types(&expr->ts, ts)) return SUCCESS;
 
   sym = find_conv(&expr->ts, ts);
   if (sym == NULL) goto bad;

@@ -1823,7 +1823,7 @@ g95_array_ref *ar;
     return FAILURE;
   }
 
-  if (ref2->type == AR_ELEMENT) return SUCCESS;
+  if (ref2->u.ar.type == AR_ELEMENT) return SUCCESS;
 
   /* Make sure that the array section reference makes sense in the
    * context of an ALLOCATE specification. */
@@ -2273,6 +2273,22 @@ int formal_ns_save, check_constant;
     }
   }
 
+  /* Constraints on allocatable- Allowed in Fortran 2000. */
+
+  if (sym->attr.allocatable) {
+    if (sym->attr.dummy) {
+      g95_error("Dummy argument at %L cannot have the allocatable attribute",
+		&sym->declared_at);
+      return;
+    }
+
+    if (sym->attr.function || sym->attr.result) {
+      g95_error("Function at %L cannot have the allocatable attribute",
+		&sym->declared_at);
+      return;
+    }
+  }
+
   /* Resolve array specifier. Check as well some constraints 
    * on COMMON blocks */
 
@@ -2431,6 +2447,7 @@ static try resolve_data_variables(g95_data_variable *d) {
 
   return SUCCESS; 
 }
+
 
 /* resolve_data()-- Resolve a single DATA statement.  We implement
  * this by storing a pointer to the value list into static variables,

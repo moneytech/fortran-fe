@@ -1130,7 +1130,7 @@ g95_array_ref *ar;
 
   ar = g95_find_array_ref(source);
 
-  if (ar->type == AS_ASSUMED_SIZE) {
+  if (ar->as && ar->as->type == AS_ASSUMED_SIZE) {
     g95_error("'source' argument of 'shape' intrinsic at %L must not be "
 	      "an assumed size array", &source->where);
     return FAILURE;

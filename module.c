@@ -2282,7 +2282,7 @@ pointer_info *q;
     st->n.sym->refs++;
   }
 
-  if (p->type == P_SYMBOL && p->u.rsym.state == UNREFERENCED)
+  if (p->type == P_SYMBOL && p->u.rsym.state == UNUSED)
     g95_free_symbol(p->u.rsym.sym);
 }
 
