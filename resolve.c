@@ -639,12 +639,12 @@ try t;
 	flag = g95_pure(expr->value.function.esym);
 	name = expr->value.function.esym->name;
       } else {
-	flag = expr->value.function.isym->elemental;
+	flag = expr->value.function.isym->pure;
 	name = expr->value.function.isym->name;
       }
 
       if (!flag) {
-	g95_error("Function references to '%s' at %L is to a non-PURE "
+	g95_error("Function reference to '%s' at %L is to a non-PURE "
 		  "procedure within a PURE procedure", name, &expr->where);
 	t = FAILURE;
       }
@@ -2103,8 +2103,9 @@ static void resolve_data(g95_data *d) {
 
 int g95_impure_variable(g95_symbol *sym) {
 
-  if (sym->attr.use_assoc || sym->attr.in_common ||
-      sym->ns != g95_current_ns) return 1;
+  if (sym->attr.use_assoc || sym->attr.in_common) return 1;
+
+  if (sym->ns != g95_current_ns) return !sym->attr.function;
 
   /* TODO: Check storage association through EQUIVALENCE statements */
 
@@ -2122,7 +2123,6 @@ symbol_attribute attr;
   if (sym == NULL) return 0;
 
   attr = sym->attr;
-  if (attr.function) return 0;
 
   return attr.flavor == FL_PROCEDURE && (attr.pure || attr.elemental);
 }

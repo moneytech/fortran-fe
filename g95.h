@@ -645,7 +645,7 @@ typedef struct g95_intrinsic_sym {
   char name[G95_MAX_SYMBOL_LEN+1], lib_name[G95_MAX_SYMBOL_LEN+1];
   g95_intrinsic_arg *formal;
   g95_typespec ts;
-  int elemental, generic, specific, actual_ok;
+  int elemental, pure, generic, specific, actual_ok;
 
   struct g95_expr *(*simplify)();
   try (*check)();

@@ -499,7 +499,7 @@ int args;
 
   case INTRINSIC_CONCAT:   /* Binary string */
     if (args != 2) goto num_args;
-    if (t1 == BT_CHARACTER) goto bad_repl;
+    if (t1 == BT_CHARACTER && t2 == BT_CHARACTER) goto bad_repl;
     break;
 
   case INTRINSIC_ASSIGN:   /* Class by itself */
@@ -1087,7 +1087,7 @@ sym_intent a_intent, f_intent;
       return FAILURE;
     }
 
-    if (g95_pure(NULL) && !g95_impure_variable(a->expr->symbol)) {
+    if (g95_pure(NULL) && g95_impure_variable(a->expr->symbol)) {
       if (f_intent == INTENT_INOUT || f_intent == INTENT_OUT) {
 	g95_error("Procedure argument at %L is local to a PURE procedure and "
 		  "is passed to an INTENT(%s) argument", &a->expr->where,
