@@ -761,6 +761,7 @@ int len;
     if (strcmp(filename, fp2->filename) == 0) {
       g95_error_now("Recursive inclusion of file '%s' at %C- ignoring it",
 		    filename);
+      g95_free(fp);
       return FAILURE;
     }
 
@@ -782,6 +783,7 @@ int len;
     else
       g95_error_now("Can't open file '%s' included at %C", filename);
 
+    g95_free(fp);
     return FAILURE;
   }
 

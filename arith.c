@@ -153,29 +153,24 @@ unsigned long p, mp;
 
   mpf_init_set(x, *arg);
 
-  if ( mpf_cmp_ui(x,0) == 0) {
+  if (mpf_cmp_ui(x, 0) == 0) {
     mpf_set_ui(*result,1);
-  }
-
-  else if ( mpf_cmp_ui(x,1) == 0) {
+  } else if (mpf_cmp_ui(x, 1) == 0) {
     mpf_set(*result,e);
-  }
-
-  else {
+  } else {
     mpf_init_set_ui(two,2);
     mpf_init(ln2);
     mpf_init(q);
     mpf_init(r);
     mpf_init(power);
-    mpf_init(num);
     mpf_init(term);
 
     natural_logarithm(&two, &ln2);
 
-    mpf_div(q,x,ln2);
-    mpf_floor(power,q);
-    mpf_mul(q,power,ln2);
-    mpf_sub(r,x,q);
+    mpf_div(q, x, ln2);
+    mpf_floor(power, q);
+    mpf_mul(q, power, ln2);
+    mpf_sub(r, x, q);
 
     mpf_init_set_ui(xp, 1);
     mpf_init_set_ui(num, 1);
@@ -183,19 +178,18 @@ unsigned long p, mp;
 
     for(i=1; i<=G95_REAL_BITS+10; i++) {
       mpf_mul(num, num, r);
-      mpf_mul_ui(denom,denom,i);
-      mpf_div(term,num,denom);
-      mpf_add(xp,xp,term);
+      mpf_mul_ui(denom, denom, i);
+      mpf_div(term, num, denom);
+      mpf_add(xp, xp, term);
     }
 
     /* Reconstruction step */
     n = (long) mpf_get_d(power);
 
-    if ( n > 0 ) {
+    if (n > 0) {
       p = (unsigned int) n;
       mpf_mul_2exp(*result,xp,p);
-    }
-    else {
+    } else {
       mp = (unsigned int) (-n);
       mpf_div_2exp(*result,xp,mp);
     }
@@ -210,7 +204,10 @@ unsigned long p, mp;
     mpf_clear(term);
     mpf_clear(xp);
   }
+
+  mpf_clear(x);
 }
+
 
 void sine(mpf_t *arg, mpf_t *result) {
 mpf_t factor, q, r, num, denom, term, x, xp;
@@ -225,14 +222,10 @@ int i, sign;
 /* Special case (we do not treat multiples of pi due to roundoff issues) */
   if (mpf_cmp_ui(x,0) ==  0) {
     mpf_set_ui(*result,0);
-  }
-
-  else {
+  } else {
     mpf_init(q);
     mpf_init(r);
     mpf_init(factor);
-    mpf_init(num);
-    mpf_init(denom);
     mpf_init(term);
 
     mpf_div(q, x, mpf_tpi);
@@ -266,10 +259,12 @@ int i, sign;
     mpf_clear(num);
     mpf_clear(denom);
     mpf_clear(term);
-    mpf_clear(x);
     mpf_clear(xp);
   }
+
+  mpf_clear(x);
 }
+
 
 void cosine(mpf_t *arg, mpf_t *result) {
 mpf_t factor, q, r, num, denom, term, x, xp;
@@ -286,8 +281,6 @@ int i, sign;
     mpf_init(q);
     mpf_init(r);
     mpf_init(factor);
-    mpf_init(num);
-    mpf_init(denom);
     mpf_init(term);
 
     mpf_div(q, x, mpf_tpi);
@@ -320,9 +313,10 @@ int i, sign;
     mpf_clear(num);
     mpf_clear(denom);
     mpf_clear(term);
-    mpf_clear(x);
     mpf_clear(xp);
   }
+
+  mpf_clear(x);
 }
 
 

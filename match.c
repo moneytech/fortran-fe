@@ -884,7 +884,10 @@ match m, n;
 
 got_match:
   if (m == MATCH_NO) g95_error("Syntax error in IF-clause at %C");
-  if (m != MATCH_YES) return MATCH_ERROR;
+  if (m != MATCH_YES) {
+    g95_free_expr(expr);
+    return MATCH_ERROR;
+  }
 
 /* At this point, we've matched the single IF and the action clause is
  * in new_st.  Rearrange things so that the IF statement appears in new_st */
