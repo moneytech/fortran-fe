@@ -1122,8 +1122,8 @@ try t;
  * particular kind of expression-- specification, restricted,
  * or initialization as determined by the check_function.  */
 
-try g95_check_constructor(g95_expr *expr, int array_constructor,
-			  match (*check_function)(g95_expr *)) {
+try g95_check_constructor(g95_expr *expr,
+			  try (*check_function)(g95_expr *)) {
 cons_stack *base_save;
 try t;
 

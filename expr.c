@@ -1421,11 +1421,11 @@ int *type_flag;
     break;
 
   case EXPR_STRUCTURE:
-    t = g95_check_constructor(e, 0, check_init_expr);
+    t = g95_check_constructor(e, check_init_expr);
     break;
 
   case EXPR_ARRAY:
-    t = g95_check_constructor(e, 1, check_init_expr);
+    t = g95_check_constructor(e, check_init_expr);
     break;
   }
 
@@ -1545,11 +1545,11 @@ int type_flag;
     break;
 
   case EXPR_STRUCTURE:
-    t = g95_check_constructor(e, 0, check_spec_expr);
+    t = g95_check_constructor(e, check_spec_expr);
     break;
 
   case EXPR_ARRAY:
-    t = g95_check_constructor(e, 1, check_spec_expr);
+    t = g95_check_constructor(e, check_spec_expr);
     break;
   }
 
