@@ -40,6 +40,9 @@ static g95_symbol *changed = NULL;
  * BT_UNKNOWN into all elements.  The arrays of flags indicate whether
  * a particular element has been explicitly set or not.  */
 
+static g95_typespec new_ts[G95_LETTERS];
+static int new_flag[G95_LETTERS];
+
 
 /* g95_match_implicit_none()-- Match an IMPLICIT NONE statement. */
 
@@ -59,10 +62,6 @@ int i;
     g95_current_ns->set_flag[i - 'a'] = 1;
   }
 }
-
-
-static g95_typespec new_ts[G95_LETTERS];
-static int new_flag[G95_LETTERS];
 
 
 /* match_implicit_range()-- Match the letter range(s) of an IMPLICIT
