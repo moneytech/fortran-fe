@@ -1080,7 +1080,7 @@ static try check_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
   if (array->rank == 0) return FAILURE;
 
-  if (array->ts.type != BT_INTEGER || array->ts.type != BT_REAL ) {
+  if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL ) {
     type_error(array);
     return FAILURE;
   }
@@ -1124,7 +1124,7 @@ static try check_minval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
   if (array->rank == 0) return FAILURE;
 
-  if (array->ts.type != BT_INTEGER || array->ts.type != BT_REAL ) {
+  if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL ) {
     type_error(array);
     return FAILURE;
   }
