@@ -583,6 +583,19 @@ int i, n, limit;
     mpz_init(int_info->huge);
     mpz_sub_ui(int_info->huge, r, 1);
 
+    /* These are the numbers that are actually representable by the
+     * target.  For bases other than two, this needs to be changed. */
+
+    if (int_info->radix != 2)
+      g95_internal_error("Fix min_int, max_int calculation");
+
+    mpz_init(int_info->min_int);
+    mpz_neg(int_info->min_int, int_info->huge);
+
+    mpz_init(int_info->max_int);
+    mpz_add(int_info->max_int, int_info->huge, int_info->huge); 
+    mpz_add_ui(int_info->max_int, int_info->max_int, 1);
+
     /* Range */
 
     mpf_set_z(a, int_info->huge);
@@ -759,18 +772,15 @@ int rc;
 
 static arith g95_check_integer_range(mpz_t p, int kind) {
 arith result;
-mpz_t t;
 int i;
 
   i = validate_integer(kind);
   if (i == -1) g95_internal_error("g95_check_integer_range(): Bad kind");
 
-  mpz_init(t);
-  mpz_abs(t, p);
-
   result = ARITH_OK;
-  if (mpz_cmp(p, g95_integer_kinds[i].huge) == 1) result = ARITH_OVERFLOW;
-  mpz_clear(t);
+
+  if (mpz_cmp(p, g95_integer_kinds[i].min_int) < 0 ||
+      mpz_cmp(p, g95_integer_kinds[i].max_int) > 0) result = ARITH_OVERFLOW;
 
   return result;
 }

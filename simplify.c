@@ -1564,7 +1564,8 @@ int i, *bits;
   else ashift = -shift;
 
   if (ashift > isize) {
-    g95_error("Magnitude of second argument of ISHFTC exceeds third argument at %L", &s->where);
+    g95_error("Magnitude of second argument of ISHFTC exceeds third argument "
+	      "at %L", &s->where);
     return &g95_bad_expr;
   }
 
@@ -2135,6 +2136,7 @@ int cmp;
 
 g95_expr *g95_simplify_not(g95_expr *e) {
 g95_expr *result;
+int i;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -2142,6 +2144,13 @@ g95_expr *result;
   result->where = e->where;
 
   mpz_com(result->value.integer, e->value.integer);
+
+  /* Because of how GMP handles numbers, the result must be ANDed with
+   * the max_int mask.  For radices <> 2, this will require change */
+
+  i = g95_validate_kind(BT_INTEGER, e->ts.kind);
+  mpz_and(result->value.integer, result->value.integer,
+	  g95_integer_kinds[i].max_int);
 
   return range_check(result, "NOT");
 }

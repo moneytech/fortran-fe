@@ -722,6 +722,8 @@ typedef struct {
 
   int range;
   mpz_t huge;
+
+  mpz_t min_int, max_int;  /* Values really representable by the target */
 } g95_integer_info;
 
 extern g95_integer_info g95_integer_kinds[];
