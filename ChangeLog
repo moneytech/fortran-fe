@@ -1,3 +1,7 @@
+2002-10-09  Paul Brook  <paul@nowt.org>
+
+	* (g95_conv_expr_reference): Handle character strings correctly.
+
 2002-10-07  Paul Brook  <paul@nowt.org>
 
 	(g95_expand_decl): Rename from f95_expand_decl_stmt and use as

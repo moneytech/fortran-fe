@@ -1157,6 +1157,13 @@ g95_conv_expr_reference (g95_se * se, g95_expr * expr)
   tree var;
   tree tmp;
 
+  if (expr->ts.type == BT_CHARACTER)
+    {
+      g95_conv_expr (se, expr);
+      g95_conv_string_parameter (se);
+      return;
+    }
+
   if (expr->expr_type == EXPR_VARIABLE)
     {
       se->want_pointer = 1;
@@ -1173,11 +1180,6 @@ g95_conv_expr_reference (g95_se * se, g95_expr * expr)
     }
 
   g95_conv_expr (se, expr);
-
-  if (expr->ts.type == BT_CHARACTER)
-    {
-      g95_conv_string_parameter (se);
-    }
 
   /* Create a temporary var to hold the value.  */
   var = g95_create_var (TREE_TYPE (se->expr), NULL);
