@@ -54,11 +54,11 @@ g95_real_info g95_real_kinds[] = {
 
 /* natural_logarithm()-- Compute a natural logarithm */
 
-static void natural_logarithm(mpf_t arg, mpf_t result) {
+static void natural_logarithm(mpf_t *arg, mpf_t *result) {
 mpf_t x, xp, t, log;
 int i, p;
 
-  mpf_init_set(x, arg);
+  mpf_init_set(x, *arg);
   mpf_init(t);
 
   p = 0;
@@ -113,22 +113,21 @@ int i, p;
   mpf_clear(xp);
   mpf_clear(t);
 
-  mpf_set(result, log);
+  mpf_set(*result, log);
   mpf_clear(log);
 }
 
 
-
-static void common_logarithm(mpf_t arg, mpf_t result) {
+static void common_logarithm(mpf_t *arg, mpf_t *result) {
 mpf_t i10, log10;
 
   natural_logarithm(arg, result);
 
   mpf_init_set_ui(i10, 10);
   mpf_init(log10);
-  natural_logarithm(i10, log10);
+  natural_logarithm(&i10, &log10);
 
-  mpf_div(result, result, log10);
+  mpf_div(*result, *result, log10);
   mpf_clear(i10);
   mpf_clear(log10);
 }
@@ -191,7 +190,7 @@ int i;
     /* Range */
 
     mpf_set_z(a, int_info->huge);
-    common_logarithm(a, a);
+    common_logarithm(&a, &a);
     mpf_trunc(a, a);
     mpz_set_f(r, a);
     int_info->range = mpz_get_si(r);
@@ -229,8 +228,8 @@ int i;
 
     /* Range */
 
-    common_logarithm(real_info->huge, a);
-    common_logarithm(real_info->tiny, b);
+    common_logarithm(&real_info->huge, &a);
+    common_logarithm(&real_info->tiny, &b);
     mpf_neg(b, b);
 
     if (mpf_cmp(a, b) > 0) mpf_set(a, b);  /* a = min(a, b) */
@@ -242,7 +241,7 @@ int i;
     /* Precision */
 
     mpf_set_ui(a, real_info->radix);
-    common_logarithm(a, a);
+    common_logarithm(&a, &a);
 
     mpf_mul_ui(a, a, real_info->digits-1);
     mpf_trunc(a, a);
