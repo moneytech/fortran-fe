@@ -787,9 +787,9 @@ int len;
   if (form != FORM_UNKNOWN)
     fp->form = form;
   else {
-    form = form_from_filename(filename);
+    fp->form = form_from_filename(filename);
 
-    if (form == FORM_UNKNOWN) {
+    if (fp->form == FORM_UNKNOWN) {
       fp->form = FORM_FREE;
       g95_warning_now("Reading file %s as free form", filename);
     }
