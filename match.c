@@ -445,6 +445,7 @@ int t;
 
 char *g95_op2string(int i) {
 
+  if (i == INTRINSIC_ASSIGN) return "=";
   return g95_code2string(operators, i);
 }
 

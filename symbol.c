@@ -1623,19 +1623,21 @@ g95_symtree *t;
  * namespace, restorting to any parent namespaces if necessary.
  * Returns NULL if we can't find it */
 
-g95_symbol *g95_find_symbol(char *name, g95_namespace *ns) {
+g95_symbol *g95_find_symbol(char *name, g95_namespace *ns, int parent_flag) {
 g95_symbol *s;
 
   if (ns == NULL) ns = g95_current_ns;
 
   do {
     s = g95_find_local_symbol(name, ns);
-    if (s != NULL) return s;
+    if (s != NULL) break;
+
+    if (!parent_flag) break;
 
     ns = ns->parent;
   } while (ns != NULL);
 
-  return NULL;
+  return s;
 }
 
 

@@ -28,17 +28,15 @@ Boston, MA 02111-1307, USA.  */
 static char expression_syntax[] = "Syntax error in expression at %C";
 
 
-/* g95_match_defined_op()-- Match a user-defined operator.  If
- * 'def_flag' is nonzero we assume that we are looking to define a new
- * operator with this name. */
+/* g95_match_defined_op_name()-- Match a user-defined operator name.
+ * This is a normal name with a few restrictions. */
 
-match g95_match_defined_op(g95_symbol **result, int def_flag) {
+match g95_match_defined_op_name(char *result) {
 static char *badops[] = {
  "true", "false", "and", "or", "not", "eqv", "neqv", "eq", "ne",
  "ge", "le", "lt", "gt", NULL };
 
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_symbol *sym;
 locus old_loc;
 match m;
 int i;
@@ -50,14 +48,11 @@ int i;
 
   for(i=0; badops[i]; i++)
     if (strcmp(badops[i], name) == 0) {
-      if (def_flag) {
-	g95_error("The name '%s' cannot be used as a defined operator at %C",
-		  name);
-	return MATCH_ERROR;
-      } else {
-	g95_set_locus(&old_loc);  /* Hope we have a logical constant */
-	return MATCH_NO;
-      }
+      g95_error("The name '%s' cannot be used as a defined operator at %C",
+		name);
+
+      g95_set_locus(&old_loc);
+      return MATCH_ERROR;
     }
 
   for(i=0; name[i]; i++)
@@ -66,12 +61,22 @@ int i;
       return MATCH_ERROR;
     }
 
-  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
+  return MATCH_YES;
+}
 
-  if (def_flag == 0 && sym->operator != NULL) {
-    g95_error("Symbol '%s' at %C is not a defined unary operator", name);
-    return MATCH_ERROR;
-  }
+
+/* match_defined_operator()-- Match a user defined operator.  The
+ * symbol found must be an operator already. */
+
+static match match_defined_operator(g95_symbol **result) {
+char name[G95_MAX_SYMBOL_LEN+1];
+g95_symbol *sym;
+match m;
+
+  m = g95_match_defined_op_name(name);
+  if (m != MATCH_YES) return m;
+
+  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
   *result = sym;
   return MATCH_YES;
@@ -162,7 +167,7 @@ match m;
 
   where = *g95_current_locus(); 
   sym = NULL; 
-  m = g95_match_defined_op(&sym, 0);
+  m = match_defined_operator(&sym);
   if (m == MATCH_ERROR) return m;
 
   m = match_primary(&e);
@@ -497,7 +502,7 @@ match m;
   if (m != MATCH_YES) return m;
 
   for(;;) {
-    m = g95_match_defined_op(&sym, 0);
+    m = match_defined_operator(&sym);
     if (m == MATCH_NO) break;
     if (m == MATCH_ERROR) {
       g95_free_expr(all);

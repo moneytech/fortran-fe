@@ -153,63 +153,103 @@ g95_formal_arglist *formal;
 }
 
 
+/* g95_match_generic_spec()-- Match a generic specification.
+ * Depending on which type of interface is found, the 'name' or
+ * 'operator' pointers may be set.  This subroutine doesn't return
+ * MATCH_NO. */
+
+match g95_match_generic_spec(interface_type *type, char *name,
+			     int *operator) {
+char buffer[G95_MAX_SYMBOL_LEN+1];
+match m;
+int i;
+ 
+  if (g95_match(" assignment ( = )") == MATCH_YES) {
+    *type = INTERFACE_INTRINSIC_OP;
+    *operator = INTRINSIC_ASSIGN;
+    return MATCH_YES;
+  }
+
+  if (g95_match(" operator ( %o )", &i) == MATCH_YES) { /* Operator i/f */
+    *type = INTERFACE_INTRINSIC_OP;
+    *operator = i;
+    return MATCH_YES;
+  }
+
+  if (g95_match(" operator ( ") == MATCH_YES) {
+    m = g95_match_defined_op_name(buffer);
+    if (m == MATCH_NO) goto syntax;
+    if (m != MATCH_YES) return MATCH_ERROR;
+
+    m = g95_match(" )");
+    if (m == MATCH_NO) goto syntax;
+    if (m != MATCH_YES) return MATCH_ERROR;
+
+    strcpy(name, buffer);
+    *type = INTERFACE_USER_OP;
+    return MATCH_YES;
+  }
+
+  if (g95_match_name(buffer) == MATCH_YES) {
+    strcpy(name, buffer);
+    *type = INTERFACE_GENERIC;    
+    return MATCH_YES;
+  }
+
+  *type = INTERFACE_NAMELESS;
+  return MATCH_YES;
+
+syntax:
+  g95_error("Syntax error in OPERATOR specification at %C");
+  return MATCH_ERROR;
+}
+
 
 /* g95_match_interface()-- Match one of the five forms of an interface
  * statement.  */
 
 match g95_match_interface(void) {
+char name[G95_MAX_SYMBOL_LEN+1];
+interface_type type;
 g95_symbol *sym;
-match m;
-int i;
+int operator;
 
-  if (g95_match_eos() == MATCH_YES) {  /* Interface block */
-    current_interface.type = INTERFACE_NAMELESS;
-    return MATCH_YES;
+  if (g95_match_generic_spec(&type, name, &operator) == MATCH_ERROR)
+    return MATCH_ERROR;
+
+  if (g95_match_eos() != MATCH_YES) {
+    g95_syntax_error(ST_INTERFACE);
+    return MATCH_ERROR;
   }
 
-  if (g95_match(" assignment ( = )%t") == MATCH_YES) { /* Assignment i/f */
-    current_interface.type = INTERFACE_INTRINSIC_OP;
-    current_interface.op = INTRINSIC_ASSIGN;
-    return MATCH_YES;
-  }
+  current_interface.type = type;
 
-  if (g95_match(" operator ( %o )%t", &i) == MATCH_YES) { /* Operator i/f */
-    current_interface.op = i;
-    current_interface.type = INTERFACE_INTRINSIC_OP;
-    return MATCH_YES;
-  }
+  switch(type) {
+  case INTERFACE_GENERIC:
+    if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
-  if (g95_match(" operator ( ") == MATCH_YES) {
-    m = g95_match_defined_op(&sym, 1);
-    if (m == MATCH_NO) g95_error("Syntax error in OPERATOR definition at %C");
-    if (m != MATCH_YES) return MATCH_ERROR;
-
-    m = g95_match(" )%t");
-    if (m == MATCH_NO) g95_error("Syntax error in OPERATOR definition at %C");
-    if (m != MATCH_YES) return MATCH_ERROR;
-
-    /* TODO: Fix parsing of generic operators */
-
-    current_interface.type = INTERFACE_USER_OP;
-    current_interface.generic = g95_new_block = sym;
-
-    return MATCH_YES;
-  }
-
-  if (g95_match(" %s%t", &sym) == MATCH_YES) { /* Generic interface */
     if (g95_add_flavor(&sym->attr, FL_GENERIC, NULL) == FAILURE)
       return MATCH_ERROR;
 
-    current_interface.type = INTERFACE_GENERIC;
     current_interface.generic = g95_new_block = sym;
+    break;
 
-    return MATCH_YES;
+  case INTERFACE_USER_OP:
+    if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+
+    current_interface.generic = sym;
+    break;
+
+  case INTERFACE_INTRINSIC_OP:
+    current_interface.op = operator;
+    break;
+
+  case INTERFACE_NAMELESS:
+    break;
   }
 
-  g95_syntax_error(ST_INTERFACE);
-  return MATCH_ERROR;
+  return MATCH_YES;
 }
-
 
 
 /* g95_match_end_interface()-- Match the different sort of
@@ -217,60 +257,65 @@ int i;
 
 match g95_match_end_interface(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
+interface_type type;
+int operator;
 match m;
-int op;
+
+  if (g95_match_generic_spec(&type, name, &operator) == MATCH_ERROR)
+    return MATCH_ERROR;
+
+  if (g95_match_eos() != MATCH_YES) {
+    g95_syntax_error(ST_END_INTERFACE);
+    return MATCH_ERROR;
+  }
+
+  m = MATCH_YES;
 
   switch(current_interface.type) {
   case INTERFACE_NAMELESS:
-    g95_error("Extra characters after END INTERFACE at %C");
-    m = MATCH_ERROR;
+    if (type != current_interface.type) {
+      g95_error("Expected a nameless interface at %C");
+      m = MATCH_ERROR;
+    }
+
     break;
 
   case INTERFACE_INTRINSIC_OP:
-    if (current_interface.op == INTRINSIC_ASSIGN) {
-      m = g95_match("% assignment ( = )%t");
-      if (m == MATCH_NO) {
-	g95_error("Expecting 'END INTERFACE ASSIGNMENT (=)' at %C");
-	m = MATCH_ERROR;
-      }
-    } else {
-      m = g95_match("% operator ( %o )%t", &op);
+    if (type != current_interface.type || operator != current_interface.op) {
 
-      if ((m == MATCH_NO) ||
-	  (m == MATCH_YES && op != current_interface.op)) {
-
+      if (current_interface.op == INTRINSIC_ASSIGN)
+	g95_error("Expected 'END INTERFACE ASSIGNMENT (=)' at %C");
+      else 
 	g95_error("Expecting 'END INTERFACE OPERATOR (%s)' at %C",
 		  g95_op2string(current_interface.op));
 
-	m = MATCH_ERROR;
-      }
+      m = MATCH_ERROR;
     }
+
     break;
 
   case INTERFACE_USER_OP:
-    m = g95_match("% operator ( .%n. ) %t", name);
+  /* Comparing the symbol node names is OK because only use-associated
+   * symbols can be renamed */
 
-    if ((m == MATCH_NO) ||
-	(m == MATCH_YES &&
-	 strcmp(name, current_interface.generic->name) != 0)) {
-
+    if (type != current_interface.type || 
+	strcmp(current_interface.generic->name, name) != 0) {
       g95_error("Expecting 'END INTERFACE OPERATOR (.%s.)' at %C",
 		current_interface.generic->name);
       m = MATCH_ERROR;
     }
+
     break;
 
   case INTERFACE_GENERIC:
-    m = g95_match("% %n %t", name);
-
-    if ((m == MATCH_NO) ||
-	(m == MATCH_YES &&
-	 strcmp(name, current_interface.generic->name) != 0)) {
-
+    if (type != current_interface.type ||
+	strcmp(current_interface.generic->name, name) != 0) {
       g95_error("Expecting 'END INTERFACE %s' at %C",
 		current_interface.generic->name);
       m = MATCH_ERROR;
     }
+
+    break;
   }
 
   return m;
