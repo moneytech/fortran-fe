@@ -1425,7 +1425,10 @@ try do_simplify(intrinsic_sym *specific, g95_expr *e) {
 g95_expr *result, *a1, *a2, *a3, *a4;
 g95_actual_arglist *arg;
 
-  if (specific->simplify == NULL) return SUCCESS;
+  if (specific->simplify == NULL) {
+    result = NULL;
+    goto finish;
+  }
 
   arg = e->value.function.actual;
 
@@ -1462,6 +1465,8 @@ g95_actual_arglist *arg;
     }
   }
 
+
+ finish:
   if (result == &g95_bad_expr) return FAILURE;
 
   if (result == NULL)      /* Must call at run-time */
