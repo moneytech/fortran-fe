@@ -2141,8 +2141,8 @@ match m;
       tail->repeat = 1;
     } else {
       msg = g95_extract_int(expr, &tail->repeat);
+      g95_free_expr(expr);
       if (msg != NULL) {
-	g95_free_expr(expr);
 	g95_error(msg);
 	return MATCH_ERROR;
       }
