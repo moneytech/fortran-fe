@@ -29,6 +29,7 @@ Boston, MA 02111-1307, USA.  */
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "g95.h"
 
@@ -98,7 +99,7 @@ static void error_printf(const char *, ...);
 static void show_locus(int offset, locus *l) {
 g95_file *f;
 char c, *p;
-int i;
+int i, m;
 
 /* TODO: Either limit the total length and number of included files displayed */
 /* or add buffering of arbitrary number of characters in error messages. */
@@ -123,7 +124,21 @@ int i;
   for(; i>0; i--) {
     c = *p++;
     if (c == '\t') c = ' ';
-    error_char(c);
+
+    if (isprint(c))
+      error_char(c);
+    else {
+      error_char('\\');
+      error_char('x');
+
+      m = ((c >> 4) & 0x0F) + '0';
+      if (m > '9') m += 'A' - '9' - 1;
+      error_char(m);
+
+      m = (c & 0x0F) + '0';
+      if (m > '9') m += 'A' - '9' - 1;
+      error_char(m);
+    }
   }
 
   error_char('\n');
