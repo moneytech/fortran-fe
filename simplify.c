@@ -1879,7 +1879,7 @@ int my_kind;
        	  mpz_set(max_val, y->value.integer);
       }
       if (my_type == BT_REAL) {
-        if (mpf_cmp(x->value.real, rmax_val) > 0)
+        if (mpf_cmp(y->value.real, rmax_val) > 0)
  	  mpf_set(rmax_val, y->value.real);
       }
       x = y;
@@ -2058,7 +2058,7 @@ int my_kind;
        	  mpz_set(min_val, y->value.integer);
       }
       if ( my_type == BT_REAL ) {
-        if ( mpf_cmp(x->value.real, rmin_val) < 0 )
+        if ( mpf_cmp(y->value.real, rmin_val) < 0 )
  	  mpf_set(rmin_val, y->value.real);
       }
       x=y;
@@ -2869,29 +2869,33 @@ int indx, len, lenc;
 
 g95_expr *g95_simplify_selected_int_kind(g95_expr *e) {
 int i, kind, range;
-g95_expr *result;
 
-  if (e->expr_type != EXPR_CONSTANT || g95_extract_int(e, &range) != NULL)
-    return NULL;
+  if (e->expr_type != EXPR_CONSTANT ||
+      g95_extract_int(e, &range) != NULL) return NULL;
 
   kind = INT_MAX;
-
-  for(i=0; g95_integer_kinds[i].kind!=0; i++)
+  for(i=0; g95_integer_kinds[i].kind!=0; i++) {
     if (g95_integer_kinds[i].range >= range && 
-	g95_integer_kinds[i].kind < kind) kind = g95_integer_kinds[i].kind;
+	g95_integer_kinds[i].kind < kind) {
+      kind = g95_integer_kinds[i].kind;
+    }
+  }
 
-  if (kind == INT_MAX) kind = -1;
+  if (kind == INT_MAX) {
+    g95_error("Range %d exceeds all integer kinds at %L", range, &e->where);
+    return &g95_bad_expr;
+  }
 
-  result = g95_int_expr(kind);
-  result->where = e->where;
-
-  return result;
+  return g95_int_expr(kind);
 }
+
 
 
 g95_expr *g95_simplify_selected_real_kind(g95_expr *p, g95_expr *q) {
 int range, precision, i, kind, found_precision, found_range;
-g95_expr *result;
+
+  if (p == NULL && q == NULL)
+    g95_internal_error("No arguments to SELECTED_REAL_KIND()");
 
   if (p == NULL)
     precision = 0;
@@ -2912,10 +2916,10 @@ g95_expr *result;
   found_range = 0;
 
   for(i=0; g95_real_kinds[i].kind!=0; i++) {
-    if (g95_real_kinds[i].precision >= precision) found_precision = 1;
-
-    if (g95_real_kinds[i].range >= range) found_range = 1;
-
+    if (g95_real_kinds[i].precision >= precision)
+      found_precision = 1;
+    if (g95_real_kinds[i].range >= range) 
+      found_range = 1;
     if (g95_real_kinds[i].precision >= precision &&
 	g95_real_kinds[i].range >= range &&
 	g95_real_kinds[i].kind < kind)
@@ -2924,14 +2928,18 @@ g95_expr *result;
   
   if (kind == INT_MAX) {
     kind = 0;
+    if (!found_precision) {
+      g95_warning("Specified precision %d exceeds all REAL kinds at %L",
+		  precision, &p->where);
+      kind = -1;
+    }
 
-    if (!found_precision) kind = -1;
-
-    if (!found_range) kind -= 2;
+    if (!found_range) {
+      g95_warning("Specified exponent range %d exceeds all REAL kinds at %L", 
+		  range, &q->where);
+      kind -= 2;
+    }
   }
-
-  result = g95_int_expr(kind);
-  result->where = (p != NULL) ? p->where : q->where;
 
   return g95_int_expr(kind);
 }
