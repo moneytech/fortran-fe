@@ -436,8 +436,8 @@ match m;
   if (g95_match(" :") == MATCH_YES) return AS_DEFERRED;
 
   m = g95_match(" %e", upper);
-  if (m == MATCH_NO) g95_error("Expected expression in array "
-			       "specification at %C");
+  if (m == MATCH_NO)
+    g95_error("Expected expression in array specification at %C");
   if (m != MATCH_YES) return AS_UNKNOWN;
 
   if (g95_match(" :") == MATCH_NO) {
@@ -456,7 +456,7 @@ match m;
     return AS_UNKNOWN;
   }
 
-  if (m == MATCH_NO) return AS_ASSUMED_SIZE;
+  if (m == MATCH_NO) return AS_ASSUMED_SHAPE;
 
   return AS_EXPLICIT;
 }
