@@ -585,12 +585,10 @@ try t;
 
 static try resolve_operator(g95_expr *e) {
 g95_expr *op1, *op2;
-char *operator_name, msg[250];
+char msg[200];
 try t;
 
 /* Resolve all subnodes-- give them types. */
-
-  operator_name = (char *) g95_op2string(e->operator); 
 
   switch(e->operator) {
   default:
@@ -620,7 +618,7 @@ try t;
     }
 
     sprintf(msg, "Operand of unary numeric operator '%s' at %%L is %s",
-	    operator_name, g95_typename(&e->ts));
+	    g95_op2string(e->operator), g95_typename(&e->ts));
     goto bad_op;
 
   case INTRINSIC_PLUS:
@@ -634,7 +632,8 @@ try t;
     }
 
     sprintf(msg, "Operands of binary numeric operator '%s' at %%L are %s/%s",
-	    operator_name, g95_typename(&op1->ts), g95_typename(&op2->ts));
+	    g95_op2string(e->operator), g95_typename(&op1->ts),
+	    g95_typename(&op2->ts));
     goto bad_op;
 
   case INTRINSIC_CONCAT:
@@ -659,7 +658,8 @@ try t;
     }
 
     sprintf(msg, "Operands of logical operator '%s' at %%L are %s/%s",
-	    operator_name, g95_typename(&op1->ts), g95_typename(&op1->ts));
+	    g95_op2string(e->operator), g95_typename(&op1->ts),
+	    g95_typename(&op1->ts));
 
     goto bad_op;
       
@@ -699,7 +699,8 @@ try t;
     }
 
     sprintf(msg, "Operands of comparison operator '%s' at %%L are %s/%s",
-	    operator_name, g95_typename(&op1->ts), g95_typename(&op2->ts));
+	    g95_op2string(e->operator), g95_typename(&op1->ts),
+	    g95_typename(&op2->ts));
 
     goto bad_op;
 
