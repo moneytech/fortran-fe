@@ -38,31 +38,42 @@ typedef enum {
 /* Local variables for checking format strings.  The saved_token is
  * used to back up by a single format token during the parsing process. */
 
-static char delimiter;
-static int format_length;
+static char last_char, *format_string;
+static int format_length, use_last_char;
 
 static format_token saved_token;
 
-static enum { MODE_STRING, MODE_FORMAT } mode;
+static enum { MODE_STRING, MODE_FORMAT, MODE_COPY } mode;
 static locus last_locus;
+
 
 /* next_char()-- Return the next character in the format string */
 
-static char next_char(void) {
+static char next_char(int in_string) {
 char c;
 
-  last_locus = *g95_current_locus();
-  format_length++;
-
-  if (mode == MODE_STRING) {
-    c = g95_next_string_char(delimiter);
-    if (c < 0) c = '\0';
-  } else {
-    c = g95_next_char_literal(0);
-    if (c == '\n') c = '\0';
+  if (use_last_char) {
+    use_last_char = 0;
+    return last_char;
   }
 
-  return toupper(c);
+  last_locus = *g95_current_locus();
+
+  format_length++;
+
+  if (mode == MODE_STRING)
+    c = *format_string++;
+  else {
+    c = g95_next_char_literal(in_string);
+    if (c == '\n') c = '\0';
+
+    if (mode == MODE_COPY) *format_string++ = c;
+  }
+
+
+  c = toupper(c);
+  last_char = c;
+  return c;
 }
 
 
@@ -70,10 +81,8 @@ char c;
 
 static void unget_char(void) {
 
-  g95_set_locus(&last_locus);
-  format_length--;
+  use_last_char = 1;
 }
-
 
 
 /* format_lex()-- Simple lexical analyzer for getting the next token
@@ -83,8 +92,6 @@ static format_token format_lex(void) {
 format_token token;
 char c, delim;
 int zflag;
-int savedmode;
-
 
   if (saved_token != 0) {
     token = saved_token;
@@ -93,19 +100,19 @@ int savedmode;
   }
 
   do {
-    c = next_char();
+    c = next_char(0);
   } while(g95_is_whitespace(c));
 
   switch(c) {
   case '-':
-    c = next_char();
+    c = next_char(0);
     if (!isdigit(c)) {
       token = FMT_UNKNOWN;
       break;
     }
 
     do {
-      c = next_char();
+      c = next_char(0);
     } while(isdigit(c));
 
     unget_char();
@@ -118,7 +125,7 @@ int savedmode;
 
     do {
       if (c != '0') zflag = 0;
-      c = next_char();
+      c = next_char(0);
     } while(isdigit(c));
 
     unget_char();
@@ -146,7 +153,7 @@ int savedmode;
     break;
 
   case 'T':
-    c = next_char();
+    c = next_char(0);
     if (c != 'L' && c != 'R') unget_char();
 
     token = FMT_POS;
@@ -165,14 +172,14 @@ int savedmode;
     break;
 
   case 'S':
-    c = next_char();
+    c = next_char(0);
     if (c != 'P' && c != 'S') unget_char();
 
     token = FMT_SIGN;
     break;
 
   case 'B':
-    c = next_char();
+    c = next_char(0);
     if (c == 'N' || c == 'Z')
       token = FMT_BLANK;
     else {
@@ -184,19 +191,16 @@ int savedmode;
 
   case '\'': case '"':
     delim = c;      
-    savedmode = mode; /* we´re now inside a character constant, ignore !´s */
-    mode = MODE_STRING;
 
     for(;;) {
-
-      c = next_char();
+      c = next_char(1);
       if (c == '\0') {
 	token = FMT_END;
 	break;
       }
 
       if (c == delim) {
-	c = next_char();
+	c = next_char(1);
 
 	if (c == '\0') {
 	  token = FMT_END;
@@ -210,7 +214,6 @@ int savedmode;
 	}
       }
     }
-    mode = savedmode;
     break;
 
   case 'P':
@@ -226,7 +229,7 @@ int savedmode;
     break;
 
   case 'E':
-    c = next_char();
+    c = next_char(0);
     if (c == 'N' || c == 'S') 
       token = FMT_EXT;
     else {
@@ -272,6 +275,7 @@ int savedmode;
  * The dual origin means that the warning message is a little less than
  * great. */
 
+
 try check_format(void) {
 char *error,
      *posint_required = "Positive width required",
@@ -284,6 +288,7 @@ format_token t, u;
 int level;
 try rv;
 
+  use_last_char = 0; 
   saved_token = 0;
   level = 0;
   rv = SUCCESS;
@@ -530,10 +535,14 @@ optional_comma:
  * in a FORMAT statement, this messes up parsing, which is an error. */
 
 syntax:
-  if (mode == MODE_STRING)
-    g95_warning("%s in format string at %C", error);
-  else
+  if (mode != MODE_STRING)
     g95_error("%s in format string at %C", error);
+  else {
+    g95_warning("%s in format string at %C", error);
+
+    /* More elaborate measures are needed to show where a problem is
+     * within a format string that has been calculated. */
+  }
 
   rv = FAILURE;
 
@@ -546,17 +555,10 @@ finished:
  * constant string, see if it looks like a format string */
 
 void g95_check_format_string(g95_expr *e) {
-locus old_loc;
 
   mode = MODE_STRING;
-  old_loc = *g95_current_locus();
-
-  g95_set_locus(&e->where);
-  delimiter = g95_next_char();
-
+  format_string = e->value.character.string;
   check_format();
-
-  g95_set_locus(&old_loc);
 }
 
 
@@ -565,9 +567,8 @@ locus old_loc;
  * locate the end of the format string.  */
 
 match g95_match_format(void) {
-char *p, *q;
+char *p;
 locus start;
-int i;
 
   if (g95_statement_label == 0) {
     g95_error("FORMAT statement at %C does not have a statement label");
@@ -589,12 +590,12 @@ int i;
   }
 
   g95_set_locus(&start);      /* Back to the beginning */
-  p = q = g95_getmem(format_length+1);
+  p = format_string = g95_getmem(format_length+1);
 
-  for(i=0; i<format_length; i++)
-    *p++ = g95_next_char_literal(0);
+  mode = MODE_COPY;
+  check_format();       /* Guaranteed to succeed */
 
-  g95_match_eos();   /* Guaranteed to succeed */
+  g95_match_eos();      /* Guaranteed to succeed */
 
 /* More here later */
 
