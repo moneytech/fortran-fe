@@ -628,27 +628,13 @@ match m;
   m = g95_match(" type ( %n )", name);
   if (m != MATCH_YES) return m;
 
-  if (data_decl) {  /* Require type to exist now */
-    if (g95_find_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
+  /* Allow the type to be defined later. */
 
-    if (sym == NULL) {
-      g95_error("Derived type '%s' at %C has not been defined", name);
-      return MATCH_ERROR;
-    }
+  if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
-    if (sym->attr.flavor != FL_DERIVED) {
-      g95_error("Name '%s' at %C is not a derived type", name);
-      return MATCH_ERROR;
-    }
-
-  } else {     /* Allow the type to be defined later. */
-
-    if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
-
-    if (sym->attr.flavor != FL_DERIVED &&
-	g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
-      return MATCH_ERROR;
-  }
+  if (sym->attr.flavor != FL_DERIVED &&
+      g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
+    return MATCH_ERROR;
 
   ts->type = BT_DERIVED;
   ts->kind = 0;
@@ -886,6 +872,15 @@ match m;
   m = match_attr_spec();
   if (m == MATCH_ERROR) {
     m = MATCH_NO;
+    goto cleanup;
+  }
+
+  if (current_ts.type == BT_DERIVED &&
+      current_ts.derived->components == NULL &&
+      (current_attr.pointer == 0 || g95_current_state() != COMP_DERIVED)) {
+
+    g95_error("Derived type at %C has not been previously defined");
+    m = MATCH_ERROR;
     goto cleanup;
   }
 
@@ -1963,10 +1958,10 @@ loop:
   if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
 /* The symbol may already have the derived attribute without the
- * components.  The only way this can happen is during a function
- * definition or INTRINSIC statement.  The first part of the AND
- * clause is true if a the symbol is not the return value of a
- * function. */
+ * components.  The ways this can happen is via a function definition,
+ * an INTRINSIC statement or a subtype in another derived type that is
+ * a pointer.  The first part of the AND clause is true if a the
+ * symbol is not the return value of a function. */
 
   if (sym->attr.flavor != FL_DERIVED &&
       g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
