@@ -2187,6 +2187,7 @@ sym_stack *p;
 int i;
 
   sym_num = 0;     /* Counter for new symbol numbers */
+  write_stack = NULL;
 
   /* Write the operator interfaces */
 
@@ -2220,8 +2221,6 @@ int i;
    * until the stack is empty.  */
 
   mio_lparen();
-
-  write_stack = NULL;
 
   g95_traverse_ns(ns, write_symbol0);
 
