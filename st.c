@@ -224,13 +224,17 @@ g95_close *close;
 g95_filepos *fp;
 g95_inquire *i;
 g95_dt *dt;
+int label = 0;
 
-  code_indent(level, c->here); 
+  if (c->op != EXEC_NOP)
+    code_indent(level, c->here); 
+
+  if (c->next && (c->next->op == EXEC_NOP))
+    label = c->next->here;
 
   switch(c->op) {
 
   case EXEC_NOP:
-    g95_status("NOP");
     break;
 
   case EXEC_CONTINUE:
@@ -304,7 +308,7 @@ g95_dt *dt;
       g95_show_code(level+1, d->next);
     }
 
-    code_indent(level, 0);
+    code_indent(level, label);
 
     g95_status("ENDIF");
     break;
@@ -332,7 +336,7 @@ g95_dt *dt;
       g95_show_code(level+1, d->next);
     }
 
-    code_indent(level, 0);
+    code_indent(level, label);
     g95_status("END SELECT");
     break;
 
@@ -416,7 +420,7 @@ g95_dt *dt;
 
     g95_show_code(level+1, c->block->next);
 
-    code_indent(level, 0);
+    code_indent(level, label);
     g95_status("END DO");
     break;
 
@@ -592,7 +596,8 @@ g95_dt *dt;
     g95_internal_error("g95_show_code_node(): Bad statement code");
   }
 
-  g95_status_char('\n');
+  if (c->op != EXEC_NOP)
+    g95_status_char('\n');
 }
 
 
