@@ -1015,7 +1015,7 @@ void g95_done_2(void);
 
 /* iresolve.c */
 
-char *g95_get_string(char *, ...)
+char *g95_get_string(const char *, ...)
 #ifdef __GNUC__
 __attribute__ ((format (printf, 1, 2)))
 #endif
@@ -1083,7 +1083,7 @@ extern g95_st_label * g95_statement_label;
 
 extern mpf_t pi, half_pi, minus_half_hpi, two_pi;
 
-char *g95_arith_error(arith);
+const char *g95_arith_error(arith);
 void g95_arith_init_1(void);
 void g95_arith_done_1(void);
 

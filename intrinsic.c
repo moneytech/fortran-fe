@@ -415,7 +415,7 @@ int g95_intrinsic_name(char *name, int subroutine_flag) {
  * of the specifics currently in the table are placed into the list of
  * specific functions associated with that generic.  */
 
-static void make_generic(char *name) {
+static void make_generic(const char *name) {
 g95_intrinsic_sym *g;
 
   if (sizing != SZ_NOTHING) return; 

@@ -1224,7 +1224,7 @@ g95_symbol *f;
 static try restricted_intrinsic(g95_expr *e) {
 g95_intrinsic_sym *sym;
 
-static struct { char *name; int case_number; } *cp, cases[] = {
+static struct { const char *name; int case_number; } *cp, cases[] = {
   { "repeat", 0 },             { "reshape", 0 },  { "selected_int_kind", 0 },
   { "selected_real_kind", 0 }, { "transfer", 0 }, { "trim", 0 },
 

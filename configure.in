@@ -52,7 +52,7 @@ if test "$ok" = "yes"; then
 	# Add more compiler warnings if we are using gcc:
 	# ($GCC is set to "yes" by AC_PROG_CC if we are using gcc.)
 	if test "$GCC" = "yes"; then
-        	CFLAGS="$CFLAGS -pedantic -Wall"
+        	CFLAGS="$CFLAGS -pedantic -Wall -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes"
 	fi
 
         AC_DEFINE(G95_DEBUG,1,[Define to turn on debugging checks.])
