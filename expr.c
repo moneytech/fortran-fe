@@ -1149,6 +1149,71 @@ g95_symbol *sym;
 }
 
 
+/* resolve_formal_arglist()-- Resolve types of formal argument lists.
+ * These have to be done first so that the formal argument lists of
+ * module procedures can be copied to the containing module before the
+ * individual procedures are resolved individually.  Since a dummy
+ * argument cannot be a non-dummy procedure, the only resort left for
+ * untyped names are the IMPLICIT types. */
+
+static try resolve_formal_arglist(g95_formal_arglist *f) {
+g95_symbol *sym;
+try t;
+
+  t = SUCCESS;
+
+  for(; f; f=f->next) {
+    sym = f->sym;
+    if (sym->ts.type != BT_UNKNOWN) continue;
+    if (g95_set_default_type(sym, 1, sym->ns) != SUCCESS) t = FAILURE;
+  }
+
+  return t;
+}
+
+
+/* resolve_entry_arglists()-- Recursive function to see out ENTRY
+ * symbols and resolve their formal argument lists. */
+
+static try resolve_entry_arglists(g95_symtree *st) {
+
+  if (st == NULL) return SUCCESS;
+
+  if (resolve_entry_arglists(st->left) == FAILURE ||
+      resolve_entry_arglists(st->right) == FAILURE)
+    return FAILURE;
+
+  if (!st->sym->attr.entry) return SUCCESS;
+
+  return resolve_formal_arglist(st->sym->formal);
+}
+
+
+/* resolve_formal_arglists()-- Given a namespace, resolve all formal
+ * argument lists within the namespace.  The most obvious is the name
+ * of the procedure.  The argument lists of all the ENTRY symbols must
+ * also be processed. */
+
+static try resolve_formal_arglists(g95_namespace *ns) {
+
+  if (ns == NULL) return SUCCESS;
+
+  if (ns->proc_name != NULL &&
+      resolve_formal_arglist(ns->proc_name->formal) == FAILURE)
+    return FAILURE;
+
+  /* Recursively resolve child and sibling namespaces */
+
+  if (resolve_formal_arglists(ns->contained) == FAILURE) return FAILURE;
+
+  for(ns=ns->sibling; ns; ns=ns->sibling)
+    if (resolve_formal_arglists(ns) == FAILURE)
+      return FAILURE;
+
+  return SUCCESS;
+}
+
+
 /* g95_resolve_modproc()-- Resolve module procedure types.  Because
  * module procedures can call one another, function types have to be
  * worked out before any of the contained procedures can be resolved.
@@ -1158,6 +1223,8 @@ g95_symbol *sym;
 void g95_resolve_modproc(g95_namespace *ns) {
 g95_symbol *sym_upper, *sym_lower;
 g95_namespace *child;
+
+  resolve_formal_arglists(ns);
 
   if (namespace_kind(ns) != COMP_MODULE) return;
 
