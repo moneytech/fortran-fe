@@ -234,6 +234,8 @@ g95_expr *init;
     if (sym->ts.type != BT_DERIVED && init->ts.type != BT_DERIVED &&
 	g95_check_assign_symbol(sym, init) == FAILURE) return FAILURE;
 
+    if (sym->attr.dimension && init->rank == 0) init->rank = sym->as->rank;
+
     sym->value = init;
     *initp = NULL;
   }
