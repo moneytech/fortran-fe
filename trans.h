@@ -94,18 +94,21 @@ typedef enum
   G95_SS_INTRINSIC
 } g95_ss_type;
 
-/* TODO: Use GCC Garbage Collection for g95_ss.
-   Keeping track of them is easy now, but may become less so as they get
-   used for other scalarizations (IO, array parameters, FORALL, WHERE).  */
+/* SS structures can only belong to a single loopinfo.  They must be added
+   otherwise they will not get freed.  */
 typedef struct g95_ss
 {
   g95_ss_type type;
   g95_expr *expr;
   union
   {
-    /* If dimen == 0.  */
-    tree scalar;
-    /* If dimen != 0.  */
+    /* If type is G95_SS_SCALAR or G95_SS_REFERENCE.  */
+    struct
+    {
+      tree expr;
+      tree string_length;
+    } scalar;
+    /* All other types.  */
     g95_ss_info info;
   } data;
 
@@ -114,7 +117,7 @@ typedef struct g95_ss
   struct g95_ss *loop_chain;
   struct g95_ss *next;
 
-  unsigned used:1;
+  unsigned useflags:2;
 } g95_ss;
 #define g95_get_ss() g95_getmem(sizeof(g95_ss))
 
@@ -137,15 +140,16 @@ typedef struct g95_loopinfo
   tree to[G95_MAX_DIMENSIONS];
   g95_ss *specloop[G95_MAX_DIMENSIONS];
 
+  /* The code member contains the code for the body of the next outer loop.  */
   tree code[G95_MAX_DIMENSIONS];
   tree code_tail[G95_MAX_DIMENSIONS];
 
   /* Order in which the dimensions should be looped, innermost first.  */
   int order[G95_MAX_DIMENSIONS];
-
+  /* The number of dimensions for which a temporary is used.  */
+  int temp_dim;
   /* If set we don't need the loop variables.  */
   unsigned array_parameter:1;
-  unsigned temp_used:1;
 } g95_loopinfo;
 
 /* Advance the SS chain to the next term.  */
@@ -168,9 +172,6 @@ void g95_init_se(g95_se *, g95_se *);
 /* Like chainon() but updates both head and tail.
    Used by g95_add_stmt_to_(pre|post).  */
 void g95_add_stmt_to_list(tree *, tree *, tree, tree);
-
-/* Depreciated, use create_tmp_var.  */
-#define g95_create_tmp_var(tree) create_tmp_var(tree, NULL)
 
 /* store the result of an expression on a temp variable so it can be used
    repeatedly even if the original changes */
@@ -216,6 +217,11 @@ void g95_conv_intrinsic_function (g95_se *, g95_expr *);
 void g95_conv_function_call (g95_se *, g95_symbol *, g95_actual_arglist *);
 /* g95_trans_* shouldn't call push/poplevel, use g95_push/pop_scope */
 
+/* Get the length of a string.  */
+tree g95_conv_string_length (tree);
+/* Initialize a string length variable.  */
+tree g95_conv_init_string_length (g95_symbol *, tree *, tree *);
+
 /* Start a new satement block.  */
 void g95_start_stmt (void);
 /* Finish a statement block.  The two paramenters are the head and tail of the
@@ -257,6 +263,9 @@ void g95_build_builtin_function_decls (void);
 /* Return the variable decl for a symbol.  */
 tree g95_get_symbol_decl (g95_symbol *);
 
+/* Allocate the lang-spcific part of a decl node.  */
+void g95_allocate_lang_decl (tree);
+
 /* Advance along a TREE_CHAIN.  */
 tree g95_advance_chain (tree, int);
 
@@ -282,11 +291,19 @@ void g95_trans_runtime_check (tree, tree, tree *, tree *);
 
 /* Initialize function decls for library functions.  */
 void g95_build_intrinsic_lib_fndecls (void);
+/* Create function decls for IO library functions.  */
+void g95_build_io_library_fndecls (void);
+/* Build a function decl for a library function.  */
+tree g95_build_library_function_decl VPARAMS((tree name, tree rettype,
+                                              int nargs, ...));
 
 /* Identical to convert() except it checks that the arguments are valid
    SIMPLE expressions.
    #define g95_simple_convert convert would also work.  */
 tree g95_simple_convert (tree, tree);
+
+/* We have a single io state for a procedure.  */
+extern GTY(()) tree g95_current_io_state;
 
 /* somewhere! */
 tree pushdecl (tree);
@@ -295,63 +312,34 @@ tree poplevel (int, int, int);
 void expand_function_body (tree);
 tree getdecls(void);
 
-/* External IO function decls.  */
-struct g95_io_fndecl_t GTY(())
-{
-  char *name;
-  tree *ptype;
-  tree write;
-  tree read;
-};
-
-typedef struct g95_io_fndecl_t g95_io_fndecl_t;
-
-/* This must be consistent with g95_io_fndecls (see trans-io.c).  */
-typedef enum
-{
-  GFORIO_FNDECL_INT4=0,
-  GFORIO_FNDECL_INT8,
-  GFORIO_FNDECL_REAL4,
-  GFORIO_FNDECL_REAL8,
-  GFORIO_FNDECL_COMPLEX4,
-  GFORIO_FNDECL_COMPLEX8,
-  /* We convert all logical values to kind=4 before passing to IO.  */
-  GFORIO_FNDECL_LOGICAL,
-  GFORIO_NUM_FNDECLS
-} g95_io_fndecl_enum;
-
-extern struct g95_io_fndecl_t g95_io_fndecls[GFORIO_NUM_FNDECLS];
-
 /* Runtime library function decls.  */
-extern GTY(()) tree g95_fndecl_push_context;
-extern GTY(()) tree g95_fndecl_pop_context;
-extern GTY(()) tree g95_fndecl_internal_malloc;
-extern GTY(()) tree g95_fndecl_internal_malloc64;
-extern GTY(()) tree g95_fndecl_internal_free;
-extern GTY(()) tree g95_fndecl_allocate;
-extern GTY(()) tree g95_fndecl_allocate64;
-extern GTY(()) tree g95_fndecl_deallocate;
-extern GTY(()) tree g95_fndecl_stop;
-extern GTY(()) tree g95_fndecl_runtime_error;
-extern GTY(()) tree g95_fndecl_repack[G95_MAX_DIMENSIONS];
+extern GTY(()) tree gfor_fndecl_push_context;
+extern GTY(()) tree gfor_fndecl_pop_context;
+extern GTY(()) tree gfor_fndecl_internal_malloc;
+extern GTY(()) tree gfor_fndecl_internal_malloc64;
+extern GTY(()) tree gfor_fndecl_internal_free;
+extern GTY(()) tree gfor_fndecl_allocate;
+extern GTY(()) tree gfor_fndecl_allocate64;
+extern GTY(()) tree gfor_fndecl_deallocate;
+extern GTY(()) tree gfor_fndecl_stop;
+extern GTY(()) tree gfor_fndecl_runtime_error;
+extern GTY(()) tree gfor_fndecl_repack[G95_MAX_DIMENSIONS];
 
 /* Math functions.  Many other math functions are handled in
    trans-intrinsic.c.  */
-extern GTY(()) tree g95_fndecl_math_powf;
-extern GTY(()) tree g95_fndecl_math_pow;
-extern GTY(()) tree g95_fndecl_math_cpowf;
-extern GTY(()) tree g95_fndecl_math_cpow;
-extern GTY(()) tree g95_fndecl_math_cabsf;
-extern GTY(()) tree g95_fndecl_math_cabs;
+extern GTY(()) tree gfor_fndecl_math_powf;
+extern GTY(()) tree gfor_fndecl_math_pow;
+extern GTY(()) tree gfor_fndecl_math_cpowf;
+extern GTY(()) tree gfor_fndecl_math_cpow;
+extern GTY(()) tree gfor_fndecl_math_cabsf;
+extern GTY(()) tree gfor_fndecl_math_cabs;
+extern GTY(()) tree gfor_fndecl_math_ishftc4;
+extern GTY(()) tree gfor_fndecl_math_ishftc8;
 
 /* String functions.  */
-extern GTY(()) tree g95_fndecl_copy_string;
-extern GTY(()) tree g95_fndecl_compare_string;
-extern GTY(()) tree g95_fndecl_concat_string;
-
-/* IO library decls.  */
-extern GTY(()) tree g95_fndecl_write_begin;
-extern GTY(()) tree g95_fndecl_write_character;
+extern GTY(()) tree gfor_fndecl_copy_string;
+extern GTY(()) tree gfor_fndecl_compare_string;
+extern GTY(()) tree gfor_fndecl_concat_string;
 
 /* True if node is an integer constant.  */
 #define INTEGER_CST_P(node) (TREE_CODE(node) == INTEGER_CST)
@@ -382,7 +370,7 @@ struct lang_decl GTY (())
 #define G95_DECL_PACKED_ARRAY(node) DECL_LANG_FLAG_1(node)
 #define G95_DECL_PARTIAL_PACKED_ARRAY(node) DECL_LANG_FLAG_2(node)
 
-#define G95_SIZE_STRING_TYPE_P(node) TYPE_LANG_FLAG_0(node)
+#define G95_KNOWN_SIZE_STRING_TYPE(node) TYPE_LANG_FLAG_0(node)
 #define G95_DESCRIPTOR_TYPE_P(node) TYPE_LANG_FLAG_1(node)
 #define G95_TYPE_DESCRIPTOR_LBOUND(node, dim) \
   (TYPE_LANG_SPECIFIC(node)->lbound[dim])

@@ -12,7 +12,7 @@ compilers="f951\$(exeext)"
 
 stagestuff=
 
-gtfiles="\$(srcdir)/f95/f95-lang.c \$(srcdir)/f95/support.c \$(srcdir)/f95/trans-decl.c \$(srcdir)/f95/trans-types.h \$(srcdir)/f95/trans-types.c \$(srcdir)/f95/trans.h"
+gtfiles="\$(srcdir)/f95/f95-lang.c \$(srcdir)/f95/trans-const.c \$(srcdir)/f95/trans-decl.c \$(srcdir)/f95/trans-intrinsic.c \$(srcdir)/f95/trans-io.c \$(srcdir)/f95/trans-types.h \$(srcdir)/f95/trans.h"
 
 #outputs=g95/Makefile
 

@@ -202,7 +202,8 @@ g95_conv_constant (g95_se * se, g95_expr * expr)
       assert (se->ss->type == G95_SS_SCALAR);
       assert (se->ss->expr == expr);
 
-      se->expr = se->ss->data.scalar;
+      se->expr = se->ss->data.scalar.expr;
+      se->string_length = se->ss->data.scalar.string_length;
       g95_advance_se_ss_chain (se);
       return;
     }

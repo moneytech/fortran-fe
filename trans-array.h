@@ -26,16 +26,11 @@ tree g95_array_deallocate (tree);
    se, which should contain an expression for the array descriptor.  */
 void g95_array_allocate (g95_se *, g95_ref *, tree);
 
-/* Generate code to initialize an array descriptor.  if lower == NULL, the
-   lower bound will be 1.  Type A arrays do not use poffset.  */
-tree g95_array_init_size (tree, int, tree *,
-    g95_expr **, g95_expr **, tree *, tree *);
-
 /* Generate code to allocate a temporary array.  */
-tree g95_trans_allocate_temp_array (g95_loopinfo *, g95_ss_info *, tree);
+tree g95_trans_allocate_temp_array (g95_loopinfo *, g95_ss_info *, tree, tree);
 
 /* Generate code for allocation of compiler allocated array variables.  */
-tree g95_trans_auto_array_allocation (tree, g95_array_spec *);
+tree g95_trans_auto_array_allocation (tree, g95_symbol *);
 /* Generate entry and exit code for dummy array parameters.  */
 tree g95_trans_dummy_array_bias (g95_symbol *, tree, tree);
 /* Add initialisation for deferred arrays.  */
@@ -54,7 +49,7 @@ void g95_cleanup_loop (g95_loopinfo *);
 /* Associate a SS chain with a loop.  */
 void g95_add_ss_to_loop (g95_loopinfo *, g95_ss *);
 /* Mark a SS chain as used in this loop.  */
-void g95_mark_ss_chain_used (g95_ss * ss);
+void g95_mark_ss_chain_used (g95_ss *, unsigned);
 /* Reverse a SS chain.  */
 g95_ss * g95_reverse_ss (g95_ss *);
 
@@ -68,13 +63,19 @@ void g95_copy_loopinfo_to_se (g95_se *, g95_loopinfo *);
 void g95_start_scalarized_body (g95_loopinfo *);
 /* Generates the actual loops for a scalarized expression.  */
 void g95_trans_scalarizing_loops (g95_loopinfo *, tree, tree);
+/* Mark the end of the main loop body and the start of the copying loop.  */
+void g95_trans_scalarized_loop_boundary (g95_loopinfo *, tree, tree);
 /* Initialise the scalarization loop parameters.  */
 void g95_conv_loop_setup (g95_loopinfo *);
+/* Resolve array assignment dependancies.  */
+void g95_conv_resolve_dependencies (g95_loopinfo *, g95_ss *, g95_ss *);
 
 /* Get a single array element.  */
 void g95_conv_array_ref (g95_se *, g95_array_ref *);
 /* Translate an array reference.  */
-void g95_conv_scalarized_array_ref (g95_se *, g95_array_ref *);
+//void g95_conv_scalarized_array_ref (g95_se *, g95_array_ref *);
+/* Translate a reference to a temporary array.  */
+void g95_conv_tmp_array_ref (g95_se * se);
 /* Translate a reference to an array temporary.  */
 void g95_conv_tmp_ref (g95_se *);
 

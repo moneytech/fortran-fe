@@ -57,50 +57,47 @@ static GTY (()) tree saved_function_decls = NULL_TREE;
 tree g95_static_ctors;
 
 /* Function declarations for builtin library functions.  */
-tree g95_fndecl_push_context;
-tree g95_fndecl_pop_context;
-tree g95_fndecl_internal_malloc;
-tree g95_fndecl_internal_malloc64;
-tree g95_fndecl_internal_free;
-tree g95_fndecl_allocate;
-tree g95_fndecl_allocate64;
-tree g95_fndecl_deallocate;
-tree g95_fndecl_stop;
-tree g95_fndecl_runtime_error;
-tree g95_fndecl_repack[G95_MAX_DIMENSIONS];
+tree gfor_fndecl_push_context;
+tree gfor_fndecl_pop_context;
+tree gfor_fndecl_internal_malloc;
+tree gfor_fndecl_internal_malloc64;
+tree gfor_fndecl_internal_free;
+tree gfor_fndecl_allocate;
+tree gfor_fndecl_allocate64;
+tree gfor_fndecl_deallocate;
+tree gfor_fndecl_stop;
+tree gfor_fndecl_runtime_error;
+tree gfor_fndecl_repack[G95_MAX_DIMENSIONS];
 
 /* Math functions.  Many other math functions are handled in
    trans-intrinsic.c.  */
-tree g95_fndecl_math_powf;
-tree g95_fndecl_math_pow;
-tree g95_fndecl_math_cpowf;
-tree g95_fndecl_math_cpow;
-tree g95_fndecl_math_cabsf;
-tree g95_fndecl_math_cabs;
+tree gfor_fndecl_math_powf;
+tree gfor_fndecl_math_pow;
+tree gfor_fndecl_math_cpowf;
+tree gfor_fndecl_math_cpow;
+tree gfor_fndecl_math_cabsf;
+tree gfor_fndecl_math_cabs;
+tree gfor_fndecl_math_ishftc4;
+tree gfor_fndecl_math_ishftc8;
 
 /* String functions.  */
-tree g95_fndecl_copy_string;
-tree g95_fndecl_compare_string;
-tree g95_fndecl_concat_string;
+tree gfor_fndecl_copy_string;
+tree gfor_fndecl_compare_string;
+tree gfor_fndecl_concat_string;
 
-/* IO library decls.  */
-tree g95_fndecl_write_begin;
-tree g95_fndecl_write_character;
-
-/* These must be consistent with g95_io_fndec_enum.  */
-g95_io_fndecl_t g95_io_fndecls[GFORIO_NUM_FNDECLS] =
+static void
+g95_add_decl_to_function (tree decl)
 {
-  {"int4", &g95_int4_type_node, NULL_TREE, NULL_TREE},
-  {"int8", &g95_int8_type_node, NULL_TREE, NULL_TREE},
-  {"real4", &g95_real4_type_node, NULL_TREE, NULL_TREE},
-  {"real8", &g95_real8_type_node, NULL_TREE, NULL_TREE},
-  {"complex4", &g95_complex4_type_node, NULL_TREE, NULL_TREE},
-  {"complex8", &g95_complex8_type_node, NULL_TREE, NULL_TREE},
-  {"logical4", &g95_logical4_type_node, NULL_TREE, NULL_TREE}
-};
+  tree stmt;
+
+  assert (decl);
+  stmt = build_stmt (DECL_STMT, decl);
+  TREE_CHAIN (stmt) = saved_function_decls;
+  saved_function_decls = stmt;
+}
 
 /* Build a  backend label declaration.
-   Set TREE_USED for named lables.  For atrificial labels it's up to the
+   Set TREE_USED for named lables.  For artificial labels it's up to the
    caller to mark the label as used.  */
 tree
 g95_build_label_decl (tree label_id)
@@ -290,10 +287,7 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
      because this would add them to the current scope rather than the
      function scope.  */
   if (current_function_decl != NULL_TREE)
-  {
-    saved_function_decls =
-      chainon (build_stmt (DECL_STMT, decl), saved_function_decls);
-  }
+    g95_add_decl_to_function (decl);
 
   /* If a variable is USE associated, it's always external.  */
   if (sym->attr.use_assoc)
@@ -310,13 +304,32 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
     TREE_STATIC (decl) = 1;
 }
 
+/* Allocate the lang-specific part of a decl.  */
+void
+g95_allocate_lang_decl (tree decl)
+{
+  DECL_LANG_SPECIFIC (decl) = (struct lang_decl *)
+    ggc_alloc_cleared (sizeof (struct lang_decl));
+}
+
+/* Remember a symbol to generate initialization/cleanup code at function
+   entry/exit.  */
+static void
+g95_defer_symbol_init (g95_symbol * sym)
+{
+  /* Don't add a symbol twice.  */
+  if (sym->tlink)
+    return;
+  sym->tlink = sym->ns->proc_name->tlink;
+  sym->ns->proc_name->tlink = sym;
+}
+
 /* Get a temporary decl for a dummy array parameter.  */
 static tree
 g95_build_dummy_array_decl (g95_symbol * sym, tree dummy)
 {
   tree decl;
   tree type;
-  tree stmt;
   char *name;
 
   if (sym->attr.pointer || sym->attr.allocatable)
@@ -350,23 +363,15 @@ g95_build_dummy_array_decl (g95_symbol * sym, tree dummy)
   if (DECL_LANG_SPECIFIC (dummy))
     DECL_LANG_SPECIFIC (decl) = DECL_LANG_SPECIFIC (dummy);
   else
-    {
-      DECL_LANG_SPECIFIC (decl) = (struct lang_decl *)
-        ggc_alloc_cleared (sizeof (struct lang_decl));
-    }
+    g95_allocate_lang_decl (decl);
   G95_DECL_SAVED_DESCRIPTOR (decl) = dummy;
   G95_DECL_STRING (decl) = G95_DECL_STRING (dummy);
 
   /* Add to list of variables if not a fake result variable.  */
   if (sym->attr.result || sym->attr.dummy)
-    {
-      sym->tlink = sym->ns->proc_name->tlink;
-      sym->ns->proc_name->tlink = sym;
-    }
+    g95_defer_symbol_init (sym);
 
-  stmt = build_stmt (DECL_STMT, decl);
-  TREE_CHAIN (stmt) = saved_function_decls;
-  saved_function_decls = stmt;
+  g95_add_decl_to_function (decl);
 
   return decl;
 }
@@ -432,8 +437,7 @@ g95_get_symbol_decl (g95_symbol * sym)
   if (sym->attr.dimension)
     {
       /* Remember this variable for allocation/cleanup.  */
-      sym->tlink = sym->ns->proc_name->tlink;
-      sym->ns->proc_name->tlink = sym;
+      g95_defer_symbol_init (sym);
 
       if ((sym->attr.allocatable
            || ! sym->attr.dummy)
@@ -449,10 +453,9 @@ g95_get_symbol_decl (g95_symbol * sym)
   /* Character variables need special handling.  */
   if (sym->ts.type == BT_CHARACTER)
     {
-      /*Character lengths are common for a whole array.  */
+      /* Character lengths are common for a whole array.  */
 
-      DECL_LANG_SPECIFIC (decl) = (struct lang_decl *)
-        ggc_alloc_cleared (sizeof (struct lang_decl));
+      g95_allocate_lang_decl (decl);
       G95_DECL_STRING (decl) = 1;
 
       if (sym->ts.cl->length->expr_type == EXPR_CONSTANT)
@@ -480,8 +483,7 @@ g95_get_symbol_decl (g95_symbol * sym)
             }
           g95_finish_var_decl (length, sym);
           /* Remember this variable for allocation/cleanup.  */
-          sym->tlink = sym->ns->proc_name->tlink;
-          sym->ns->proc_name->tlink = sym;
+          g95_defer_symbol_init (sym);
         }
 
       G95_DECL_STRING_LENGTH (decl) = length;
@@ -697,8 +699,7 @@ g95_get_function_decl (g95_symbol * sym)
 
               if (f->sym->ts.type == BT_CHARACTER)
                 {
-                  DECL_LANG_SPECIFIC (parm) = (struct lang_decl *)
-                    ggc_alloc_cleared (sizeof (struct lang_decl));
+                  g95_allocate_lang_decl (parm);
                   G95_DECL_STRING (parm) = 1;
 
                   if (f->sym->ts.cl
@@ -764,8 +765,7 @@ g95_get_fake_result_decl (g95_symbol * sym)
 
       layout_decl (decl, 0);
 
-      saved_function_decls = chainon (saved_function_decls,
-                                      build_stmt (DECL_STMT, decl));
+      g95_add_decl_to_function (decl);
     }
 
   current_fake_result_decl = decl;
@@ -775,7 +775,7 @@ g95_get_fake_result_decl (g95_symbol * sym)
 
 /* Builds a function decl.  The remaining parameters are the types of the
    function arguments.  Negative nargs indicates a varargs function.  */
-static tree
+tree
 g95_build_library_function_decl VPARAMS((tree name, tree rettype, int nargs, ...))
 {
   tree arglist;
@@ -824,87 +824,66 @@ g95_build_library_function_decl VPARAMS((tree name, tree rettype, int nargs, ...
 }
 
 static void
-g95_build_io_library_fndecls (void)
-{
-  int i;
-  char name[G95_MAX_SYMBOL_LEN+1];
-
-  for (i = 0; i < GFORIO_NUM_FNDECLS; i++)
-    {
-      sprintf (name, "_gforio_write_%s", g95_io_fndecls[i].name);
-      g95_io_fndecls[i].write =
-        g95_build_library_function_decl (get_identifier (name),
-                                        void_type_node,
-                                        1, *g95_io_fndecls[i].ptype);
-      sprintf (name, "_gforio_read_%s", g95_io_fndecls[i].name);
-      g95_io_fndecls[i].read =
-        g95_build_library_function_decl (get_identifier (name),
-                                        void_type_node,
-                                        1, *g95_io_fndecls[i].ptype);
-    }
-}
-
-static void
 g95_build_intrinsic_function_decls (void)
 {
   /* String functions.  */
-  g95_fndecl_copy_string =
-    g95_build_library_function_decl (get_identifier ("__g95_copy_string"),
+  gfor_fndecl_copy_string =
+    g95_build_library_function_decl (get_identifier ("_gfor_copy_string"),
                                     void_type_node,
                                     4,
                                     g95_strlen_type_node, pchar_type_node,
                                     g95_strlen_type_node, pchar_type_node);
 
-  g95_fndecl_compare_string =
-    g95_build_library_function_decl (get_identifier ("__g95_compare_string"),
+  gfor_fndecl_compare_string =
+    g95_build_library_function_decl (get_identifier ("_gfor_compare_string"),
                                     g95_int4_type_node,
                                     4,
                                     g95_strlen_type_node, pchar_type_node,
                                     g95_strlen_type_node, pchar_type_node);
 
-  g95_fndecl_concat_string =
-    g95_build_library_function_decl (get_identifier ("__g95_concat_string"),
+  gfor_fndecl_concat_string =
+    g95_build_library_function_decl (get_identifier ("_gfor_concat_string"),
                                     void_type_node,
                                     6,
                                     g95_strlen_type_node, pchar_type_node,
                                     g95_strlen_type_node, pchar_type_node,
                                     g95_strlen_type_node, pchar_type_node);
 
-  /* IO library declarations.  */
-  g95_fndecl_write_begin =
-    g95_build_library_function_decl (get_identifier ("_gforio_write_begin"),
-                                    void_type_node,
-                                    -1, long_unsigned_type_node);
-
-  g95_fndecl_write_character =
-    g95_build_library_function_decl (get_identifier ("_gforio_write_character"),
-                                    void_type_node,
-                                    2, g95_strlen_type_node, pchar_type_node);
   /* Power functions.  */
-  g95_fndecl_math_powf =
+  gfor_fndecl_math_powf =
     g95_build_library_function_decl (get_identifier ("powf"),
                                      g95_real4_type_node,
                                      1, g95_real4_type_node);
-  g95_fndecl_math_pow =
+  gfor_fndecl_math_pow =
     g95_build_library_function_decl (get_identifier ("pow"),
                                      g95_real8_type_node,
                                      1, g95_real8_type_node);
-  g95_fndecl_math_cpowf =
+  gfor_fndecl_math_cpowf =
     g95_build_library_function_decl (get_identifier ("cpowf"),
                                      g95_complex4_type_node,
                                      1, g95_complex4_type_node);
-  g95_fndecl_math_cpow =
+  gfor_fndecl_math_cpow =
     g95_build_library_function_decl (get_identifier ("cpow"),
                                      g95_complex8_type_node,
                                      1, g95_complex8_type_node);
-  g95_fndecl_math_cabsf =
+  gfor_fndecl_math_cabsf =
     g95_build_library_function_decl (get_identifier ("cabsf"),
                                      g95_real4_type_node,
                                      1, g95_complex4_type_node);
-  g95_fndecl_math_cabs =
+  gfor_fndecl_math_cabs =
     g95_build_library_function_decl (get_identifier ("cabs"),
                                      g95_real8_type_node,
                                      1, g95_complex8_type_node);
+  gfor_fndecl_math_ishftc4 =
+    g95_build_library_function_decl (get_identifier ("__gfor_ishftc4"),
+                                     g95_int4_type_node,
+                                     3, g95_int4_type_node,
+                                     g95_int4_type_node, g95_int4_type_node);
+  gfor_fndecl_math_ishftc8 =
+    g95_build_library_function_decl (get_identifier ("__gfor_ishftc8"),
+                                     g95_int8_type_node,
+                                     3, g95_int8_type_node,
+                                     g95_int8_type_node, g95_int8_type_node);
 }
 
 /* Make prototypes for runtime library functions.  */
@@ -913,64 +892,64 @@ g95_build_builtin_function_decls (void)
 {
   int n;
 
-  g95_fndecl_internal_malloc = g95_build_library_function_decl (
-            get_identifier ("__g95_internal_malloc"),
+  gfor_fndecl_internal_malloc = g95_build_library_function_decl (
+            get_identifier ("_gfor_internal_malloc"),
             void_type_node,
             2,
             ppvoid_type_node,
             g95_int4_type_node);
 
-  g95_fndecl_internal_malloc64 = g95_build_library_function_decl (
-            get_identifier ("__g95_internal_malloc64"),
+  gfor_fndecl_internal_malloc64 = g95_build_library_function_decl (
+            get_identifier ("_gfor_internal_malloc64"),
             void_type_node,
             2,
             ppvoid_type_node,
             g95_int8_type_node);
 
-  g95_fndecl_internal_free = g95_build_library_function_decl (
-            get_identifier ("__g95_internal_free"),
+  gfor_fndecl_internal_free = g95_build_library_function_decl (
+            get_identifier ("_gfor_internal_free"),
             void_type_node,
             1,
             ppvoid_type_node);
 
-  g95_fndecl_push_context = g95_build_library_function_decl (
-            get_identifier ("__g95_push_context"),
+  gfor_fndecl_push_context = g95_build_library_function_decl (
+            get_identifier ("_gfor_push_context"),
             void_type_node,
             0);
 
-  g95_fndecl_pop_context = g95_build_library_function_decl (
-            get_identifier ("__g95_pop_context"),
+  gfor_fndecl_pop_context = g95_build_library_function_decl (
+            get_identifier ("_gfor_pop_context"),
             void_type_node,
             0);
 
-  g95_fndecl_allocate = g95_build_library_function_decl (
-            get_identifier ("__g95_allocate"),
+  gfor_fndecl_allocate = g95_build_library_function_decl (
+            get_identifier ("_gfor_allocate"),
             void_type_node,
             2,
             ppvoid_type_node,
             g95_int4_type_node);
 
-  g95_fndecl_allocate64 = g95_build_library_function_decl (
-            get_identifier ("__g95_allocate64"),
+  gfor_fndecl_allocate64 = g95_build_library_function_decl (
+            get_identifier ("_gfor_allocate64"),
             void_type_node,
             2,
             ppvoid_type_node,
             g95_int8_type_node);
 
-  g95_fndecl_deallocate = g95_build_library_function_decl (
-            get_identifier ("__g95_deallocate"),
+  gfor_fndecl_deallocate = g95_build_library_function_decl (
+            get_identifier ("_gfor_deallocate"),
             void_type_node,
             1,
             ppvoid_type_node);
 
-  g95_fndecl_stop = g95_build_library_function_decl (
-            get_identifier ("__g95_stop"),
+  gfor_fndecl_stop = g95_build_library_function_decl (
+            get_identifier ("_gfor_stop"),
             void_type_node,
             1,
             g95_int4_type_node);
 
-  g95_fndecl_runtime_error =
-    g95_build_library_function_decl (get_identifier ("__g95_runtime_error"),
+  gfor_fndecl_runtime_error =
+    g95_build_library_function_decl (get_identifier ("_gfor_runtime_error"),
                                     void_type_node,
                                     3,
                                     pchar_type_node, pchar_type_node,
@@ -979,8 +958,8 @@ g95_build_builtin_function_decls (void)
   for (n = 0; n < G95_MAX_DIMENSIONS; n++)
     {
       char name[16];
-      sprintf (name, "__g95_repack_%d", n);
-      g95_fndecl_repack[n] =
+      sprintf (name, "_gfor_repack_%d", n);
+      gfor_fndecl_repack[n] =
         g95_build_library_function_decl (get_identifier (name),
                                         void_type_node,
                                         3, ppvoid_type_node, ppvoid_type_node,
@@ -999,46 +978,43 @@ g95_trans_auto_character_variable (g95_symbol * sym, tree body)
   tree stmt;
   tree tmp;
   tree args;
-  g95_se se;
+  tree len;
+  tree head;
+  tree tail;
 
   assert (sym->ts.cl && sym->ts.cl->length);
   assert (sym->backend_decl != NULL_TREE);
 
   g95_start_stmt ();
+  head = tail = NULL_TREE;
 
-  g95_init_se (&se, NULL);
-  g95_conv_simple_val_type (&se, sym->ts.cl->length, g95_int4_type_node);
-
-  tmp = G95_DECL_STRING_LENGTH (sym->backend_decl);
-  tmp = build (MODIFY_EXPR, g95_int4_type_node, tmp, se.expr);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_pre (&se, stmt, stmt);
+  len = g95_conv_init_string_length (sym, &head, &tail);
 
   TREE_ADDRESSABLE (sym->backend_decl) = 1;
   tmp = build1 (ADDR_EXPR, ppvoid_type_node, sym->backend_decl);
-  tmp = g95_simple_fold (tmp, &se.pre, &se.pre_tail, NULL);
+  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
 
   args = g95_chainon_list (NULL_TREE, tmp);
-  args = g95_chainon_list (args, se.expr);
-  tmp = g95_build_function_call (g95_fndecl_internal_malloc, args);
+  args = g95_chainon_list (args, len);
+  tmp = g95_build_function_call (gfor_fndecl_internal_malloc, args);
   stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_pre (&se, stmt, stmt);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
 
-  stmt = g95_finish_stmt (se.pre, se.pre_tail);
+  stmt = g95_finish_stmt (head, tail);
   body = chainon (stmt, body);
 
   g95_start_stmt ();
 
-  se.pre = se.pre_tail = NULL_TREE;
+  head = tail = NULL_TREE;
   tmp = build1 (ADDR_EXPR, ppvoid_type_node, sym->backend_decl);
-  tmp = g95_simple_fold (tmp, &se.pre, &se.pre_tail, NULL);
+  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
 
   args = tree_cons (NULL_TREE, tmp, NULL_TREE);
-  tmp = g95_build_function_call (g95_fndecl_internal_free, args);
+  tmp = g95_build_function_call (gfor_fndecl_internal_free, args);
   stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_pre (&se, stmt, stmt);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
 
-  stmt = g95_finish_stmt (se.pre, se.pre_tail);
+  stmt = g95_finish_stmt (head, tail);
   body = chainon (body, stmt);
 
   return body;
@@ -1050,32 +1026,32 @@ g95_trans_auto_character_variable (g95_symbol * sym, tree body)
     Allocation of character string variables.
     Initialization and possibly repacking of dummy arrays.  */
 static tree
-g95_trans_deferred_vars (g95_symbol * sym, tree body)
+g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
 {
   tree tmp;
   tree stmt;
   locus loc;
+  g95_symbol * sym;
 
   /* Deal with implicit return variables.  Explicit return variables will
      already have been added.  */
-  if (g95_return_by_reference (sym) && sym->result == sym)
+  if (g95_return_by_reference (proc_sym) && proc_sym->result == proc_sym)
     {
       if (! current_fake_result_decl)
         {
           warning ("Function does not return a value");
           return body;
         }
-      body = g95_trans_dummy_array_bias (sym, current_fake_result_decl, body);
+      body = g95_trans_dummy_array_bias (proc_sym, current_fake_result_decl,
+                                         body);
     }
 
-  for (sym = sym->tlink; sym; sym = sym->tlink)
+  for (sym = proc_sym->tlink; sym != proc_sym; sym = sym->tlink)
     {
       /* For now this is only array variables, but may get extended to
          derived types.  */
       if (sym->attr.dimension)
         {
-          if (sym->ts.type == BT_CHARACTER)
-            g95_todo_error ("Arrays of character strings");
           switch (sym->as->type)
             {
             case AS_EXPLICIT:
@@ -1087,7 +1063,7 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
                   g95_get_backend_locus (&loc);
                   g95_set_backend_locus (&sym->declared_at);
                   stmt = g95_trans_auto_array_allocation (sym->backend_decl,
-                                                          sym->as);
+                                                          sym);
                   g95_set_backend_locus (&loc);
 
                   /* Add to the start of the function body.  */
@@ -1108,8 +1084,7 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
               break;
 
             default:
-              internal_error("Bad array type (%d)", sym->as->type);
-              break;
+              abort ();
             }
         }
       else if (sym->ts.type == BT_CHARACTER)
@@ -1120,18 +1095,18 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
           g95_set_backend_locus (&loc);
         }
       else
-        abort();
+        abort ();
     }
 
-  /* Build a call to __g95_push_context ().  */
-  tmp = g95_build_function_call (g95_fndecl_push_context, NULL_TREE);
+  /* Build a call to _gfor_push_context ().  */
+  tmp = g95_build_function_call (gfor_fndecl_push_context, NULL_TREE);
   stmt = build_stmt (EXPR_STMT, tmp);
 
   /* Add to start of function body.  */
   body = chainon (stmt, body);
 
-  /* Build a call to __g95_pop_context ().  */
-  tmp = g95_build_function_call (g95_fndecl_pop_context, NULL_TREE);
+  /* Build a call to _gfor_pop_context ().  */
+  tmp = g95_build_function_call (gfor_fndecl_pop_context, NULL_TREE);
   stmt = build_stmt (EXPR_STMT, tmp);
 
   /* Add to end of function body.  */
@@ -1197,6 +1172,7 @@ g95_generate_function_code (g95_namespace * ns)
 
   /* Check that the frontend isn't still using this.  */
   assert (sym->tlink == NULL);
+  sym->tlink = sym;
 
   g95_start_stmt ();
 
@@ -1235,6 +1211,11 @@ g95_generate_function_code (g95_namespace * ns)
         }
     }
 
+  if (g95_current_io_state)
+    {
+      g95_add_decl_to_function (g95_current_io_state);
+      g95_current_io_state = NULL_TREE;
+    }
   /* Add all the decls we created during processing.  */
   body = chainon (saved_function_decls, body);
   saved_function_decls = NULL;

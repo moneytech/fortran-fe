@@ -131,7 +131,7 @@ g95_trans_stop (g95_code *code)
     arg = integer_zero_node;
 
   arg = tree_cons (NULL_TREE, arg, NULL_TREE);
-  tmp = g95_build_function_call (g95_fndecl_stop, arg);
+  tmp = g95_build_function_call (gfor_fndecl_stop, arg);
   tmp = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_pre (&se, tmp, tmp);
 
@@ -365,7 +365,7 @@ g95_trans_do (g95_code * code)
     {
       /* Count needs to be a temporary variable. */
       if (countvar == NULL_TREE)
-        countvar = g95_create_tmp_var (type);
+        countvar = create_tmp_var (type, "count");
       tmp = build (MODIFY_EXPR, type, countvar, count);
       for_init = build_stmt (EXPR_STMT, tmp);
       count = countvar;
@@ -434,7 +434,7 @@ g95_trans_do (g95_code * code)
   if (! is_simple_val (dovar.expr))
     {
       /* Create a temporary if necessary.  */
-      tmp = g95_create_tmp_var (type);
+      tmp = create_tmp_var (type, "dovar");
       build_stmt (EXPR_STMT, build (MODIFY_EXPR, type, tmp, dovar.expr));
     }
   else
@@ -629,7 +629,7 @@ g95_trans_allocate (g95_code * code)
 
   if (code->expr)
     {
-      stat = g95_create_tmp_var (g95_int4_type_node);
+      stat = create_tmp_var (g95_int4_type_node, "stat");
       TREE_ADDRESSABLE (stat) = 1;
       pstat = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (stat)), stat);
       pstat = g95_simple_fold (pstat, &head, &tmp, NULL);
@@ -679,7 +679,7 @@ g95_trans_allocate (g95_code * code)
           /*TODO: allocation of derived types containing arrays.  */
           tree val;
 
-          val = g95_create_tmp_var (ppvoid_type_node);
+          val = create_tmp_var (ppvoid_type_node, "ptr");
           tmp = build1 (ADDR_EXPR, TREE_TYPE (val), se.expr);
           tmp = build (MODIFY_EXPR, TREE_TYPE (val), val, tmp);
           stmt = build_stmt (EXPR_STMT, tmp);
@@ -689,7 +689,7 @@ g95_trans_allocate (g95_code * code)
           parm = g95_chainon_list (NULL_TREE, val);
           parm = g95_chainon_list (parm, tmp);
           parm = g95_chainon_list (parm, pstat);
-          tmp = g95_build_function_call (g95_fndecl_allocate, parm);
+          tmp = g95_build_function_call (gfor_fndecl_allocate, parm);
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_pre (&se, stmt, stmt);
 
@@ -765,7 +765,7 @@ g95_trans_deallocate (g95_code * code)
       else
         {
           type = build_pointer_type (TREE_TYPE (se.expr));
-          var = g95_create_tmp_var (type);
+          var = create_tmp_var (type, "ptr");
           tmp = build1 (ADDR_EXPR, type, se.expr);
           tmp = build (MODIFY_EXPR, type, var, tmp);
           stmt = build_stmt (EXPR_STMT, tmp);
@@ -773,7 +773,7 @@ g95_trans_deallocate (g95_code * code)
 
           tmp = g95_chainon_list (NULL_TREE, var);
           tmp = g95_chainon_list (tmp, integer_zero_node);
-          tmp = g95_build_function_call (g95_fndecl_deallocate, tmp);
+          tmp = g95_build_function_call (gfor_fndecl_deallocate, tmp);
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_pre (&se, stmt, stmt);
         }

@@ -126,11 +126,31 @@ g95_make_safe_expr(g95_se * se)
     return;
 
   /* we need a temporary for this result */
-  tmp = g95_create_tmp_var (TREE_TYPE(se->expr));
+  tmp = create_tmp_var (TREE_TYPE(se->expr), NULL);
   stmt = build_stmt (EXPR_STMT,
               build (MODIFY_EXPR, TREE_TYPE (se->expr), tmp, se->expr));
   g95_add_stmt_to_pre (se, stmt, NULL);
   se->expr = tmp;
+}
+
+/* Generate code to initialize a string length variable and return the
+   value.  */
+tree
+g95_conv_init_string_length (g95_symbol * sym, tree * phead, tree * ptail)
+{
+  g95_se se;
+  tree tmp;
+
+  g95_init_se (&se, NULL);
+  g95_conv_simple_val_type (&se, sym->ts.cl->length, g95_strlen_type_node);
+  g95_add_stmt_to_list (phead, ptail, se.pre, se.pre_tail);
+
+  tmp = G95_DECL_STRING_LENGTH (sym->backend_decl);
+  tmp = build (MODIFY_EXPR, g95_strlen_type_node, tmp, se.expr);
+  tmp = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (phead, ptail, tmp, tmp);
+
+  return se.expr;
 }
 
 static void
@@ -143,7 +163,7 @@ g95_conv_substring (g95_se * se, g95_ref * ref, int kind)
   g95_se end;
 
   type = g95_get_character_type (kind, ref->u.ss.length);
-  if (G95_SIZE_STRING_TYPE_P (type))
+  if (G95_KNOWN_SIZE_STRING_TYPE (type))
     type = build_pointer_type (type);
 
   var = NULL_TREE;
@@ -158,7 +178,7 @@ g95_conv_substring (g95_se * se, g95_ref * ref, int kind)
   else
     {
       /* Change the start of the string.  */
-      if (G95_SIZE_STRING_TYPE_P (TREE_TYPE (se->expr)))
+      if (G95_KNOWN_SIZE_STRING_TYPE (TREE_TYPE (se->expr)))
         tmp = se->expr;
       else
         tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (se->expr)), se->expr);
@@ -194,7 +214,8 @@ g95_conv_variable (g95_se * se, g95_expr * expr)
       if (se->ss->type == G95_SS_SCALAR)
         {
           /* This is a scalar term so we already have a value.  */
-          se->expr = se->ss->data.scalar;
+          se->expr = se->ss->data.scalar.expr;
+          se->string_length = se->ss->data.scalar.string_length;
           g95_advance_se_ss_chain (se);
           return;
         }
@@ -235,14 +256,15 @@ g95_conv_variable (g95_se * se, g95_expr * expr)
                             se->expr);
         }
 
-      /* For character variables, also get the length.  */
-      if (expr->symbol->ts.type == BT_CHARACTER)
-        {
-          assert (G95_DECL_STRING (se->expr));
-          se->string_length = G95_DECL_STRING_LENGTH (se->expr);
-        }
-
       ref = expr->ref;
+    }
+
+  /* For character variables, also get the length.  */
+  if (expr->symbol->ts.type == BT_CHARACTER)
+    {
+      assert (G95_DECL_STRING (se->expr));
+      se->string_length = G95_DECL_STRING_LENGTH (se->expr);
+      assert (se->string_length);
     }
 
   while (ref)
@@ -324,7 +346,7 @@ g95_conv_simple_val_type(g95_se * se, g95_expr * expr, tree type)
       g95_finish_se_stmt (se);
 
       /* The result variable must be created outside the new scope.  */
-      tmp = g95_create_tmp_var (TREE_TYPE (se->expr));
+      tmp = create_tmp_var (TREE_TYPE (se->expr), NULL);
       TREE_OPERAND (assign, 0) = tmp;
       se->expr = tmp;
     }
@@ -343,7 +365,7 @@ g95_conv_simple_val_type(g95_se * se, g95_expr * expr, tree type)
       g95_finish_se_stmt (se);
 
       /* The result variable must be created outside the new scope.  */
-      tmp = g95_create_tmp_var (type);
+      tmp = create_tmp_var (type, NULL);
       TREE_OPERAND (assign, 0) = tmp;
       se->expr = tmp;
     }
@@ -384,7 +406,7 @@ g95_conv_simple_val(g95_se * se, g95_expr * expr)
       /* Wrap everything up in its own scope if neccessary.  */
       g95_finish_se_stmt (se);
       /* The result variable must be created outside the new scope.  */
-      tmp = g95_create_tmp_var (type);
+      tmp = create_tmp_var (type, NULL);
       TREE_OPERAND (assign, 0) = tmp;
       se->expr = tmp;
     }
@@ -421,7 +443,7 @@ g95_conv_simple_reference (g95_se * se, g95_expr * expr)
     }
 
   /* Create a temporary to hold the value.  */
-  var = g95_create_tmp_var (TREE_TYPE (se->expr));
+  var = create_tmp_var (TREE_TYPE (se->expr), NULL);
   TREE_ADDRESSABLE (var) = 1;
   tmp = build (MODIFY_EXPR, TREE_TYPE (var), var, se->expr);
   stmt = build_stmt (EXPR_STMT, tmp);
@@ -463,7 +485,7 @@ g95_conv_simple_cond (g95_se * se, g95_expr * expr)
   if (!is_simple_condexpr (se->expr))
     {
       type = TREE_TYPE (se->expr);
-      tmp = g95_create_tmp_var(type);
+      tmp = create_tmp_var(type, NULL);
       assign = build (MODIFY_EXPR, type, tmp, se->expr);
       g95_add_stmt_to_pre(se, build_stmt (EXPR_STMT, assign), NULL);
       se->expr=tmp;
@@ -715,8 +737,8 @@ g95_conv_power_op (g95_se * se, g95_expr * expr)
     case BT_REAL:
       switch (kind)
         {
-        case 4: fndecl = g95_fndecl_math_powf; break;
-        case 8: fndecl = g95_fndecl_math_pow; break;
+        case 4: fndecl = gfor_fndecl_math_powf; break;
+        case 8: fndecl = gfor_fndecl_math_pow; break;
         default: abort();
         }
       break;
@@ -724,8 +746,8 @@ g95_conv_power_op (g95_se * se, g95_expr * expr)
     case BT_COMPLEX:
       switch (kind)
         {
-        case 4: fndecl = g95_fndecl_math_cpowf; break;
-        case 8: fndecl = g95_fndecl_math_cpow; break;
+        case 4: fndecl = gfor_fndecl_math_cpowf; break;
+        case 8: fndecl = gfor_fndecl_math_cpow; break;
         default: abort();
         }
       break;
@@ -769,13 +791,13 @@ g95_conv_concat_op (g95_se * se, g95_expr * expr)
   g95_add_stmt_to_pre (se, rse.pre, rse.pre_tail);
 
   type = g95_get_character_type (expr->ts.kind, expr->ts.cl);
-  if (G95_SIZE_STRING_TYPE_P (type))
+  if (G95_KNOWN_SIZE_STRING_TYPE (type))
     tmp = build_pointer_type (type);
   else
     tmp = type;
-  var = g95_create_tmp_var (tmp);
+  var = create_tmp_var (tmp, "pstr");
 
-  if (G95_SIZE_STRING_TYPE_P (type))
+  if (G95_KNOWN_SIZE_STRING_TYPE (type))
     {
       len = TYPE_MAX_VALUE (TYPE_DOMAIN (type));
     }
@@ -790,7 +812,7 @@ g95_conv_concat_op (g95_se * se, g95_expr * expr)
     {
       /* Create a temporary (stack) array to hold the result.  */
       type = g95_get_stack_array_type (len);
-      tmp = g95_create_tmp_var (type);
+      tmp = create_tmp_var (type, "str");
       TREE_ADDRESSABLE (tmp) = 1;
       tmp = build1 (ADDR_EXPR, TREE_TYPE (var), tmp);
       tmp = build (MODIFY_EXPR, TREE_TYPE (var), var, tmp);
@@ -810,13 +832,13 @@ g95_conv_concat_op (g95_se * se, g95_expr * expr)
       args = NULL_TREE;
       args = g95_chainon_list (args, addr);
       args = g95_chainon_list (args, len);
-      tmp = g95_build_function_call (g95_fndecl_internal_malloc, args);
+      tmp = g95_build_function_call (gfor_fndecl_internal_malloc, args);
       stmt = build_stmt (EXPR_STMT, tmp);
       g95_add_stmt_to_pre (se, stmt, stmt);
 
       /* Free the temporary afterwards.  */
       args = g95_chainon_list (NULL_TREE, addr);
-      tmp = g95_build_function_call (g95_fndecl_internal_free, args);
+      tmp = g95_build_function_call (gfor_fndecl_internal_free, args);
       stmt = build_stmt (EXPR_STMT, tmp);
       g95_add_stmt_to_post (se, stmt, stmt);
     }
@@ -829,7 +851,7 @@ g95_conv_concat_op (g95_se * se, g95_expr * expr)
   args = g95_chainon_list (args, lse.expr);
   args = g95_chainon_list (args, rse.string_length);
   args = g95_chainon_list (args, rse.expr);
-  tmp = g95_build_function_call (g95_fndecl_concat_string, args);
+  tmp = g95_build_function_call (gfor_fndecl_concat_string, args);
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_pre (se, stmt, stmt);
 
@@ -945,11 +967,9 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
       break;
 
     case INTRINSIC_USER:
-      g95_todo_error ("User operatior");
-      return;
-
     case INTRINSIC_ASSIGN:
-      g95_todo_error ("intrinsic assignment expr");
+      /* These should be converted into function calls by the frontend.  */
+      abort ();
       return;
 
     default:
@@ -985,7 +1005,7 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
       args = g95_chainon_list (args, rse.string_length);
       args = g95_chainon_list (args, rse.expr);
 
-      assign = g95_build_function_call (g95_fndecl_compare_string, args);
+      assign = g95_build_function_call (gfor_fndecl_compare_string, args);
       assign = build (MODIFY_EXPR, g95_int4_type_node, NULL_TREE, assign);
       stmt = build_stmt (EXPR_STMT, assign);
 
@@ -1000,7 +1020,7 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
       g95_finish_se_stmt (&lse);
 
       /* Create the result variable outside the containing scope.  */
-      lse.expr = g95_create_tmp_var (g95_int4_type_node);
+      lse.expr = create_tmp_var (g95_int4_type_node, NULL);
       TREE_OPERAND (assign, 0) = lse.expr;
       rse.expr = integer_zero_node;
     }
@@ -1027,7 +1047,7 @@ g95_conv_function_val (g95_se * se, g95_symbol * sym)
       assert (TREE_CODE (tmp) == POINTER_TYPE
              && TREE_CODE (TREE_TYPE (tmp)) == FUNCTION_DECL);
 
-      se->expr = g95_create_tmp_var (TREE_TYPE (tmp));
+      se->expr = create_tmp_var (TREE_TYPE (tmp), "fn");
 
       tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), se->expr, tmp);
       tmp = build_stmt (EXPR_STMT, tmp);
@@ -1066,18 +1086,19 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
             {
             case G95_SS_SCALAR:
               /* We've already got the return value of this function.  */
-              se->expr = se->ss->data.scalar;
+              se->expr = se->ss->data.scalar.expr;
+              se->string_length = se->ss->data.scalar.string_length;
               g95_advance_se_ss_chain (se);
               return;
 
             case G95_SS_FUNCTION:
-              if (se->ss->used)
+              if (se->ss->useflags)
                 {
                   assert (g95_return_by_reference (sym));
                   assert (se->loop != NULL);
 
                   /* Access the previously obtained result.  */
-                  g95_conv_scalarized_array_ref (se, NULL);
+                  g95_conv_tmp_array_ref (se);
                   g95_advance_se_ss_chain (se);
                   return;
                 }
@@ -1101,8 +1122,9 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
       assert (se->loop && se->ss);
       /* Set the type of the array.  */
       tmp = g95_typenode_for_spec (&sym->ts);
+      info->dimen = se->loop->dimen;
       /* Allocate a temporary to store the result.  */
-      g95_trans_allocate_temp_array (se->loop, info, tmp);
+      g95_trans_allocate_temp_array (se->loop, info, tmp, NULL_TREE);
 
       /* Zero the first stride to indicate a temporary.  */
       tmp = g95_get_stride_component (TREE_TYPE (info->descriptor), 0);
@@ -1123,7 +1145,7 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
       /* We don't do alternate returns.  */
       assert (arg->expr != NULL);
 
-      if (se->ss && se->ss->used)
+      if (se->ss && se->ss->useflags)
         {
           g95_init_se (&parmse, se);
 
@@ -1193,23 +1215,17 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
 }
 
 /* Translate a function expression.  */
+/* TODO: dummy function arguments.  */
 static void
 g95_conv_function_expr (g95_se * se, g95_expr * expr)
 {
-  g95_symbol *psym;
-  g95_intrinsic_sym *isym;
-
-  isym = expr->value.function.isym;
-  psym = expr->value.function.esym;
-  assert ((isym || psym) && ! (isym && psym));
-
-  if (isym)
+  if (expr->value.function.isym)
     {
       g95_conv_intrinsic_function (se, expr);
       return;
     }
 
-  g95_conv_function_call (se, psym, expr->value.function.actual);
+  g95_conv_function_call (se, expr->symbol, expr->value.function.actual);
 }
 
 static void
@@ -1218,7 +1234,7 @@ g95_conv_array_constructor_expr (g95_se * se, g95_expr * expr)
   assert (se->ss != NULL && se->ss != g95_ss_terminator);
   assert (se->ss->expr == expr && se->ss->type == G95_SS_CONSTRUCTOR);
 
-  g95_conv_scalarized_array_ref (se, NULL);
+  g95_conv_tmp_array_ref (se);
   g95_advance_se_ss_chain (se);
 }
 
@@ -1273,38 +1289,18 @@ g95_trans_pointer_assign (g95_code * code ATTRIBUTE_UNUSED)
   g95_internal_error ("pointer assignment not implemented");
 }
 
-/* Resolve array data dependancies.  This will eventualy do dependancy analysis
-   and maybe loop shifting, etc.  Currently it allocates a temporary if
-   there are any possible dependancies.  */
-static void
-g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
-                              g95_ss * rss)
+/* Get the decl for the length of a string from an expression.  */
+tree
+g95_conv_string_length (tree expr)
 {
-  g95_ss *ss;
-  int need_temp;
+  /* TODO: string lengths of components.  */
+  while (TREE_CODE (expr) == INDIRECT_REF)
+    expr = TREE_OPERAND (expr, 0);
 
-  loop->temp_ss = NULL;
-  need_temp = 0;
-  for (ss = rss; ss != g95_ss_terminator; ss = ss->next)
-    {
-      if (ss->type != G95_SS_SECTION)
-        continue;
-      if (ss->expr->symbol == dest->expr->symbol)
-        need_temp = 1;
-    }
+  if (!(DECL_P (expr) && G95_DECL_STRING (expr)))
+    return NULL_TREE;
 
-  if (need_temp)
-    {
-      loop->temp_ss = g95_get_ss();
-      loop->temp_ss->type = G95_SS_TEMP;
-      loop->temp_ss->data.info.descriptor =
-        g95_get_element_type (TREE_TYPE (dest->data.info.descriptor));
-      loop->temp_ss->data.info.dimen = loop->dimen;
-      loop->temp_ss->next = g95_ss_terminator;
-      g95_add_ss_to_loop (loop, loop->temp_ss);
-    }
-  else
-    loop->temp_ss = NULL;
+  return G95_DECL_STRING_LENGTH (expr);
 }
 
 /* Makes sure se is suitable for passing as a function string parameter.  */
@@ -1319,11 +1315,11 @@ g95_conv_string_parameter (g95_se *se)
 
   se->string_length =
     g95_simple_fold (se->string_length, &se->pre, &se->pre_tail, NULL);
-  if (G95_SIZE_STRING_TYPE_P (TREE_TYPE (se->expr)))
+
+  if (G95_KNOWN_SIZE_STRING_TYPE (TREE_TYPE (se->expr)))
     se->expr = build1 (ADDR_EXPR, pchar_type_node, se->expr);
 
-  assert (TREE_CODE (TREE_TYPE (se->expr)) == POINTER_TYPE);
-
+  assert (POINTER_TYPE_P (TREE_TYPE (se->expr)));
   se->expr = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, NULL);
 }
 
@@ -1346,7 +1342,7 @@ g95_trans_string_assign (g95_se * lse, g95_se * rse)
   args = g95_chainon_list (args, rse->string_length);
   args = g95_chainon_list (args, rse->expr);
 
-  tmp = g95_build_function_call (g95_fndecl_copy_string, args);
+  tmp = g95_build_function_call (gfor_fndecl_copy_string, args);
   tmp = build_stmt (EXPR_STMT, tmp);
 
   return tmp;
@@ -1380,9 +1376,6 @@ g95_trans_assign (g95_code * code)
     {
       /* The assignment needs scalarization.  */
       lss_section = lss;
-
-      if (code->expr->ts.type == BT_CHARACTER)
-        g95_todo_error ("Character array assignments");
 
       /* Find a non-scalar SS from the lhs.  */
       while (lss_section != g95_ss_terminator
@@ -1422,16 +1415,22 @@ g95_trans_assign (g95_code * code)
       /* Setup the g95_se structures.  */
       g95_copy_loopinfo_to_se (&lse, &loop);
       g95_copy_loopinfo_to_se (&rse, &loop);
-      rse.ss = rss;
 
+      rse.ss = rss;
+      g95_mark_ss_chain_used (rss, 1);
       if (loop.temp_ss == NULL)
-        lse.ss = lss;
+        {
+          lse.ss = lss;
+          g95_mark_ss_chain_used (lss, 1);
+        }
       else
-        lse.ss = loop.temp_ss;
+        {
+          lse.ss = loop.temp_ss;
+          g95_mark_ss_chain_used (lss, 3);
+          g95_mark_ss_chain_used (loop.temp_ss, 3);
+        }
 
       /* Start the scalarized loop body.  */
-      g95_mark_ss_chain_used (lse.ss);
-      g95_mark_ss_chain_used (rse.ss);
       g95_start_scalarized_body (&loop);
     }
 
@@ -1439,7 +1438,10 @@ g95_trans_assign (g95_code * code)
   g95_conv_simple_rhs (&rse, code->expr2);
 
   if (lss != g95_ss_terminator && loop.temp_ss != NULL)
-    g95_conv_scalarized_array_ref (&lse, NULL);
+    {
+      g95_conv_tmp_array_ref (&lse);
+      g95_advance_se_ss_chain (&lse);
+    }
   else
     g95_conv_simple_lhs (&lse, code->expr);
 
@@ -1467,17 +1469,16 @@ g95_trans_assign (g95_code * code)
     }
   else
     {
-      /* Generate the scalarizer loop code.  */
-      g95_trans_scalarizing_loops (&loop, lse.pre, lse.pre_tail);
+      if (lse.ss != g95_ss_terminator)
+        abort ();
+      if (rse.ss != g95_ss_terminator)
+        abort ();
 
       if (loop.temp_ss != NULL)
         {
+          g95_trans_scalarized_loop_boundary (&loop, lse.pre, lse.pre_tail);
+
           /* We need to copy the temporary to the actual lhs.  */
-          /* TODO: For unit stride packed arrays we could use memcpy.  */
-          /* Generate code to copy the elements.  */
-          g95_mark_ss_chain_used (loop.temp_ss);
-          g95_mark_ss_chain_used (lss);
-          g95_start_scalarized_body (&loop);
           g95_init_se (&lse, NULL);
           g95_init_se (&rse, NULL);
           g95_copy_loopinfo_to_se (&lse, &loop);
@@ -1486,20 +1487,34 @@ g95_trans_assign (g95_code * code)
           rse.ss = loop.temp_ss;
           lse.ss = lss;
 
-          g95_conv_scalarized_array_ref (&rse, NULL);
+          g95_conv_tmp_array_ref (&rse);
+          g95_advance_se_ss_chain (&rse);
           g95_conv_simple_lhs (&lse, code->expr);
 
-          tmp = build (MODIFY_EXPR, TREE_TYPE (lse.expr), lse.expr, rse.expr);
-          assign = build_stmt (EXPR_STMT, tmp);
+          if (lse.ss != g95_ss_terminator)
+            abort ();
+
+          if (rse.ss != g95_ss_terminator)
+            abort ();
+
+          if (code->expr->ts.type == BT_CHARACTER)
+            {
+              assign = g95_trans_string_assign (&lse, &rse);
+            }
+          else
+            {
+              tmp = build (MODIFY_EXPR, TREE_TYPE (lse.expr), lse.expr,
+                           rse.expr);
+              assign = build_stmt (EXPR_STMT, tmp);
+            }
 
           g95_add_stmt_to_pre (&lse, rse.pre, rse.pre_tail);
           g95_add_stmt_to_pre (&lse, assign, NULL_TREE);
           g95_add_stmt_to_pre (&lse, rse.post, rse.post_tail);
           g95_add_stmt_to_pre (&lse, lse.post, lse.post_tail);
-
-          /* Generate the copying loops.  */
-          g95_trans_scalarizing_loops (&loop, lse.pre, lse.pre_tail);
         }
+      /* Generate the copying loops.  */
+      g95_trans_scalarizing_loops (&loop, lse.pre, lse.pre_tail);
 
       /* Wrap the whole thing up.  */
       g95_add_stmt_to_pre (&loop, loop.post, loop.post_tail);

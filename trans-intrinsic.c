@@ -58,17 +58,6 @@ Boston, MA 02111-1307, USA.  */
 
    All the character functions
 
-   logical
-
-   btest
-   ibtclr
-   ibits
-   ibset
-   ieor
-   ior
-   ishift
-   ishiftc
-   not
    transfer
 
    exponent
@@ -116,7 +105,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* This maps fortran intrinsic math functions to external library or GCC
    builtin functions.  */
-typedef struct GTY(())
+typedef struct g95_intrinsic_map_t GTY(())
 {
   const char *name;
   int len;
@@ -182,23 +171,14 @@ g95_conv_intrinsic_function_args (g95_se * se, g95_expr * expr)
       if (! actual->expr)
         continue;
 
-      if (se->ss)
-        {
-          /* Substitute a scalar that has been taken out of the loop.  */
-          assert (se->ss->type == G95_SS_SCALAR);
-          args = g95_chainon_list (args, se->ss->data.scalar);
-          g95_advance_se_ss_chain (se);
-        }
-      else
-        {
-          /* Evaluate the parameter.  */
-          g95_init_se (&argse, se);
-          g95_conv_simple_val (&argse, actual->expr);
-          g95_add_stmt_to_pre (se, argse.pre, argse.pre_tail);
-          g95_add_stmt_to_post (se, argse.post, argse.post_tail);
+      /* Evaluate the parameter.  This will substitute scalarized
+         references automatically. */
+      g95_init_se (&argse, se);
+      g95_conv_simple_val (&argse, actual->expr);
+      g95_add_stmt_to_pre (se, argse.pre, argse.pre_tail);
+      g95_add_stmt_to_post (se, argse.post, argse.post_tail);
 
-          args = g95_chainon_list (args, argse.expr);
-        }
+      args = g95_chainon_list (args, argse.expr);
     }
   return args;
 }
@@ -560,8 +540,8 @@ g95_conv_intrinsic_abs (g95_se * se, g95_expr * expr)
     case BT_COMPLEX:
       switch (expr->ts.kind)
         {
-        case 4: fndecl = g95_fndecl_math_cabsf; break;
-        case 8: fndecl = g95_fndecl_math_cabs; break;
+        case 4: fndecl = gfor_fndecl_math_cabsf; break;
+        case 8: fndecl = gfor_fndecl_math_cabs; break;
         default: abort();
         }
       se->expr = g95_build_function_call (fndecl, args);
@@ -901,6 +881,258 @@ g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
   se->expr = sum;
 }
 
+/* BTEST (i, pos) = (i & (1 << pos)) != 0.  */
+static void
+g95_conv_intrinsic_btest (g95_se * se, g95_expr * expr)
+{
+  tree arg;
+  tree arg2;
+  tree type;
+  tree tmp;
+  tree tmpvar;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg2 = TREE_VALUE (TREE_CHAIN (arg));
+  arg = TREE_VALUE (arg);
+  type = TREE_TYPE (arg);
+
+  tmpvar = NULL_TREE;
+  tmp = build (LSHIFT_EXPR, type, integer_one_node, arg2);
+  tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+  tmp = build (BIT_AND_EXPR, type, arg, tmp);
+  tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+
+  type = g95_typenode_for_spec (&expr->ts);
+  se->expr = fold (build (NE_EXPR, type, tmp, integer_zero_node));
+}
+
+/* Generate code to perform the specified operation.  */
+static void
+g95_conv_intrinsic_bitop (g95_se * se, g95_expr * expr, int op)
+{
+  tree arg;
+  tree arg2;
+  tree type;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg2 = TREE_VALUE (TREE_CHAIN (arg));
+  arg = TREE_VALUE (arg);
+  type = TREE_TYPE (arg);
+
+  se->expr = fold (build (op, type, arg, arg2));
+}
+
+/* Bitwise not.  */
+static void
+g95_conv_intrinsic_not (g95_se * se, g95_expr * expr)
+{
+  tree arg;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg = TREE_VALUE (arg);
+
+  se->expr = build1 (BIT_NOT_EXPR, TREE_TYPE (arg), arg);
+}
+
+/* Set or clear a single bit.  */
+static void
+g95_conv_intrinsic_singlebitop (g95_se * se, g95_expr * expr, int set)
+{
+  tree arg;
+  tree arg2;
+  tree type;
+  tree tmp;
+  tree tmpvar;
+  int op;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg2 = TREE_VALUE (TREE_CHAIN (arg));
+  arg = TREE_VALUE (arg);
+  type = TREE_TYPE (arg);
+
+  tmpvar = NULL_TREE;
+  tmp = build (LSHIFT_EXPR, type, integer_one_node, arg2);
+  tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+  if (set)
+    op = BIT_IOR_EXPR;
+  else
+    {
+      op = BIT_AND_EXPR;
+      tmp = build1 (BIT_NOT_EXPR, type, tmp);
+      tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+    }
+  se->expr = fold (build (op, type, arg, tmp));
+}
+
+/* Extract a sequence of bits.
+    IBITS(I, POS, LEN) = (I >> POS) & ~(-1 << LEN).  */
+static void
+g95_conv_intrinsic_ibits (g95_se * se, g95_expr * expr)
+{
+  tree arg;
+  tree arg2;
+  tree arg3;
+  tree type;
+  tree tmp;
+  tree tmpvar;
+  tree mask;
+  tree maskvar;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg2 = TREE_CHAIN (arg);
+  arg3 = TREE_VALUE (TREE_CHAIN (arg2));
+  arg = TREE_VALUE (arg);
+  arg2 = TREE_VALUE (arg2);
+  type = TREE_TYPE (arg);
+
+  maskvar = NULL_TREE;
+  mask = build_int_2 (-1, ~(unsigned HOST_WIDE_INT) 0);
+  mask = build (LSHIFT_EXPR, type, mask, arg3);
+  mask = g95_simple_fold (mask, &se->pre, &se->pre_tail, &maskvar);
+  mask = build1 (BIT_NOT_EXPR, type, mask);
+  mask = g95_simple_fold (mask, &se->pre, &se->pre_tail, &maskvar);
+
+  tmpvar = NULL_TREE;
+  tmp = build (RSHIFT_EXPR, type, arg, arg2);
+  tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+
+  se->expr = fold (build (BIT_AND_EXPR, type, tmp, mask));
+}
+
+/* ISHFT (I, SHIFT) = (shift >= 0) ? i << shift : i >> -shift.
+   It would probably be best to implement this as a case statement.  */
+static void
+g95_conv_intrinsic_ishft (g95_se * se, g95_expr * expr)
+{
+  tree arg;
+  tree arg2;
+  tree type;
+  tree tmp;
+  tree val;
+  tree lstmt;
+  tree rstmt;
+  tree head;
+  tree tail;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg2 = TREE_VALUE (TREE_CHAIN (arg));
+  arg = TREE_VALUE (arg);
+  type = TREE_TYPE (arg);
+
+  val = create_tmp_var (type, "ishft");
+
+  /* Left shift if positive.  */
+  tmp = build (LSHIFT_EXPR, type, arg, arg2);
+  tmp = build (MODIFY_EXPR, type, val, tmp);
+  lstmt = build_stmt (EXPR_STMT, tmp);
+
+  /* Right shift if negative.  This will perform an arithmetic shift as
+     we are dealing with signed integers.  Section 13.5.7 allows this.  */
+  g95_start_stmt ();
+  head = tail = NULL_TREE;
+
+  tmp = build1 (NEGATE_EXPR, TREE_TYPE (arg2), arg2);
+  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
+
+  tmp = build (RSHIFT_EXPR, type, arg, tmp);
+  tmp = build (MODIFY_EXPR, type, val, tmp);
+  rstmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&head, &tail, rstmt, rstmt);
+
+  rstmt = g95_finish_stmt (head, tail);
+
+  tmp = build (GT_EXPR, boolean_type_node, arg2, integer_zero_node);
+  rstmt = build_stmt (IF_STMT, tmp, lstmt, rstmt);
+
+  /* Do nothing if shift == 0.  */
+  tmp = build (MODIFY_EXPR, type, val, integer_zero_node);
+  lstmt = build_stmt (EXPR_STMT, tmp);
+
+  tmp = build (EQ_EXPR, boolean_type_node, arg2, integer_zero_node);
+  tmp = build_stmt (IF_STMT, tmp, lstmt, rstmt);
+  g95_add_stmt_to_pre (se, tmp, tmp);
+
+  se->expr = val;
+}
+
+static void
+g95_conv_intrinsic_ishftc (g95_se * se, g95_expr * expr)
+{
+  tree arg;
+  tree arg2;
+  tree arg3;
+  tree type;
+  tree tmp;
+  tree val;
+  tree lstmt;
+  tree rstmt;
+  tree head;
+  tree tail;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg2 = TREE_CHAIN (arg);
+  arg3 = TREE_CHAIN (arg2);
+  if (arg3)
+    {
+      /* Use a library function for the 3 parameter version.  */
+      type = TREE_TYPE (TREE_VALUE (arg));
+      /* Convert all args to the same type otherwise we need loads of library
+         functions.  SIZE and SHIFT cannot have values > BIT_SIZE (I) so the
+         conversion is safe.  */
+      tmp = g95_simple_convert (type, TREE_VALUE (arg2));
+      tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
+      TREE_VALUE (arg2) = tmp;
+      tmp = g95_simple_convert (type, TREE_VALUE (arg3));
+      tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
+      TREE_VALUE (arg3) = tmp;
+
+      switch (expr->ts.kind)
+        {
+        case 4: tmp = gfor_fndecl_math_ishftc4; break;
+        case 8: tmp = gfor_fndecl_math_ishftc8; break;
+        default: abort();
+        }
+      se->expr = g95_build_function_call (tmp, arg);
+      return;
+    }
+  arg = TREE_VALUE (arg);
+  arg2 = TREE_VALUE (arg2);
+  type = TREE_TYPE (arg);
+  val = create_tmp_var (type, "ishftc");
+
+  /* Left shift if positive.  */
+  tmp = build (LROTATE_EXPR, type, arg, arg2);
+  tmp = build (MODIFY_EXPR, type, val, tmp);
+  lstmt = build_stmt (EXPR_STMT, tmp);
+
+  /* Right shift if negative.  */
+  g95_start_stmt ();
+  head = tail = NULL_TREE;
+
+  tmp = build1 (NEGATE_EXPR, TREE_TYPE (arg2), arg2);
+  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
+
+  tmp = build (RROTATE_EXPR, type, arg, tmp);
+  tmp = build (MODIFY_EXPR, type, val, tmp);
+  rstmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&head, &tail, rstmt, rstmt);
+
+  rstmt = g95_finish_stmt (head, tail);
+
+  tmp = build (GT_EXPR, boolean_type_node, arg2, integer_zero_node);
+  rstmt = build_stmt (IF_STMT, tmp, lstmt, rstmt);
+
+  /* Do nothing if shift == 0.  */
+  tmp = build (MODIFY_EXPR, type, val, integer_zero_node);
+  lstmt = build_stmt (EXPR_STMT, tmp);
+
+  tmp = build (EQ_EXPR, boolean_type_node, arg2, integer_zero_node);
+  tmp = build_stmt (IF_STMT, tmp, lstmt, rstmt);
+  g95_add_stmt_to_pre (se, tmp, tmp);
+
+  se->expr = val;
+}
+
 /* Generate code for an intrinsic function.  Some map directly to library
    calls, others get special handling.  In some cases the name of the function
    used depends on the type specifiers.  */
@@ -912,7 +1144,9 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 
   if (se->ss && se->ss->type == G95_SS_SCALAR)
     {
-      se->expr = se->ss->data.scalar;
+      se->expr = se->ss->data.scalar.expr;
+      se->string_length = se->ss->data.scalar.string_length;
+      g95_advance_se_ss_chain (se);
       return;
     }
 
@@ -927,7 +1161,8 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
       || strcmp (name, "ifix") == 0
       || strcmp (name, "idint") == 0
       || strcmp (name, "float") == 0
-      || strcmp (name, "sngl") == 0)
+      || strcmp (name, "sngl") == 0
+      || strncmp (name, "logical_", 8) == 0)
     g95_conv_intrinsic_conversion (se, expr);
   else if (strncmp (name, "conjg_", 6) == 0)
     g95_conv_intrinsic_conjg (se, expr);
@@ -949,6 +1184,26 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     g95_conv_intrinsic_minmax(se, expr, GT_EXPR);
   else if (strncmp (name, "sum_", 4) == 0)
     g95_conv_intrinsic_sum (se, expr);
+  else if (strncmp (name, "btest_", 6) == 0)
+    g95_conv_intrinsic_btest (se, expr);
+  else if (strncmp (name, "iand_", 5) == 0)
+    g95_conv_intrinsic_bitop (se, expr, BIT_AND_EXPR);
+  else if (strncmp (name, "ieor_", 5) == 0)
+    g95_conv_intrinsic_bitop (se, expr, BIT_XOR_EXPR);
+  else if (strncmp (name, "ior_", 4) == 0)
+    g95_conv_intrinsic_bitop (se, expr, BIT_IOR_EXPR);
+  else if (strncmp (name, "not_", 4) == 0)
+    g95_conv_intrinsic_not (se, expr);
+  else if (strncmp (name, "ibits_", 5) == 0)
+    g95_conv_intrinsic_ibits (se, expr);
+  else if (strncmp (name, "ibset_", 5) == 0)
+    g95_conv_intrinsic_singlebitop (se, expr, 1);
+  else if (strncmp (name, "ibclr_", 5) == 0)
+    g95_conv_intrinsic_singlebitop (se, expr, 0);
+  else if (strncmp (name, "ishft_", 6) == 0)
+    g95_conv_intrinsic_ishft (se, expr);
+  else if (strncmp (name, "ishftc_", 7) == 0)
+    g95_conv_intrinsic_ishftc (se, expr);
   else if (strncmp (name, "ubound", 6) == 0
            || strncmp (name, "lbound", 6) == 0)
     g95_conv_intrinsic_bound (se, expr, name[0] == 'u');
@@ -1002,3 +1257,4 @@ g95_walk_intrinsic_function (g95_ss * ss, g95_expr * expr,
                   expr->value.function.name);
 }
 
+#include "gt-f95-trans-intrinsic.h"

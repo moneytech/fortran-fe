@@ -125,7 +125,7 @@ g95_simple_fold(tree expr, tree * phead, tree * ptail, tree * tmpvar)
 
   if (var == NULL_TREE)
     {
-      var = g95_create_tmp_var (TREE_TYPE (tmp));
+      var = create_tmp_var (TREE_TYPE (tmp), NULL);
       if (tmpvar != NULL)
         *tmpvar = var;
     }
@@ -184,7 +184,7 @@ g95_simple_fold_tmp(tree expr, tree * phead, tree * ptail, tree * tmpvar)
 
   if (var == NULL_TREE)
     {
-      var = g95_create_tmp_var (TREE_TYPE (tmp));
+      var = create_tmp_var (TREE_TYPE (tmp), NULL);
       if (tmpvar != NULL)
         *tmpvar = var;
     }
@@ -329,6 +329,7 @@ g95_trans_runtime_check (tree cond, tree msg, tree * phead, tree * ptail)
   if (integer_zerop (cond))
     return;
 
+  /* The code to generate the error.  */
   g95_start_stmt ();
   head = tail = NULL;
 
@@ -347,19 +348,26 @@ g95_trans_runtime_check (tree cond, tree msg, tree * phead, tree * ptail)
   tmp = build_int_2 (lineno, 0);
   args = g95_chainon_list (args, tmp);
 
-  tmp = g95_build_function_call (g95_fndecl_runtime_error, args);
+  tmp = g95_build_function_call (gfor_fndecl_runtime_error, args);
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_list (&head, &tail, stmt, stmt);
 
-  head = g95_finish_stmt (head, tail);
+  stmt = g95_finish_stmt (head, tail);
 
   if (integer_onep (cond))
     {
-      g95_add_stmt_to_list (phead, ptail, head, NULL_TREE);
+      g95_add_stmt_to_list (phead, ptail, stmt, NULL_TREE);
     }
   else
     {
-      stmt = build_stmt (IF_STMT, cond, head, NULL_TREE);
+      /* Tell the compiler that this isn't likley.  */
+      cond = g95_simple_fold (cond, phead, ptail, NULL);
+      tmp = g95_chainon_list (NULL_TREE, cond);
+      tmp = g95_chainon_list (tmp, integer_zero_node);
+      cond = g95_build_function_call (built_in_decls[BUILT_IN_EXPECT], tmp);
+      cond = g95_simple_fold (cond, phead, ptail, NULL);
+
+      stmt = build_stmt (IF_STMT, cond, stmt, NULL_TREE);
       g95_add_stmt_to_list (phead, ptail, stmt, stmt);
     }
 }
@@ -392,15 +400,12 @@ g95_add_stmt_to_list (tree * phead, tree * ptail, tree head, tree tail)
   if (tail == NULL_TREE)
     {
       tail = head;
+      while (TREE_CHAIN (tail) != NULL_TREE)
+        tail = TREE_CHAIN (tail);
     }
-  /* BUG: this function as sometimes called wit a tail that is not the last
-     statement in the chain.  We need to move this loop inside the above if
-     statement and incomment the assert below.  */
-  while (TREE_CHAIN (tail) != NULL_TREE)
-    tail = TREE_CHAIN (tail);
 
   /* Check this is actualy the tail of the tree.  */
-/*  assert (TREE_CHAIN(tail) == NULL_TREE); */
+  assert (TREE_CHAIN(tail) == NULL_TREE);
 
   /* Set the new tail.  */
   *ptail = tail;
@@ -624,6 +629,10 @@ g95_generate_function_protos (g95_namespace * ns)
 
   for (n = ns->contained; n; n = n->sibling)
     {
+      /* Namespaces are also added for module procedures.  We don't want to
+         process those here.  */
+      if (n->parent != ns)
+        continue;
 
       g95_get_function_decl (n->proc_name);
       /*g95_generate_function_protos (n, func_decl);*/
@@ -664,6 +673,10 @@ g95_generate_code (g95_namespace * ns)
 
   for (n = ns->contained ; n ; n = n->sibling)
     {
+      /* Skip namespaces for used module procedures.  */
+      if (n->parent != ns)
+        continue;
+
       g95_todo_error("contained subroutines");
       g95_generate_function_code (n);
     }

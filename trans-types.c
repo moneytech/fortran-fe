@@ -210,8 +210,7 @@ g95_get_logical_type (int kind)
     }
 }
 
-/* Get a type node for a character kind.  Will be a pointer if the length is
-   unknown.  */
+/* Get a type node for a character kind.  */
 tree
 g95_get_character_type (int kind, g95_charlen * cl)
 {
@@ -241,15 +240,13 @@ g95_get_character_type (int kind, g95_charlen * cl)
   bounds = build_range_type (g95_array_index_type, integer_one_node, len);
   type = build_array_type (base, bounds);
   TYPE_STRING_FLAG (type) = 1;
-  if (len == NULL_TREE)
-    type = build_pointer_type (type);
-  else
-    G95_SIZE_STRING_TYPE_P (type) = 1;
+  if (len != NULL_TREE)
+    G95_KNOWN_SIZE_STRING_TYPE (type) = 1;
 
   return type;
 }
 
-/* Covert a basic type */
+/* Covert a basic type.  This will be an array for character types.  */
 tree
 g95_typenode_for_spec (g95_typespec * spec)
 {
@@ -463,6 +460,18 @@ g95_get_stack_array_type (tree size)
    dimension.  This requires extra fields in the descriptor (both real_ubound
    and fake_ubound).  In tree.def there is mention of TYPE_SEP, which
    may allow us to do this, however I can't find mention of this anywhere else.
+
+   Arrays of character strings are stored as an array of string pointers. This
+   is slightly inefficient mut makes things much simpler.
+   The string data immediately follows this block of pointers.
+    CHARACTER(LEN=20), DIMENSION(5)
+    struct character_array_data
+    {
+      char * pstr[5];
+      char data[100];
+    } data;
+    for (i = 0; i < 5; i++)
+      data.pstr[i] = data.data[i * 20];
  */
 
 static tree
@@ -653,7 +662,8 @@ g95_build_pointer_type (g95_symbol * sym, tree type)
     return build_pointer_type (type);
 }
 
-/* Return the type for a symbol.
+/* Return the type for a symbol.  Special handling is required for character
+   types to get the correct level of indirection.
    For functions, returns the return type.
    For Subroutines returns void_type_node.
  */
@@ -675,26 +685,32 @@ g95_sym_type (g95_symbol * sym)
 
   type = g95_typenode_for_spec (&sym->ts);
 
-  if (sym->attr.dimension)
-      type = g95_build_array_type (type, sym->as);
-
   if (sym->ts.type == BT_CHARACTER)
     {
-      if ((sym->attr.allocatable || sym->attr.pointer || sym->attr.dummy)
-          && G95_SIZE_STRING_TYPE_P (type))
+      if (sym->attr.dimension
+          || sym->attr.pointer || sym->attr.allocatable)
         type = build_pointer_type (type);
     }
-  else
+
+  if (sym->attr.dimension)
     {
-      if ((sym->attr.allocatable || sym->attr.pointer)
-          && ! sym->attr.dimension)
+      type = g95_build_array_type (type, sym->as);
+    }
+  else if (sym->ts.type != BT_CHARACTER)
+    {
+      if (sym->attr.allocatable || sym->attr.pointer)
         type = g95_build_pointer_type (sym, type);
 
-      /* We currently pass all parameters by reference.
-         See f95_get_function_decl.  */
-      if (sym->attr.dummy)
-        type = build_reference_type (type);
     }
+  else if (! (G95_KNOWN_SIZE_STRING_TYPE (type) || sym->attr.dummy))
+    {
+      type = build_pointer_type (type);
+    }
+
+  /* We currently pass all parameters by reference.
+     See f95_get_function_decl.  */
+  if (sym->attr.dummy)
+    type = build_reference_type (type);
 
   return (type);
 }
@@ -775,6 +791,9 @@ g95_return_by_reference (g95_symbol * sym)
 {
   if (sym->attr.dimension)
     return 1;
+
+  if (sym->ts.type == BT_CHARACTER)
+    g95_todo_error ("Returning character variables");
 
   /* Possibly return derived types by reference.  */
   return 0;
