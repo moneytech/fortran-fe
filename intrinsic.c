@@ -42,37 +42,11 @@ int g95_intrinsic_extension;
 
 #define MAX_INTRINSIC_ARGS 5
 
-char *g95_current_intrinsic, *g95_intrinsic_arg[MAX_INTRINSIC_ARGS];
+char *g95_current_intrinsic, *g95_current_intrinsic_arg[MAX_INTRINSIC_ARGS];
 locus *g95_current_intrinsic_where;
 
-typedef struct intrinsic_arg {
-  char name[G95_MAX_SYMBOL_LEN+1];
-
-  g95_typespec ts;
-  int optional;
-  g95_actual_arglist *actual;
-
-  struct intrinsic_arg *next;
-
-} intrinsic_arg;
-
-
-typedef struct intrinsic_sym {
-  char name[G95_MAX_SYMBOL_LEN+1], lib_name[G95_MAX_SYMBOL_LEN+1];
-  intrinsic_arg *arg;
-  g95_typespec ts;
-  int elemental, generic, specific, actual_ok;
-
-  g95_expr *(*simplify)();
-  try (*check)();
-  void (*resolve)();
-  struct intrinsic_sym *specific_head, *next;
-
-} intrinsic_sym;
-
-
-static intrinsic_sym *functions, *subroutines, *conversion, *next_sym;
-static intrinsic_arg *next_arg;
+static g95_intrinsic_sym *functions, *subroutines, *conversion, *next_sym;
+static g95_intrinsic_arg *next_arg;
 
 static int nfunc, nsub, nargs, nconv;
 
@@ -111,12 +85,12 @@ static char name[30];
 }
 
 
-/* find_conv()-- Given a pair of typespecs, find the intrinsic_sym
+/* find_conv()-- Given a pair of typespecs, find the g95_intrinsic_sym
  * node that corresponds to the conversion.  Returns NULL if the
  * conversion isn't found. */
 
-static intrinsic_sym *find_conv(g95_typespec *from, g95_typespec *to) {
-intrinsic_sym *sym;
+static g95_intrinsic_sym *find_conv(g95_typespec *from, g95_typespec *to) {
+g95_intrinsic_sym *sym;
 char *target;
 int i;
 
@@ -231,7 +205,7 @@ g95_constructor *head, *c, *tail;
  * argument list and call the proper check function rather than
  * forcing each function to manipulate the argument list */
 
-static try do_check(intrinsic_sym *specific, g95_actual_arglist *arg) {
+static try do_check(g95_intrinsic_sym *specific, g95_actual_arglist *arg) {
 g95_expr *a1, *a2, *a3, *a4, *a5;
 try t;
 
@@ -375,7 +349,7 @@ va_list argp;
  * number of elements in the table and a pointer to a name.  Returns
  * the NULL pointer if a name is not found. */
 
-static intrinsic_sym *find_sym(intrinsic_sym *start, int n, const char *name) {
+static g95_intrinsic_sym *find_sym(g95_intrinsic_sym *start, int n, const char *name) {
 
   while(n > 0) {
     if (strcmp(name, start->name) == 0) return start;
@@ -391,7 +365,7 @@ static intrinsic_sym *find_sym(intrinsic_sym *start, int n, const char *name) {
 /* find_function()-- Given a name, find a function in the intrinsic
  * function table.  Returns NULL if not found. */
 
-static intrinsic_sym *find_function(const char *name) {
+static g95_intrinsic_sym *find_function(const char *name) {
 
   return find_sym(functions, nfunc, name);
 }
@@ -400,7 +374,7 @@ static intrinsic_sym *find_function(const char *name) {
 /* find_subroutine()-- Given a name, find a function in the intrinsic
  * subroutine table.  Returns NULL if not found. */
 
-static intrinsic_sym *find_subroutine(const char *name) {
+static g95_intrinsic_sym *find_subroutine(const char *name) {
 
   return find_sym(subroutines, nsub, name);
 }
@@ -410,7 +384,7 @@ static intrinsic_sym *find_subroutine(const char *name) {
  * the name of a generic intrinsic function or not. */
 
 int g95_generic_intrinsic(char *name) {
-intrinsic_sym *sym;
+g95_intrinsic_sym *sym;
 
   sym = find_function(name);
   return (sym == NULL) ? 0 : sym->generic;
@@ -421,7 +395,7 @@ intrinsic_sym *sym;
  * name of a specific intrinsic function or not. */
 
 int g95_specific_intrinsic(char *name) {
-intrinsic_sym *sym;
+g95_intrinsic_sym *sym;
 
   sym = find_function(name);
   return (sym == NULL) ? 0 : sym->specific;
@@ -447,7 +421,7 @@ int g95_intrinsic_name(char *name, int subroutine_flag) {
  * specific functions associated with that generic.  */
 
 static void make_generic(const char *name) {
-intrinsic_sym *g;
+g95_intrinsic_sym *g;
 
   if (sizing != SZ_NOTHING) return; 
 
@@ -1379,7 +1353,7 @@ static void add_conv(bt from_type, int from_kind, bt to_type, int to_kind,
 		     g95_expr *(*simplify)()) {
 
 g95_typespec from, to;
-intrinsic_sym *sym;
+g95_intrinsic_sym *sym;
 
   if (sizing == SZ_CONVS) {
     nconv++;
@@ -1406,7 +1380,7 @@ intrinsic_sym *sym;
 }
 
 
-/* add_conversions()-- Create intrinsic_sym nodes for all intrinsic
+/* add_conversions()-- Create g95_intrinsic_sym nodes for all intrinsic
  * conversion functions by looping over the kind tables. */
 
 static void add_conversions(void) {
@@ -1483,15 +1457,15 @@ void g95_intrinsic_init_1(void) {
   sizing = SZ_CONVS;
   add_conversions();
 
-  functions = g95_getmem(sizeof(intrinsic_sym)*(nfunc+nsub)
-			 + sizeof(intrinsic_arg)*nargs);
+  functions = g95_getmem(sizeof(g95_intrinsic_sym)*(nfunc+nsub)
+			 + sizeof(g95_intrinsic_arg)*nargs);
 
   next_sym = functions;
   subroutines = functions + nfunc;
 
-  conversion = g95_getmem(sizeof(intrinsic_sym)*nconv);
+  conversion = g95_getmem(sizeof(g95_intrinsic_sym)*nconv);
 
-  next_arg = ((intrinsic_arg *) (subroutines + nsub)) - 1;
+  next_arg = ((g95_intrinsic_arg *) (subroutines + nsub)) - 1;
 
   sizing = SZ_NOTHING;
   nconv = 0;
@@ -1559,10 +1533,10 @@ g95_actual_arglist *head, *tail, *next;
  * abort sorting and return FAILURE. */
 
 static try sort_actual(const char *name, g95_actual_arglist **ap,
-		       intrinsic_arg *formal, locus *where) {
+		       g95_intrinsic_arg *formal, locus *where) {
 
 g95_actual_arglist *actual, *a;
-intrinsic_arg *f;
+g95_intrinsic_arg *f;
 int i;
 
   remove_nullargs(ap);
@@ -1654,10 +1628,10 @@ do_sort:
  * intrinsic's formal argument list.  The lists are checked for
  * agreement of type.  We don't check for arrayness here. */
 
-static try check_arglist(g95_actual_arglist **ap, intrinsic_sym *sym,
+static try check_arglist(g95_actual_arglist **ap, g95_intrinsic_sym *sym,
 			 int error_flag) {
 g95_actual_arglist *actual;
-intrinsic_arg *formal;
+g95_intrinsic_arg *formal;
 int i;
 
   formal = sym->arg;
@@ -1670,7 +1644,7 @@ int i;
     if (!g95_compare_types(&formal->ts, &actual->expr->ts)) {
       if (error_flag)
 	g95_error("Type of argument '%s' in call to '%s' at %L should be "
-		  "%s, not %s", g95_intrinsic_arg[i],
+		  "%s, not %s", g95_current_intrinsic_arg[i],
 		  g95_current_intrinsic, &actual->expr->where,
 		  g95_typename(&formal->ts), g95_typename(&actual->expr->ts));
       return FAILURE;
@@ -1686,7 +1660,7 @@ int i;
  * subroutine, figure out the type of the result.  This may involve
  * calling a resolution subroutine */
 
-static void resolve_intrinsic(intrinsic_sym *specific, g95_expr *e) {
+static void resolve_intrinsic(g95_intrinsic_sym *specific, g95_expr *e) {
 g95_expr *a1, *a2, *a3, *a4, *a5;
 g95_actual_arglist *arg;
 
@@ -1762,7 +1736,7 @@ g95_actual_arglist *arg;
  * on an error of the simplification, SUCCESS if the simplification
  * worked, even if nothing has changed in the expression itself */
 
-static try do_simplify(intrinsic_sym *specific, g95_expr *e) {
+static try do_simplify(g95_intrinsic_sym *specific, g95_expr *e) {
 g95_expr *result, *a1, *a2, *a3, *a4, *a5;
 g95_actual_arglist *arg;
 
@@ -1848,10 +1822,10 @@ g95_actual_arglist *arg;
  * is consistent with the intrinsic's formal argument list.  Return
  * SUCCESS if the expression and intrinsic match, FAILURE otherwise.  */
 
-static try check_specific(intrinsic_sym *specific, g95_expr *expr,
+static try check_specific(g95_intrinsic_sym *specific, g95_expr *expr,
 			  int error_flag) {
 g95_actual_arglist **ap;
-intrinsic_arg *formal;
+g95_intrinsic_arg *formal;
 try t;
 int i;
 
@@ -1870,7 +1844,7 @@ int i;
     if (i >= MAX_INTRINSIC_ARGS)
       g95_internal_error("check_arglist(): MAX_INTRINSICS_ARGS too small");
 
-    g95_intrinsic_arg[i++] = formal->name;
+    g95_current_intrinsic_arg[i++] = formal->name;
   }
 
   if (sort_actual(specific->name, ap, specific->arg, &expr->where) == FAILURE)
@@ -1902,7 +1876,7 @@ int i;
  */
 
 match g95_intrinsic_func_interface(g95_expr *expr, int error_flag) {
-intrinsic_sym *isym, *specific;
+g95_intrinsic_sym *isym, *specific;
 g95_actual_arglist *actual;
 const char *name;
 int flag;
@@ -1988,7 +1962,7 @@ got_specific:
 
 try g95_intrinsic_sub_interface(g95_code *c) {
 g95_actual_arglist **argp;
-intrinsic_sym *isym;
+g95_intrinsic_sym *isym;
 char *name;
 
   name = c->sym->name;
@@ -2015,7 +1989,7 @@ char *name;
  */
 
 try g95_convert_type(g95_expr *expr, g95_typespec *ts, int eflag) {
-intrinsic_sym *sym;
+g95_intrinsic_sym *sym;
 locus old_where;
 g95_expr *new;
 int rank;

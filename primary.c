@@ -1700,6 +1700,8 @@ match m;
       break;
     }
 
+    sym->result = sym;
+
     m = g95_match_actual_arglist(0, &e->value.function.actual);
     if (m == MATCH_NO)
       g95_error("Missing argument list in function '%s' at %C", sym->name);

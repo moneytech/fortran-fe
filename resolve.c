@@ -517,29 +517,31 @@ try t;
     return FAILURE;
 
 /* See if function is already resolved */
+
   if (expr->value.function.name != NULL) {
     if (expr->ts.type == BT_UNKNOWN) expr->ts = expr->symbol->ts;
-    return SUCCESS;
+    t = SUCCESS;
+  } else {     /* Apply the rules of section 14.1.2 */
+
+    switch(procedure_kind(expr->symbol)) {
+    case PTYPE_GENERIC:   t = resolve_generic(expr);   break;
+    case PTYPE_SPECIFIC:  t = resolve_specific(expr);  break;
+    case PTYPE_UNKNOWN:   t = resolve_unknown(expr);   break;
+    default:
+      g95_internal_error("resolve_function(): bad function type");
+    }
   }
 
-/* Apply the rules of section 14.1.2 */
+  /* If the expression is still a function (it might have simplified),
+   * then we check to see if we are calling an elemental function */
 
-  switch(procedure_kind(expr->symbol)) {
-  case PTYPE_GENERIC:   t = resolve_generic(expr);   break;
-  case PTYPE_SPECIFIC:  t = resolve_specific(expr);  break;
-  case PTYPE_UNKNOWN:   t = resolve_unknown(expr);   break;
-  default:
-    g95_internal_error("resolve_function(): bad function type");
-  }
-
-#if 0
   if (expr->expr_type == EXPR_FUNCTION &&
+      expr->value.function.actual != NULL &&
       ((expr->value.function.esym != NULL &&
 	expr->value.function.esym->attr.elemental) ||
        (expr->value.function.isym != NULL &&
 	expr->value.function.isym->elemental)))
     expr->rank = expr->value.function.actual->expr->rank;
-#endif
 
   return t;
 }

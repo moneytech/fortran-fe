@@ -611,6 +611,33 @@ typedef struct g95_ref {
 
 #define g95_get_ref() g95_getmem(sizeof(g95_ref))
 
+/* Structures representing intrinsic symbols and their arguments lists */
+
+typedef struct g95_intrinsic_arg {
+  char name[G95_MAX_SYMBOL_LEN+1];
+
+  g95_typespec ts;
+  int optional;
+  g95_actual_arglist *actual;
+
+  struct g95_intrinsic_arg *next;
+
+} g95_intrinsic_arg;
+
+
+typedef struct g95_intrinsic_sym {
+  char name[G95_MAX_SYMBOL_LEN+1], lib_name[G95_MAX_SYMBOL_LEN+1];
+  g95_intrinsic_arg *arg;
+  g95_typespec ts;
+  int elemental, generic, specific, actual_ok;
+
+  struct g95_expr *(*simplify)();
+  try (*check)();
+  void (*resolve)();
+  struct g95_intrinsic_sym *specific_head, *next;
+
+} g95_intrinsic_sym;
+
 
 /* Expression nodes.  The expression node types deserve explanations, since
  * the last couple can be easily misconstrued:
@@ -653,7 +680,7 @@ typedef struct g95_expr {
     struct {
       g95_actual_arglist *actual;
       char *name;   /* Points to the ultimate name of the function */
-      struct intrinsic_sym *isym;
+      g95_intrinsic_sym *isym;
       g95_symbol *esym;
     } function;
 

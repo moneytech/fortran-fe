@@ -34,7 +34,7 @@ Boston, MA 02111-1307, USA.  */
 #include "intrinsic.h"
 
 extern int g95_intrinsic_extension;
-extern char *g95_current_intrinsic, *g95_intrinsic_arg[5];
+extern char *g95_current_intrinsic, *g95_current_intrinsic_arg[5];
 extern locus *g95_current_intrinsic_where;
 
 
@@ -44,7 +44,8 @@ extern locus *g95_current_intrinsic_where;
 static void must_be(g95_expr *e, int n, const char *thing) {
 
   g95_error("'%s' argument of '%s' intrinsic at %L must be %s",
-	    g95_intrinsic_arg[n], g95_current_intrinsic, &e->where, thing);
+	    g95_current_intrinsic_arg[n], g95_current_intrinsic, &e->where,
+	    thing);
 }
 
 
@@ -171,7 +172,8 @@ char *message;
   if (g95_compare_types(&e->ts, &f->ts)) return SUCCESS;
 
   message = alloca(100);
-  sprintf(message, "the same type and kind as '%s'", g95_intrinsic_arg[n]);
+  sprintf(message, "the same type and kind as '%s'",
+	  g95_current_intrinsic_arg[n]);
 
   must_be(f, m, message);
 
@@ -202,7 +204,7 @@ static try nonoptional_check(g95_expr *e, int n) {
 
   if (e->expr_type == EXPR_VARIABLE && e->symbol->attr.optional) {
     g95_error("'%s' argument of '%s' intrinsic at %L must not be OPTIONAL",
-	      g95_intrinsic_arg[n], g95_current_intrinsic, &e->where);
+	      g95_current_intrinsic_arg[n], g95_current_intrinsic, &e->where);
 
   }
 
