@@ -487,6 +487,7 @@ void g95_resolve_logical(g95_expr *f, g95_expr *a, g95_expr *kind) {
   f->ts.type = BT_LOGICAL;
   f->ts.kind = (kind == NULL) ? g95_default_logical_kind()
     : mpz_get_ui(kind->value.integer);
+  f->rank = a->rank;
 
   f->value.function.name =
     get_string("__logical_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
