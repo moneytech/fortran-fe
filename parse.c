@@ -1059,6 +1059,7 @@ loop:
 
     case ST_ATTR_DECL:
     case ST_DATA_DECL:
+    case ST_COMMON:
       seen_decl = 1;
       accept_statement(st);
       break;
