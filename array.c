@@ -578,11 +578,6 @@ try g95_set_array_spec(g95_symbol *sym, g95_array_spec *as, locus *error_loc) {
 
   if (g95_add_dimension(&sym->attr, error_loc) == FAILURE) return FAILURE;
 
-  if (as->type == AS_ASSUMED_SIZE && sym->attr.dummy == 0) {
-    g95_error("Assumed size array at %L must be a dummy argument", error_loc);
-    return FAILURE;
-  }
-
   sym->as = as;
 
   return SUCCESS;

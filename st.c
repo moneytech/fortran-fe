@@ -403,6 +403,14 @@ g95_alloc *a;
 static void resolve_symbol(g95_symbol *sym) {
 
   if (sym->attr.flavor == FL_UNKNOWN) sym->attr.flavor = FL_VARIABLE;
+
+  if (sym->as != NULL && sym->as->type == AS_ASSUMED_SIZE &&
+      sym->attr.dummy == 0) {
+    g95_error("Assumed size array at %L must be a dummy argument",
+	      &sym->declared_at);
+    return;
+  }
+
 }
 
 
