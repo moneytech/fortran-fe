@@ -569,10 +569,8 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
 
   /* Finish off the type.  */
   TYPE_FIELDS (fat_type) = fieldlist;
-  layout_type (fat_type);
 
-  /* Output the debugging info for this type.  */
-  rest_of_type_compilation (fat_type, 0);
+  g95_finish_type (fat_type);
 
   return fat_type;
 }
@@ -641,6 +639,19 @@ g95_sym_type (g95_symbol * sym)
   return (type);
 }
 
+/* Layout and output debug info for a record type.  */
+void
+g95_finish_type (tree type)
+{
+  tree decl;
+
+  decl = build_decl (TYPE_DECL, NULL_TREE, type);
+  TYPE_STUB_DECL (type) = decl;
+  layout_type (type);
+  rest_of_type_compilation (type, 1);
+  rest_of_decl_compilation (decl, NULL, 1, 0);
+}
+
 /* This is used by g95_get_derived_type.  Not sure what it was meant to do.  */
 static void
 g95_set_decl_attributes (tree type ATTRIBUTE_UNUSED, symbol_attribute * attr ATTRIBUTE_UNUSED)
@@ -702,10 +713,8 @@ g95_get_derived_type (g95_symbol * derived)
   /* Now we have the final fieldlist.  Record it, then lay out the
      derived type, including the fields.  */
   TYPE_FIELDS (typenode) = fieldlist;
-  layout_type (typenode);
 
-  /* Finish debugging output for this type.  */
-  rest_of_type_compilation (typenode, 0);
+  g95_finish_type (typenode);
 
   derived->backend_decl = typenode;
 

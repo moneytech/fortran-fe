@@ -83,6 +83,9 @@ tree g95_signed_or_unsigned_type (int, tree);
 tree g95_get_element_type (tree);
 tree g95_get_array_type_bounds (tree, int, tree *, tree *);
 
+/* Layout and output debugging info for a type.  */
+void g95_finish_type (tree);
+
 /* Some functions have an extra parameter for the return value.  */
 int g95_return_by_reference (g95_symbol *);
 

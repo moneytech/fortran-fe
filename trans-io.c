@@ -131,9 +131,8 @@ g95_init_io_state_type (void)
   gforio_state_err = gforio_addfield (type, "err", g95_int4_type_node);
   gforio_state_iostat = gforio_addfield (type, "iostat", g95_int4_type_node);
 
-  layout_type (type);
+  g95_finish_type (type);
 
-  rest_of_type_compilation (type, 0);
   gforio_pstate_type_node = build_pointer_type (type);
 }
 

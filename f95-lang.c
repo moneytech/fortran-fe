@@ -780,7 +780,6 @@ pushdecl (tree decl)
    and some nodes representing standard constants (0, 1, (void *) 0).
    Initialize the global binding level.
    Make definitions for built-in primitive functions.  */
-/* G95_TODO */
 static void
 g95_init_decl_processing (void)
 {
@@ -813,7 +812,7 @@ g95_init_decl_processing (void)
    the TARGET attribute, but we implement it here for a
    likely future Cray pointer extension.
    Value is 1 if successful.  */
-/* G95_TODO */
+/* TODO: Check/fix mark_addressable.  */
 int
 g95_mark_addressable (tree exp)
 {

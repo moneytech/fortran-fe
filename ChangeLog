@@ -1,3 +1,10 @@
+2002-09-02  Paul Brook  <paul@nowt.org>
+
+	* g95_generate_code: Clear the attr for __fortran_main.
+	* trans-types.c (g95_finish_type): New function.
+	* g95_init_io_state_type: Use g95_finish_type.
+	* g95_conv_intrinsic_anyall: Fix thinko in result initialization.
+
 2002-09-01  Paul Brook  <paul@nowt.org>
 
 	* README.backend: Warn about the dangers of extra config.h files.

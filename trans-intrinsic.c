@@ -834,9 +834,9 @@ g95_conv_intrinsic_anyall (g95_se * se, g95_expr * expr, int op)
   /* Initialize the result.  */
   resvar = create_tmp_var (type, "test");
   if (op == EQ_EXPR)
-    tmp = g95_build_const (type, integer_zero_node);
-  else
     tmp = g95_build_const (type, integer_one_node);
+  else
+    tmp = g95_build_const (type, integer_zero_node);
   tmp = build (MODIFY_EXPR, type, resvar, tmp);
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_pre (se, stmt, stmt);

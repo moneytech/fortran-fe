@@ -588,7 +588,7 @@ c_expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
      const char *filename;
      int line;
 {
-  g95_todo_error("fortran shouldn't contain asm statements!");
+  internal_error("fortran shouldn't contain asm statements!");
 }
 
 /* Given a list of expressions, return a compound expression
@@ -637,7 +637,7 @@ build_modify_expr (lhs, modifycode, rhs)
 
   if (modifycode != NOP_EXPR)
     {
-      g95_todo_error("Fortran shouldn't call build_modify_exprwith modifycode!=NOP_EXPR");
+      internal_error("Fortran shouldn't call build_modify_exprwith modifycode!=NOP_EXPR");
     }
 
   /* Handle a cast used as an "lvalue".
