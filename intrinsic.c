@@ -305,30 +305,6 @@ g95_ref *ref;
 }
 
 
-/* Abs family */
-
-static try check_dabs(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-static try check_iabs(g95_expr *x) {
-
-  if (x->ts.type != BT_INTEGER) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
 static try check_aint(g95_expr *a, g95_expr *kind) {
 
   if ( a->ts.type != BT_REAL ) {
@@ -474,8 +450,6 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
   return SUCCESS;
 }
 
-/* Cosine family */
-
 static try check_cos(g95_expr *x) {
 
   if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
@@ -485,18 +459,6 @@ static try check_cos(g95_expr *x) {
 
   return SUCCESS;
 }
-
-static try check_dcos(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-/* end of cosines */
 
 
 static try check_count(g95_expr *mask, g95_expr *dim) {
@@ -1399,38 +1361,6 @@ static try check_real(g95_expr *a, g95_expr *kind) {
   return SUCCESS;
 }
 
-static try check_float(g95_expr *x) {
-
-  if (x->ts.type != BT_INTEGER) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (x->ts.kind != g95_default_integer_kind()) {
-    kind_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-
-}
-
-static try check_sngl(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (x->ts.kind != g95_default_double_kind()) {
-    kind_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-
-}
-/* end of this family */
 
 static try check_repeat(g95_expr *x, g95_expr *y) {
 
@@ -1556,8 +1486,6 @@ static try check_shape(g95_expr *source) {
 }
 
 
-/* Sine family */
-
 static try check_sin(g95_expr *x) {
 
   if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
@@ -1567,18 +1495,6 @@ static try check_sin(g95_expr *x) {
 
   return SUCCESS;
 }
-
-static try check_dsin(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-/* end sines */
 
 
 static try check_size(g95_expr *array, g95_expr *dim) {
@@ -2103,9 +2019,9 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym_f1("abs",  0, BT_REAL,    dr, g95_simplify_abs, NULL,
 	     a, BT_REAL, dr, 0, NULL);
-  add_sym_f1("iabs", 0, BT_INTEGER, di, g95_simplify_iabs, check_iabs,
+  add_sym_f1("iabs", 0, BT_INTEGER, di, g95_simplify_iabs, NULL,
 	     a, BT_INTEGER, di, 0, NULL);
-  add_sym_f1("dabs", 0, BT_REAL,    dd, g95_simplify_abs, check_dabs,
+  add_sym_f1("dabs", 0, BT_REAL,    dd, g95_simplify_abs, NULL,
 	     a, BT_REAL, dd, 0, NULL);
   add_sym_f1("cabs", 0, BT_REAL,    dr, g95_simplify_cabs, NULL,
 	     a, BT_COMPLEX, dz, 0, NULL);
@@ -2190,7 +2106,7 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym_f1("cos",  0, BT_REAL,    dr, g95_simplify_cos, check_cos,
 	     x, BT_REAL,    dr, 0, NULL);
-  add_sym_f1("dcos", 0, BT_REAL,    dd, g95_simplify_cos, check_dcos,
+  add_sym_f1("dcos", 0, BT_REAL,    dd, g95_simplify_cos, NULL,
 	     x, BT_REAL,    dd, 0, NULL);
   add_sym_f1("ccos", 0, BT_COMPLEX, dz, g95_simplify_cos, NULL,
 	     x, BT_COMPLEX, dz, 0, NULL);
@@ -2448,10 +2364,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f2("real",  1, BT_REAL, dr, g95_simplify_real, check_real,
 	     a, BT_INTEGER, di, 0,   knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym_f1("float", 1, BT_REAL, dr, g95_simplify_float, check_float,
+  add_sym_f1("float", 1, BT_REAL, dr, g95_simplify_float, NULL,
 	     a, BT_INTEGER, di, 0, NULL);
 
-  add_sym_f1("sngl",  1, BT_REAL, dr, g95_simplify_sngl, check_sngl,
+  add_sym_f1("sngl",  1, BT_REAL, dr, g95_simplify_sngl, NULL,
 	     a, BT_REAL, dd, 0, NULL);
 
   add_sym_f2("repeat", 1, BT_CHARACTER, dc, g95_simplify_repeat, check_repeat,
@@ -2494,7 +2410,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("sign");
 
   add_sym_f1("sin",  1, BT_REAL,    dr, g95_simplify_sin, check_sin,   x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dsin", 1, BT_REAL,    dd, g95_simplify_sin, check_dsin,   x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("dsin", 1, BT_REAL,    dd, g95_simplify_sin, NULL,   x, BT_REAL, dd, 0, NULL);
   add_sym_f1("csin", 1, BT_COMPLEX, dz, g95_simplify_sin, NULL,
 	     x, BT_COMPLEX, dz, 0, NULL);
   make_generic("sin");
@@ -2935,6 +2851,11 @@ intrinsic_arg *formal;
 		      "be %s, not %s", actual->arg_number, sym->name,
 		      g95_typename(formal->ts.type),
 		      g95_typename(actual->expr->ts.type));
+      return FAILURE;
+    }
+    else if (formal->ts.kind != actual->expr->ts.kind) {
+      intrinsic_error("Incorrect kind of argument %d in call to %s at %%L",
+                      actual->arg_number, sym->name);
       return FAILURE;
     }
 
