@@ -1584,10 +1584,6 @@ g95_statement st;
     g95_current_ns->parent = parent_ns;
 
     st = next_statement();
-    if (st != ST_FUNCTION && st != ST_SUBROUTINE) {
-      g95_free_namespace(g95_current_ns);
-      g95_current_ns = parent_ns;
-    }
 
     switch(st) {
     case ST_NONE:
@@ -1616,12 +1612,17 @@ g95_statement st;
 
     case ST_END_FUNCTION:   case ST_END_MODULE:
     case ST_END_PROGRAM:    case ST_END_SUBROUTINE:
+      g95_free_namespace(g95_current_ns);
+      g95_current_ns = parent_ns;
       break;
 
     default:
       g95_error("Unexpected %s statement in CONTAINS section at %C", 
  		g95_ascii_statement(st));
       g95_reject_statement();
+
+      g95_free_namespace(g95_current_ns);
+      g95_current_ns = parent_ns;
       break;
     }
   } while(st != ST_END_FUNCTION && st != ST_END_SUBROUTINE &&
