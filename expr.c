@@ -287,35 +287,6 @@ g95_ref *dest;
 }
 
 
-/* g95_free_array_shape()-- Free an array shape structure */
-
-void g95_free_array_shape(g95_array_shape *p) {
-int i;
-
-  for(i=0; i<p->rank; i++)
-    g95_free(p->shape[i]);
-
-  g95_free(p);
-}
-
-
-/* g95_copy_array_shape()-- Copy an array shape structure */
-
-g95_array_shape *g95_copy_array_shape(g95_array_shape *p) {
-g95_array_shape *q;
-int i;
-
-  q = g95_get_array_shape();
-
-  q->rank = p->rank;
-
-  for(i=0; i<p->rank; i++)
-    q->shape[i] = g95_copy_expr(p->shape[i]);
-
-  return q;
-}
-
-
 /* g95_copy_expr()-- Given an expression pointer, return a copy of the
  * expression.  This subroutine is recursive. */
 
