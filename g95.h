@@ -1244,7 +1244,7 @@ int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
 void g95_free_constructor(g95_constructor *);
 match g95_match_array_constructor(g95_expr **);
 void g95_simplify_iterator_var(g95_expr *);
-try g95_expand_constructor(g95_constructor **);
+try g95_expand_constructor(g95_expr *);
 try g95_resolve_array_constructor(g95_expr *);
 try g95_check_constructor_type(g95_expr *);
 try g95_check_iter_variable(g95_expr *);

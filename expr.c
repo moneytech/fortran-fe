@@ -827,7 +827,7 @@ g95_actual_arglist *ap;
     if (simplify_constructor(p->value.constructor, type) == FAILURE)
       return FAILURE;
 
-    if (type == 1 && g95_expand_constructor(&p->value.constructor) == FAILURE)
+    if (type == 1 && g95_expand_constructor(p) == FAILURE)
       return FAILURE;
 
     break;
@@ -1444,7 +1444,7 @@ match m;
 
   if (expr->expr_type == EXPR_ARRAY &&
       (g95_check_constructor_type(expr) == FAILURE ||
-       g95_expand_constructor(&expr->value.constructor) == FAILURE)) {
+       g95_expand_constructor(expr) == FAILURE)) {
     g95_free_expr(expr);
     return MATCH_ERROR;
   }
