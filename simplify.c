@@ -408,6 +408,7 @@ g95_expr *rtrunc, *result;
 
 g95_expr *g95_simplify_anint(g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *result;
+mpf_t half;
 int kind, cmp;
 
   kind = get_kind(k, "ANINT", e->ts.kind);
@@ -415,44 +416,63 @@ int kind, cmp;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
+  result = g95_constant_result(e->ts.type,kind);
+  result->where = e->where;
+
   rtrunc = g95_copy_expr(e);
+
+  mpf_init_set_d(half,0.5);
 
   cmp = mpf_cmp_ui(e->value.real, 0);
 
   if (cmp > 0) {
-    mpf_ceil(rtrunc->value.real,e->value.real);
-  } else if (cmp < 0) {
-    mpf_floor(rtrunc->value.real,e->value.real);
-  } else 
-    mpf_set_ui(rtrunc->value.real,0);
+    mpf_add(rtrunc->value.real,e->value.real,half);
+    mpf_trunc(result->value.real,rtrunc->value.real);
+  } 
+  else if (cmp < 0) {
+    mpf_sub(rtrunc->value.real,e->value.real,half);
+    mpf_trunc(result->value.real,rtrunc->value.real);
+  } 
+  else 
+    mpf_set_ui(result->value.real,0);
 
-  result = g95_real2real(rtrunc,kind);
-
+  mpf_clear(half);
   g95_free_expr(rtrunc);
+
   return range_check(result,"ANINT");
 }
 
 
 g95_expr *g95_simplify_dnint(g95_expr *e) {
 g95_expr *rtrunc, *result;
+mpf_t half;
 int cmp;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
+  result = g95_constant_result(BT_REAL, g95_default_double_kind());
+  result->where = e->where;
+
   rtrunc = g95_copy_expr(e);
+
+  mpf_init_set_d(half,0.5);
 
   cmp = mpf_cmp_ui(e->value.real, 0);
 
   if (cmp > 0) {
-    mpf_ceil(rtrunc->value.real,e->value.real);
-  } else if (cmp < 0 ) {
-    mpf_floor(rtrunc->value.real,e->value.real);
-  } else 
-    mpf_set_ui(rtrunc->value.real,0);
+    mpf_add(rtrunc->value.real,e->value.real,half);
+    mpf_trunc(result->value.real,rtrunc->value.real);
+  } 
+  else if (cmp < 0 ) {
+    mpf_sub(rtrunc->value.real,e->value.real,half);
+    mpf_trunc(result->value.real,rtrunc->value.real);
+  }
+  else 
+    mpf_set_ui(result->value.real,0);
 
-  result = g95_real2real(rtrunc,g95_default_double_kind());
-
+  mpf_clear(half);
   g95_free_expr(rtrunc);
+
   return range_check(result, "DNINT");
 }
 
@@ -2394,7 +2414,8 @@ int p, i, k;
 
 
 g95_expr *g95_simplify_nint(g95_expr *e, g95_expr *k) {
-g95_expr *rtrunc, *result;
+g95_expr *rtrunc, *itrunc, *result;
+mpf_t half;
 int kind, cmp;
 
   kind = get_kind(k, "NINT", g95_default_integer_kind());
@@ -2402,20 +2423,32 @@ int kind, cmp;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  rtrunc = g95_copy_expr(e);
+  result = g95_constant_result(BT_INTEGER,kind);
+  result->where = e->where;
 
-  cmp = mpf_cmp_si(e->value.real, 0);
+  rtrunc = g95_copy_expr(e);
+  itrunc = g95_copy_expr(e);
+
+  cmp = mpf_cmp_ui(e->value.real, 0);
+
+  mpf_init_set_d(half,0.5);
 
   if (cmp > 0) {
-    mpf_ceil(rtrunc->value.real,e->value.real);
-  } else if (cmp < 0) {
-    mpf_floor(rtrunc->value.real, e->value.real);
-  } else {
-    mpf_set_si(rtrunc->value.real, 0);
+    mpf_add(rtrunc->value.real,e->value.real,half);
+    mpf_trunc(itrunc->value.real,rtrunc->value.real);
+  } 
+  else if (cmp < 0) {
+    mpf_sub(rtrunc->value.real,e->value.real,half);
+    mpf_trunc(itrunc->value.real,rtrunc->value.real);
+  } 
+  else {
+    mpf_set_ui(itrunc->value.real, 0);
   }
 
-  result = g95_real2int(rtrunc, kind);
+  mpz_set_f(result->value.integer,itrunc->value.real);
 
+  mpf_clear(half);
+  g95_free_expr(itrunc);
   g95_free_expr(rtrunc);
 
   return range_check(result,"NINT");
@@ -2423,7 +2456,8 @@ int kind, cmp;
 
 
 g95_expr *g95_simplify_idnint(g95_expr *e) {
-g95_expr *rtrunc, *result;
+g95_expr *rtrunc, *itrunc, *result;
+mpf_t half;
 int cmp;
 
   if (e->expr_type != EXPR_CONSTANT ) return NULL;
@@ -2432,19 +2466,28 @@ int cmp;
   result->where = e->where;
 
   rtrunc = g95_copy_expr(e);
+  itrunc = g95_copy_expr(e);
+
+  mpf_init_set_d(half,0.5);
 
   cmp = mpf_cmp_ui(e->value.real, 0);
 
   if (cmp > 0) {
-    mpf_ceil(rtrunc->value.real, e->value.real);
-  } else if (cmp < 0) {
-    mpf_floor(rtrunc->value.real,e->value.real);
-  } else {
-    mpf_set_si(rtrunc->value.real, 0);
+    mpf_add(rtrunc->value.real,e->value.real,half);
+    mpf_trunc(itrunc->value.real,rtrunc->value.real);
+  } 
+  else if (cmp < 0) {
+    mpf_sub(rtrunc->value.real,e->value.real,half);
+    mpf_trunc(itrunc->value.real,rtrunc->value.real);
+  } 
+  else {
+    mpf_set_ui(itrunc->value.real, 0);
   }
 
-  mpz_set_f(result->value.integer,rtrunc->value.real);
+  mpz_set_f(result->value.integer,itrunc->value.real);
 
+  mpf_clear(half);
+  g95_free_expr(itrunc);
   g95_free_expr(rtrunc);
 
   return range_check(result,"IDNINT");
