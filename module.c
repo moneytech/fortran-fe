@@ -525,7 +525,7 @@ static void write_char(char out) {
 
 static void write_atom(atom_type atom, void *v) {
 char *p, buffer[20];
-int len;
+int i, len;
 
   switch(atom) {
   case ATOM_STRING:
@@ -542,7 +542,10 @@ int len;
     break;
 
   case ATOM_INTEGER:
-    sprintf(buffer, "%d", *((int *) v));
+    i = *((int *) v);
+    if (i < 0) g95_internal_error("write_atom(): Writing negative integer");
+
+    sprintf(buffer, "%d", i);
     p = buffer;
     break;
   }
