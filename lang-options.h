@@ -28,6 +28,8 @@ This file is part of GNU Fortran.
       N_("Warn about truncated source lines") },
 { "-F",
       N_("Parse an F program") },
+{ "-d8",
+      N_("Set the default real and integer kinds to double precision") },
 { "-ffixed-line-length-80",
       N_("80 character line width in fixed mode") },
 { "-ffixed-line-length-132",

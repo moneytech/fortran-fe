@@ -936,7 +936,7 @@ typedef struct g95_directorylist {
 typedef struct {
   char *source, *object;
   int verbose, pedantic, line_truncation, fixed_line_length, fmode, dollar,
-    q_kind, quiet, r8, i8, l1;
+    q_kind, quiet, r8, i8, d8, l1;
   g95_directorylist *include_dirs;
   char *module_dir;
   g95_source_form form;

@@ -430,6 +430,12 @@ int i;
     return 1;
   }
 
+  if (strcmp(option, "-d8") == 0) {
+    g95_option.r8 = 1;
+    g95_option.i8 = 1;
+    return 1;
+  }
+
   if (strcmp(option, "-l1") == 0) {
     g95_option.l1 = 1;
     return 1;
@@ -503,6 +509,7 @@ static void init_options(void) {
   g95_option.q_kind = g95_default_double_kind();
   g95_option.quiet = 0;
   g95_option.r8 = 0;
+  g95_option.d8 = 0;
   g95_option.l1 = g95_default_logical_kind();
 }
 
