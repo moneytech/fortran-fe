@@ -1109,15 +1109,14 @@ cleanup:
  * are unique. */
 
 match g95_match_actual_arglist(int sub_flag, g95_actual_arglist **argp) {
-int arg_number, label, seen_keyword;
 g95_actual_arglist *head, *tail;
+int label, seen_keyword;
 locus old_loc;
 match m;
 
   *argp = tail = NULL;
   old_loc = *g95_current_locus();
 
-  arg_number = 1;
   seen_keyword = 0;
 
   if (g95_match_char('(') == MATCH_NO)
@@ -1167,8 +1166,6 @@ match m;
 	if (m == MATCH_NO) goto syntax;
       }
     }
-
-    tail->arg_number = arg_number++;
 
   next:
     if (g95_match_char(')') == MATCH_YES) break;
@@ -1804,7 +1801,16 @@ match m;
     break;
 
   case FL_PROCEDURE:  /* Check for a nonrecursive function result */
-    if (sym->attr.function && sym->result == sym) break;
+    if (sym->attr.function && sym->result == sym) {
+
+      /* If a function results is a derived type, then the derived
+       * type may still have to be resolved. */
+
+      if (sym->ts.type == BT_DERIVED &&
+	  g95_use_derived(sym->ts.derived) == NULL) return MATCH_ERROR;
+
+      break;
+    }
 
     /* Fall through to error */
 

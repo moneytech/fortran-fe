@@ -1141,7 +1141,6 @@ static void mio_actual_arg(g95_actual_arglist *a) {
 
   mio_lparen();
   mio_internal_string(a->name);
-  mio_integer(&a->arg_number);
   mio_expr(&a->expr);
   mio_rparen();
 }

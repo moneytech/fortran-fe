@@ -377,7 +377,6 @@ typedef struct g95_formal_arglist {
 
 typedef struct g95_actual_arglist {
   char name[G95_MAX_SYMBOL_LEN+1];
-  int arg_number;
   int label;    /* Alternate return label when the expr member is null */
   struct g95_expr *expr;
   struct g95_actual_arglist *next;
