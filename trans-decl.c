@@ -293,7 +293,7 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
       TREE_PUBLIC (decl) = 1;
       TREE_STATIC (decl) = 1;
     }
-  
+
   if (sym->attr.save)
     TREE_STATIC (decl) = 1;
 }
@@ -957,12 +957,17 @@ g95_trans_auto_character_variable (g95_symbol * sym, tree body)
   return body;
 }
 
-/* Generate function entry and exit code.  */
+/* Generate function entry and exit code, and add it to the function body.
+   This includes:
+    Allocation and initialisation of array variables.
+    Allocation of character string variables.
+    Initialization and possibly repacking of dummy arrays.  */
 static tree
 g95_trans_deferred_vars (g95_symbol * sym, tree body)
 {
   tree tmp;
   tree stmt;
+  locus loc;
 
   for (; sym; sym = sym->tlink)
     {
@@ -979,7 +984,10 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
                 body = g95_trans_dummy_array_bias (sym, body);
               else
                 {
+                  g95_get_backend_locus (&loc);
+                  g95_set_backend_locus (&sym->declared_at);
                   stmt = g95_trans_auto_array_allocation (sym);
+                  g95_set_backend_locus (&loc);
 
                   /* Add to the start of the function body.  */
                   body = chainon (stmt, body);
@@ -988,7 +996,7 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
 
             case AS_ASSUMED_SHAPE:
             case AS_ASSUMED_SIZE:
-              /* Must be dummy parameters.  */
+              /* These must be dummy parameters.  */
               assert (sym->attr.dummy);
 
               body = g95_trans_dummy_array_bias (sym, body);
@@ -1005,7 +1013,10 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
         }
       else if (sym->ts.type == BT_CHARACTER)
         {
+          g95_get_backend_locus (&loc);
+          g95_set_backend_locus (&sym->declared_at);
           body = g95_trans_auto_character_variable (sym, body);
+          g95_set_backend_locus (&loc);
         }
       else
         abort();
@@ -1060,8 +1071,12 @@ g95_generate_function_code (g95_namespace * ns)
   /* create RTL for function definition */
   make_decl_rtl (fndecl, NULL);
 
+  /* Set the line and filename.  sym->decalred_at seems to point to the last
+     statement for subroutines, but it'll do for now.  */
+  g95_set_backend_locus (&sym->declared_at);
+
   /* line and file should not be 0 */
-  init_function_start (fndecl, input_filename, /*line*/ 1);
+  init_function_start (fndecl, input_filename, lineno);
 
   /* We're in function-at-a-time mode. */
   cfun->x_whole_function_mode_p = 1;

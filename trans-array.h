@@ -40,6 +40,9 @@ tree g95_trans_deferred_array (g95_symbol *, tree);
 /* Generate scalarization information for an expression.  */
 g95_ss * g95_walk_expr (g95_ss *, g95_expr *);
 
+
+/* Free a SS chain.  */
+void g95_free_ss (g95_ss *);
 /* Add the pre and post chains from an SS chain to a loopinfo.  */
 void g95_add_ss_stmts (g95_loopinfo *, g95_ss *);
 /* Reverse a SS chain.  */
@@ -58,6 +61,11 @@ void g95_conv_loopvars (g95_loopinfo *);
 
 /* Translate an array reference.  */
 void g95_conv_array_index_ref (g95_se *, tree, tree *, int);
+/* Translate a reference to an array temporary.  */
+void g95_conv_tmp_ref (g95_se *);
+
+/* Convert an array for passing as an actual function parameter.  */
+void g95_conv_array_parameter (g95_se *, g95_expr *, g95_ss *);
 
 /* Return either an INT_CST or a COMPONENT_REF. */
 tree g95_conv_array_stride (tree, int);

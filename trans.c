@@ -49,7 +49,9 @@ Boston, MA 02111-1307, USA.  */
    Coding conventions for backend interface code:
    GNU Coding Standard + GCC extensions.  */
 
-/* Advance along a TREE_CHAIN n times.  */
+static g95_file *g95_current_backend_file;
+
+/* Advance along TREE_CHAIN n times.  */
 tree
 g95_advance_chain (tree t, int n)
 {
@@ -59,6 +61,17 @@ g95_advance_chain (tree t, int n)
       t = TREE_CHAIN (t);
     }
   return t;
+}
+
+/* Like chainon(list, listify(add)) except it ignores TREE_CHAIN(add).  */
+tree
+g95_chainon_list (tree list, tree add)
+{
+  tree l;
+
+  l = tree_cons (NULL_TREE, add, NULL_TREE);
+
+  return chainon (list, l);
 }
 
 /* Change the flags for the type of the node T to make it writable.  */
@@ -450,6 +463,23 @@ g95_add_stmt_to_list (tree * phead, tree * ptail, tree head, tree tail)
 
 }
 
+/* Get the current locus.  The structure may not be complete, and should only
+   be used with g95_set_current_locus.  */
+void
+g95_get_backend_locus (locus * loc)
+{
+  loc->line = lineno - 1;
+  loc->file = g95_current_backend_file;
+}
+
+/* Set the current locus.  */
+void
+g95_set_backend_locus (locus * loc)
+{
+  lineno = loc->line + 1;
+  g95_current_backend_file = loc->file;
+  input_filename = loc->file->filename;
+}
 
 /* Translate an executable statement.
    Returns NULL_TREE if there is no code to translate.  */
@@ -472,6 +502,7 @@ g95_trans_code (g95_code * code)
      the end of this g95_code branch.  */
   for ( ; code ; code = code->next)
     {
+      g95_set_backend_locus (&code->loc);
       if (code->here != 0)
         {
           res=g95_trans_label_here (code);
@@ -720,7 +751,7 @@ g95_create_module_variable (g95_symbol * sym)
   /* Don't generate variables from other modules.  */
   if (sym->attr.use_assoc)
     return;
-  
+
   if (sym->backend_decl)
     internal_error ("backend decl for module variable %s already exists");
 
@@ -751,7 +782,7 @@ g95_generate_module_code (g95_namespace * ns)
 
   module_namespace = ns;
   g95_traverse_ns (ns, g95_create_module_variable);
-  
+
   for (n = ns->contained ; n ; n = n->sibling)
     {
       g95_get_function_decl (n->proc_name);

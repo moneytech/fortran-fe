@@ -48,7 +48,7 @@ g95_build_string_const(int length, char *s)
 {
   tree str;
   tree len;
-  
+
   str = build_string (length, s);
   len = build_int_2 (length, 0);
   TREE_TYPE (str) =
@@ -147,7 +147,7 @@ g95_conv_constant (g95_se * se, g95_expr * expr)
 
     case BT_CHARACTER:
       se->expr = g95_build_string_const (expr->value.character.length,
-                              expr->value.character.string);
+                                        expr->value.character.string);
       se->string_length = TYPE_MAX_VALUE (TYPE_DOMAIN (TREE_TYPE (se->expr)));
       break;
 
