@@ -473,7 +473,7 @@ try t;
   tree = avl_create();
   overlap = 0;
  
-  for(body=code; body; body=body->block) {
+  for(body=code->block; body; body=body->block) {
     g95_resolve_code(body->next);
 
     if (t == FAILURE) continue;
