@@ -892,11 +892,6 @@ char c;
 g95_expr *g95_simplify_iand(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 
-  if ( y == NULL ) {
-    g95_error("Second argument of IAND missing at %L", &x->where);
-    return &g95_bad_expr;
-  }
-
   if (x->ts.kind != y->ts.kind) {
     g95_error("KIND of arguments of IAND at %L must agree", &x->where);
     return &g95_bad_expr;
@@ -920,17 +915,12 @@ g95_expr *result;
 
 
 g95_expr *g95_simplify_ibclr(g95_expr *x, g95_expr *y) {
-g95_expr *result;
+/*g95_expr *result; */
 
   return NULL; 
 
  /* Second argument must be nonnegative and less than bit_size(i) */
   /* Not done -- needs bit-size functions 
-
-  if ( y == NULL ) {
-    g95_error("Second argument of IBCLR missing at %L", &x->where);
-    return &g95_bad_expr;
-  }
 
   if (x->ts.kind != y->ts.kind) {
     g95_error("KIND of arguments of IBCLR at %L must agree", &x->where);
@@ -1034,14 +1024,8 @@ int index;
 }
 
 
-
 g95_expr *g95_simplify_ieor(g95_expr *x, g95_expr *y) {
 g95_expr *result;
-
-  if ( y == NULL ) {
-    g95_error("Second argument of IEOR missing at %L", &x->where);
-    return &g95_bad_expr;
-  }
 
   if (x->ts.kind != y->ts.kind) {
     g95_error("KIND of arguments of IEOR at %L must agree", &x->where);
@@ -1094,80 +1078,43 @@ g95_expr *arg1, *arg2, *arg3;
 }
 
 
-g95_expr *g95_simplify_int(g95_expr *e) {
-g95_expr *arg, *rmid, *rtrunc, *result;
-int knd;
+g95_expr *g95_simplify_int(g95_expr *e, g95_expr *k) {
+g95_expr *rpart, *rtrunc, *result;
+int kind;
 
-  return NULL; 
+  kind = get_kind(k, "INT", g95_default_real_kind()); 
+  if (kind == -1) return &g95_bad_expr;
 
-/* Result needs to have correct KIND */
-/* knd (optional) must be a valid integer kind */
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  arg = FIRST_ARG(e);
-
-  knd = g95_validate_kind(BT_REAL, arg->ts.type);
-
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  result = g95_copy_expr(arg);
-
-  switch ( arg->ts.type ) {
+  switch ( e->ts.type ) {
           case BT_INTEGER:
-	          break;
+  		result = g95_int2int(e, kind);
+		return result;
           case BT_REAL:
-		  rmid = g95_get_expr();
-                  mpf_init(rmid->value.real);
-                  mpf_trunc(rmid->value.real, arg->value.real);
-                  result = g95_real2int(rmid, g95_default_integer_kind());
-		  g95_free(rmid);
-                  if (result != NULL) {
-		    g95_replace_expr(e, result);
-		    //		    return SUCCESS;
-		  }
-                  else {
-                    g95_warning("Conversion in NINT at %L failed",
-	               	        &SECOND_ARG(e)->where);
-		    g95_free_expr(result);
-		    //                    return FAILURE;
-                  }
-	          break;
+                rtrunc = g95_copy_expr(e);
+		mpf_trunc(rtrunc->value.real, e->value.real);
+                result = g95_real2int(rtrunc, kind);
+                g95_free_expr(rtrunc);
+		return result;
           case BT_COMPLEX:
-	          rmid   = g95_get_expr();
-	          rtrunc = g95_get_expr();
-		  rmid = g95_complex2real(arg, g95_default_real_kind());
-		  mpf_init(rtrunc->value.real);
-	          mpf_trunc(rtrunc->value.real, rmid->value.real);
-                  result = g95_real2int(rtrunc, g95_default_integer_kind());
-		  g95_free_expr(rmid);
-		  g95_free_expr(rtrunc);
-                  if (result != NULL) {
-		    g95_replace_expr(e, result);
-		    //		    return SUCCESS;
-		  }
-                  else {
-                    g95_warning("Conversion in NINT at %L failed",
-	                	&SECOND_ARG(e)->where);
-		    g95_free_expr(result);
-		    //                    return FAILURE;
-		  }
-	          break;
+  		rpart = g95_complex2real(e, kind);
+                rtrunc = g95_copy_expr(rpart);
+		mpf_trunc(rtrunc->value.real, rpart->value.real);
+                result = g95_real2int(rtrunc, kind);
+                g95_free_expr(rtrunc);
+		return result;
 	  default:
-	          g95_warning("Argument of INT at %L is not a valid type",
-			      &FIRST_ARG(e)->where);
-		  //                  return FAILURE;
+	        g95_error("Argument of INT at %L is not a valid type",
+			      &e->where);
+		return &g95_bad_expr;
   }
 
-  //  return SUCCESS;
 }
 
 
 g95_expr *g95_simplify_ior(g95_expr *x, g95_expr *y) {
 g95_expr *result;
-
-  if ( y == NULL ) {
-    g95_error("Second argument of IEOR missing at %L", &x->where);
-    return &g95_bad_expr;
-  }
 
   if (x->ts.kind != y->ts.kind) {
     g95_error("KIND of arguments of IEOR at %L must agree", &x->where);

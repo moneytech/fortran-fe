@@ -58,7 +58,7 @@ g95_expr *g95_simplify_ibset(g95_expr *);
 g95_expr *g95_simplify_ichar(g95_expr *);
 g95_expr *g95_simplify_ieor(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_index(g95_expr *);
-g95_expr *g95_simplify_int(g95_expr *);
+g95_expr *g95_simplify_int(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_ior(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_ishft(g95_expr *);
 g95_expr *g95_simplify_ishftc(g95_expr *);
