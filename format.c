@@ -83,6 +83,8 @@ static format_token format_lex(void) {
 format_token token;
 char c, delim;
 int zflag;
+int savedmode;
+
 
   if (saved_token != 0) {
     token = saved_token;
@@ -181,13 +183,11 @@ int zflag;
     break;
 
   case '\'': case '"':
-    delim = c;
+    delim = c;      
+    savedmode = mode; /* we´re now inside a character constant, ignore !´s */
+    mode = MODE_STRING;
 
     for(;;) {
-    int savedmode;
-
-      savedmode = mode; /* we´re now inside a character constant, ignore !´s */
-      mode = MODE_STRING;
 
       c = next_char();
       if (c == '\0') {
@@ -209,9 +209,8 @@ int zflag;
 	  break;
 	}
       }
-      mode = savedmode;
     }
-
+    mode = savedmode;
     break;
 
   case 'P':
