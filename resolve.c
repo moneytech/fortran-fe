@@ -156,7 +156,7 @@ g95_array_spec *as;
 g95_ref *ref;
 try t;
 
-  as = expr->symbol->as;
+  as = (expr->symbol) ? expr->symbol->as : NULL; /* NULL for substrings */
   t = SUCCESS;
 
   for(ref=expr->ref; ref; ref=ref->next)
