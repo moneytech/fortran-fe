@@ -804,7 +804,7 @@ try g95_extend_expr(g95_expr *e) {
 g95_actual_arglist *actual;
 g95_symbol *ip, *sym;
 g95_namespace *ns;
-int i, sub_flag;
+int i;
 
   ip = sym = NULL;
 
@@ -817,7 +817,6 @@ int i, sub_flag;
   }
 
   i = e->operator;
-  sub_flag = 0;
 
   switch(i) {
   case INTRINSIC_UPLUS:   i = INTRINSIC_PLUS;     break;
@@ -834,7 +833,6 @@ int i, sub_flag;
   case INTRINSIC_USER:
     i = -1;
     ip = e->symbol;
-    sub_flag = 1;
     break;
 
   default:
@@ -842,10 +840,10 @@ int i, sub_flag;
   }
     
   if (i == -1)
-    sym = g95_search_interface(ip->operator, sub_flag, actual);
+    sym = g95_search_interface(ip->operator, 0, actual);
   else {
     for(ns=g95_current_ns; ns; ns=ns->parent) {
-      sym = g95_search_interface(ns->operator[i], sub_flag, actual);
+      sym = g95_search_interface(ns->operator[i], 0, actual);
       if (sym != NULL) break;
     }
   }
