@@ -585,6 +585,7 @@ const char *p;
   case ST_IF_BLOCK:       p = "block IF"; break;
   case ST_IMPLICIT:       p = "IMPLICIT"; break;
   case ST_IMPLICIT_NONE:  p = "IMPLICIT NONE"; break;
+  case ST_IMPLIED_ENDDO:  p = "implied END DO"; break;
   case ST_INQUIRE:        p = "INQUIRE"; break;
   case ST_INTERFACE:      p = "INTERFACE"; break;
   case ST_PARAMETER:      p = "PARAMETER"; break;
@@ -652,32 +653,31 @@ const char *p;
  * statement */
 
 static void accept_statement(g95_statement st) {
-
-  new_st.here = 0;
+g95_sl_type type;
 
   if (g95_statement_label != 0) {
     switch(st) {
-    case ST_ENDDO:    case ST_ENDIF:  case ST_END_SELECT:
+    case ST_ENDDO:  case ST_ENDIF:  case ST_END_SELECT:
     case_executable:
     case_exec_markers:
       new_st.here = g95_statement_label;
-      g95_define_st_label(g95_statement_label, &label_locus,
-                          g95_state_stack->this_block_no,ST_LABEL_TARGET);
+      type = ST_LABEL_TARGET;
       break;
 
     case ST_FORMAT:
       new_st.here = g95_statement_label;
-      g95_define_st_label(g95_statement_label, &label_locus,
-                          g95_state_stack->this_block_no,ST_LABEL_FORMAT);
+      type = ST_LABEL_FORMAT;
       break;
 
     default:
       g95_error("Statement label not allowed in %s statement at %C",
 		g95_ascii_statement(st));
-      g95_define_st_label(g95_statement_label, &label_locus,
-                          g95_state_stack->this_block_no,ST_LABEL_BAD_TARGET);
+      type = ST_LABEL_BAD_TARGET;
       break;
     }
+
+    g95_define_st_label(g95_statement_label, &label_locus,
+			g95_state_stack->this_block_no, type);
   }
 
   switch(st) {
@@ -1488,7 +1488,7 @@ g95_state_data *p;
 
 
 /* parse_do_block()-- Parse a DO loop.  Note that the ST_CYCLE and
- * ST_BLOCK statements are handled inside of parse_executable(),
+ * ST_EXIT statements are handled inside of parse_executable(),
  * because they aren't really loop statements. */
 
 static void parse_do_block(void) {
@@ -1518,7 +1518,6 @@ loop:
     /* fall throught */
 
   case ST_IMPLIED_ENDDO:
-    accept_statement(st);
     break;
 
   default:
@@ -1699,7 +1698,6 @@ int n;
     unexpected_eof();
 
   case ST_CONTAINS:
-    accept_statement(st);
     goto contains;
 
   case_end:
@@ -1719,7 +1717,6 @@ loop:
       unexpected_eof();
 
     case ST_CONTAINS:
-      accept_statement(st);
       goto contains;
   
     case_end:
@@ -1787,7 +1784,6 @@ loop:
     unexpected_eof();
 
   case ST_CONTAINS:
-    accept_statement(st);
     parse_contained(1);
     break;
 

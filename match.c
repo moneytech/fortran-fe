@@ -1001,6 +1001,7 @@ match m;
 
 done:
   new_st.label = label;
+  g95_reference_st_label(label, ST_LABEL_TARGET);
 
   if (new_st.op == EXEC_DO_WHILE)
     new_st.expr = iter.end;

@@ -1243,6 +1243,7 @@ g95_st_label *lp;
 
 int g95_new_internal_label() {
 static int next_label = 100000; /* only initialized at startup! */
+
   return next_label++;
 }
 
@@ -1262,26 +1263,35 @@ g95_st_label *lp;
     g95_error("Statement label %d at %C has already been defined at %L",
 	      label, &lp->where);
     return;
-  } else if (lp->defined == ST_LABEL_BAD_TARGET) {
-      g95_error("A bad definition of label %d at %C has already been rejected at %L",
-                label, &lp->where);
-      return;
+  }
+
+  if (lp->defined == ST_LABEL_BAD_TARGET) {
+    g95_error("A bad definition of label %d at %C has already been "
+	      "rejected at %L", label, &lp->where);
+    return;
   }
 
   lp->where = *label_locus;
   lp->block_no = block_no;
 
-  if (type == ST_LABEL_FORMAT) {
+  switch(type) {
+  case ST_LABEL_FORMAT:
     if (lp->referenced == ST_LABEL_TARGET) 
       g95_error("Label %d at %C already referenced as branch target", label);
     else
       lp->defined = ST_LABEL_FORMAT;
-  } else if (type == ST_LABEL_TARGET) {
+
+    break;
+
+  case ST_LABEL_TARGET:
     if (lp->referenced == ST_LABEL_FORMAT)
       g95_error("Label %d at %C already referenced as a format label", label);
     else
       lp->defined = ST_LABEL_TARGET;
-  } else {
+
+    break;
+
+  default:
     lp->defined = ST_LABEL_BAD_TARGET;
     lp->referenced = ST_LABEL_BAD_TARGET;
   }

@@ -1924,7 +1924,7 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("achar", 0, BT_CHARACTER, dc, g95_simplify_achar, NULL,
 	  i, BT_INTEGER, di, 0, NULL);
-  
+
   add_sym("acos",  0, BT_REAL, dr, g95_simplify_acos, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
@@ -2926,13 +2926,12 @@ try t;
   lib_name = NULL;
 
 /* Don't attempt to sort the argument list for min or max */
-  if ( strcmp(specific->name,"min")  ==0 || strcmp(specific->name,"max")  ==0||
-       strcmp(specific->name,"min0") ==0 || strcmp(specific->name,"max0") ==0||
-       strcmp(specific->name,"min1") ==0 || strcmp(specific->name,"max1") ==0||
-       strcmp(specific->name,"amin0")==0 || strcmp(specific->name,"amax0")==0||
-       strcmp(specific->name,"amin1")==0 || strcmp(specific->name,"amax1")==0) {
-    t=do_check(specific, *ap);
-    return t;
+  if (strcmp(specific->name,"min")  ==0 || strcmp(specific->name,"max")  ==0 ||
+      strcmp(specific->name,"min0") ==0 || strcmp(specific->name,"max0") ==0 ||
+      strcmp(specific->name,"min1") ==0 || strcmp(specific->name,"max1") ==0 ||
+      strcmp(specific->name,"amin0")==0 || strcmp(specific->name,"amax0")==0 ||
+      strcmp(specific->name,"amin1")==0 || strcmp(specific->name,"amax1")==0) {
+    return do_check(specific, *ap);
   } 
 
   if (sort_actual(specific->name, ap, specific->arg) == FAILURE)
@@ -2941,9 +2940,8 @@ try t;
   if (specific->check_function == NULL) {
     t = check_arglist(ap, specific);
     if (t == SUCCESS) expr->ts = specific->ts;
-  } 
-  else 
-  t = do_check(specific, *ap);
+  } else 
+    t = do_check(specific, *ap);
 
   return t;
 }

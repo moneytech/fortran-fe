@@ -390,8 +390,6 @@ g95_st_label *lp;
       break;
 
     case EXEC_DO:
-      g95_reference_st_label(code->label, ST_LABEL_TARGET);
-
       if (code->ext.iterator != NULL) g95_resolve_iterator(code->ext.iterator);
       break;
 
