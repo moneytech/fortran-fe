@@ -588,6 +588,30 @@ static try check_real(g95_expr *a, g95_expr *kind) {
 }
 
 
+static try check_reshape(g95_expr *source, g95_expr *shape,
+			 g95_expr *pad, g95_expr *order) {
+
+  if (source->as == NULL) return FAILURE;
+
+  if (shape->as == NULL) return FAILURE;
+
+  if (shape->ts.type != BT_INTEGER) return FAILURE;
+  if (shape->as->rank != 1) return FAILURE;
+
+  if (pad->as == NULL) return FAILURE;
+
+  if (pad != NULL) {
+    if (!g95_compare_types(&source->ts, &pad->ts)) return FAILURE;
+  }
+
+  if (order != NULL) {
+    if (order->as == NULL) return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
 static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
 
   if (p == NULL && r == NULL) return FAILURE;
@@ -627,6 +651,13 @@ static try check_sqrt(g95_expr *x) {
   return SUCCESS;
 }
 
+
+static try check_tiny(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL) return FAILURE;
+
+  return SUCCESS;
+}
 
 
 /* do_check()-- Interface to the check functions.  We break apart an
@@ -1240,7 +1271,7 @@ int di, dr, dd, dl, dc, dz;
 	  stg, BT_CHARACTER, dc, 0, n, BT_INTEGER, di, 0, NULL);
 
 /* KAH Takes any type array, integer arrays, returns array */
-  add_sym("reshape", 1, BT_REAL, dr, NULL, not_ready,
+  add_sym("reshape", 1, BT_REAL, dr, g95_simplify_reshape, check_reshape,
 	  src, BT_REAL, dr, 0, shp, BT_INTEGER, di, 0,
 	  pad, BT_REAL, dr, 1, ord, BT_INTEGER, di, 1, NULL);
 
@@ -1321,7 +1352,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dtanh", 1, BT_REAL, dd, NULL, NULL,  x, BT_REAL, dd, 0, NULL);
   make_generic("tanh");
 
-  add_sym("tiny", 0, BT_REAL, dr, g95_simplify_tiny, NULL,
+  add_sym("tiny", 0, BT_REAL, dr, g95_simplify_tiny, check_tiny,
 	  x, BT_REAL, dr, 0, NULL);
 
 /* KAH Array function */

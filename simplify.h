@@ -99,6 +99,7 @@ g95_expr *g95_simplify_radix(g95_expr *);
 g95_expr *g95_simplify_range(g95_expr *);
 g95_expr *g95_simplify_real(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_repeat(g95_expr *, g95_expr *);
+g95_expr *g95_simplify_reshape(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 g95_expr *g95_simplify_rrspacing(g95_expr *);
 g95_expr *g95_simplify_scale(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_scan(g95_expr *, g95_expr *, g95_expr *);

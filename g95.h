@@ -828,7 +828,7 @@ typedef struct g95_constructor {
   g95_expr *expr;
   g95_iterator *iterator;
   locus where;
-  struct g95_constructor *next, *child;
+  struct g95_constructor *next;
 } g95_constructor;
 
 #define g95_get_constructor() g95_getmem(sizeof(g95_constructor))
@@ -1252,8 +1252,7 @@ try g95_check_constructor_type(g95_expr *);
 try g95_check_iter_variable(g95_expr *);
 try g95_check_constructor(g95_expr *, int, try (*)(g95_expr *));
 g95_constructor *g95_copy_constructor(g95_constructor *src);
-
-
+g95_expr *g95_get_array_element(g95_expr *, int);
 
 /* interface.c */
 

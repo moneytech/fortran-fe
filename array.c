@@ -761,10 +761,9 @@ g95_constructor *next;
 
   if (p == NULL) return;
 
-  for(;p ;p=next) {
+  for(; p; p=next) {
     next = p->next;
 
-    g95_free_constructor(p->child);
     g95_free_expr(p->expr);
     if (p->iterator != NULL) g95_free_iterator(p->iterator, 1);
     g95_free(p);
@@ -772,20 +771,25 @@ g95_constructor *next;
 }
 
 
-/* check_iterators()-- Given a constructor node and a symbol, make
- * sure than no iterators in this or child constructors use the symbol
- * as an implied-DO iterator.  Returns nonzero if a duplicate was found. */
+/* check_iterators()-- Given an expression node that might be an array
+ * constructor and a symbol, make sure than no iterators in this or
+ * child constructors use the symbol as an implied-DO iterator.
+ * Returns nonzero if a duplicate was found. */
 
-static int check_duplicate_iterator(g95_constructor *cons,
-				    g95_symbol *master) {
+static int check_duplicate_iterator(g95_constructor *c, g95_symbol *master) {
+g95_expr *e;
 
-  for(; cons; cons=cons->next) {
-    if (check_duplicate_iterator(cons->child, master)) return 1;
-    if (cons->iterator == NULL) continue;
+  for(; c; c=c->next) {
+    e = c->expr;
 
-    if (cons->iterator->var->symbol == master) {
+    if (e->expr_type == EXPR_ARRAY &&
+	check_duplicate_iterator(e->value.constructor, master)) return 1;
+
+    if (c->iterator == NULL) continue;
+
+    if (c->iterator->var->symbol == master) {
       g95_error("DO-iterator '%s' at %L is inside iterator of the same name",
-		master->name, &cons->where);
+		master->name, &c->where);
 
       return 1;
     }
@@ -803,6 +807,7 @@ static match match_array_list(g95_constructor **result) {
 g95_constructor *p, *head, *tail, *new;
 g95_iterator iter;
 locus old_loc;
+g95_expr *e;
 match m;
 
   old_loc = *g95_current_locus();
@@ -844,12 +849,18 @@ match m;
 
   if (check_duplicate_iterator(head, iter.var->symbol)) goto cleanup;
 
+  e = g95_get_expr();
+  e->expr_type = EXPR_ARRAY;
+  e->where = old_loc;
+  e->value.constructor = head;
+  size_constructor(e);
+
   p = g95_get_constructor();
   p->where = *g95_current_locus();
   p->iterator = g95_get_iterator();
   *p->iterator = iter;
 
-  p->child = head;
+  p->expr = e;
   *result = p;
 
   return MATCH_YES;
@@ -1006,12 +1017,19 @@ static int check_element_type(g95_expr *expr) {
  * g95_check_constructor_type(). */
 
 static try check_constructor_type(g95_constructor *c) {
+g95_expr *e;
 
   for(; c; c=c->next) {
-    if (c->expr != NULL && check_element_type(c->expr) == FAILURE)
-      return FAILURE;
+    e = c->expr;
 
-    if (check_constructor_type(c->child) == FAILURE) return FAILURE;
+    if (e->expr_type == EXPR_ARRAY) {
+      if (check_constructor_type(e->value.constructor) == FAILURE)
+	return FAILURE;
+
+      continue;
+    }
+
+    if (check_element_type(e) == FAILURE) return FAILURE;
   }
 
   return SUCCESS;
@@ -1070,22 +1088,25 @@ cons_stack *c;
  * function for each expression in the constructor, giving variables
  * with the names of iterators a pass.  */
 
-static try check_constructor(g95_constructor *cons,
+static try check_constructor(g95_constructor *c,
 			     match (*check_function)(g95_expr *)) {
 cons_stack element;
+g95_expr *e;
 try t;
 
-  for(; cons; cons=cons->next) {
-    if (cons->expr != NULL &&
-	(*check_function)(cons->expr) == FAILURE) return FAILURE;
+  for(; c; c=c->next) {
+    e = c->expr;
 
-    if (cons->iterator == NULL) continue;
+    if (e->expr_type != EXPR_ARRAY) {
+      if ((*check_function)(e) == FAILURE) return FAILURE;
+      continue;
+    }
 
     element.previous = base;
-    element.iterator = cons->iterator;
+    element.iterator = c->iterator;
 
     base = &element;
-    t = check_constructor(cons->child, check_function);
+    t = check_constructor(e->value.constructor, check_function);
     base = element.previous;
 
     if (t == FAILURE) return FAILURE;
@@ -1209,7 +1230,8 @@ try t;
   iter_stack = &frame;
 
   while(mpz_sgn(trip) > 0) {
-    if (expand_constructor(c->child) == FAILURE) goto cleanup;
+    if (expand_constructor(c->expr->value.constructor) == FAILURE)
+      goto cleanup;
 
     mpz_add(frame.value, frame.value, step->value.integer);
     mpz_sub_ui(trip, trip, 1);
@@ -1235,6 +1257,7 @@ cleanup:
  * constructors without any iterators. */
 
 static try expand_constructor(g95_constructor *c) {
+g95_expr *e;
 
   for(; c; c=c->next) {
     if (c->iterator != NULL) {
@@ -1242,27 +1265,25 @@ static try expand_constructor(g95_constructor *c) {
       continue;
     }
 
-    if (c->child != NULL) {
-      if (expand_constructor(c->child) == FAILURE) return FAILURE;
+    e = c->expr;
+
+    if (e->expr_type == EXPR_ARRAY) {
+      if (expand_constructor(e->value.constructor) == FAILURE) return FAILURE;
       continue;
     }
 
-    if (c->expr != NULL) {
-      if (new_head == NULL)
-	new_head = new_tail = g95_get_constructor();
-      else {
-	new_tail->next = g95_get_constructor();
-	new_tail = new_tail->next;
-      }
-
-      new_tail->where = c->where;
-      new_tail->expr = g95_copy_expr(c->expr);
-
-      if (g95_simplify_expr(new_tail->expr, 1) == FAILURE) return FAILURE;
-      continue;
+    if (new_head == NULL)
+      new_head = new_tail = g95_get_constructor();
+    else {
+      new_tail->next = g95_get_constructor();
+      new_tail = new_tail->next;
     }
 
-    g95_internal_error("expand_constructor(): Bad constructor node");
+    new_tail->where = c->where;
+    new_tail->expr = g95_copy_expr(e);
+
+    if (g95_simplify_expr(new_tail->expr, 1) == FAILURE) return FAILURE;
+    continue;
   }
 
   return SUCCESS;
@@ -1299,19 +1320,13 @@ try g95_expand_constructor(g95_expr *e) {
 static try resolve_array_list(g95_constructor *p) {
 try t;
 
+  t = SUCCESS;
+
   for(;p ;p=p->next) {
-
-    if (p->child != NULL) {
-      if (resolve_array_list(p->child) == FAILURE) t = FAILURE;
-      if (g95_resolve_iterator(p->iterator) == FAILURE) t = FAILURE;
-    }
-
-    if (p->expr == NULL) continue;
-
-    if (g95_resolve_expr(p->expr) == FAILURE) {
+    if (p->iterator != NULL && g95_resolve_iterator(p->iterator) == FAILURE)
       t = FAILURE;
-      continue;
-    }
+
+    if (g95_resolve_expr(p->expr) == FAILURE) t = FAILURE;
   }
 
   return t;
@@ -1362,8 +1377,52 @@ g95_constructor *dest;
   dest->iterator = copy_iterator(src->iterator);
 
   dest->next = g95_copy_constructor(src->next);
-  dest->child = g95_copy_constructor(dest->child);
 
   return dest;
+}
+
+
+/* get_element()-- Recursive work function for g95_get_array_element(). */
+
+g95_expr *get_element(g95_constructor *c, int *element) {
+g95_expr *e;
+
+  for(;; c=c->next) {
+    if (c == NULL) return NULL;
+
+    if (c->iterator)
+      g95_internal_error("get_element(): Can't deal with iterators");
+
+    e = c->expr;
+
+    if (e->expr_type == EXPR_ARRAY) {
+      e = get_element(e->value.constructor, element);
+      if (e != NULL) break;
+
+      continue;
+    }
+
+    if (*element == 0) {
+      e = c->expr;
+      break;
+    }
+
+    (*element)--;
+  }
+
+  return e;
+}
+
+
+/* g95_get_array_element()-- Given an array expression and an element
+ * number (starting at zero), return a pointer to the array element.
+ * NULL is returned if the size of the array has been exceeded.  The
+ * expression node returned remains a part of the array and should not
+ * be freed.  Access is not efficient at all, but this is another
+ * place where things do not have to be particularly fast. */
+
+g95_expr *g95_get_array_element(g95_expr *array, int element) {
+
+  return get_element(array->value.constructor, &element);
 }
 

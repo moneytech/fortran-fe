@@ -587,8 +587,6 @@ static int is_constant_constructor(g95_constructor *c) {
   for(; c; c=c->next) {
     if (!is_constant_expr(c->expr)) return 0;
 
-    if (!is_constant_constructor(c->child)) return 0;
-    
     if (c->iterator != NULL) {
       if (!is_constant_expr(c->iterator->start)) return 0;
       if (!is_constant_expr(c->iterator->end))   return 0;
@@ -754,9 +752,6 @@ static try simplify_constructor(g95_constructor *c, int type) {
 	(g95_simplify_expr(c->iterator->start, type) == FAILURE ||
 	 g95_simplify_expr(c->iterator->end, type) == FAILURE ||
 	 g95_simplify_expr(c->iterator->step, type) == FAILURE))
-      return FAILURE;
-
-    if (c->child && simplify_constructor(c->child, type) == FAILURE)
       return FAILURE;
 
     if (c->expr && g95_simplify_expr(c->expr, type) == FAILURE) return FAILURE;
@@ -1615,11 +1610,11 @@ static void show_ref(g95_ref *p) {
 static void show_constructor(g95_constructor *c) {
 
   for(;c ;c=c->next) {
-    if (c->child == NULL)
+    if (c->iterator == NULL)
       g95_show_expr(c->expr);
     else {
-      g95_status("( ");
-      show_constructor(c->child);
+      g95_status_char('(');
+      g95_show_expr(c->expr);
 
       g95_status_char(' ');
       g95_show_expr(c->iterator->var);
@@ -1630,7 +1625,7 @@ static void show_constructor(g95_constructor *c) {
       g95_status_char(',');
       g95_show_expr(c->iterator->step);
 
-      g95_status(" )");
+      g95_status_char(')');
     }
 
     if (c->next != NULL) g95_status(" , ");

@@ -2549,6 +2549,22 @@ int i, j, len, ncopies, nlen;
 }
 
 
+/* simplify_reshape()-- This one is a bear, but mainly has to do with
+ * shuffling elements. */
+
+g95_expr *g95_simplify_reshape(g95_expr *source, g95_expr *shape,
+			       g95_expr *pad, g95_expr *order) {
+
+int rank, i_order[G95_MAX_DIMENSIONS], i_shape[G95_MAX_DIMENSIONS];
+g95_expr *e;
+
+
+
+
+  return NULL; 
+}
+
+
 g95_expr *g95_simplify_rrspacing(g95_expr *x) {
 g95_expr *result;
 mpf_t i2, absv, ln2, lnx, frac, pow2;

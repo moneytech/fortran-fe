@@ -1115,7 +1115,6 @@ g95_constructor *c, *tail;
       mio_lparen();
       mio_expr(&c->expr);
       mio_iterator(&c->iterator);
-      mio_constructor(&c->child);
       mio_rparen();
     }
   } else {
@@ -1136,7 +1135,6 @@ g95_constructor *c, *tail;
       mio_lparen();
       mio_expr(&c->expr);
       mio_iterator(&c->iterator);
-      mio_constructor(&c->child);
       mio_rparen();
     }
   }
