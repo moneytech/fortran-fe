@@ -704,7 +704,7 @@ static void accept_statement(g95_statement st) {
     g95_set_implicit();
     break;
 
-  case ST_FUNCTION: case ST_SUBROUTINE:
+  case ST_FUNCTION: case ST_SUBROUTINE: case ST_MODULE:
     g95_current_ns->proc_name = g95_new_block;
     break;
 

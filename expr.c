@@ -1122,6 +1122,58 @@ try t;
 }
 
 
+/* namespace_kind()-- Given a namespace, figure out what kind it is.
+ * We return one of the g95_compile_state enums COMP_NONE,
+ * COMP_MODULE, COMP_SUBROUTINE or COMP_FUNCTION. */
+
+static g95_compile_state namespace_kind(g95_namespace *ns) {
+g95_symbol *sym;
+
+  sym = ns->proc_name;
+
+  if (sym == NULL) return COMP_NONE;
+
+  if (sym->attr.flavor == FL_MODULE) return COMP_MODULE;
+
+  if (sym->attr.subroutine) return COMP_SUBROUTINE;
+
+  if (sym->attr.flavor == FL_VARIABLE ||
+      sym->attr.function) return COMP_FUNCTION;
+
+  return COMP_NONE;
+}
+
+
+/* g95_resolve_modproc()-- Resolve module procedure types.  Because
+ * module procedures can call one another, function types have to be
+ * worked out before any of the contained procedures can be resolved.
+ * If a function in a module procedure doesn't already have a type,
+ * the only way it can get one is through an IMPLICIT. */
+
+void g95_resolve_modproc(g95_namespace *ns) {
+g95_symbol *sym_upper, *sym_lower;
+g95_namespace *child;
+
+  if (namespace_kind(ns) != COMP_MODULE) return;
+
+  for(child=ns->contained; child; child=child->sibling) {
+    if (namespace_kind(child) != COMP_FUNCTION) continue;
+
+    sym_lower = child->proc_name;
+
+    g95_find_symbol(sym_lower->name, ns, 0, &sym_upper);
+
+    if (sym_upper == NULL)
+      g95_internal_error("g95_resolve_modproc(): Module procedure not found");
+
+    if (sym_lower->ts.type == BT_UNKNOWN)
+      g95_set_default_type(sym_lower, 1, child);
+
+    sym_upper->ts = sym_lower->ts;
+  }
+}
+
+
 /* resolve_ref()-- Resolve subtype references */
 
 static try resolve_ref(g95_expr *expr) {

@@ -340,16 +340,12 @@ g95_symbol *s1, *s2;
  * makes sense.  Depending on the type of interface this can mean
  * several things.  No checking is required for a nameless interface.
  * For a generic interface, the interface must be unique within the
- * block.  For an intrinsic operator interface, the interface must not
- * conflict with the intrinsic operator itself and must have the
- * correct number of arguments.  The 'base' pointer points to the
- * first symbol node in the list of operators (which might be NULL) */
+ * block.  Intrinsic operator interfaces are checked during the
+ * resolution phase in greater detail.  The 'base' pointer points to
+ * the first symbol node in the list of operators (which might be NULL) */
 
 try g95_check_interface(g95_interface *base, g95_symbol *new) {
-g95_formal_arglist *p, *arg1, *arg2;
 g95_interface *ip;
-bt t1, t2;
-int args;
 
   for(ip=base; ip; ip=ip->next) {
     if (ip->sym == new) {
@@ -368,109 +364,146 @@ int args;
     }
   }
 
+  return SUCCESS;
+}
+
+
+
+/* check_operator_interface()-- Given a namespace and an operator,
+ * make sure that all interfaces for that operator are legal. */
+
+static void check_operator_interface(g95_interface *intr, int operator) {
+g95_formal_arglist *formal;
+sym_intent i1, i2;
+g95_symbol *sym;
+bt t1, t2;
+int args;
+
   args = 0;
   t1 = BT_UNKNOWN;
   t2 = BT_UNKNOWN;
 
-  for(p=new->formal; p; p=p->next) {
-    if (args == 0) { arg1 = p;  t1 = p->sym->ts.type; }
-    if (args == 1) { arg2 = p;  t2 = p->sym->ts.type; }
+  for(formal=intr->sym->formal; formal; formal=formal->next) {
+    sym = formal->sym;
 
+    if (args == 0) { t1 = sym->ts.type; i1 = sym->attr.intent; }
+    if (args == 1) { t2 = sym->ts.type; i2 = sym->attr.intent; }
     args++;
   }
 
-/* All kinds of checking needs to be done on intrinsic operator interfaces */
+  if (args == 0 || args > 2) goto num_args;
 
-  if (current_interface.type == INTERFACE_INTRINSIC_OP) {
+  sym = intr->sym;
 
-    if (current_interface.op == INTRINSIC_ASSIGN) {
-      if (!new->attr.subroutine) {
-	g95_error("Assignment operator interface at %C must be a SUBROUTINE");
-	return FAILURE;
-      }
-    } else {
-      if (!new->attr.function) {
-	g95_error("Intrinsic operator interface at %C must be a FUNCTION");
-	return FAILURE;
-      }
+  if (operator == INTRINSIC_ASSIGN) {
+    if (!sym->attr.subroutine) {
+      g95_error("Assignment operator interface at %L must be a SUBROUTINE",
+		&intr->where);
+      return;
     }
-
-    if (args == 0 || args > 2) goto num_args;
-
-    switch(current_interface.op) {
-    case INTRINSIC_PLUS:     /* Numeric unary or binary */
-    case INTRINSIC_MINUS: 
-      if ((args == 1) &&
-	  (t1 == BT_INTEGER || t1 == BT_REAL || t1 == BT_COMPLEX))
-	goto bad_repl;
-
-      if ((args == 2) &&
-	  (t1 == BT_INTEGER || t1 == BT_REAL || t1 == BT_COMPLEX) &&
-	  (t2 == BT_INTEGER || t2 == BT_REAL || t2 == BT_COMPLEX))
-	goto bad_repl;
-
-      break;
-
-    case INTRINSIC_POWER:    /* Binary numeric */
-    case INTRINSIC_TIMES:
-    case INTRINSIC_DIVIDE:
-
-    case INTRINSIC_EQ:
-    case INTRINSIC_NE:
-      if (args == 1) goto num_args;
-
-      if ((t1 == BT_INTEGER || t1 == BT_REAL || t1 == BT_COMPLEX) &&
-	  (t2 == BT_INTEGER || t2 == BT_REAL || t2 == BT_COMPLEX))
-	goto bad_repl;
-
-      break;
-
-    case INTRINSIC_GE:  /* Binary numeric operators that do not support */
-    case INTRINSIC_LE:  /* complex numbers */
-    case INTRINSIC_LT:
-    case INTRINSIC_GT:
-      if (args == 1) goto num_args;
-
-      if ((t1 == BT_INTEGER || t1 == BT_REAL) &&
-	  (t2 == BT_INTEGER || t2 == BT_REAL)) goto bad_repl;
-
-      break;
-
-    case INTRINSIC_OR:       /* Binary logical */
-    case INTRINSIC_AND:
-    case INTRINSIC_EQV:
-    case INTRINSIC_NEQV:
-      if (args == 1) goto num_args;
-      if (t1 == BT_LOGICAL && t2 == BT_LOGICAL) goto bad_repl;
-      break;
-
-    case INTRINSIC_NOT:      /* Unary logical */
-      if (args != 1) goto num_args;
-      if (t1 == BT_LOGICAL) goto bad_repl;
-      break;
-
-    case INTRINSIC_CONCAT:   /* Binary string */
-      if (args != 2) goto num_args;
-      if (t1 == BT_CHARACTER) goto bad_repl;
-      break;
-
-    case INTRINSIC_ASSIGN:   /* Class by itself */
-      if (args != 2) goto num_args;
-      break;
+  } else {
+    if (!sym->attr.function) {
+      g95_error("Intrinsic operator interface at %L must be a FUNCTION",
+		&intr->where);
+      return;
     }
-
-    return SUCCESS;
-
-  bad_repl:
-    g95_error("Operator interface at %C conflicts with intrinsic interface");
-    return FAILURE;
-
-  num_args:
-    g95_error("Operator interface at %C has the wrong number of arguments");
-    return FAILURE;
   }
 
-  return SUCCESS;
+  switch(operator) {
+  case INTRINSIC_PLUS:     /* Numeric unary or binary */
+  case INTRINSIC_MINUS: 
+    if ((args == 1) &&
+	(t1 == BT_INTEGER || t1 == BT_REAL || t1 == BT_COMPLEX))
+      goto bad_repl;
+
+    if ((args == 2) &&
+	(t1 == BT_INTEGER || t1 == BT_REAL || t1 == BT_COMPLEX) &&
+	(t2 == BT_INTEGER || t2 == BT_REAL || t2 == BT_COMPLEX))
+      goto bad_repl;
+
+    break;
+
+  case INTRINSIC_POWER:    /* Binary numeric */
+  case INTRINSIC_TIMES:
+  case INTRINSIC_DIVIDE:
+
+  case INTRINSIC_EQ:
+  case INTRINSIC_NE:
+    if (args == 1) goto num_args;
+
+    if ((t1 == BT_INTEGER || t1 == BT_REAL || t1 == BT_COMPLEX) &&
+	(t2 == BT_INTEGER || t2 == BT_REAL || t2 == BT_COMPLEX))
+      goto bad_repl;
+
+    break;
+
+  case INTRINSIC_GE:  /* Binary numeric operators that do not support */
+  case INTRINSIC_LE:  /* complex numbers */
+  case INTRINSIC_LT:
+  case INTRINSIC_GT:
+    if (args == 1) goto num_args;
+
+    if ((t1 == BT_INTEGER || t1 == BT_REAL) &&
+	(t2 == BT_INTEGER || t2 == BT_REAL)) goto bad_repl;
+
+    break;
+
+  case INTRINSIC_OR:       /* Binary logical */
+  case INTRINSIC_AND:
+  case INTRINSIC_EQV:
+  case INTRINSIC_NEQV:
+    if (args == 1) goto num_args;
+    if (t1 == BT_LOGICAL && t2 == BT_LOGICAL) goto bad_repl;
+    break;
+
+  case INTRINSIC_NOT:      /* Unary logical */
+    if (args != 1) goto num_args;
+    if (t1 == BT_LOGICAL) goto bad_repl;
+    break;
+
+  case INTRINSIC_CONCAT:   /* Binary string */
+    if (args != 2) goto num_args;
+    if (t1 == BT_CHARACTER) goto bad_repl;
+    break;
+
+  case INTRINSIC_ASSIGN:   /* Class by itself */
+    if (args != 2) goto num_args;
+    break;
+  }
+
+  if (i1 != INTENT_IN)
+    g95_error("First argument of operator interface at %L must be INTENT(IN)",
+	      &intr->where);
+
+  if (operator != INTRINSIC_ASSIGN && args == 2 && i2 != INTENT_IN)
+    g95_error("Second argument of operator interface at %L must be INTENT(IN)",
+	      &intr->where);
+
+  return;
+
+ bad_repl:
+  g95_error("Operator interface at %L conflicts with intrinsic interface",
+	    &intr->where);
+  return;
+
+ num_args:
+  g95_error("Operator interface at %L has the wrong number of arguments",
+	    &intr->where);
+  return;
+}
+
+
+/* g95_check_operator_interfaces()-- Given a namespace, make sure all
+ * of it's operator interfaces are legal. */
+
+void g95_check_operator_interfaces(g95_namespace *ns) {
+g95_interface *intr;
+int op;
+
+  for(op=0; op < G95_INTRINSIC_OPS; op++) {
+    for(intr=ns->operator[op]; intr; intr=intr->next)
+      check_operator_interface(intr, op);
+  }
 }
 
 
@@ -592,12 +625,12 @@ int i;
 
 /* g95_add_interface()-- Add a symbol to the current interface */
 
-void g95_add_interface(g95_symbol *new) {
+try g95_add_interface(g95_symbol *new) {
 g95_interface **head, *intr;
 
   switch(current_interface.type) {
   case INTERFACE_NAMELESS:
-    return;
+    return SUCCESS;
 
   case INTERFACE_INTRINSIC_OP:
     head = &current_interface.ns->operator[current_interface.op];
@@ -615,13 +648,16 @@ g95_interface **head, *intr;
     g95_internal_error("g95_add_interface(): Bad interface type");
   }
 
-  if (g95_check_interface(*head, new) == SUCCESS) {
-    intr = g95_get_interface();
-    intr->sym = new;
+  if (g95_check_interface(*head, new) == FAILURE) return FAILURE;
 
-    intr->next = *head;
-    *head = intr;
-  }
+  intr = g95_get_interface();
+  intr->sym = new;
+  intr->where = *g95_current_locus();
+
+  intr->next = *head;
+  *head = intr;
+
+  return SUCCESS;
 }
 
 

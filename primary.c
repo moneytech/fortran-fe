@@ -1604,7 +1604,7 @@ match m;
       }
 
       if (sym->ts.type == BT_UNKNOWN &&
-	  g95_set_default_type(sym, 1) == FAILURE) {
+	  g95_set_default_type(sym, 1, NULL) == FAILURE) {
 	m = MATCH_ERROR;
 	break;
       }
@@ -1632,7 +1632,7 @@ match m;
       }
 
       if (sym->ts.type == BT_UNKNOWN &&
-	  g95_set_default_type(sym, 1) == FAILURE) {
+	  g95_set_default_type(sym, 1, NULL) == FAILURE) {
 	m = MATCH_ERROR;
 	break;
       }

@@ -254,12 +254,14 @@ int i;
  * according to the first letter of its name.  Fails if the letter in
  * question has no default type. */
 
-try g95_set_default_type(g95_symbol *sym, int error_flag) {
+try g95_set_default_type(g95_symbol *sym, int error_flag, g95_namespace *ns) {
 int i;
 
   i = sym->name[0] - 'a';
 
-  if (g95_current_ns->default_type[i].type == BT_UNKNOWN) {
+  if (ns == NULL) ns = g95_current_ns;
+
+  if (ns->default_type[i].type == BT_UNKNOWN) {
     if (error_flag)
       g95_error("Symbol '%s' at %C has no IMPLICIT type", sym->name);
 
@@ -269,7 +271,7 @@ int i;
   if (sym->ts.type != BT_UNKNOWN)
     g95_internal_error("g95_set_default_type(): symbol already has a type");
 
-  sym->ts = g95_current_ns->default_type[i];
+  sym->ts = ns->default_type[i];
   sym->attr.implicit_type = 1;
 
   return SUCCESS;
@@ -288,7 +290,7 @@ g95_symbol *sym;
   sym = lvalue->symbol; 
 
   if (sym->ts.type == BT_UNKNOWN) {
-    if (g95_set_default_type(sym, 0) == FAILURE) return FAILURE;
+    if (g95_set_default_type(sym, 0, NULL) == FAILURE) return FAILURE;
     lvalue->ts = sym->ts;
   }
 
@@ -2225,7 +2227,7 @@ static void set_sym_defaults(g95_symbol *sym) {
   if (sym->ts.type != BT_UNKNOWN) return;
 
   if (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER)
-    g95_set_default_type(sym, 0);
+    g95_set_default_type(sym, 0, NULL);
 }
 
 

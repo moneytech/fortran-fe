@@ -511,6 +511,10 @@ g95_charlen *cl;
 
   old_ns = g95_current_ns;
 
+  g95_check_operator_interfaces(ns);
+
+  g95_resolve_modproc(ns);
+
   for(n=ns->contained; n; n=n->sibling) {
     g95_current_ns = n;
     g95_resolve(n);
@@ -522,7 +526,7 @@ g95_charlen *cl;
 
   g95_set_sym_defaults(ns);
 
-  g95_resolve_code(ns->code,ns);
+  g95_resolve_code(ns->code, ns);
 
   for(cl=ns->cl_list; cl; cl=cl->next) {
     if (cl->length == NULL || g95_resolve_expr(cl->length) == FAILURE)
@@ -735,13 +739,14 @@ g95_dt *dt;
     
   case EXEC_DO:
     g95_status("DO ");
-    g95_show_expr(((g95_iterator *) (c->ext.forall_iterator))->var);
+
+    g95_show_expr(c->ext.iterator->var);
     g95_status_char('=');
-    g95_show_expr(((g95_iterator *) (c->ext.forall_iterator))->start);
+    g95_show_expr(c->ext.iterator->start);
     g95_status_char(' ');
-    g95_show_expr(((g95_iterator *) (c->ext.forall_iterator))->end);
+    g95_show_expr(c->ext.iterator->end);
     g95_status_char(' ');
-    g95_show_expr(((g95_iterator *) (c->ext.forall_iterator))->step);
+    g95_show_expr(c->ext.iterator->step);
     g95_status_char('\n');
 
     g95_show_code(level+1, c->block->next);

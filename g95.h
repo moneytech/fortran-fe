@@ -1062,7 +1062,7 @@ match g95_match_implicit_none(void);
 void g95_set_implicit_none(void);
 match g95_match_implicit(void);
 void g95_set_implicit(void);
-try g95_set_default_type(g95_symbol *, int);
+try g95_set_default_type(g95_symbol *, int, g95_namespace *);
 try g95_check_assign(g95_expr *, g95_expr *);
 try g95_check_pointer_assign(g95_expr *, g95_expr *);
 try g95_check_assign_symbol(g95_symbol *, g95_expr *);
@@ -1268,6 +1268,7 @@ g95_expr *g95_build_funcall(g95_symbol *func, ...);
 void g95_free_ref_list(g95_ref *);
 void g95_type_convert_binary(g95_expr *);
 try g95_simplify_expr(g95_expr *, int);
+void g95_resolve_modproc(g95_namespace *);
 try g95_resolve_expr(g95_expr *);
 void g95_expr_init_1(void);
 
@@ -1337,13 +1338,14 @@ match g95_match_generic_spec(interface_type *, char *, int *);
 match g95_match_interface(void);
 match g95_match_end_interface(void);
 void g95_start_interface(void);
+void g95_check_operator_interfaces(g95_namespace *);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
 int g95_compare_types(g95_typespec *, g95_typespec *);
 try g95_check_interface(g95_interface *, g95_symbol *);
 g95_symbol *g95_search_interface(g95_interface *, g95_actual_arglist *);
 try g95_extend_expr(g95_expr *);
 void g95_free_formal_arglist(g95_formal_arglist *);
-void g95_add_interface(g95_symbol *sym);
+try g95_add_interface(g95_symbol *sym);
 try g95_parent_procedure(g95_symbol *sym, int);
 
 /* select.c */

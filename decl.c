@@ -1947,7 +1947,7 @@ match m;
 	g95_add_procedure(&sym->attr, PROC_MODULE, NULL) == FAILURE)
       return MATCH_ERROR;
 
-    g95_add_interface(sym);
+    if (g95_add_interface(sym) == FAILURE) return MATCH_ERROR;
 
     if (g95_match_eos() == MATCH_YES) break;
     if (g95_match(" ,") != MATCH_YES) goto syntax;
