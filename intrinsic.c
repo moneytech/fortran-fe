@@ -1622,10 +1622,14 @@ try t;
 
 match g95_intrinsic_func_interface(g95_expr *expr, int intrinsic_flag) {
 intrinsic_sym *isym, *specific;
+char *name;
 
   is_intrinsic = intrinsic_flag;
 
-  isym = find_function(expr->symbol->name);
+  name = expr->value.function.name;
+  if (name == NULL) name = expr->symbol->name;
+
+  isym = find_function(name);
   if (isym == NULL) return MATCH_NO;
 
 /* If the function is generic, check all of its specific incarnations.
