@@ -58,6 +58,9 @@ typedef struct g95_se
   /* An array function call returning without a temporary.  */
   unsigned direct_byref:1;
 
+  /* Ignore absent optional arguments.  Used for some intrinsics.  */
+  unsigned ignore_optional:1;
+
   /* Scalarization parameters.  */
   struct g95_se *parent;
   struct g95_ss *ss;

@@ -1042,15 +1042,26 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
       if (arg->expr == NULL)
         {
 
-          /* We don't do alternate returns or optional parameters.
-             The correct intrinsic will already have been chosen.  */
-          if (sym->attr.proc == PROC_INTRINSIC)
-            continue;
+          if (se->ignore_optional)
+            {
+              /* Some intrinsics have already been resolved to the correct
+                 parameters.  */
+              continue;
+            }
+          else if (arg->label)
+            {
+              /* We don't do alternate returns yet.  */
+              abort ();
+            }
           else
-            abort ();
+            {
+              /* Pass a NULL pointer for an absent arg.  */
+              g95_init_se (&parmse, NULL);
+              parmse.expr = null_pointer_node;
+              /* TODO: passing optional character type parameters.  */
+            }
         }
-
-      if (se->ss && se->ss->useflags)
+      else if (se->ss && se->ss->useflags)
         {
           g95_init_se (&parmse, se);
 

@@ -1678,6 +1678,7 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 {
   g95_intrinsic_sym *isym;
   char *name;
+  int lib;
 
   isym = expr->value.function.isym;
 
@@ -1691,14 +1692,18 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
       return;
     }
 
-  assert (strncmp (expr->value.function.name, "__", 2) == 0);
   name = &expr->value.function.name[2];
 
-  if (expr->rank > 0
-      && g95_is_intrinsic_libcall (expr))
+  if (expr->rank > 0)
     {
-      g95_conv_intrinsic_funcall (se, expr);
-      return;
+      lib = g95_is_intrinsic_libcall (expr);
+      if (lib != 0)
+        {
+          if (lib == 1)
+            se->ignore_optional = 1;
+          g95_conv_intrinsic_funcall (se, expr);
+          return;
+        }
     }
 
   switch (expr->value.function.isym->generic_id)
@@ -1710,9 +1715,7 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_ANINIT:
     case G95_ISYM_ASSOCIATED:
     case G95_ISYM_CEILING:
-    case G95_ISYM_CPU_TIME:
     case G95_ISYM_CSHIFT:
-    case G95_ISYM_DATE_AND_TIME:
     case G95_ISYM_EOSHIFT:
     case G95_ISYM_EXPONENT:
     case G95_ISYM_FLOOR:
@@ -1720,18 +1723,13 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_INDEX:
     case G95_ISYM_MERGE:
     case G95_ISYM_MODULO:
-    case G95_ISYM_MVBITS:
     case G95_ISYM_NEAREST:
     case G95_ISYM_PACK:
     case G95_ISYM_PRESENT:
-    case G95_ISYM_RANDOM_NUMBER:
-    case G95_ISYM_RANDOM_SEED:
     case G95_ISYM_REPEAT:
-    case G95_ISYM_RESHAPE:
     case G95_ISYM_SCAN:
     case G95_ISYM_SET_EXPONENT:
     case G95_ISYM_SPREAD:
-    case G95_ISYM_SYSTEM_CLOCK:
     case G95_ISYM_TRANSFER:
     case G95_ISYM_TRANSPOSE:
     case G95_ISYM_TRIM:
@@ -1994,7 +1992,7 @@ g95_walk_intrinsic_libfunc (g95_ss * ss, g95_expr * expr)
   return newss;
 }
 
-/* Returns true if the specified intrinsic function call maps directly to a
+/* Returns nonzero if the specified intrinsic function call maps directly to a
    an external library call.  Should only be used for functions that return
    arrays.  */
 int
@@ -2017,7 +2015,12 @@ g95_is_intrinsic_libcall (g95_expr * expr)
     case G95_ISYM_PRODUCT:
     case G95_ISYM_SUM:
     case G95_ISYM_SHAPE:
+      /* Ignore absent optional parameters.  */
       return 1;
+      
+    case G95_ISYM_RESHAPE:
+      /* Pass absent optional parameters.  */
+      return 2;
 
     default:
       return 0;
