@@ -1858,6 +1858,8 @@ try t;
 
   ap = &expr->value.function.actual;
 
+  init_arglist(specific);
+
 /* Don't attempt to sort the argument list for min or max */
 
   if (specific->check == g95_check_min_max ||
@@ -1865,8 +1867,6 @@ try t;
       specific->check == g95_check_min_max_real ||
       specific->check == g95_check_min_max_double)
     return (*specific->check)(*ap);
-
-  init_arglist(specific);
 
   if (sort_actual(specific->name, ap, specific->formal,
 		  &expr->where) == FAILURE) return FAILURE;
@@ -1947,6 +1947,8 @@ int flag;
 /* Bypass the generic list for min and max */
 
   if (isym->check == g95_check_min_max) {
+    init_arglist(isym);
+
     if (g95_check_min_max(expr->value.function.actual) == SUCCESS)
       goto got_specific;
 
