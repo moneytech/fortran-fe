@@ -1086,6 +1086,7 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   g95_se parmse;
   g95_ss *argss;
   g95_ss_info *info;
+  int byref;
 
   arglist = NULL_TREE;
 
@@ -1124,7 +1125,8 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   else
     info = NULL;
 
-  if (g95_return_by_reference (sym))
+  byref = g95_return_by_reference (sym);
+  if (byref)
     {
       /* Currently we only return arrays be reference, but we may
          need to do derived types as well.  */
@@ -1172,7 +1174,7 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
         }
       else
         {
-          /* A scalar function.  */
+          /* A scalar or transformational function.  */
           g95_init_se (&parmse, NULL);
           argss = g95_walk_expr (g95_ss_terminator, arg->expr);
 
@@ -1197,11 +1199,12 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   g95_conv_function_val (se, sym);
   fntype =TREE_TYPE (TREE_TYPE (se->expr));
   se->expr = build (CALL_EXPR, TREE_TYPE (fntype), se->expr, arglist);
+    
 
   if (! sym->attr.pure)
     TREE_SIDE_EFFECTS (se->expr) = 1;
 
-  if (g95_return_by_reference (sym))
+  if (byref)
     {
       stmt = build_stmt (EXPR_STMT, se->expr);
       g95_add_stmt_to_pre (se, stmt, stmt);

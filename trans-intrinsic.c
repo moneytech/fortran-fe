@@ -48,62 +48,6 @@ Boston, MA 02111-1307, USA.  */
 /* Only for g95_trans_assign and g95_trans_pointer_assign.  */
 #include "trans-stmt.h"
 
-/* Intrinsic functions still to implement:
-    Numeric inquiry functions (eg. KIND, HUGE) should be handled by the
-    frontend.
-   ceiling
-   floor
-   mod
-   modulo
-   [a]ninit
-
-   All the character functions
-
-   transfer
-
-   exponent
-   fraction
-   nearest
-   rrspacing
-   scale
-   set_exponent
-   spacing
-
-   dot_product
-   matmul
-   all
-   any
-   count
-   maxval
-   minval
-   product
-   sum
-   allocated
-   shape
-   size
-   merge
-   pack
-   spread
-   unpack
-   reshape
-   cshift
-   eoshift
-   transpose
-   maxloc
-   minloc
-
-   associated
-
-   cpu_time
-   date_and_time
-   mvbits
-   random_number
-   random_seed
-   system_clock
-
-   sum is partialy implemented
- */
-
 /* This maps fortran intrinsic math functions to external library or GCC
    builtin functions.  */
 typedef struct g95_intrinsic_map_t GTY(())
@@ -761,11 +705,9 @@ g95_get_symbol_for_expr (g95_expr * expr)
 {
   g95_symbol *sym;
   g95_symbol *esym;
-  char name[G95_MAX_SYMBOL_LEN+1];
 
   assert (strlen (expr->value.function.name) <= G95_MAX_SYMBOL_LEN - 5);
-  sprintf (name, "gfori%s", expr->value.function.name);
-  sym = g95_new_symbol (name, NULL);
+  sym = g95_new_symbol (expr->value.function.name, NULL);
   esym = expr->symbol;
 
   sym->ts = expr->ts;
@@ -1111,12 +1053,6 @@ g95_conv_intrinsic_minmaxloc (g95_se * se, g95_expr * expr, int op)
   tree body;
   tree body_tail;
   int n;
-
-  actual = expr->value.function.actual;
-  if (! actual->next->expr)
-    {
-      g95_todo_error ("min/maxloc without DIM parameter");
-    }
 
   if (se->ss)
     {
@@ -1983,10 +1919,12 @@ g95_walk_intrinsic_function (g95_ss * ss, g95_expr * expr,
     case G95_ISYM_ALL:
     case G95_ISYM_ANY:
     case G95_ISYM_COUNT:
+    case G95_ISYM_MAXLOC:
     case G95_ISYM_MAXVAL:
+    case G95_ISYM_MINLOC:
     case G95_ISYM_MINVAL:
-    case G95_ISYM_SUM:
     case G95_ISYM_PRODUCT:
+    case G95_ISYM_SUM:
       return g95_walk_intrinsic_libfunc (ss, expr);
       break;
 
