@@ -1021,7 +1021,7 @@ match m;
   m = g95_match_label();
   if (m == MATCH_ERROR) return m;
 
-  if (g95_match(" do") != MATCH_YES) return MATCH_NO;
+  if (g95_match(" do% ") != MATCH_YES) return MATCH_NO;
 
 /* Match an infinite DO, make it like a DO WHILE(.TRUE.) */
 
@@ -1045,7 +1045,7 @@ match m;
   g95_set_locus(&old_loc);
 
   g95_match_label();    /* This won't error */
-  g95_match(" do");     /* This will work */
+  g95_match(" do ");     /* This will work */
 
   m = g95_match_st_label(&label);
   if (m == MATCH_ERROR) goto cleanup;
@@ -1053,8 +1053,8 @@ match m;
   g95_match(" ,");      /* Optional comma */
 
   m = g95_match_iterator(&iter);
-  if (m == MATCH_NO) g95_syntax_error(ST_DO);
-  if (m != MATCH_YES) goto cleanup;
+  if (m == MATCH_NO) return MATCH_NO;
+  if (m == MATCH_ERROR) goto cleanup;
 
   if (g95_match_eos() != MATCH_YES) {
     g95_syntax_error(ST_DO);
