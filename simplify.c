@@ -1243,67 +1243,140 @@ g95_expr *result;
 }
 
 
+g95_expr *g95_simplify_ishft(g95_expr *e, g95_expr *s) {
+g95_expr *result;
+int shift;
+int isize, k;
+long e_int, new_int;
 
-g95_expr *g95_simplify_ishft(g95_expr *e) {
-g95_expr *arg1, *arg2;
+  if (e->expr_type != EXPR_CONSTANT || s->expr_type != EXPR_CONSTANT)  
+    return NULL;
 
-  return NULL; 
-
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER ) {
-    g95_warning("Arguments of ISHFT at %L must be integer",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (e->ts.type != BT_INTEGER || s->ts.type != BT_INTEGER ) {
+    g95_warning("Arguments of ISHFT at %L must be integer", &e->where);
+    return &g95_bad_expr;
   }
 
-/* Range checking */
-/* Absolute value of second argument (the shift) must be <=bit_size(i) */
-
-  if ( g95_compare_expr(arg2, integer_zero) < 0 ) {
-    g95_warning("Last argument of ISHFT at %L must be nonnegative",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (g95_extract_int(s, &shift) != NULL || shift < 0 ) {
+    g95_error("Invalid second argument of ISHFT at %L", &s->where);
+    return &g95_bad_expr;
   }
-/* Second argument must be less than or equal to BIT_SIZE(I), no check yet */
 
-  //  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
+  k = g95_validate_kind(BT_INTEGER, e->ts.kind);
 
-  //  return SUCCESS;
+  isize = g95_integer_kinds[k].bit_size;
+
+  if ( shift > isize ) {
+    g95_error("Second argument of ISHFT exceeds bit size at %L", &s->where);
+    return &g95_bad_expr;
+  }
+
+  result = g95_copy_expr(e);
+
+  if ( shift == 0 ) {
+    return result;
+  }
+  else {
+    e_int = mpz_get_si(e->value.integer);
+    if (e_int > INT_MAX || e_int < INT_MIN) {
+      g95_internal_error("ISHFT: unable to extract integer");
+      return &g95_bad_expr;
+    }
+    else if ( shift > 0 ) {
+      new_int = e_int << shift;
+      mpz_set_si(result->value.integer, new_int);
+      return result;
+    }
+    else
+      new_int = e_int >> shift;
+      mpz_set_si(result->value.integer, new_int);
+      return result;
+  }
+
 }
 
 
-g95_expr *g95_simplify_ishftc(g95_expr *e) {
-g95_expr *arg1, *arg2;
+g95_expr *g95_simplify_ishftc(g95_expr *e, g95_expr *s, g95_expr *sz) {
+g95_expr *result;
+int shift, isize, delta, k;
+int i;
+int *bits;
 
-  return NULL; 
+  if (e->expr_type != EXPR_CONSTANT || s->expr_type != EXPR_CONSTANT)  
+    return NULL;
 
-/* Takes optional argument, not implemented */
-
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER ) {
-    g95_warning("Arguments of ISHFTC at %L must be integer",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (e->ts.type != BT_INTEGER || s->ts.type != BT_INTEGER ) {
+    g95_warning("Arguments of ISHFTC at %L must be integer", &e->where);
+    return &g95_bad_expr;
   }
 
-/* Range checking */
+  if (g95_extract_int(s, &shift) != NULL || shift < 0 ) {
+    g95_error("Invalid second argument of ISHFTC at %L", &s->where);
+    return &g95_bad_expr;
+  }
 
-/* Optional argument must be positive and less than or equal to BIT_SIZE(I) */
-/* If not present, it is treated as if equal to BIT_SIZE(I) */
+  k = g95_validate_kind(BT_INTEGER, e->ts.kind);
 
-/* no check yet on bit_size */
+  if (sz !=NULL ) {
+    if (g95_extract_int(sz, &isize) != NULL || isize < 0 ) {
+      g95_error("Invalid third argument of ISHFTC at %L", &sz->where);
+      return &g95_bad_expr;
+    }
+  }
+  else
+    isize = g95_integer_kinds[k].bit_size;
 
-  //  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
+  if ( shift > isize ) {
+    g95_error("Second argument of ISHFTC exceeds bit size at %L", &s->where);
+    return &g95_bad_expr;
+  }
 
-  //  return SUCCESS;
+  result = g95_copy_expr(e);
+
+  if ( shift == 0 ) {
+    return result;
+  }
+
+  bits = g95_getmem(isize);
+
+  if (bits == NULL) {
+    g95_internal_error("ISHFTC: Unable to allocate memory");
+  }
+
+  for ( i=0; i<isize; ++i ) {
+    bits[i] = mpz_tstbit(e->value.integer,i);
+  }
+
+  delta = isize-shift;
+
+  if (shift == 0 ) {
+    return result;
+  }
+  else if ( shift > 0 ) {
+    for ( i=0; i<delta; ++i ) {
+      if ( bits[i] == 0 ) mpz_clrbit(result->value.integer, i+shift);
+      if ( bits[i] == 1)  mpz_setbit(result->value.integer, i+shift);
+    }
+    for ( i=delta; i<isize; ++i ) {
+      if ( bits[i] == 0 ) mpz_clrbit(result->value.integer, i-delta);
+      if ( bits[i] == 1 ) mpz_setbit(result->value.integer, i-delta);
+    }
+    return result;
+  }
+  else {
+    for ( i=shift; i<isize; ++i ) {
+      if ( bits[i] == 0 ) mpz_clrbit(result->value.integer, i-shift);
+      if ( bits[i] == 1 ) mpz_setbit(result->value.integer, i-shift);
+    }
+    for ( i=0; i<shift; ++i) {
+      if ( bits[i] == 0 ) mpz_clrbit(result->value.integer, i+delta);
+      if ( bits[i] == 1 ) mpz_setbit(result->value.integer, i+delta);
+    }
+    return result;
+  }
+
+  g95_free(bits);
+
 }
 
 
