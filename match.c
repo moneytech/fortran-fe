@@ -1681,20 +1681,38 @@ cleanup:
 }
 
 
+/* match_common_name()-- Match a common block name.  */
+
+static match match_common_name(g95_symbol **sym) {
+match m;
+
+  if (g95_match_char('/') == MATCH_NO) return MATCH_NO;
+
+  if (g95_match_char('/') == MATCH_YES) {
+    *sym = NULL;
+    return MATCH_YES;
+  }
+
+  m = g95_match_symbol(sym);
+
+  if (m == MATCH_ERROR) return MATCH_ERROR;
+  if (m == MATCH_YES && g95_match_char('/') == MATCH_YES) return MATCH_YES;
+
+  g95_error("Syntax error in common block name at %C");
+  return MATCH_ERROR;
+}
+
+
 /* g95_match_common()-- Match a COMMON statement */
 
 match g95_match_common(void) {
 g95_symbol *sym, *common_name, **head, *tail;
 g95_array_spec *as;
-match m, m2;
+match m;
 
   if (g95_match_eos() == MATCH_YES) goto syntax;
 
-  if (g95_match(" / %s /", &common_name) != MATCH_YES) {
-    common_name = NULL;
-    g95_match(" / /");
-  }
-
+  common_name = NULL;
   as = NULL;
 
   for(;;) {
@@ -1703,11 +1721,13 @@ match m, m2;
     else {
       head = &common_name->common_head;
       
-      if (g95_add_common(&common_name->attr, NULL) == FAILURE)
+      if (!common_name->attr.common &&
+	  g95_add_common(&common_name->attr, NULL) == FAILURE)
 	goto cleanup;
     }
 
-    if (*head == NULL) tail = NULL;
+    if (*head == NULL)
+      tail = NULL;
     else {
       tail = *head;
       while(tail->common_next)
@@ -1717,6 +1737,10 @@ match m, m2;
 /* Grab the list of symbols */
 
     for(;;) {
+      m = match_common_name(&common_name);
+      if (m == MATCH_ERROR) goto cleanup;
+      if (m == MATCH_YES) break;
+
       m = g95_match_symbol(&sym);
       if (m == MATCH_ERROR) goto cleanup;
       if (m == MATCH_NO) goto syntax;
@@ -1727,6 +1751,14 @@ match m, m2;
       }
 
       if (g95_add_in_common(&sym->attr, NULL) == FAILURE) goto cleanup;
+
+/* Derived type names must have the SEQUENCE attribute */
+
+      if (sym->ts.type == BT_DERIVED && !sym->ts.derived->attr.sequence) {
+	g95_error("Derived type variable in COMMON at %C does not have the "
+		  "SEQUENCE attribute");
+	goto cleanup;
+      }
 
       if (tail != NULL)
 	tail->common_next = sym;
@@ -1760,16 +1792,11 @@ match m, m2;
 
       if (g95_match_eos() == MATCH_YES) goto done;
 
-      m = g95_match_char(',');
+      m = match_common_name(&common_name);
+      if (m == MATCH_ERROR) goto cleanup;
+      if (m == MATCH_YES) break;
 
-      if (g95_match_char('/') == MATCH_YES) {
-	m2 = g95_match(" %s /", &common_name);
-	if (m2 == MATCH_YES) break;
-	if (m2 == MATCH_NO) goto syntax;
-	goto cleanup;
-      }
-
-      if (m != MATCH_YES) goto syntax;
+      if (g95_match_char(',') != MATCH_YES) goto syntax;
     }
   }
 
@@ -1781,7 +1808,6 @@ syntax:
 
 cleanup:
   g95_free_array_spec(as);
-
   return MATCH_ERROR;
 }
 

@@ -28,7 +28,7 @@ Boston, MA 02111-1307, USA.  */
 /* format tokens returned by format_lex() */
 
 typedef enum {
-  FMT_NONE, FMT_UNKNOWN, FMT_NEGINT, FMT_ZERO, FMT_POSINT, FMT_PERIOD,
+  FMT_NONE, FMT_UNKNOWN, FMT_SIGNED_INT, FMT_ZERO, FMT_POSINT, FMT_PERIOD,
   FMT_COMMA, FMT_COLON, FMT_SLASH, FMT_DOLLAR, FMT_POS, FMT_LPAREN,
   FMT_RPAREN, FMT_X, FMT_SIGN, FMT_BLANK, FMT_CHAR, FMT_P, FMT_IBOZ, FMT_F,
   FMT_E, FMT_EXT, FMT_G, FMT_L, FMT_A, FMT_D, FMT_H, FMT_END
@@ -102,6 +102,7 @@ int zflag;
 
   switch(c) {
   case '-':
+  case '+':
     c = next_char(0);
     if (!isdigit(c)) {
       token = FMT_UNKNOWN;
@@ -113,16 +114,16 @@ int zflag;
     } while(isdigit(c));
 
     unget_char();
-    token = FMT_NEGINT;
+    token = FMT_SIGNED_INT;
     break;
 
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
-    zflag = 1;
+    zflag = (c == '0');
 
     do {
-      if (c != '0') zflag = 0;
       c = next_char(0);
+      if (c != '0') zflag = 0;
     } while(isdigit(c));
 
     unget_char();
@@ -324,8 +325,7 @@ format_item:
     level++;
     goto format_item;
 
-  case FMT_NEGINT:
-  case FMT_ZERO:   /* Nonpositive can only be a prelude to a P format */
+  case FMT_SIGNED_INT:  /* Signed integer can only precede a P format */
     t = format_lex();
     if (t != FMT_P) {
       error = "Expected P edit descriptor";
@@ -358,7 +358,6 @@ format_item:
       goto syntax;
     }
 
-    level--;
     goto finished;
 
   case FMT_POS:  case FMT_IBOZ:  case FMT_F:  case FMT_E:  case FMT_EXT:
@@ -443,7 +442,7 @@ data_desc:
 
   case FMT_F:
     t = format_lex();
-    if (t != FMT_POSINT && t != FMT_ZERO) {
+    if (t != FMT_ZERO && t != FMT_POSINT) {
       error = nonneg_required;
       goto syntax;
     }
