@@ -360,7 +360,7 @@ static g95_intrinsic_sym *find_sym(g95_intrinsic_sym *start, int n, const char *
 /* g95_find_function()-- Given a name, find a function in the intrinsic
  * function table.  Returns NULL if not found. */
 
-g95_intrinsic_sym *g95_find_function(const char *name) {
+g95_intrinsic_sym *g95_find_function(char *name) {
 
   return find_sym(functions, nfunc, name);
 }
@@ -415,7 +415,7 @@ int g95_intrinsic_name(char *name, int subroutine_flag) {
  * of the specifics currently in the table are placed into the list of
  * specific functions associated with that generic.  */
 
-static void make_generic(const char *name) {
+static void make_generic(char *name) {
 g95_intrinsic_sym *g;
 
   if (sizing != SZ_NOTHING) return; 
@@ -2046,7 +2046,7 @@ try t;
 match g95_intrinsic_func_interface(g95_expr *expr, int error_flag) {
 g95_intrinsic_sym *isym, *specific;
 g95_actual_arglist *actual;
-const char *name;
+char *name;
 int flag;
 
   if (expr->value.function.isym != NULL)

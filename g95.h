@@ -1246,7 +1246,7 @@ try g95_convert_type(g95_expr *, g95_typespec *, int);
 int g95_generic_intrinsic(char *);
 int g95_specific_intrinsic(char *);
 int g95_intrinsic_name(char *, int);
-g95_intrinsic_sym *g95_find_function(const char *);
+g95_intrinsic_sym *g95_find_function(char *);
 
 /* simplify.c */
 

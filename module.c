@@ -1496,6 +1496,7 @@ intrinsics[] = {
 static void mio_expr(g95_expr **ep) {
 atom_type t;
 g95_expr *e;
+int flag;
 
   mio_lparen();
 
@@ -1554,6 +1555,26 @@ g95_expr *e;
     mio_symbol_ref(&e->symbol);
     mio_actual_arglist(&e->value.function.actual);
     mio_allocated_string(&e->value.function.name);
+
+    if (iomode == IO_OUTPUT) {
+      flag = e->value.function.esym != NULL;
+      mio_integer(&flag);
+      if (flag)
+	mio_symbol_ref(&e->value.function.esym);
+      else
+	write_atom(ATOM_STRING, e->value.function.isym->name);
+
+    } else {
+      mio_integer(&flag);
+      if (flag)
+	mio_symbol_ref(&e->value.function.esym);
+      else {
+	require_atom(ATOM_STRING);
+	e->value.function.isym = g95_find_function(atom_string);
+	g95_free(atom_string);
+      }
+    }
+
     break;
 
   case EXPR_VARIABLE:
