@@ -1058,20 +1058,23 @@ g95_symbol *sym;
     break;
 
   case INTERFACE_GENERIC:
-    sym = current_interface.sym;
-    while(sym) {
+    for(ns=current_interface.ns; ns; ns=ns->parent) {
+      g95_find_symbol(current_interface.sym->name, ns, 0, &sym);
+      if (sym == NULL) continue;
+
       if (check_new_interface(sym->generic, new, 1) == FAILURE) return FAILURE;
-      g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
     }
 
     head = &current_interface.sym->generic;
     break;
 
   case INTERFACE_USER_OP:
-    sym = current_interface.sym;
-    while(sym) {
-      if (check_new_interface(sym->operator, new, 1) ==FAILURE) return FAILURE;
-      g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+    for(ns=current_interface.ns; ns; ns=ns->parent) {
+      g95_find_symbol(current_interface.sym->name, ns, 0, &sym);
+      if (sym == NULL) continue;
+
+      if (check_new_interface(sym->operator, new, 1) == FAILURE)
+	return FAILURE;
     }
 
     head = &current_interface.sym->operator;
