@@ -254,13 +254,15 @@ int i;
  * according to the first letter of its name.  Fails if the letter in
  * question has no default type. */
 
-try g95_set_default_type(g95_symbol *sym) {
+try g95_set_default_type(g95_symbol *sym, int error_flag) {
 int i;
 
   i = sym->name[0] - 'a';
 
   if (g95_current_ns->default_type[i].type == BT_UNKNOWN) {
-    //    g95_error("Symbol '%s' at %C has no IMPLICIT type", sym->name);
+    if (error_flag)
+      g95_error("Symbol '%s' at %C has no IMPLICIT type", sym->name);
+
     return FAILURE;
   }
 
@@ -285,7 +287,7 @@ g95_symbol *sym;
   sym = lvalue->symbol; 
 
   if (sym->ts.type == BT_UNKNOWN) {
-    if (g95_set_default_type(sym) == FAILURE) return FAILURE;
+    if (g95_set_default_type(sym, 0) == FAILURE) return FAILURE;
     lvalue->ts = sym->ts;
   }
 
@@ -2180,7 +2182,7 @@ static void set_sym_defaults(g95_symbol *sym) {
     return;
   }
 
-  g95_set_default_type(sym);
+  g95_set_default_type(sym, 0);
 }
 
 
