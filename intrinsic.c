@@ -948,7 +948,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("scale", 0, BT_REAL, dr, g95_simplify_scale, NULL,
 	  x, BT_REAL, dr, 0, i, BT_INTEGER, di, 0, NULL);
 
-  add_sym("scan", 0, BT_INTEGER, di, g95_simplify_scan, not_ready,
+  add_sym("scan", 0, BT_INTEGER, di, g95_simplify_scan, NULL,
 	  stg, BT_CHARACTER, dc, 0,  set, BT_CHARACTER, dc, 0,
 	  bck, BT_LOGICAL, dl, 1, NULL);
 
