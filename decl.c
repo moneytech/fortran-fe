@@ -1571,7 +1571,7 @@ match g95_match_intrinsic(void) {
 match g95_match_optional(void) {
 
   g95_clear_attr(&current_attr);
-  g95_add_intrinsic(&current_attr, NULL);
+  g95_add_optional(&current_attr, NULL);
 
   return attr_decl();
 }
