@@ -128,7 +128,7 @@ static g95_expr *range_check(g95_expr *result, const char *name) {
  * missing kind parameter.  Returns the kind, -1 if something went
  * wrong. */
 
-static int get_kind(g95_expr *k, const char *name, int default_kind) {
+static int get_kind(bt type, g95_expr *k, const char *name, int default_kind) {
 int kind;
 
   if (k == NULL) return default_kind;
@@ -141,7 +141,7 @@ int kind;
   }
 
   if (g95_extract_int(k, &kind) != NULL ||
-      g95_validate_kind(BT_REAL, kind) < 0) {
+      g95_validate_kind(type, kind) < 0) {
 
     g95_error("Invalid KIND parameter of %s at %L", name, &k->where);
     return -1;
@@ -368,7 +368,7 @@ g95_expr *g95_simplify_aint(g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *result;
 int kind;
 
-  kind = get_kind(k, "AINT", e->ts.kind);
+  kind = get_kind(BT_REAL, k, "AINT", e->ts.kind);
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -405,7 +405,7 @@ g95_expr *g95_simplify_anint(g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *result;
 int kind, cmp;
 
-  kind = get_kind(k, "ANINT", e->ts.kind);
+  kind = get_kind(BT_REAL, k, "ANINT", e->ts.kind);
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -608,7 +608,7 @@ g95_expr *g95_simplify_ceiling(g95_expr *e, g95_expr *k) {
 g95_expr *ceil, *result;
 int kind;
 
-  kind = get_kind(k, "CEILING", g95_default_integer_kind());
+  kind = get_kind(BT_REAL, k, "CEILING", g95_default_integer_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -631,7 +631,7 @@ g95_expr *g95_simplify_char(g95_expr *e, g95_expr *k) {
 g95_expr *result;
 int c, kind;
 
-  kind = get_kind(k, "CHAR", g95_default_character_kind());
+  kind = get_kind(BT_CHARACTER, k, "CHAR", g95_default_character_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -658,7 +658,7 @@ g95_expr *g95_simplify_cmplx(g95_expr *x, g95_expr *y, g95_expr *k) {
 g95_expr *result;
 int kind;
 
-  kind = get_kind(k, "CMPLX", g95_default_real_kind());
+  kind = get_kind(BT_REAL, k, "CMPLX", g95_default_real_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
@@ -1054,7 +1054,7 @@ g95_expr *result;
 mpf_t floor;
 int kind;
 
-  kind = get_kind(k, "FLOOR", g95_default_integer_kind());
+  kind = get_kind(BT_REAL, k, "FLOOR", g95_default_integer_kind());
   if (kind == -1) g95_internal_error("g95_simplify_floor(): Bad kind");
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -1438,7 +1438,7 @@ g95_expr *g95_simplify_int(g95_expr *e, g95_expr *k) {
 g95_expr *rpart, *rtrunc, *result;
 int kind;
 
-  kind = get_kind(k, "INT", g95_default_integer_kind());
+  kind = get_kind(BT_REAL, k, "INT", g95_default_integer_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -1821,7 +1821,7 @@ g95_expr *g95_simplify_logical(g95_expr *e, g95_expr *k) {
 g95_expr *result;
 int kind;
 
-  kind = get_kind(k, "LOGICAL", g95_default_logical_kind());
+  kind = get_kind(BT_LOGICAL, k, "LOGICAL", g95_default_logical_kind());
   if (kind < 0) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -2110,7 +2110,7 @@ g95_expr *g95_simplify_nint(g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *itrunc, *result;
 int kind, cmp;
 
-  kind = get_kind(k, "NINT", g95_default_integer_kind());
+  kind = get_kind(BT_REAL, k, "NINT", g95_default_integer_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -2277,7 +2277,7 @@ g95_expr *g95_simplify_real(g95_expr *e, g95_expr *k) {
 g95_expr *result;
 int kind;
 
-  kind = get_kind(k, "REAL", g95_default_real_kind());
+  kind = get_kind(BT_REAL, k, "REAL", g95_default_real_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;

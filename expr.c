@@ -1039,7 +1039,8 @@ int i;
       e->value.function.actual->next != NULL)  /* Doesn't have one arg */
     return FAILURE;
 
-  if (e->value.function.name[0] != '\0') return FAILURE;
+  if (e->value.function.name != NULL &&
+      e->value.function.name[0] != '\0') return FAILURE;
 
   name = e->symbol->name;
 
