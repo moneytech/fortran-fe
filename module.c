@@ -276,7 +276,6 @@ module_locus m;
 }
 
 
-
 /* parse_name()-- Parse a name.  */
 
 static void parse_name(int c) {
@@ -301,7 +300,6 @@ int len;
 
   set_module_locus(&m);
 }
-
 
 
 /* parse_atom()-- Read the next atom in the module's input stream. */
@@ -331,6 +329,22 @@ int c;
 
   parse_name(c);
   return ATOM_NAME;
+}
+
+
+/* peek_atom()-- Peek at the next atom on the input */
+
+static atom_type peek_atom(void) {
+module_locus m;
+atom_type a;
+
+  get_module_locus(&m); 
+
+  a = parse_atom();
+  if (a == ATOM_STRING) g95_free(atom_string);
+
+  set_module_locus(&m);
+  return a;
 }
 
 
@@ -384,7 +398,6 @@ int i;
 
   return i;
 }
-
 
 
 /* Module output subroutines */
@@ -675,7 +688,7 @@ atom_type t;
 
 
 /* BT_UNKNOWN has been omitted from this list on purpose-- it should
- * never appear in an expression. */
+ * never appear in an expression being written. */
 
 static mstring bt_types[] = {
   minit("INTEGER",    BT_INTEGER),      minit("REAL",       BT_REAL),
@@ -726,6 +739,45 @@ int i;
 }
 
 
+
+static mstring array_ref_types[] = {
+  minit("FULL", AR_FULL),         minit("ELEMENT", AR_ELEMENT),
+  minit("SECTION", AR_SECTION),   minit(NULL, -1)
+};
+
+
+static void mio_array_ref(g95_array_ref *ar) {
+int i;
+
+  mio_lparen();
+  ar->type = mio_name(ar->type, array_ref_types);
+  mio_integer(&ar->rank);
+
+  switch(ar->type) {
+  case AR_FULL:
+    break;
+
+  case AR_ELEMENT:
+    for(i=0; i<ar->rank; i++)
+      mio_expr(&ar->shape[i].start);
+
+    break;
+
+  case AR_SECTION:
+    for(i=0; i<ar->rank; i++) {
+      mio_expr(&ar->shape[i].start);
+      mio_expr(&ar->shape[i].end);
+      mio_expr(&ar->shape[i].stride);
+    }
+
+    break;
+  }
+
+  mio_rparen();
+}
+
+
+
 static void mio_component(g95_component *c) {
 
   mio_lparen();
@@ -742,6 +794,219 @@ static void mio_component(g95_component *c) {
 }
 
 
+static void mio_actual_arg(g95_actual_arglist *a) {
+
+  mio_lparen();
+  mio_internal_string(a->name);
+  mio_integer(&a->arg_number);
+  mio_expr(&a->expr);
+  mio_rparen();
+}
+
+
+static void mio_actual_arglist(g95_actual_arglist **ap) {
+g95_actual_arglist *a, *tail;
+
+  mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    for(a=*ap; a; a=a->next)
+      mio_actual_arg(a);
+
+  } else {
+    tail = NULL;
+
+    for(;;) {
+      if (peek_atom() != ATOM_LPAREN) break;
+
+      a = g95_get_actual_arglist();
+
+      if (tail == NULL)
+	*ap = a;
+      else
+	tail->next = a;
+
+      tail = a;
+      mio_actual_arg(a);
+    }
+  }
+
+  mio_rparen();
+}
+
+
+
+/* mio_symbol_ref()-- Saves a *reference* to a symbol.  An entity's
+ * real name is its address in memory, which is guaranteed to be
+ * unique when it needs to be and the same for multiply named things.
+ * During writing, we spit out the address.  During reading, this
+ * address is matched definition of the entity */
+
+static void mio_symbol_ref(g95_symbol **symp) {
+
+
+
+}
+
+
+
+
+
+static void mio_iterator(g95_iterator **ip) {
+g95_iterator *iter;
+
+  mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    if (*ip != NULL) {
+      mio_rparen();
+      goto done;
+    }
+  } else {
+    if (peek_atom() == ATOM_RPAREN) {
+      *ip = NULL;
+      goto done;
+    }
+
+    *ip = g95_get_iterator();
+  }
+
+  iter = *ip;
+
+  mio_expr(&iter->var);
+  mio_expr(&iter->start);
+  mio_expr(&iter->end);
+  mio_expr(&iter->step);
+
+done:
+  mio_rparen();
+}
+
+
+
+static void mio_constructor(g95_constructor **cp) {
+g95_constructor *c, *tail;
+
+  mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    for(c=*cp; c; c=c->next) {
+      mio_lparen();
+      mio_expr(&c->expr);
+      mio_iterator(&c->iter);
+      mio_constructor(&c->child);
+      mio_rparen();
+    }
+  } else {
+
+    *cp = NULL;
+    tail = NULL;
+
+    while(peek_atom() != ATOM_RPAREN) {
+      c = g95_get_constructor();
+
+      if (tail == NULL)
+	*cp = c;
+      else
+	tail->next = c;
+
+      tail = c;
+
+      mio_lparen();
+      mio_expr(&c->expr);
+      mio_iterator(&c->iter);
+      mio_constructor(&c->child);
+      mio_rparen();
+    }
+  }
+
+  mio_rparen();
+}
+
+
+static mstring ref_types[] = {
+  minit("ARRAY", REF_ARRAY),            minit("COMPONENT", REF_COMPONENT),
+  minit("SUBSTRING", REF_SUBSTRING),    minit(NULL, -1)
+};
+
+
+
+static void mio_ref(g95_ref **r) {
+
+#if 0
+char name[G95_MAX_SYMBOL_LEN+1];
+
+  mio_lparen();
+
+  r->type = mio_name(r->type, ref_types);
+
+  //  mio_symbol_ref(&r->symbol);
+
+  if (iomode == IO_OUTPUT) {
+
+    write_atom(ATOM_NAME, r->component->name);
+  } else {
+    
+
+  }
+
+  mio_rparen();
+#endif
+}
+
+
+
+static void mio_ref_list(g95_ref **rp) {
+
+
+}
+
+
+
+/* mio_gmp_integer()-- Read and write an integer value */
+
+static void mio_gmp_integer(mpz_t *integer) {
+char *p;
+
+  if (iomode == IO_INPUT) {
+    if (parse_atom() != ATOM_STRING) bad_module("Expected integer string");
+
+    mpz_init(*integer);
+    if (mpz_set_str(*integer, atom_string, 10))
+      bad_module("Error converting integer");
+
+    g95_free(atom_string);
+
+  } else {
+    p = mpz_get_str(NULL, 10, *integer);
+    write_atom(ATOM_STRING, p);
+    g95_free(p);
+  }
+}
+
+
+static void mio_gmp_real(mpf_t *real) {
+int exponent;
+char *p;
+
+  if (iomode == IO_INPUT) {
+    if (parse_atom() != ATOM_STRING) bad_module("Expected real string");
+
+    mpf_init(*real);
+    mpf_set_str(*real, atom_string, -16);
+    g95_free(atom_string);
+
+  } else {
+    p = mpf_get_str(NULL, (mp_exp_t *) &exponent, 16, 0, *real);
+    atom_string = g95_getmem(strlen(p) + 20);
+
+    sprintf(atom_string, "0.%s@%d", p, exponent);
+    write_atom(ATOM_STRING, atom_string);
+
+    g95_free(atom_string);
+    g95_free(p);
+  }
+}
 
 
 static mstring expr_types[] = {
@@ -801,28 +1066,88 @@ g95_expr *e;
   }
 
   e->expr_type = mio_name(e->expr_type, expr_types);
-
   mio_typespec(&e->ts);
-
   mio_integer(&e->rank);
 
   switch(e->expr_type) {
-
   case EXPR_OP:
+    e->operator = mio_name(e->operator, intrinsics);
+
+    switch(e->operator) {
+
+    case INTRINSIC_UPLUS:   case INTRINSIC_UMINUS:  case INTRINSIC_NOT:
+      mio_expr(&e->op1);
+      break;
+
+    case INTRINSIC_PLUS:    case INTRINSIC_MINUS:   case INTRINSIC_TIMES:
+    case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:   case INTRINSIC_CONCAT:
+    case INTRINSIC_AND:     case INTRINSIC_OR:      case INTRINSIC_EQV:
+    case INTRINSIC_NEQV:    case INTRINSIC_EQ:      case INTRINSIC_NE:
+    case INTRINSIC_GT:      case INTRINSIC_GE:      case INTRINSIC_LT:
+    case INTRINSIC_LE:
+      mio_expr(&e->op1);
+      mio_expr(&e->op2);
+      break;
+
+    default:
+      bad_module("Bad operator");
+    }
+
+    break;
+
   case EXPR_FUNCTION:
-  case EXPR_CONSTANT:
+    mio_symbol_ref(&e->symbol);
+    mio_actual_arglist(&e->value.function.actual);
+    mio_allocated_string(&e->value.function.name);
+    break;
+
   case EXPR_VARIABLE:
+    mio_symbol_ref(&e->symbol);
+    mio_ref(&e->ref);
+    break;
+
   case EXPR_SUBSTRING:
+    mio_allocated_string(&e->value.character.string);
+    mio_expr(&e->op1);
+    mio_expr(&e->op2);
+    break;
+
   case EXPR_STRUCTURE:
   case EXPR_ARRAY:
+    mio_constructor(&e->value.constructor);
+    break;
+
+  case EXPR_CONSTANT:
+    switch(e->expr_type) {
+    case BT_INTEGER:
+      mio_gmp_integer(&e->value.integer);
+      break;
+
+    case BT_REAL:
+      mio_gmp_real(&e->value.real);
+      break;
+
+    case BT_COMPLEX:
+      mio_gmp_real(&e->value.complex.r);
+      mio_gmp_real(&e->value.complex.i);
+      break;
+
+    case BT_LOGICAL:
+      mio_integer(&e->value.logical);
+      break;
+
+    case BT_CHARACTER:
+      mio_integer(&e->value.character.length);
+      mio_allocated_string(&e->value.character.string);
+      break;
+
+    default:
+      bad_module("Bad type in constant expression");
+    }
 
     break;
   }
-
-
-  /* more */
 }
-
 
 
 

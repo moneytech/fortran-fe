@@ -1147,8 +1147,8 @@ done:
 
 static g95_symbol *changed = NULL;
 
-#define NIL &sentinel           /* all leafs are sentinels */
-static g95_redblack sentinel = { NIL, NIL, NULL, BLACK, NULL};
+#define NIL &sentinel           /* all leaves are sentinels */
+static g95_symtree sentinel = { { '\0' }, NULL, NIL, NIL, NIL, BLACK };
 
 #define CompLT(a,b) (strcmp(a,b) < 0)
 #define CompEQ(a,b) (strcmp(a,b) == 0)
@@ -1188,8 +1188,8 @@ int i;
 
 /* rotateLeft()-- rotate node x to left */
 
-static void rotateLeft(g95_namespace *ns, g95_redblack *x) {
-g95_redblack *y = x->right;
+static void rotateLeft(g95_namespace *ns, g95_symtree *x) {
+g95_symtree *y = x->right;
   
   x->right = y->left;    /* establish x->right link */
   if (y->left != NIL) y->left->parent = x;
@@ -1213,8 +1213,8 @@ g95_redblack *y = x->right;
 
 /* rotateRight()-- rotate node x to right */
 
-static void rotateRight(g95_namespace *ns, g95_redblack *x) {
-g95_redblack *y = x->left;
+static void rotateRight(g95_namespace *ns, g95_symtree *x) {
+g95_symtree *y = x->left;
 
   /* establish x->left link */
   x->left = y->right;
@@ -1239,13 +1239,13 @@ g95_redblack *y = x->left;
 
 /* insertFixup()-- maintain Red-Black tree balance after inserting node x */
 
-static void insertFixup(g95_namespace *ns, g95_redblack *x) {
+static void insertFixup(g95_namespace *ns, g95_symtree *x) {
 
   /* check Red-Black properties */
 
   while (x != ns->root && x->parent->color == RED) {  /* we have a violation */
     if (x->parent == x->parent->parent->left) {
-      g95_redblack *y = x->parent->parent->right;
+      g95_symtree *y = x->parent->parent->right;
       if (y->color == RED) {
 
 	/* uncle is RED */
@@ -1270,7 +1270,7 @@ static void insertFixup(g95_namespace *ns, g95_redblack *x) {
     } else {
 
       /* mirror image of above code */
-      g95_redblack *y = x->parent->parent->left;
+      g95_symtree *y = x->parent->parent->left;
       if (y->color == RED) {
 
 	/* uncle is RED */
@@ -1298,33 +1298,33 @@ static void insertFixup(g95_namespace *ns, g95_redblack *x) {
 /* insert_node()-- Allocate a new red/black node and associate it with
  * the new symbol. */
 
-static void insert_node(g95_namespace *ns, g95_symbol *sym) {
-g95_redblack *current, *parent, *x;
+static g95_symtree *insert_node(g95_namespace *ns, char *name) {
+g95_symtree *current, *parent, *x;
 
   current = ns->root;     /* find future parent */
   parent = NULL;
   while (current != NIL) {
-    if (CompEQ(sym->name, current->sym->name))
+    if (CompEQ(name, current->name))
       g95_internal_error("insert_node(): Node already in tree!");
 
     parent = current;
-    current = CompLT(sym->name, current->sym->name) ?
+    current = CompLT(name, current->name) ?
       current->left : current->right;
   }
 
   /* setup new node */
 
-  x = g95_getmem(sizeof(g95_redblack));
+  x = g95_getmem(sizeof(g95_symtree));
 
   x->parent = parent;
   x->left = NIL;
   x->right = NIL;
   x->color = RED;
-  x->sym = sym;
+  strcpy(x->name, name);
 
     /* insert node in tree */
   if (parent) {
-    if (CompLT(sym->name, parent->sym->name))
+    if (CompLT(name, parent->name))
       parent->left = x;
     else
       parent->right = x;
@@ -1333,16 +1333,18 @@ g95_redblack *current, *parent, *x;
   }
 
   insertFixup(ns, x);
+
+  return x;
 }
 
 
 /* deleteFixup()-- maintain Red-Black tree balance after deleting node x */
 
-static void deleteFixup(g95_namespace *ns, g95_redblack *x) {
+static void deleteFixup(g95_namespace *ns, g95_symtree *x) {
 
   while (x != ns->root && x->color == BLACK) {
     if (x == x->parent->left) {
-      g95_redblack *w = x->parent->right;
+      g95_symtree *w = x->parent->right;
 
       if (w->color == RED) {
 	w->color = BLACK;
@@ -1367,7 +1369,7 @@ static void deleteFixup(g95_namespace *ns, g95_redblack *x) {
 	x = ns->root;
       }
     } else {
-      g95_redblack *w = x->parent->left;
+      g95_symtree *w = x->parent->left;
       if (w->color == RED) {
 	w->color = BLACK;
 	x->parent->color = RED;
@@ -1401,14 +1403,14 @@ static void deleteFixup(g95_namespace *ns, g95_redblack *x) {
  * symbol itself! */
 
 void delete_node(g95_namespace *ns, g95_symbol *sym) {
-g95_redblack *x, *y, *z;
+g95_symtree *x, *y, *z;
 
   /* find node in tree */
   z = ns->root;
   while(z != NIL) {
-    if (CompEQ(sym->name, z->sym->name)) break;
+    if (CompEQ(sym->name, z->name)) break;
 
-    z = CompLT(sym->name, z->sym->name) ? z->left : z->right;
+    z = CompLT(sym->name, z->name) ? z->left : z->right;
   }
 
   if (z == NIL) g95_internal_error("delete_node(): node not found!");
@@ -1437,24 +1439,27 @@ g95_redblack *x, *y, *z;
   else
     ns->root = x;
 
-  if (y != z) z->sym = y->sym;
+  if (y != z) {  /* Copy non red/black information */
+    z->sym = y->sym;
+    strcpy(z->name, y->name);
+  }
 
   if (y->color == BLACK) deleteFixup(ns, x);
 
-  g95_free (y);
+  g95_free(y);
 }
 
 
 /* find_node()-- Given a namespace and a name, try to find the symbol
  * within the namespace.  Returns NULL if the symbol is not found. */
 
-static g95_symbol *find_node(g95_namespace *ns, char *name) {
-g95_redblack *current = ns->root;
+static g95_symtree *find_node(g95_namespace *ns, char *name) {
+g95_symtree *current = ns->root;
 
   while(current != NIL) {
-    if (CompEQ(name, current->sym->name)) return current->sym;
+    if (CompEQ(name, current->name)) return current;
 
-    current = CompLT (name, current->sym->name) ?
+    current = CompLT(name, current->name) ?
       current->left : current->right;
   }
 
@@ -1512,17 +1517,18 @@ g95_symbol *p;
  * find it */
 
 g95_symbol *g95_find_symbol(char *name, g95_namespace *ns) {
-g95_symbol *p;
+g95_symtree *t;
 
   if (ns == NULL) ns = g95_current_ns;
 
   do {
-    p = find_node(ns, name);
-    if (p != NULL) break;
+    t = find_node(ns, name);
+    if (t != NULL) return t->sym;
+
     ns = ns->parent;
   } while (ns != NULL);
 
-  return p;
+  return NULL;
 }
 
 
@@ -1551,7 +1557,7 @@ g95_symbol *p;
 
   if (p == NULL) {
     p = new_symbol(name, ns);
-    insert_node(ns, p);
+    insert_node(ns, name)->sym = p;
   }
 
   return p;
@@ -1657,7 +1663,7 @@ g95_symbol *p, *q;
 /* free_rb_tree()-- Recursive function that deletes an entire
  * red-black tree and all the symbols that it contains. */
 
-static void free_rb_tree(g95_redblack *rb) {
+static void free_rb_tree(g95_symtree *rb) {
 
   if (rb == NIL) return;
 
@@ -1779,7 +1785,7 @@ g95_symbol *s;
 
 /* traverse_ns()-- Recursive namespace traversal function. */
 
-static void traverse_ns(g95_redblack *rb, void (*func)(g95_symbol *)) {
+static void traverse_ns(g95_symtree *rb, void (*func)(g95_symbol *)) {
 
   if (rb != NIL) {
     (*func)(rb->sym);

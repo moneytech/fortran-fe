@@ -34,7 +34,7 @@ Boston, MA 02111-1307, USA.  */
 #define G95_REAL_BITS 100  /* Number of bits in g95's floating point numbers */
 #define G95_DEBUG 1
 
-#define G95_MAX_LINE 132   /* Characters beyond this are not seen */
+#define G95_MAX_LINE 132        /* Characters beyond this are not seen */
 
 #define G95_MAX_DIMENSIONS 7    /* Maximum dimensions in an array */
 
@@ -103,6 +103,8 @@ typedef enum { ACCESS_PUBLIC, ACCESS_PRIVATE
 typedef enum { AS_EXPLICIT=1, AS_ASSUMED_SHAPE, AS_DEFERRED,
 	       AS_ASSUMED_SIZE, AS_UNKNOWN
 } array_type;
+
+typedef enum { AR_FULL=1, AR_ELEMENT, AR_SECTION } ar_type;
 
 /* Statement label types */
 
@@ -375,10 +377,15 @@ typedef struct g95_st_label {
 #define g95_get_st_label() g95_getmem(sizeof(g95_st_label))
 
 
-/* Symbol nodes.  These are important things. */
+/* Symbol nodes.  These are important things.  They are what the
+ * standard refers to as "entities".  The possibly multiple names that
+ * refer to the same entity are accomplished by a binary tree of
+ * symtree structures that is balenced by the red-black method-- more
+ * than one symtree node can point to any given symbol. */
 
 typedef struct g95_symbol {
-  char name[G95_MAX_SYMBOL_LEN+1];
+  char name[G95_MAX_SYMBOL_LEN+1],    /* Primary name, before renaming */
+       module[G95_MAX_SYMBOL_LEN+1];  /* Module this symbol came from */
   locus declared_at;
 
   g95_typespec ts;
@@ -413,27 +420,36 @@ typedef struct g95_symbol {
 } g95_symbol;
 
 
-/* Within a namespace, symbols are linked together by a Red-Black
- * balenced binary tree.  The tree information is not stored within a
- * symbol structure because like many other binary tree
- * implementations, deleting a node can cause other nodes to be moved
- * around.  Since symbols can have lots of things pointing to them,
- * they can't be moved.  Because the only pointers to red-black nodes
- * are other red-black nodes, its OK if they are moved.
+/* Within a namespace, symbols are pointed to by symtree nodes that
+ * are linked together in a Red-Black balenced binary tree.  The tree
+ * information is not stored within a symbol structure because like
+ * many other binary tree implementations, deleting a node can cause
+ * other nodes to be moved around.  Since symbols can have lots of
+ * things pointing to them, they can't be moved.  Because the only
+ * pointers to red-black nodes are other red-black nodes, its OK if
+ * they are moved.
+ *
+ * Besides the many-to-one relationship between symbol nodes and
+ * symtree nodes, this is also why there is no pointer from symbol
+ * nodes to symtree nodes.  If it turns out this is needed, the
+ * delete_node() subroutine must be modified to update such a pointer
+ * when nodes are moved.
  *
  * The "key" of the red-black structures points to the symbol node
  * which contain the symbol name, which is the actual key used to
  * balence the tree.  The red-black code is due to Thomas Niemann. */
 
-typedef struct g95_redblack {
-  struct g95_redblack *left, *right, *parent;
-  enum { BLACK, RED } color;   /* node color (BLACK, RED) */
+typedef struct g95_symtree {
+  char name[G95_MAX_SYMBOL_LEN+1];
   g95_symbol *sym;             /* Symbol associated with this node */
-} g95_redblack;
+
+  struct g95_symtree *left, *right, *parent;
+  enum { BLACK, RED } color;   /* node color (BLACK, RED) */
+} g95_symtree;
 
 
 typedef struct g95_namespace {
-  g95_redblack *root;    /* Root of the red/black symbol tree */
+  g95_symtree *root;    /* Root of the red/black symbol tree */
 
   int set_flag[G95_LETTERS];
   g95_typespec default_type[G95_LETTERS];    /* IMPLICIT typespecs */
@@ -501,7 +517,7 @@ extern g95_state_data *g95_state_stack;
 /* Array reference */
 
 typedef struct g95_array_ref {
-  enum { AR_FULL, AR_ELEMENT, AR_SECTION } type;
+  ar_type type;
   int rank;
   locus where;
 
@@ -765,7 +781,7 @@ typedef struct g95_directorylist {
 
 typedef struct {
   char *source, *object;
-  int verbose, pedantic, resolve, line_truncation, fixed_80;
+  int verbose, pedantic, resolve, line_truncation, fixed_80, fmode;
   g95_directorylist *include_dirs, *module_dirs;
 } g95_option_t;
 

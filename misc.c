@@ -217,13 +217,15 @@ static void display_help(void) {
     "Compiled " __DATE__ " " __TIME__ "\n\n"
     "Usage: g95 [options] file\n"
     "Options:\n"
-    "  --help                    Display this information\n"
-    "  -v                        Output namespace and code structures\n"
-    "  -Wline-truncation         Warn about truncated source lines\n"
-    "  -ffixed-line-length-80    80 character line width in fixed mode\n"
-    "  -pedantic                 Warn about use of non-standard features\n"
-    "  -r                        Run the resolution phase\n"
-    "  -I[directory]             Add directory to the include file search path\n\n"
+    "  --help                  Display this information\n"
+    "  -v                      Output namespace and code structures\n"
+    "  -Wline-truncation       Warn about truncated source lines\n"
+    "  -F                      Parse an F program\n"
+    "  -ffixed-line-length-80  80 character line width in fixed mode\n"
+    "  -pedantic               Warn about use of non-standard features\n"
+    "  -r                      Run the resolution phase\n"
+    "  -I[directory]           Add directory to the include file search path\n"
+    "\n"
     "See http://g95.sourceforge.net for more information.\n\n");
 
   exit(0);
@@ -252,6 +254,11 @@ char *option;
 
   if (strcmp(option, "-r") == 0) {
     g95_option.resolve = 1;
+    return 1;
+  }
+
+  if (strcmp(option, "-F") == 0) {
+    g95_option.fmode = 1;
     return 1;
   }
 
@@ -306,6 +313,7 @@ static void init_options(void) {
   g95_option.resolve = 0;
   g95_option.line_truncation = 0;
   g95_option.fixed_80 = 0;
+  g95_option.fmode = 0;
 }
 
 
