@@ -165,10 +165,15 @@ g95_simple_fold_tmp(tree expr, tree * phead, tree * ptail, tree * tmpvar)
   assert (is_simple_rhs (expr));
 
   tmp = fold (expr);
+  if (TREE_CODE (tmp) == NON_LVALUE_EXPR)
+    var = TREE_OPERAND (tmp, 0);
+  else
+    var = tmp;
+  
   if (is_simple_val (tmp)
       && (is_simple_const (tmp)
-          || (tmpvar && tmp == *tmpvar)
-          || ! g95_is_artificial_decl (tmp)))
+          || (tmpvar && var == *tmpvar)
+          || ! DECL_ARTIFICIAL (var)))
     return tmp;
 
   if (! is_simple_rhs (expr))

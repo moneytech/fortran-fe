@@ -42,6 +42,7 @@ Boston, MA 02111-1307, USA.  */
 #include "trans-stmt.h"
 #include "trans-types.h"
 #include "trans-array.h"
+#include "trans-const.h"
 
 tree
 g95_trans_label_here (g95_code *code)
@@ -243,10 +244,43 @@ g95_trans_if (g95_code * code)
   return top;
 }
 
+/* An Arithmetic if statement. IF (cond) label1, label2, label3 translates to
+    if (cond <= 0)
+      {
+        if (cond < 0)
+          goto label1;
+        else // cond == 0
+          goto label2;
+      }
+    else // cond > 0
+      goto label3;
+ */
 tree
 g95_trans_arithmetic_if (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented: ARITHMETIC IF");
+  g95_se se;
+  tree tmp;
+  tree branch1;
+  tree branch2;
+  tree zero;
+
+  g95_start_stmt ();
+  
+  g95_init_se (&se, NULL);
+  g95_conv_simple_val (&se, code->expr);
+
+  zero = g95_build_const (TREE_TYPE (se.expr), integer_zero_node);
+  branch1 = build_stmt (GOTO_STMT, g95_get_label_decl (code->label));
+  branch2 = build_stmt (GOTO_STMT, g95_get_label_decl (code->label2));
+  tmp = build (LT_EXPR, boolean_type_node, se.expr, zero);
+  branch1 = build_stmt (IF_STMT, tmp, branch1, branch2);
+  branch2 = build_stmt (GOTO_STMT, g95_get_label_decl (code->label3));
+  tmp = build (LE_EXPR, boolean_type_node, se.expr, zero);
+  branch1 = build_stmt (IF_STMT, tmp, branch1, branch2);
+  
+  g95_add_stmt_to_pre (&se, branch1, branch1);
+
+  return g95_finish_stmt (se.pre, se.pre_tail);
 }
 
 /* Compare two values.  Return true if they are the same variable.  */

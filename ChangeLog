@@ -1,3 +1,9 @@
+2002-09-19  Paul Brook  <paul@nowt.org>
+
+	* trans.c (g95_simple_fold_tmp): Detect variables inside
+	NON_LVALUE_EXPR.
+	* trans-stmt.c (g95_trans_arithmetic_if): Implement this.
+
 2002-09-18  Steven Bosscher <s.bosscher@student.tudelft.nl>
 
 	* Make-lang.in (F95_ADDITIONAL_OBJS): Add tree-ssa-dce.o
