@@ -37,6 +37,7 @@ g95_expr *e;
   g95_clear_ts(&e->ts);
   e->op1 = NULL;
   e->op2 = NULL;
+  e->shape = NULL;
 
   return e;
 }
@@ -137,20 +138,6 @@ int i;
 }
 
 
-/* free_shape()-- Free a shape array. */
-
-static void free_shape(mpz_t *shape, int rank) {
-int n;
-
-  if (shape == NULL) return;
-
-  for(n=0; n<rank; n++)
-    mpz_clear(shape[n]);
-
-  g95_free(shape);
-}
-
-
 /* g95_free_expr0()-- Workhorse function for g95_free_expr() that
  * frees everything beneath an expression node, but not the node
  * itself.  This is useful when we want to simplify a node and replace
@@ -158,6 +145,7 @@ int n;
  * structure.  */
 
 static void g95_free_expr0(g95_expr *e) {
+int n;
 
   switch(e->expr_type) {
   case EXPR_CONSTANT:
@@ -202,7 +190,6 @@ static void g95_free_expr0(g95_expr *e) {
   case EXPR_ARRAY:
   case EXPR_STRUCTURE:
     g95_free_constructor(e->value.constructor);
-    if (e->shape) free_shape(e->shape, e->rank);
     break;
 
   case EXPR_SUBSTRING:
@@ -215,6 +202,15 @@ static void g95_free_expr0(g95_expr *e) {
 
   default:
     g95_internal_error("g95_free_expr0(): Bad expr type");
+  }
+
+  /* Free a shape array */
+
+  if (e->shape != NULL) {
+    for(n=0; n<e->rank; n++)
+      mpz_clear(e->shape[n]);
+
+    g95_free(e->shape);
   }
 
   memset(e, '\0', sizeof(g95_expr));
@@ -390,6 +386,7 @@ char *s;
       q->op2 = g95_copy_expr(p->op2);
       break;
     }
+
     break;
 
   case EXPR_FUNCTION:
@@ -404,12 +401,13 @@ char *s;
   case EXPR_STRUCTURE:
   case EXPR_ARRAY:
     q->value.constructor = g95_copy_constructor(p->value.constructor);
-    q->shape = g95_copy_shape(p->shape, p->rank);
     break;
 
   case EXPR_NULL:
     break;
   }
+
+  q->shape = g95_copy_shape(p->shape, p->rank);
 
   return q;
 }

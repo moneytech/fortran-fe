@@ -318,9 +318,9 @@ try t;
     
     if (op1_flag && op2_flag && mpz_cmp(op1_size, op2_size) != 0) {
       g95_error("%s at %L has different shape on dimension %d (%d/%d)",
-		optype, &op1->where, d+1, mpz_get_si(op1_size),
-		mpz_get_si(op2_size));
-      
+		optype, &op1->where, d+1, (int) mpz_get_si(op1_size),
+		(int) mpz_get_si(op2_size));
+
       t = FAILURE;
     }
 

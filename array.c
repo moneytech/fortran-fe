@@ -55,6 +55,8 @@ g95_array_ref *g95_copy_array_ref(g95_array_ref *src) {
 g95_array_ref *dest;
 int i;
 
+  if (src == NULL) return NULL;
+
   dest = g95_get_array_ref();
 
   *dest = *src;
@@ -1017,7 +1019,10 @@ mpz_t result;
 
 static try extract_element(g95_expr *e) {
 
-  if (e->rank != 0) return FAILURE;  /* Something unextractable */
+  if (e->rank != 0) {  /* Something unextractable */
+    g95_free_expr(e);
+    return FAILURE;
+  }
 
   if (current_expand.extract_count == current_expand.extract_n)
     current_expand.extracted = e;

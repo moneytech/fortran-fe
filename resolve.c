@@ -1428,7 +1428,7 @@ g95_ref *ref;
 int i, rank;
 
   if (e->ref == NULL) {
-    if (e->expr_type == EXPR_ARRAY) return;
+    if (e->expr_type == EXPR_ARRAY) goto done;
     /* Constructors can have a rank different from one via RESHAPE() */
 
     if (e->symbol == NULL) {
@@ -1530,17 +1530,7 @@ try t;
     expression_rank(e);
 
     t = g95_resolve_array_constructor(e);
-
     if (t == SUCCESS) t = g95_expand_constructor(e);
-
-    if (e->shape == NULL) {
-      e->shape = g95_get_shape(1);
-
-      if (g95_array_size(e, &e->shape[0]) == FAILURE) {
-	g95_free(e->shape);
-	e->shape = NULL;
-      }
-    }
 
     break;
 
