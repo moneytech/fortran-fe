@@ -1003,7 +1003,7 @@ g95_expr *e;
       continue;
     }
 
-    if (check_element_type(e) == FAILURE) return FAILURE;
+    if (check_element_type(e)) return FAILURE;
   }
 
   return SUCCESS;
