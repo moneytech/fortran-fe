@@ -290,10 +290,16 @@ void g95_resolve_ubound(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_unpack(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_verify(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 
+
+/* Intrinsic subroutine resolution */
+
+void g95_resolve_cpu_time(g95_code *);
+void g95_resolve_random_number(g95_code *);
+
+
 /* Enumeration of all the generic intrinsic functions.  Used by the backend
    for identification of a function.  */
-enum g95_generic_isym_id
-{
+enum g95_generic_isym_id {
   /* G95_ISYM_NONE is used for intrinsics which will never be seen by the
      backend (eg. KIND).  */
   G95_ISYM_NONE = 0,

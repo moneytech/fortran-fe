@@ -20,12 +20,14 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-/* iresolve.c-- assign name and types to intrinsic procedures.  The
- * first argument to a resolution function is an expression pointer to
- * the original function node and the rest are pointers to the
- * arguments of the function call.  The result type and library
- * subroutine name are generally set accoring to the function
- * arguments. */
+/* iresolve.c-- assign name and types to intrinsic procedures.  For
+ * functions, the first argument to a resolution function is an
+ * expression pointer to the original function node and the rest are
+ * pointers to the arguments of the function call.  For subroutines,
+ * a pointer to the code node is passed.
+ *
+ * The result type and library subroutine name are generally set
+ * according to the function arguments. */
 
 #include <string.h>
 #include <stdarg.h>
@@ -771,7 +773,8 @@ void g95_resolve_rrspacing(g95_expr *f, g95_expr *x) {
 void g95_resolve_scale(g95_expr *f, g95_expr *x, g95_expr *y) {
 
   f->ts = x->ts;
-  f->value.function.name = g95_get_string("__scale_%d_%d", x->ts.kind, x->ts.kind);
+  f->value.function.name = g95_get_string("__scale_%d_%d", x->ts.kind,
+					  x->ts.kind);
 }
 
 
@@ -950,6 +953,25 @@ void g95_resolve_verify(g95_expr *f, g95_expr *string, g95_expr *set,
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
   f->value.function.name = g95_get_string("__verify_%d", string->ts.kind);
+}
+
+
+/* Intrinsic subroutine resolution.  */
+
+void g95_resolve_cpu_time(g95_code *c) {
+
+  c->sub_name = g95_get_string("_gfor_cpu_time_%d",
+			       c->ext.actual->expr->ts.kind);
+}
+
+
+void g95_resolve_random_number(g95_code *c) {
+int kind;
+
+  kind = c->ext.actual->expr->ts.kind;
+
+  c->sub_name = g95_get_string((c->ext.actual->expr->rank == 0) ?
+			       "_gfor_random_%d" : "_gfor_arandom_%d", kind);
 }
 
 

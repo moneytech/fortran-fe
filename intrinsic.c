@@ -291,7 +291,7 @@ va_list argp;
   case SZ_NOTHING:
     strcpy(next_sym->name, name);
 
-    strcpy(next_sym->lib_name, "__");
+    strcpy(next_sym->lib_name, "_g95_");
     strcat(next_sym->lib_name, name);
 
     next_sym->elemental = elemental;
@@ -1454,7 +1454,7 @@ int di, dr, dc;
   dc = g95_default_character_kind();
 
   add_sym("cpu_time", 0, 1, BT_UNKNOWN, 0,
-	  g95_check_cpu_time, NULL, NULL,
+	  g95_check_cpu_time, NULL, g95_resolve_cpu_time,
 	  tm, BT_REAL, dr, 0, NULL);
 
   add_sym("date_and_time", 0, 1, BT_UNKNOWN, 0,
@@ -1474,7 +1474,7 @@ int di, dr, dc;
 	  tp, BT_INTEGER, di, 0, NULL);
 
   add_sym("random_number", 0, 1, BT_UNKNOWN, 0,
-	  g95_check_random_number, NULL, NULL,
+	  g95_check_random_number, NULL, g95_resolve_random_number,
 	  h, BT_REAL, dr, 0, NULL);
 
   add_sym("random_seed", 0, 1, BT_UNKNOWN, 0,
@@ -2173,7 +2173,11 @@ char *name;
    * seen at this point. */
 
   g95_suppress_error = 0;
-  c->sub_name = isym->lib_name;
+
+  if (isym->resolve != NULL)
+    isym->resolve(c);
+  else
+    c->sub_name = isym->lib_name;
 
   if (g95_pure(NULL) && !isym->elemental) {
     g95_error("Subroutine call to intrinsic '%s' at %L is not PURE", name,
