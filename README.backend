@@ -21,7 +21,7 @@ To make useful programs you'll also need the runtime and IO libraries
  (libgfor.c and libgforio.a).
 
 Note that the backend interface is still at an early stage. Many features are
-either missing or only partialy complete.
+either missing or only partially complete.
 
 Any problems/comments/suggestions please let me know.
 
