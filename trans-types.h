@@ -90,7 +90,7 @@ tree g95_get_base_component (tree);
 tree g95_get_element_type (tree);
 tree g95_get_array_type_bounds (tree, int, tree *, tree *);
 
-/* Return a structure type for saving descriptors of specified rank.  */
-tree g95_get_descriptorsave_type(int);
+/* Some functions have an extra parameter for the return value.  */
+int g95_return_by_reference (g95_symbol *);
 
 #endif

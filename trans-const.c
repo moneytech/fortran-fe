@@ -117,10 +117,10 @@ g95_conv_constant (g95_se * se, g95_expr * expr)
   if (se->ss != NULL)
     {
       assert (se->ss != g95_ss_terminator);
-      assert (se->ss->dimen == 0);
+      assert (se->ss->type == G95_SS_SCALAR);
       assert (se->ss->expr == expr);
 
-      se->expr = se->ss->data.se.expr;
+      se->expr = se->ss->data.scalar;
       g95_advance_se_ss_chain (se);
       return;
     }

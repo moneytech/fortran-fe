@@ -31,10 +31,13 @@ void g95_array_allocate (g95_se *, g95_ref *, tree);
 tree g95_array_init_size (tree, int, tree *,
     g95_expr **, g95_expr **, tree *, tree *);
 
-/* Generate code for allocation and cleanup of local array variables.  */
-tree g95_trans_auto_array_allocation (g95_symbol * sym);
-/* Generate entry and exit code for local array variables.  */
-tree g95_trans_dummy_array_bias (g95_symbol * sym, tree body);
+/* Generate code to allocate a temporary array.  */
+void g95_trans_allocate_temp_array (g95_loopinfo *, g95_ss_info *);
+
+/* Generate code for allocation of compiler allocated array variables.  */
+tree g95_trans_auto_array_allocation (tree, g95_array_spec *);
+/* Generate entry and exit code for dummy array parameters.  */
+tree g95_trans_dummy_array_bias (g95_symbol *, tree, tree);
 /* Add initialisation for deferred arrays.  */
 tree g95_trans_deferred_array (g95_symbol *, tree);
 /* Generate scalarization information for an expression.  */

@@ -42,6 +42,7 @@ Boston, MA 02111-1307, USA.  */
 #include "errors.h"
 #include "timevar.h"
 #include "flags.h"
+#include "target.h"
 #include "tree-optimize.h"
 #include <assert.h>
 #define BACKEND_CODE
@@ -261,6 +262,17 @@ expand_function_body (tree fndecl)
 
   rest_of_compilation (fndecl);
 
+  if (DECL_STATIC_CONSTRUCTOR (fndecl))
+    {
+      if (targetm.have_ctors_dtors)
+        {
+
+          (* targetm.asm_out.constructor) (XEXP (DECL_RTL (fndecl), 0),
+                                           DEFAULT_INIT_PRIORITY);
+        }
+      else
+        g95_static_ctors = g95_chainon_list (g95_static_ctors, fndecl);
+    }
   if (nested)
     ggc_pop_context ();
 
@@ -316,6 +328,7 @@ void
 g95_be_parse_file (void *set_yydebug ATTRIBUTE_UNUSED)
 {
   g95_parse_file ();
+  g95_generate_constructors ();
 }
 
 /* Routines Expected by GCC:  */
@@ -340,6 +353,8 @@ g95_init (const char *filename)
 
   if (g95_new_file (g95_option.source, g95_option.form) != SUCCESS)
     return (NULL);
+
+  g95_static_ctors = NULL_TREE;
 
   return filename;
 }

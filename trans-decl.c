@@ -53,6 +53,9 @@ static GTY(()) tree current_function_return_label;
 /* Holds the variable DECLs for the current function.  */
 static GTY (()) tree saved_function_decls = NULL_TREE;
 
+/* List of static constructor functions.  */
+tree g95_static_ctors;
+
 /* Function declarations for builtin library functions.  */
 tree g95_fndecl_push_context;
 tree g95_fndecl_pop_context;
@@ -300,21 +303,25 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
 
 /* Get a temporary decl for a dummy array parameter.  */
 static tree
-g95_build_dummy_array_decl (g95_symbol * sym)
+g95_build_dummy_array_decl (g95_symbol * sym, tree dummy)
 {
   tree decl;
   tree type;
   tree stmt;
   char *name;
 
-  type = TREE_TYPE (sym->backend_decl);
-  assert (TREE_CODE (sym->backend_decl) == PARM_DECL
+  if (sym->attr.pointer || sym->attr.allocatable)
+    return dummy;
+
+  type = TREE_TYPE (dummy);
+  assert (TREE_CODE (dummy) == PARM_DECL
          && TREE_CODE (type) == REFERENCE_TYPE);
   type = TREE_TYPE (type);
   assert (G95_DESCRIPTOR_TYPE_P (type));
   ASM_FORMAT_PRIVATE_NAME (name,
-      IDENTIFIER_POINTER (DECL_NAME (sym->backend_decl)), 0);
+      IDENTIFIER_POINTER (DECL_NAME (dummy)), 0);
   decl = build_decl (VAR_DECL, get_identifier (name), type);
+
   DECL_ARTIFICIAL (decl) = 1;
   TREE_PUBLIC (decl) = 0;
   TREE_STATIC (decl) = 0;
@@ -331,24 +338,26 @@ g95_build_dummy_array_decl (g95_symbol * sym)
         G95_DECL_PARTIAL_PACKED_ARRAY (decl) = 1;
     }
 
-  if (DECL_LANG_SPECIFIC (sym->backend_decl))
-    DECL_LANG_SPECIFIC (decl) = DECL_LANG_SPECIFIC (sym->backend_decl);
+  if (DECL_LANG_SPECIFIC (dummy))
+    DECL_LANG_SPECIFIC (decl) = DECL_LANG_SPECIFIC (dummy);
   else
     {
       DECL_LANG_SPECIFIC (decl) = (struct lang_decl *)
         ggc_alloc_cleared (sizeof (struct lang_decl));
     }
-  G95_DECL_SAVED_DESCRIPTOR (decl) = sym->backend_decl;
-  G95_DECL_STRING (decl) = G95_DECL_STRING (sym->backend_decl);
+  G95_DECL_SAVED_DESCRIPTOR (decl) = dummy;
+  G95_DECL_STRING (decl) = G95_DECL_STRING (dummy);
 
-  sym->tlink = sym->ns->proc_name->tlink;
-  sym->ns->proc_name->tlink = sym;
+  /* Add to list of variables if not a fake result variable.  */
+  if (sym->attr.result || sym->attr.dummy)
+    {
+      sym->tlink = sym->ns->proc_name->tlink;
+      sym->ns->proc_name->tlink = sym;
+    }
 
   stmt = build_stmt (DECL_STMT, decl);
   TREE_CHAIN (stmt) = saved_function_decls;
   saved_function_decls = stmt;
-
-  sym->backend_decl = decl;
 
   return decl;
 }
@@ -361,15 +370,27 @@ g95_get_symbol_decl (g95_symbol * sym)
   tree decl;
   tree length;
 
-  if (sym->attr.dummy)
+  if (sym->attr.dummy || sym->attr.result)
     {
       assert (sym->backend_decl);
+
+      /* Return via extra parameter.  */
+      if (sym->attr.result && g95_return_by_reference (sym->ns->proc_name)
+          && ! sym->backend_decl)
+        {
+          sym->backend_decl =
+            DECL_ARGUMENTS (sym->ns->proc_name->backend_decl);
+
+        }
+
       /* Use a copy of the descriptor for dummy arrays.  */
       if (sym->attr.dimension
-          && ! (sym->attr.pointer || sym->attr.allocatable)
           && TREE_CODE (sym->backend_decl) == PARM_DECL)
         {
-          return g95_build_dummy_array_decl (sym);
+          TREE_USED (sym->backend_decl) = 1;
+          sym->backend_decl =
+            g95_build_dummy_array_decl (sym, sym->backend_decl);
+          return sym->backend_decl;
         }
       /* Dummy variables should already have been created.  */
       TREE_USED (sym->backend_decl) = 1;
@@ -534,10 +555,15 @@ g95_get_function_decl (g95_symbol * sym)
   result_decl = NULL_TREE;
   if (attr.function)
     {
-      if (sym->result != sym)
-        result_decl = g95_sym_identifier (sym->result);
+      if (g95_return_by_reference (sym))
+        type = void_type_node;
+      else
+        {
+          if (sym->result != sym)
+            result_decl = g95_sym_identifier (sym->result);
 
-      type = TREE_TYPE (TREE_TYPE (fndecl));
+          type = TREE_TYPE (TREE_TYPE (fndecl));
+        }
     }
   else
     {
@@ -598,17 +624,33 @@ g95_get_function_decl (g95_symbol * sym)
      of the current function.  */
   if (! attr.external)
     {
+      tree parm;
+
       pushdecl (fndecl);
       /* Build formal argument list. Make sure that their TREE_CONTEXT is
          the new FUNCTION_DECL node.  */
       current_function_decl = fndecl;
       arglist = NULL_TREE;
       typelist = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
+      if (g95_return_by_reference (sym))
+        {
+          type = TREE_VALUE (typelist);
+          parm = build_decl (PARM_DECL, get_identifier ("__return"), type);
+
+          DECL_CONTEXT (parm) = fndecl;
+          DECL_ARG_TYPE (parm) = type;
+          TREE_READONLY (parm) = 1;
+          G95_DECL_PACKED_ARRAY (parm) = 1;
+          g95_finish_decl (parm, NULL_TREE);
+
+          arglist = chainon (arglist, parm);
+          typelist = TREE_CHAIN (typelist);
+        }
+
       for (f = sym->formal; f; f = f->next)
         {
           if (f->sym != NULL)       /* ignore alternate returns. */
             {
-              tree parm;
               tree length = NULL_TREE;
 
               type = TREE_VALUE (typelist);
@@ -684,7 +726,7 @@ g95_get_function_decl (g95_symbol * sym)
 
 /* Return the decl used to hold the function return value.  */
 tree
-g95_get_fake_result_decl (void)
+g95_get_fake_result_decl (g95_symbol * sym)
 {
   tree decl;
   char name[G95_MAX_SYMBOL_LEN+10];
@@ -692,21 +734,31 @@ g95_get_fake_result_decl (void)
   if (current_fake_result_decl != NULL_TREE)
     return current_fake_result_decl;
 
-  sprintf (name, "__result_%s",
-        IDENTIFIER_POINTER (DECL_NAME (current_function_decl)));
+  if (g95_return_by_reference (sym))
+    {
+      decl = DECL_ARGUMENTS (sym->backend_decl);
 
-  decl = build_decl (VAR_DECL, get_identifier (name),
-              TREE_TYPE (TREE_TYPE (current_function_decl)));
+      TREE_USED (decl) = 1;
+      decl = g95_build_dummy_array_decl (sym, decl);
+    }
+  else
+    {
+      sprintf (name, "__result_%s",
+               IDENTIFIER_POINTER (DECL_NAME (current_function_decl)));
 
-  DECL_ARTIFICIAL (decl) = 1;
-  DECL_EXTERNAL (decl) = 0;
-  TREE_PUBLIC (decl) = 0;
-  TREE_USED (decl) = 1;
+      decl = build_decl (VAR_DECL, get_identifier (name),
+                         TREE_TYPE (TREE_TYPE (current_function_decl)));
 
-  layout_decl (decl, 0);
+      DECL_ARTIFICIAL (decl) = 1;
+      DECL_EXTERNAL (decl) = 0;
+      TREE_PUBLIC (decl) = 0;
+      TREE_USED (decl) = 1;
 
-  saved_function_decls = chainon (saved_function_decls,
-        build_stmt (DECL_STMT, decl));
+      layout_decl (decl, 0);
+
+      saved_function_decls = chainon (saved_function_decls,
+                                      build_stmt (DECL_STMT, decl));
+    }
 
   current_fake_result_decl = decl;
 
@@ -969,7 +1021,19 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
   tree stmt;
   locus loc;
 
-  for (; sym; sym = sym->tlink)
+  /* Deal with implicit return variables.  Explicit return variables will
+     already have been added.  */
+  if (g95_return_by_reference (sym) && sym->result == sym)
+    {
+      if (! current_fake_result_decl)
+        {
+          warning ("Function does not return a value");
+          return body;
+        }
+      body = g95_trans_dummy_array_bias (sym, current_fake_result_decl, body);
+    }
+
+  for (sym = sym->tlink; sym; sym = sym->tlink)
     {
       /* For now this is only array variables, but may get extended to
          derived types.  */
@@ -981,12 +1045,14 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
             {
             case AS_EXPLICIT:
               if (sym->attr.dummy)
-                body = g95_trans_dummy_array_bias (sym, body);
+                body =
+                  g95_trans_dummy_array_bias (sym, sym->backend_decl, body);
               else
                 {
                   g95_get_backend_locus (&loc);
                   g95_set_backend_locus (&sym->declared_at);
-                  stmt = g95_trans_auto_array_allocation (sym);
+                  stmt = g95_trans_auto_array_allocation (sym->backend_decl,
+                                                          sym->as);
                   g95_set_backend_locus (&loc);
 
                   /* Add to the start of the function body.  */
@@ -999,7 +1065,7 @@ g95_trans_deferred_vars (g95_symbol * sym, tree body)
               /* These must be dummy parameters.  */
               assert (sym->attr.dummy);
 
-              body = g95_trans_dummy_array_bias (sym, body);
+              body = g95_trans_dummy_array_bias (sym, sym->backend_decl, body);
               break;
 
             case AS_DEFERRED:
@@ -1112,11 +1178,7 @@ g95_generate_function_code (g95_namespace * ns)
     }
 
   /* Add code to create and cleanup arrays.  */
-  if (sym->tlink != NULL)
-    {
-      body = g95_trans_deferred_vars (sym->tlink, body);
-      sym->tlink = NULL;
-    }
+  body = g95_trans_deferred_vars (sym, body);
 
   if (TREE_TYPE (DECL_RESULT (fndecl)) != void_type_node)
     {
@@ -1184,6 +1246,63 @@ g95_generate_function_code (g95_namespace * ns)
   expand_function_body (fndecl);
 
   current_function_decl = old_context;
+}
+
+void
+g95_generate_constructors ()
+{
+  tree fnname;
+  tree type;
+  tree fndecl;
+  tree decl;
+  tree tmp;
+
+  if (g95_static_ctors == NULL_TREE)
+    return;
+
+  fnname = get_file_function_name ('I');
+  type = build_function_type (void_type_node,
+                             g95_chainon_list (NULL_TREE, void_type_node));
+
+  fndecl = build_decl (FUNCTION_DECL, fnname, type);
+  TREE_PUBLIC (fndecl) = 1;
+
+  decl = build_decl (RESULT_DECL, NULL_TREE, void_type_node);
+  DECL_CONTEXT (decl) = fndecl;
+  DECL_RESULT (fndecl) = decl;
+
+  pushdecl (fndecl);
+
+  current_function_decl = fndecl;
+
+  rest_of_decl_compilation (fndecl, NULL, 1, 0);
+
+  make_decl_rtl (fndecl, NULL);
+
+  init_function_start (fndecl, input_filename, lineno);
+
+  cfun->x_whole_function_mode_p = 1;
+
+  immediate_size_expand = 0;
+
+  pushlevel (0);
+
+  for (; g95_static_ctors; g95_static_ctors = TREE_CHAIN (g95_static_ctors))
+    {
+      tmp = g95_build_function_call (TREE_VALUE (g95_static_ctors), NULL_TREE);
+      DECL_SAVED_TREE (fndecl) = build_stmt (EXPR_STMT, tmp);
+    }
+
+  poplevel (1, 0, 1);
+
+  BLOCK_SUPERCONTEXT (DECL_INITIAL (fndecl)) = fndecl;
+
+  free_after_parsing (cfun);
+  free_after_compilation (cfun);
+
+  expand_function_body (fndecl);
+
+  current_function_decl = NULL_TREE;
 }
 
 #include "gt-f95-trans-decl.h"

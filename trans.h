@@ -50,6 +50,9 @@ typedef struct g95_se
   struct g95_se *parent;
   tree loopvar[G95_MAX_DIMENSIONS];
   struct g95_ss *ss;
+  struct g95_loopinfo *loop;
+  /* Only used for functions returning arrays.  */
+  tree data_pointer;
 } g95_se;
 
 /* Scalarisation State chain.  Created by walking an expression tree before
@@ -59,6 +62,7 @@ typedef struct g95_se
    indicates to g95_conv_* that this should be a scalar expression.  */
 typedef struct g95_ss_info
 {
+  int dimen;
   /* The ref that holds information on this section.  */
   g95_ref *ref;
   /* The descriptor of this array.  */
@@ -78,18 +82,27 @@ typedef struct g95_ss_info
   int dim[G95_MAX_DIMENSIONS];
 } g95_ss_info;
 
+typedef enum
+{
+  G95_SS_SCALAR,
+  G95_SS_REFERENCE,
+  G95_SS_SECTION,
+  G95_SS_FUNCTION,
+  G95_SS_VECTOR
+} g95_ss_type;
+
 /* TODO: Use GCC Garbage Collection for g95_ss.
    Keeping track of them is easy now, but may become less so as they get
    used for other scalarizations (IO, array parameters, FORALL, WHERE).  */
 typedef struct g95_ss
 {
-  int dimen;
+  g95_ss_type type;
   g95_expr *expr;
   union
   {
     /* If dimen == 0.  */
-    g95_se se;
-    /* If dimen > 0.  */
+    tree scalar;
+    /* If dimen != 0.  */
     g95_ss_info info;
   } data;
 
@@ -121,6 +134,7 @@ typedef struct g95_loopinfo
 
   /* If set we don't need the loop variables.  */
   unsigned array_parameter:1;
+  unsigned temp_used:1;
 } g95_loopinfo;
 
 /* Advance the SS chain to the next term.  */
@@ -131,7 +145,8 @@ void g95_advance_se_ss_chain (g95_se *);
    parent to get scalarization data from, or NULL.  */
 void g95_init_se(g95_se *, g95_se *);
 
-/* helpers for adding to stmt chains */
+/* Helpers for adding to stmt chains.  Not these should be macros as they are
+   used for both g95_se and g95_loop structures.  */
 /* Add statements to a g95_se->pre chain.  */
 #define g95_add_stmt_to_pre(se, h, t) \
             g95_add_stmt_to_list(&(se)->pre, &(se)->pre_tail, h, t)
@@ -143,7 +158,8 @@ void g95_init_se(g95_se *, g95_se *);
    Used by g95_add_stmt_to_(pre|post).  */
 void g95_add_stmt_to_list(tree *, tree *, tree, tree);
 
-/* create a temporary variable in the current scope.  */
+/* Create a temporary variable in the current scope.  Depreciated, use
+   create_tmp_var.  */
 tree g95_create_tmp_var(tree);
 
 /* store the result of an expression on a temp variable so it can be used
@@ -220,7 +236,7 @@ tree g95_build_label_decl(tree);
 
 /* Return the decl used to hold the function return value.
    Do not use if the function has an explicit result variable.  */
-tree g95_get_fake_result_decl(void);
+tree g95_get_fake_result_decl(g95_symbol *);
 
 /* Get the return label for the current function.  */
 tree g95_get_return_label (void);
@@ -246,6 +262,10 @@ void g95_generate_function_code (g95_namespace *);
 /* Get and set the current location.  */
 void g95_set_backend_locus (locus *);
 void g95_get_backend_locus (locus *);
+
+/* Handle static constructor functions.  */
+tree g95_static_ctors;
+void g95_generate_constructors (void);
 
 /* somewhere! */
 tree pushdecl (tree);

@@ -51,11 +51,14 @@ Boston, MA 02111-1307, USA.  */
 
 static g95_file *g95_current_backend_file;
 
+/* The namespace of the module we're currently generating.  */
+static g95_namespace *module_namespace;
+
 /* Advance along TREE_CHAIN n times.  */
 tree
 g95_advance_chain (tree t, int n)
 {
-  for ( ; n > 0 ; n--)
+  for (; n > 0; n--)
     {
       assert (t != NULL_TREE);
       t = TREE_CHAIN (t);
@@ -194,7 +197,9 @@ create_tmp_alias_var (tree type, const char * prefix)
 /* Create a temporary variable.  Note that it may be used for small array
    temporaries.  Also used for array descriptors.  Be careful when you call
    this as the temporary is added to the current scope.  It is only valid
-   inside the g95_start/finish_stmt pair in which it is created.  */
+   inside the g95_start/finish_stmt pair in which it is created.
+   Use of this function is depreciated, use create_tmp_var or
+   create_tmp_alias_var.  */
 tree
 g95_create_tmp_var (tree type)
 {
@@ -718,7 +723,6 @@ g95_generate_code (g95_namespace * ns)
 
   g95_generate_function_protos (ns);
 
-
   for (n = ns->contained ; n ; n = n->sibling)
     {
       g95_todo_error("contained subroutines");
@@ -729,8 +733,6 @@ g95_generate_code (g95_namespace * ns)
 
   current_function_decl = NULL;
 }
-
-static g95_namespace * module_namespace;
 
 static void
 g95_create_module_variable (g95_symbol * sym)
@@ -789,4 +791,3 @@ g95_generate_module_code (g95_namespace * ns)
       g95_generate_function_code (n);
     }
 }
-

@@ -196,17 +196,21 @@ check-f95-fix: force
 # Can't be bothered doing these properly... Fix later :-)
 
 # Everything depends on g95.h
-$(G95_PARSER_OBJS): f95/g95.h
+$(G95_PARSER_OBJS): f95/g95.h f95/intrinsic.h
 
-f95/f95-lang.o: f95/g95.h f95/trans.h
-f95/support.o: f95/g95.h
-f95/convert.o: f95/g95.h
-f95/trans.o: f95/g95.h f95/trans.h
-f95/trans-decl.o: f95/g95.h
-f95/trans-types.o: f95/g95.h
-f95/trans-const.o: f95/g95.h f95/trans.h
-f95/trans-expr.o: f95/g95.h f95/trans.h
-f95/trans-stmt.o: f95/g95.h f95/trans.h
-f95/trans-io.o: f95/g95.h f95/trans.h
-f95/trans-array.o: f95/g95.h f95/trans.h
-f95/trans-intrinsic.o: f95/g95.h f95/trans.h
+G95_TRANS_DEPS = f95/g95.h f95/intrinsic.h f95/trans-array.h \
+    f95/trans-const.h f95/trans-const.h f95/trans.h f95/trans-stmt.h \
+    f95/trans-types.h
+
+f95/f95-lang.o: $(G95_TRANS_DEPS) f95/g95-support.h
+f95/support.o: $(G95_TRANS_DEPS) f95/g95-support.h
+f95/convert.o: $(G95_TRANS_DEPS) f95/g95-support.h
+f95/trans.o: $(G95_TRANS_DEPS)
+f95/trans-decl.o: $(G95_TRANS_DEPS)
+f95/trans-types.o: $(G95_TRANS_DEPS)
+f95/trans-const.o: $(G95_TRANS_DEPS)
+f95/trans-expr.o: $(G95_TRANS_DEPS)
+f95/trans-stmt.o: $(G95_TRANS_DEPS)
+f95/trans-io.o: $(G95_TRANS_DEPS) f95/gforio-flags.h
+f95/trans-array.o: $(G95_TRANS_DEPS)
+f95/trans-intrinsic.o: $(G95_TRANS_DEPS)

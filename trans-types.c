@@ -49,9 +49,6 @@ Boston, MA 02111-1307, USA.  */
 #error If you really need >99 dimensions, continue the sequence above...
 #endif
 
-/* Remenber array descriptor save types for reuse.  */
-static GTY(()) tree g95_desriptorsave_types[G95_MAX_DIMENSIONS];
-
 static tree g95_get_derived_type (g95_symbol * derived);
 
 tree g95_type_nodes[NUM_F95_TYPES];
@@ -69,8 +66,6 @@ tree pchar_type_node;
 void
 g95_init_types (void)
 {
-  int n;
-
   /* Name the types.  */
 #define PUSH_TYPE(name, node)                   \
   pushdecl (build_decl (TYPE_DECL, get_identifier (name), node))
@@ -133,9 +128,6 @@ g95_init_types (void)
 
   g95_array_index_kind = TYPE_PRECISION (integer_type_node) / 8;
   g95_array_index_type = g95_get_int_type (g95_array_index_kind);
-
-  for (n = 0 ; n < G95_MAX_DIMENSIONS ; n++)
-    g95_desriptorsave_types[n] = NULL_TREE;
 }
 
 /* Get a type node for an integer kind */
@@ -312,77 +304,6 @@ g95_conv_array_bound (g95_expr * expr)
 
   /* Otherwise return NULL.  */
   return NULL_TREE;
-}
-
-/* Return a structure type for saving descriptors of specified rank.
-   We need one member for each dimension. Type B arrays also need to
-   store the data member. */
-/*GCC ARRAYS*/
-tree
-g95_get_descriptorsave_type(int rank)
-{
-  tree typenode;
-  tree fieldlist;
-  tree field;
-  int n;
-  char name[6+G95_RANK_DIGITS];
-
-  if (g95_desriptorsave_types[rank] != NULL_TREE)
-    return g95_desriptorsave_types[rank];
-
-  typenode = make_node (RECORD_TYPE);
-  TYPE_NAME (typenode) = get_identifier ("descriptorsave");
-  TYPE_PACKED (typenode) = g95_option.pack_derived;
-
-  fieldlist = NULL_TREE;
-
-  field = build_decl (FIELD_DECL,
-                      get_identifier ("data"),
-                      build_pointer_type (void_type_node));
-
-  DECL_CONTEXT (field) = typenode;
-  DECL_PACKED (field) |= TYPE_PACKED (typenode);
-  DECL_INITIAL (field) = 0;
-
-  DECL_ALIGN (field) = 0;
-  DECL_USER_ALIGN (field) = 0;
-
-  TREE_CHAIN (field) = NULL_TREE;
-
-  fieldlist = chainon (fieldlist, field);
-
-  /* Add the delta fields.  */
-  for (n = 0 ; n < rank ; n++)
-    {
-      sprintf (name, "delta"G95_RANK_PRINTF_FORMAT, n);
-      field = build_decl (FIELD_DECL,
-			  get_identifier (name),
-			  g95_array_index_type);
-
-      DECL_CONTEXT (field) = typenode;
-      DECL_PACKED (field) |= TYPE_PACKED (typenode);
-      DECL_INITIAL (field) = 0;
-
-      DECL_ALIGN (field) = 0;
-      DECL_USER_ALIGN (field) = 0;
-
-      TREE_CHAIN (field) = NULL_TREE;
-
-      fieldlist = chainon (fieldlist, field);
-    }
-
-  /* Now we have the final fieldlist.  Record it, then lay out the
-     derived type, including the fields.  */
-  TYPE_FIELDS (typenode) = fieldlist;
-  layout_type (typenode);
-
-  /* Finish debugging output for this type.  */
-  rest_of_type_compilation (typenode, 0);
-
-  g95_desriptorsave_types[rank] = typenode;
-
-  return typenode;
-
 }
 
 tree
@@ -768,7 +689,8 @@ g95_sym_type (g95_symbol * sym)
     }
   else
     {
-      if (sym->attr.allocatable || sym->attr.pointer)
+      if ((sym->attr.allocatable || sym->attr.pointer)
+          && ! sym->attr.dimension)
         type = g95_build_pointer_type (sym, type);
 
       /* We currently pass all parameters by reference.
@@ -851,6 +773,16 @@ g95_get_derived_type (g95_symbol * derived)
   return typenode;
 }
 
+int
+g95_return_by_reference (g95_symbol * sym)
+{
+  if (sym->attr.dimension)
+    return 1;
+
+  /* Possibly return derived types by reference.  */
+  return 0;
+}
+
 tree
 g95_get_function_type (g95_symbol * sym)
 {
@@ -863,6 +795,13 @@ g95_get_function_type (g95_symbol * sym)
     return TREE_TYPE (sym->backend_decl);
 
   typelist = NULL_TREE;
+  /* For functions that return arrays we use an extra parameter for the
+     return value.  */
+  if (g95_return_by_reference (sym))
+    {
+      type = build_reference_type (g95_sym_type (sym));
+      typelist = chainon (typelist, listify (type));
+    }
   /* Build the argument types for the function */
   for (f = sym->formal; f; f = f->next)
     {
@@ -898,7 +837,7 @@ g95_get_function_type (g95_symbol * sym)
 
   typelist = chainon (typelist, listify (void_type_node));
 
-  if (sym->attr.subroutine)
+  if (sym->attr.subroutine || g95_return_by_reference (sym))
     type=void_type_node;
   else
     type=g95_sym_type (sym);
@@ -1160,5 +1099,3 @@ g95_signed_or_unsigned_type (int unsignedp, tree type)
 
   return type;
 }
-
-#include "gt-f95-trans-types.h"
