@@ -1382,10 +1382,7 @@ g95_select s;
     g95_reject_statement();
   }
 
-  if (st == ST_END_SELECT) {
-    g95_free_expr(expr);
-    goto done;
-  }
+  if (st == ST_END_SELECT) goto done;
 
 /* At this point, we're really going to do something */
 
