@@ -1098,6 +1098,8 @@ g95_expr *g95_constant_result(bt, int, locus *);
 int g95_validate_kind(bt, int);
 arith g95_range_check(g95_expr *);
 
+int g95_zero_size_array(g95_expr *);
+
 arith g95_arith_uminus(g95_expr *, g95_expr **);
 arith g95_arith_plus(g95_expr *, g95_expr *, g95_expr **);
 arith g95_arith_minus(g95_expr *, g95_expr *, g95_expr **);

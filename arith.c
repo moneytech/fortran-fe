@@ -1882,19 +1882,66 @@ runtime:
   return result;
 }
 
+
+/* g95_zero_size_array()-- Return nonzero if the expression is a zero
+ * size array. */
+
+int g95_zero_size_array(g95_expr *e) {
+
+  if (e->expr_type != EXPR_ARRAY) return 0;
+
+  return e->value.constructor == NULL;
+}
+
+
+/* reduce_binary0()-- Reduce a binary expression where at least one of
+ * the operands involves a zero-length array.  Returns NULL if neither
+ * of the operands is a zero-length array. */
+
+static g95_expr *reduce_binary0(g95_expr *op1, g95_expr *op2) {
+
+  if (g95_zero_size_array(op1)) {
+    g95_free_expr(op2);
+    return op1;
+  }
+
+  if (g95_zero_size_array(op2)) {
+    g95_free_expr(op1);
+    return op2;
+  }
+
+  return NULL;
+}
+
+
 static g95_expr *eval_intrinsic_f2(g95_intrinsic_op operator,
 				   arith (*eval)(g95_expr *, g95_expr **),
 				   g95_expr *op1, g95_expr *op2) {
+g95_expr *result;
+
+  if (op2 == NULL) {
+    if (g95_zero_size_array(op1)) return op1;
+  } else {
+    result = reduce_binary0(op1, op2);
+    if (result != NULL) return result;
+  }
+
   return eval_intrinsic(operator, eval, op1, op2);
 }
+
 
 static g95_expr *eval_intrinsic_f3(g95_intrinsic_op operator,
 				   arith (*eval)(g95_expr *, g95_expr *,
 						 g95_expr **),
 				   g95_expr *op1, g95_expr *op2) {
+g95_expr *result;
+
+  result = reduce_binary0(op1, op2);
+  if (result != NULL) return result;
 
   return eval_intrinsic(operator, eval, op1, op2);
 }
+
 
 
 g95_expr *g95_uplus(g95_expr *op) {

@@ -2211,7 +2211,8 @@ int rank;
 
   if (ts->type == BT_UNKNOWN) goto bad;
 
-  if (expr->expr_type == EXPR_NULL) { /* NULL pointers acquire types easily */
+  if (expr->expr_type == EXPR_NULL ||
+      g95_zero_size_array(expr)) { /* Sometimes the RHS acquire the type */
     expr->ts = *ts;
     return SUCCESS;
   }
