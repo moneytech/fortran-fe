@@ -758,7 +758,7 @@ enum { AB_ALLOCATABLE, AB_DIMENSION, AB_EXTERNAL, AB_INTRINSIC, AB_OPTIONAL,
        AB_POINTER, AB_SAVE, AB_TARGET, AB_DUMMY, AB_COMMON, AB_RESULT,
        AB_ENTRY, AB_DATA, AB_IN_NAMELIST, AB_IN_COMMON, AB_SAVED_COMMON,
        AB_FUNCTION, AB_SUBROUTINE, AB_SEQUENCE, AB_ELEMENTAL, AB_PURE,
-       AB_RECURSIVE, AB_GENERIC
+       AB_RECURSIVE, AB_GENERIC, AB_INTERFACE
 } attribute_bits;
 
 
@@ -789,7 +789,8 @@ attr_bits[] = {
   minit("FUNCTION",    AB_FUNCTION),    minit("SUBROUTINE",   AB_SUBROUTINE),
   minit("SEQUENCE",    AB_SEQUENCE),    minit("ELEMENTAL",    AB_ELEMENTAL),
   minit("PURE",        AB_PURE),        minit("RECURSIVE",    AB_RECURSIVE),
-  minit("GENERIC",     AB_GENERIC),     minit(NULL, -1)
+  minit("GENERIC",     AB_GENERIC),     minit("INTERFACE",    AB_INTERFACE),
+  minit(NULL, -1)
 },
 
 procedures[] = {
@@ -840,6 +841,7 @@ atom_type t;
     if (attr->in_namelist)   mio_name(AB_IN_NAMELIST, attr_bits);
     if (attr->in_common)     mio_name(AB_IN_COMMON, attr_bits);
     if (attr->saved_common)  mio_name(AB_SAVED_COMMON, attr_bits);
+    if (attr->interface)     mio_name(AB_INTERFACE, attr_bits);
 
     if (attr->function)      mio_name(AB_FUNCTION, attr_bits);
     if (attr->subroutine)    mio_name(AB_SUBROUTINE, attr_bits);
@@ -883,6 +885,7 @@ atom_type t;
       case AB_ELEMENTAL:     attr->elemental = 1;     break;
       case AB_PURE:          attr->pure = 1;          break;
       case AB_RECURSIVE:     attr->recursive = 1;     break;
+      case AB_INTERFACE:     attr->interface = 1;     break;
       }
     }
   }

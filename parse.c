@@ -1025,10 +1025,12 @@ loop:
 
   case ST_SUBROUTINE:
     new_state = COMP_SUBROUTINE;
+    g95_new_block->attr.interface = 1;
     break;
 
   case ST_FUNCTION: 
     new_state = COMP_FUNCTION;
+    g95_new_block->attr.interface = 1;
     break;
 
   case ST_MODULE_PROC:  /* The module procedure matcher makes sure the

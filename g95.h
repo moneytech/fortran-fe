@@ -199,7 +199,8 @@ typedef struct {
            dummy:1,       common:1,    result:1,    entry:1;
 
   unsigned data:1,        /* Symbol is named in a DATA statement */
-           use_assoc:1;   /* Symbol has been use-associated */
+           use_assoc:1,   /* Symbol has been use-associated */
+           interface:1;   /* Symbol appears in an interface body */
 
   unsigned in_namelist:1, in_common:1, saved_common:1;
   unsigned function:1, subroutine:1, generic:1;
@@ -1338,6 +1339,7 @@ void g95_start_interface(void);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
 int g95_compare_types(g95_typespec *, g95_typespec *);
 try g95_check_interface(g95_interface *, g95_symbol *);
+g95_symbol *g95_search_interface(g95_interface *, g95_actual_arglist *);
 try g95_extend_expr(g95_expr *);
 void g95_add_interface(g95_symbol *sym);
 try g95_parent_procedure(g95_symbol *sym, int);

@@ -501,13 +501,13 @@ g95_formal_arglist *f;
 }
 
 
-/* search_interface()-- Given an interface pointer and an actual
+/* g95_search_interface()-- Given an interface pointer and an actual
  * argument list, search for a formal argument list that matches the
  * actual.  If found, returns a pointer to the symbol of the correct
  * interface.  Returns NULL if not found. */
 
-static g95_symbol *search_interface(g95_interface *intr,
-				    g95_actual_arglist *actual) {
+g95_symbol *g95_search_interface(g95_interface *intr,
+				 g95_actual_arglist *actual) {
 
   for(; intr; intr=intr->next)
     if (g95_compare_actual_formal(actual, intr->sym->formal)) return intr->sym;
@@ -564,10 +564,10 @@ int i;
   }
     
   if (i == -1)
-    sym = search_interface(ip->operator, actual);
+    sym = g95_search_interface(ip->operator, actual);
   else {
     for(ns=g95_current_ns; ns; ns=ns->parent) {
-      sym = search_interface(ns->operator[i], actual);
+      sym = g95_search_interface(ns->operator[i], actual);
       if (sym != NULL) break;
     }
   }

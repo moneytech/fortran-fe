@@ -922,6 +922,7 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->data = 0;
   attr->use_assoc = 0;
   attr->in_namelist = 0;
+  attr->interface = 0;
   
   attr->in_common = 0;
   attr->saved_common = 0;

@@ -1869,7 +1869,6 @@ va_list argp;
 
 
 
-
 /* find_sym()-- Locate an intrinsic symbol given a base pointer,
  * number of elements in the table and a pointer to a name.  Returns
  * the NULL pointer if a name is not found. */
@@ -1912,7 +1911,7 @@ int g95_generic_intrinsic(char *name) {
 intrinsic_sym *sym;
 
   sym = find_function(name);
-  return sym->generic;
+  return (sym == NULL) ? 0 : sym->generic;
 }
 
 
@@ -1923,7 +1922,17 @@ int g95_specific_intrinsic(char *name) {
 intrinsic_sym *sym;
 
   sym = find_function(name);
-  return sym->specific;
+  return (sym == NULL) ? 0 : sym->specific;
+}
+
+
+/* g95_intrinsic_subroutine()-- Given a string, figure out if it is
+ * the name of an intrinsic subroutine.  There are no generic
+ * intrinsic subroutines, they are all specific. */
+
+int g95_intrinsic_subroutine(char *name) {
+
+  return find_subroutine(name) != NULL;
 }
 
 

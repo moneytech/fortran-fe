@@ -880,6 +880,200 @@ g95_actual_arglist *ap;
 
 /****************** Expression name resolution ******************/
 
+
+/* procedure_kind()-- Figure out if the procedure is specific, generic
+ * or unknown. */
+
+typedef enum { PTYPE_GENERIC=1, PTYPE_SPECIFIC, PTYPE_UNKNOWN } proc_type;
+
+
+proc_type procedure_kind(g95_symbol *sym) {
+g95_symbol *s;
+char *name;
+
+  name = sym->name;
+
+  /* Locate symbol in the nearest parent scope */
+
+  s = NULL;
+  if (sym->ns->parent != NULL) g95_find_symbol(name, sym->ns->parent, 1, &s);
+
+  /* See if a symbol is generic */
+
+  if (sym->attr.generic ||
+      (sym->attr.intrinsic && g95_generic_intrinsic(name)))
+    return PTYPE_GENERIC;
+
+  g95_find_symbol(name, sym->ns->parent, 1, &s);
+
+  if (s != NULL && (s->attr.generic ||
+		    (s->attr.intrinsic && g95_generic_intrinsic(name))))
+    return PTYPE_GENERIC;
+
+  /* Not generic, see if it is specific */
+
+  if (sym->attr.interface || sym->attr.proc == PROC_MODULE ||
+      sym->attr.proc == PROC_INTERNAL || sym->attr.proc == PROC_ST_FUNCTION ||
+      (sym->attr.intrinsic && g95_specific_intrinsic(name)) ||
+      sym->attr.external) return PTYPE_GENERIC;
+
+  /* Check parent scopes */
+
+  if (s != NULL && (s->attr.interface || s->attr.proc == PROC_MODULE ||
+		    s->attr.proc == PROC_INTERNAL ||
+		    s->attr.proc == PROC_ST_FUNCTION ||
+		    (s->attr.intrinsic && g95_specific_intrinsic(name)) ||
+		    s->attr.external))
+      return PTYPE_GENERIC;
+
+  return PTYPE_UNKNOWN;
+}
+
+
+/* resolve_generic()-- Resolve a procedure call known to be generic.
+ * Section 14.1.2.4.1. */
+
+static match resolve_generic0(g95_expr *expr, g95_symbol *sym) {
+g95_symbol *s;
+
+  if (sym->attr.generic) {
+    s = g95_search_interface(sym->generic, expr->value.function.actual);
+    if (s != NULL) {
+      expr->value.function.name = s->name;
+      return MATCH_YES;
+    }
+
+    /* TODO: Need to search for elemental references in generic interface */
+  }
+
+  if (sym->attr.intrinsic) return g95_intrinsic_func_interface(expr, 0);
+
+  return MATCH_NO;
+}
+
+
+static try resolve_generic(g95_expr *expr) {
+g95_symbol *sym;
+match m;
+
+  sym = expr->symbol;
+
+  m = resolve_generic0(expr, sym);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_ERROR) return FAILURE;
+
+  if (sym->ns->parent != NULL) {
+    g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+    if (sym != NULL) {
+      m = resolve_generic0(expr, sym);
+      if (m == MATCH_YES) return SUCCESS;
+      if (m == MATCH_NO) return FAILURE;
+    }
+  }
+
+  /* Last ditch attempt */
+
+  if (!g95_generic_intrinsic(expr->symbol->name)) {
+    g95_error("Generic function '%s' at %L is not a generic intrinsic "
+	      "function", expr->symbol->name, &expr->where);
+    return FAILURE;
+  }
+
+  m = g95_intrinsic_func_interface(expr, 0);
+
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_ERROR) return FAILURE;
+
+  g95_error("Generic function '%s' at %L is not consistent with a specific "
+	    "intrinsic interface", expr->symbol->name, &expr->where);
+
+  return FAILURE;
+}
+
+
+/* resolve_specific()-- Resolve a procedure call known to be specific */
+
+static match resolve_specific0(g95_symbol *sym, g95_expr *expr) {
+
+  if (sym->attr.external || sym->attr.interface) {
+    if (sym->attr.dummy) {
+      sym->attr.proc = PROC_DUMMY;
+      expr->value.function.name = sym->name;
+      return MATCH_YES;
+    }
+
+    sym->attr.proc = PROC_EXTERNAL;
+    expr->value.function.name = sym->name;
+
+    return MATCH_YES;
+  }
+
+  if (sym->attr.proc == PROC_MODULE || sym->attr.proc == PROC_ST_FUNCTION ||
+      sym->attr.proc == PROC_INTERNAL) {
+    expr->value.function.name = sym->name;
+    return MATCH_YES;
+  }
+
+  return g95_intrinsic_func_interface(expr, 0);
+}
+
+
+static try resolve_specific(g95_expr *expr) {
+g95_symbol *sym;
+match m;
+
+  sym = expr->symbol;
+
+  m = resolve_specific0(sym, expr);
+  if (m == MATCH_YES) return SUCCESS;
+  if (m == MATCH_ERROR) return FAILURE;
+
+  g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+
+  if (sym != NULL) {
+    m = resolve_specific0(sym, expr);
+    if (m == MATCH_YES) return SUCCESS;
+    if (m == MATCH_ERROR) return FAILURE;
+  }
+
+  g95_error("Unable to resolve the specific function '%s' at %L",
+	    expr->symbol->name, &expr->where);
+
+  return SUCCESS;
+}
+
+
+/* resolve_unknown()-- Resolve a procedure call not known to be
+ * generic nor specific */
+
+static try resolve_unknown(g95_expr *expr) {
+g95_symbol *sym;
+
+  sym = expr->symbol; 
+
+  if (sym->attr.dummy) {
+    sym->attr.proc = PROC_DUMMY;
+    expr->value.function.name = sym->name;
+    return SUCCESS;
+  }
+
+  /* The standard specifies that the test be that the name be the name
+   * of an intrinsic function.  Querying for specific function names
+   * amounts to the same thing. */
+
+  if (g95_specific_intrinsic(sym->name) && 
+      g95_intrinsic_func_interface(expr, 0) == MATCH_YES)
+    return SUCCESS;
+
+  /* The reference is to an external name */
+
+  sym->attr.proc = PROC_EXTERNAL;
+  expr->value.function.name = sym->name;
+
+  return SUCCESS;
+}
+
+
 /* resolve_function()-- Resolve a function call, which means resolving
  * the arguments, then figuring out which entity the name refers to. */
 
@@ -900,15 +1094,27 @@ try t;
 /* See if function is already resolved */
   if (expr->value.function.name != NULL) return SUCCESS;
 
-/* Now resolve the function itself.  For now, we just see if the function
- * is compatible with an intrinsic. */
+/* Apply the rules of section 14.1.2 */
 
-  if (g95_intrinsic_func_interface(expr, 0) == MATCH_NO) {
-    expr->value.function.name = expr->symbol->name;
-    expr->ts = expr->symbol->ts;
+  switch(procedure_kind(expr->symbol)) {
+  case PTYPE_GENERIC:   t = resolve_generic(expr);   break;
+  case PTYPE_SPECIFIC:  t = resolve_specific(expr);  break;
+  case PTYPE_UNKNOWN:   t = resolve_unknown(expr);   break;
+  default:
+    g95_internal_error("resolve_function(): bad function type");
   }
 
-  return SUCCESS;  /* Always succeeds for now */
+  /* If we still have a function node and it's type is unknown, give
+   * it one. */
+
+  if (t == SUCCESS && expr->expr_type == EXPR_FUNCTION) {
+    if (expr->symbol->ts.type == BT_UNKNOWN)
+      g95_set_default_type(expr->symbol, 1);
+
+    if (expr->ts.type == BT_UNKNOWN) expr->ts = expr->symbol->ts;
+  }
+
+  return t;
 }
 
 
