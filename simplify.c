@@ -1828,7 +1828,7 @@ int kind;
  * succeeds.  sign is 1 for MAX(), -1 for MIN(). */
 
 static g95_expr *simplify_min_max(g95_expr *expr, int sign) {
-g95_actual_arglist *arg, *last, *extremum=NULL;
+g95_actual_arglist *arg, *last, *extremum;
 
   last = NULL;
   extremum = NULL;

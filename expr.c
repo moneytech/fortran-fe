@@ -460,7 +460,7 @@ g95_expr *p;
   p->ts.kind = g95_default_logical_kind();
 
   if (where == NULL) where = g95_current_locus();
-  p->where = *g95_current_locus();
+  p->where = *where;
   p->value.logical = i;
 
   return p;

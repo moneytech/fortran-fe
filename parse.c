@@ -990,7 +990,7 @@ g95_compile_state new_state, current_state;
 g95_symbol *prog_unit, *sym;
 g95_interface_info save;
 g95_state_data s1, s2;
-g95_statement st=0;
+g95_statement st;
 int seen_body;
 
   accept_statement(ST_INTERFACE);

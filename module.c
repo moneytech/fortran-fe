@@ -1099,6 +1099,25 @@ int i;
 }
 
 
+static void mio_component_ref(g95_component **cp, g95_symbol *sym) {
+char name[G95_MAX_SYMBOL_LEN+1];
+g95_component *c;
+
+  if (iomode == IO_OUTPUT)
+    mio_internal_string((*cp)->name);
+  else {
+    mio_internal_string(name);
+
+    for(c=sym->components; c; c=c->next)
+      if (strcmp(c->name, name) == 0) break;
+
+    if (c == NULL) bad_module("mio_component_ref(): Can't find component");
+
+    *cp = c;
+  }
+}
+
+
 static void mio_component(g95_component *c) {
 
   mio_lparen();
@@ -1208,7 +1227,7 @@ g95_formal_arglist *f, *tail;
       mio_symbol_ref(&f->sym);
 
       if (sym->formal == NULL)
-	sym->formal = tail = f;
+	sym->formal = f;
       else
 	tail->next = f;
 
@@ -1356,7 +1375,7 @@ g95_ref *r;
 
   case REF_COMPONENT:
     mio_symbol_ref(&r->u.c.sym);
-    mio_component(r->u.c.component);
+    mio_component_ref(&r->u.c.component, r->u.c.sym);
     break;    
 
   case REF_SUBSTRING:

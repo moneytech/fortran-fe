@@ -1256,8 +1256,6 @@ arith rc;
 
   result = g95_constant_result(op1->ts.type, op1->ts.kind);
 
-  rc = ARITH_OK;
-
   if (power == 0) {     /* Handle something to the zeroth power */
     switch(op1->ts.type) {
     case BT_INTEGER:
@@ -1294,10 +1292,7 @@ arith rc;
 
   if (power != 0) {
     apower = power;
-    if (power < 0)
-      apower = -power;
-    else
-      apower = power;
+    if (power < 0) apower = -power;
 
     switch(op1->ts.type) {
     case BT_INTEGER:

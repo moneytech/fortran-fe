@@ -163,11 +163,10 @@ static try scalar_check(g95_expr *e, int n) {
 /* same_type_check()-- Make sure two expression have the same type */
 
 static try same_type_check(g95_expr *e, int n, g95_expr *f, int m) {
-char *message;
+char message[100];
 
   if (g95_compare_types(&e->ts, &f->ts)) return SUCCESS;
 
-  message = alloca(100);
   sprintf(message, "the same type and kind as '%s'",
 	  g95_current_intrinsic_arg[n]);
 

@@ -68,7 +68,7 @@ static sym_intent match_intent_spec(void) {
 static match char_len_param_value(g95_expr **expr) {
 
   if (g95_match_char('*') == MATCH_YES) {
-    expr = NULL;
+    *expr = NULL;
     return MATCH_YES;
   }
 

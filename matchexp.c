@@ -534,8 +534,6 @@ match m;
 
     all = total;
     all->where = where;
-
-    where = *g95_current_locus();
   }
 
   *result = all;
@@ -571,8 +569,6 @@ match m;
 
     all = total;
     all->where = where;
-
-    where = *g95_current_locus();
   }
 
   *result = all;
@@ -623,7 +619,6 @@ int i;
 
     all = total;
     all->where = where;
-    where = *g95_current_locus();
   }
 
   *result = all;
@@ -662,8 +657,6 @@ match m;
 
     all = build_node(INTRINSIC_USER, &where, all, e);
     all->uop = uop;
-
-    where = *g95_current_locus();
   }
 
   *result = all;

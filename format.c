@@ -358,7 +358,7 @@ format_item:
       goto syntax;
     }
 
-    if (t == FMT_RPAREN) level--;
+    level--;
     goto finished;
 
   case FMT_POS:  case FMT_IBOZ:  case FMT_F:  case FMT_E:  case FMT_EXT:
