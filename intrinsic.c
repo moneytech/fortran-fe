@@ -528,11 +528,11 @@ int di, dr, dd, dl, dc, dz;
   make_generic("achar");
 
   add_sym("acos", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_acos, NULL,
+	  NULL, g95_simplify_acos, g95_resolve_acos,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("dacos", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_acos, NULL,
+	  NULL, g95_simplify_acos, g95_resolve_acos,
 	  x, BT_REAL, dd, 0, NULL);
 
   make_generic("acos");
@@ -546,11 +546,11 @@ int di, dr, dd, dl, dc, dz;
 	  stg, BT_CHARACTER, dc, 0, NULL);
 
   add_sym("aimag", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_aimag, NULL,
+	  NULL, g95_simplify_aimag, g95_resolve_aimag,
 	  z, BT_COMPLEX, dz, 0, NULL);
 
   add_sym("dimag", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_aimag, NULL,
+	  NULL, g95_simplify_aimag, g95_resolve_aimag,
 	  z, BT_COMPLEX, dd, 0, NULL);    /* Extension */
 
   make_generic("aimag");
@@ -594,11 +594,11 @@ int di, dr, dd, dl, dc, dz;
   make_generic("any");
 
   add_sym("asin", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_asin, NULL,
+	  NULL, g95_simplify_asin, g95_resolve_asin,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("dasin", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_asin, NULL,
+	  NULL, g95_simplify_asin, g95_resolve_asin,
 	  x, BT_REAL, dd, 0, NULL);
 
   make_generic("asin");
@@ -610,21 +610,21 @@ int di, dr, dd, dl, dc, dz;
   make_generic("associated");
 
   add_sym("atan", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_atan, NULL,
+	  NULL, g95_simplify_atan, g95_resolve_atan,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("datan", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_atan, NULL,
+	  NULL, g95_simplify_atan, g95_resolve_atan,
 	  x, BT_REAL, dd, 0, NULL);
 
   make_generic("atan");
 
   add_sym("atan2", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_atan2, NULL,
+	  NULL, g95_simplify_atan2, g95_resolve_atan2,
 	  y, BT_REAL, dr, 0,   x, BT_REAL, dr, 0, NULL);
 
   add_sym("datan2", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_atan2, NULL,
+	  NULL, g95_simplify_atan2, g95_resolve_atan2,
 	  y, BT_REAL, dd, 0,   x, BT_REAL, dd, 0, NULL);
 
   make_generic("atan2");
@@ -668,11 +668,11 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dd, 0,   y, BT_REAL, dd, 1, NULL);  /* Extension */
 
   add_sym("conjg", 1, 1, BT_COMPLEX, dz,
-	  NULL, g95_simplify_conjg, NULL,
+	  NULL, g95_simplify_conjg, g95_resolve_conjg,
 	  z, BT_COMPLEX, dz, 0, NULL);
 
   add_sym("dconjg", 1, 1, BT_COMPLEX, dd,
-	  NULL, g95_simplify_conjg, NULL,
+	  NULL, g95_simplify_conjg, g95_resolve_conjg,
 	  z, BT_COMPLEX, dd, 0, NULL);   /* Extension */
 
   make_generic("conjg");
@@ -698,11 +698,11 @@ int di, dr, dd, dl, dc, dz;
   make_generic("cos");
 
   add_sym("cosh", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_cosh, NULL,
+	  NULL, g95_simplify_cosh, g95_resolve_cosh,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("dcosh", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_cosh, NULL,
+	  NULL, g95_simplify_cosh, g95_resolve_cosh,
 	  x, BT_REAL, dd, 0, NULL);
 
   make_generic("cosh");
@@ -832,7 +832,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("iand");
 
   add_sym("iargc", 1, 1, BT_INTEGER, di,
-	  NULL, NULL, NULL, 
+	  NULL, NULL, NULL,
 	  NULL);   /* Extension, takes no arguments */
 
   add_sym("ibclr", 1, 1, BT_INTEGER, di,
@@ -1300,11 +1300,11 @@ int di, dr, dd, dl, dc, dz;
   make_generic("sin");
 
   add_sym("sinh", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_sinh, NULL,
+	  NULL, g95_simplify_sinh, g95_resolve_sinh,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("dsinh", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_sinh, NULL,
+	  NULL, g95_simplify_sinh, g95_resolve_sinh,
 	  x, BT_REAL, dd, 0, NULL);
 
   make_generic("sinh");
@@ -1356,23 +1356,23 @@ int di, dr, dd, dl, dc, dz;
   make_generic("sum");
 
   add_sym("tan", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_tan, NULL,
+	  NULL, g95_simplify_tan, g95_resolve_tan,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("dtan", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_tan, NULL,
+	  NULL, g95_simplify_tan, g95_resolve_tan,
 	  x, BT_REAL, dd, 0, NULL);
 
   make_generic("tan");
 
   add_sym("tanh", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_tanh, NULL,
+	  NULL, g95_simplify_tanh, g95_resolve_tan,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("dtanh", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_tanh, NULL,
+	  NULL, g95_simplify_tanh, g95_resolve_tanh,
 	  x, BT_REAL, dd, 0, NULL);
- 
+
   make_generic("tanh");
 
   add_sym("tiny", 0, 1, BT_REAL, dr,

@@ -122,14 +122,31 @@ void g95_resolve_abs(g95_expr *f, g95_expr *a) {
 }
 
 
+void g95_resolve_acos(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    g95_get_string("__acos_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+}
+
+
+void g95_resolve_aimag(g95_expr *f, g95_expr *x) {
+
+  f->ts.type = BT_REAL;
+  f->ts.kind = x->ts.kind;
+  f->value.function.name =
+    g95_get_string("__aimag_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+}
+
+
 void g95_resolve_aint(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = a->ts.type;
   f->ts.kind = (kind == NULL) ? a->ts.kind
     : mpz_get_ui(kind->value.integer);
 
-  f->value.function.name = 
-    g95_get_string("__aint_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type), 
+  f->value.function.name =
+    g95_get_string("__aint_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
 		   a->ts.kind);
 }
 
@@ -171,6 +188,30 @@ static char any0[] = "__any0", any1[] = "__any1";
     f->value.function.name = any1;
     f->rank = mask->rank - 1;
   }
+}
+
+
+void g95_resolve_asin(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    g95_get_string("__asin_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+}
+
+
+void g95_resolve_atan(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    g95_get_string("__atan_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+}
+
+
+void g95_resolve_atan2(g95_expr *f, g95_expr *x, g95_expr *y) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    g95_get_string("__atan2_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -226,11 +267,26 @@ void g95_resolve_cmplx(g95_expr *f, g95_expr *x, g95_expr *y, g95_expr *kind) {
 }
 
 
+void g95_resolve_conjg(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name = g95_get_string("__conjg_%d", x->ts.kind);
+}
+
+
 void g95_resolve_cos(g95_expr *f, g95_expr *x) {
 
   f->ts = x->ts;
   f->value.function.name =
     g95_get_string("__cos_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+}
+
+
+void g95_resolve_cosh(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    g95_get_string("__cosh_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -307,7 +363,7 @@ void g95_resolve_eoshift(g95_expr *f, g95_expr *array, g95_expr *shift,
   f->rank = array->rank;
 
   f->value.function.name =
-    g95_get_string("__eoshift_%c%d", g95_type_letter(array->ts.type), 
+    g95_get_string("__eoshift_%c%d", g95_type_letter(array->ts.type),
 		   array->ts.kind);
 }
 
@@ -730,7 +786,7 @@ void g95_resolve_scale(g95_expr *f, g95_expr *x, g95_expr *y) {
 }
 
 
-void g95_resolve_scan(g95_expr *f, g95_expr *string, g95_expr *set, 
+void g95_resolve_scan(g95_expr *f, g95_expr *string, g95_expr *set,
 		      g95_expr *back) {
 
   f->ts.type = BT_INTEGER;
@@ -760,6 +816,14 @@ void g95_resolve_sin(g95_expr *f, g95_expr *x) {
   f->ts = x->ts;
   f->value.function.name =
     g95_get_string("__sin_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+}
+
+
+void g95_resolve_sinh(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    g95_get_string("__sinh_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -800,6 +864,22 @@ void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
   f->value.function.name =
     g95_get_string("__sum_%c%d", g95_type_letter(array->ts.type),
 		   array->ts.kind);
+}
+
+
+void g95_resolve_tan(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    g95_get_string("__tan_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
+}
+
+
+void g95_resolve_tanh(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    g95_get_string("__tanh_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
