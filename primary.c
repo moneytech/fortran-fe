@@ -1345,14 +1345,17 @@ cleanup:
 
 match g95_match_rvalue(g95_expr **result) {
 g95_actual_arglist *actual_arglist;
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_state_data *st;
 g95_symbol *sym;
 locus where;
 g95_expr *e;
 match m;
 
-  m = g95_match_symbol(&sym);
+  m = g95_match_name(name); 
   if (m != MATCH_YES) return m;
+
+  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
   e = NULL;
   where = *g95_current_locus();
@@ -1428,6 +1431,8 @@ match m;
       m = MATCH_ERROR;
       break;
     }
+
+    g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
 
     e = g95_get_expr();
     e->symbol = sym;
@@ -1509,6 +1514,7 @@ match m;
 
 /* Give up, assume we have a function */
 
+    g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
     e->expr_type = EXPR_FUNCTION;
 
     if (!sym->attr.function && g95_add_function(&sym->attr, NULL) == FAILURE) {
@@ -1535,6 +1541,8 @@ match m;
 
   case FL_GENERIC:
   case FL_MODULE_PROC:
+    g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
+
     e = g95_get_expr();
     e->symbol = sym;
     e->expr_type = EXPR_FUNCTION;
