@@ -1396,6 +1396,7 @@ g95_symbol *sym;
   c->expr = NULL;
   c->expr2 = NULL;
   c->ext.actual = actual;
+  c->sub_name = sym->name;
 
   if (g95_pure(NULL) && !g95_pure(sym)) {
     g95_error("Subroutine '%s' called in lieu of assignment at %L must be "
