@@ -2296,7 +2296,7 @@ time_t now;
 
 /* g95_use_module()-- Process a USE directive. */
 
-void g95_use_module() {
+void g95_use_module(void) {
 char filename[G95_MAX_SYMBOL_LEN+5];
 g95_state_data *p;
 int c, line;

@@ -741,7 +741,7 @@ static void accept_statement(g95_statement st) {
 /* g95_reject_statement()-- Undo anything tentative that has been built
  * for the current statement. */
 
-void g95_reject_statement() {
+void g95_reject_statement(void) {
 
   g95_undo_symbols();
   g95_undo_statement();
