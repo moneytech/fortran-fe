@@ -322,6 +322,7 @@ int errors, warnings, i;
 
   while(argc > 1) {
     i = g95_parse_arg(argc, argv);
+    if (i < 0) i = -i;
 
     argc -= i;
     argv += i;

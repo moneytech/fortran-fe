@@ -21,20 +21,22 @@ Boston, MA 02111-1307, USA.  */
 
 /* options.c-- Parse and display command line options */
 
-#include "g95.h"
-
-
-#include <string.h>
-#include <stdlib.h>
-
 #ifdef IN_GCC
-#include "intl.h"
+#include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include "flags.h"
+#include "intl.h"
+#define BACKEND_CODE
 #else
 #define N_(msg) (msg)
 #endif
+
+#include "g95.h"
+
+#include <string.h>
+#include <stdlib.h>
 
 #define DEFINE_LANG_NAME(x)
 static struct {
@@ -215,7 +217,9 @@ static void set_Wall(void) {
 
 
 /* g95_parse_arg()-- Parse an argument on the command line.  Returns
- * the number of elements used in the argv array. */
+ * the number of elements used in the argv array.  Negative values
+ * indicate that the option is language-dependent (and the absolute
+ * value number of arguments are consumed). */
 
 int g95_parse_arg(int argc, char *argv[]) {
 char *option;
@@ -243,7 +247,7 @@ int i;
 
   if (strcmp(option, "-std=F") == 0) {
     g95_option.fmode = 1;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-Wline-truncation") == 0) {
@@ -258,7 +262,7 @@ int i;
 
   if (strcmp(option, "-Wunused-label") == 0) {
     g95_option.unused_label = 1;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-Wall") == 0) {
@@ -269,32 +273,32 @@ int i;
   if (strcmp(option, "-fimplicit-none") == 0 ||
       strcmp(option, "-Wimplicit") == 0) {
     g95_option.implicit_none = 1;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-ffixed-line-length-80") == 0) {
     g95_option.fixed_line_length = 80;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-ffixed-line-length-132") == 0) {
     g95_option.fixed_line_length = 132;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-ffree-form") == 0) {
     g95_option.form = FORM_FREE;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-ffixed-form") == 0) {
     g95_option.form = FORM_FIXED;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-fmodule-private") == 0) {
     g95_option.module_access_private = 1;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-fdollar-ok") == 0) {
@@ -308,7 +312,7 @@ int i;
       g95_fatal_error("Argument to -fqkind isn't a valid real kind");
 
     g95_option.q_kind = i;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-fquiet") == 0) {
@@ -350,23 +354,23 @@ int i;
 
   if (strcmp(option, "-i8") == 0) {
     g95_option.i8 = 1;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-r8") == 0) {
     g95_option.r8 = 1;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-d8") == 0) {
     g95_option.r8 = 1;
     g95_option.i8 = 1;
-    return 1;
+    return -1;
   }
 
   if (strcmp(option, "-l1") == 0) {
     g95_option.l1 = 1;
-    return 1;
+    return -1;
   }
 
   if (option[0] == '-' && option[1] == 'I') {
