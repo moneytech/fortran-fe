@@ -405,6 +405,8 @@ blank_line:
 static g95_statement next_statement(void) {
 g95_statement st;
 
+  g95_new_block = NULL;
+
   for(;;) {
     g95_statement_label = 0;
     g95_buffer_error(1);
