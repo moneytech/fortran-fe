@@ -52,6 +52,7 @@ g95_expr *g95_simplify_cosh(g95_expr *);
 g95_expr *g95_simplify_dble(g95_expr *);
 g95_expr *g95_simplify_digits(g95_expr *);
 g95_expr *g95_simplify_dim(g95_expr *, g95_expr *);
+g95_expr *g95_simplify_dot_product(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_dprod(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_epsilon(g95_expr *);
 g95_expr *g95_simplify_exp(g95_expr *);

@@ -870,6 +870,46 @@ g95_expr *result;
 }
 
 
+/* dot_name()-- Given a type and kind, return a static pointer to the
+ * name of the appropriate dot_product intrinsic. */
+
+static char *dot_name(bt type, int kind) {
+static char buffer[25];
+
+  sprintf(buffer, "__dot_product_%c%d", g95_type_letter(type), kind);
+  return buffer;
+}
+
+
+/* g95_simplify_dot_product()-- The "simplification" here is inserting
+ * a resolved call to the right subroutine. */
+
+g95_expr *g95_simplify_dot_product(g95_expr *a, g95_expr *b) {
+g95_expr temp, *result;
+
+  a = g95_copy_expr(a);
+  b = g95_copy_expr(b);
+
+  result = g95_build_funcall(NULL, a, b, NULL);
+
+  if (a->ts.type == BT_LOGICAL && b->ts.type == BT_LOGICAL) {
+    result->ts.type = BT_LOGICAL;
+    result->ts.kind = g95_default_logical_kind();
+  } else {
+    temp.op1 = a;
+    temp.op2 = b;
+    g95_type_convert_binary(&temp);
+
+    result->ts = temp.ts;
+  }
+
+  result->value.function.name =
+    g95_get_string(dot_name(result->ts.type, result->ts.kind));
+
+  return result;
+}
+
+
 g95_expr *g95_simplify_dprod(g95_expr *x, g95_expr *y) {
 g95_expr *mult1, *mult2, *result;
 
@@ -3249,6 +3289,7 @@ int n, limit;
 
 
 void g95_simplify_init_1(void) {
+int i;
 
   init_pi();
 
@@ -3261,6 +3302,18 @@ void g95_simplify_init_1(void) {
   mpz_init_set_str(mpz_zero,   "0", 10);
 
   invert_table(ascii_table, xascii_table);
+
+  /* Names of the various dot product subroutines */
+
+  g95_add_string(dot_name(BT_LOGICAL, g95_default_logical_kind()));
+
+  for(i=0; g95_integer_kinds[i].kind; i++)
+    g95_add_string(dot_name(BT_INTEGER, g95_integer_kinds[i].kind));
+
+  for(i=0; g95_real_kinds[i].kind; i++) {
+    g95_add_string(dot_name(BT_REAL, g95_real_kinds[i].kind));
+    g95_add_string(dot_name(BT_COMPLEX, g95_real_kinds[i].kind));
+  }
 }
 
 

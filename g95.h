@@ -920,6 +920,9 @@ void g95_show_typespec(g95_typespec *);
 const char *g95_code2string(mstring *, int);
 int g95_string2code(mstring *, const char *);
 
+void g95_add_string(char *);
+char *g95_get_string(char *);
+
 void g95_init_1(void);
 void g95_init_2(void);
 void g95_done_1(void);
@@ -1143,6 +1146,7 @@ void g95_symbol_state(void);
 void g95_intrinsic_init_1(void);
 void g95_intrinsic_done_1(void);
 
+char g95_type_letter(bt);
 try g95_convert_type(g95_expr *, g95_typespec *, int);
 int g95_generic_intrinsic(char *);
 int g95_specific_intrinsic(char *);

@@ -88,10 +88,10 @@ va_list argp;
 }
 
 
-/* type_letter()-- Return a letter based on the passed type.  Used to
- * construct the name of a type conversion subroutine. */
+/* g95_type_letter()-- Return a letter based on the passed type.  Used
+ * to construct the name of a type-dependent subroutine. */
 
-static char type_letter(bt type) {
+char g95_type_letter(bt type) {
 char c;
 
   switch(type) {
@@ -116,8 +116,8 @@ char c;
 static char *conv_name(g95_typespec *from, g95_typespec *to) {
 static char name[30];
 
-  sprintf(name, "__convert_%c%d_%c%d", type_letter(from->type), from->kind,
-	  type_letter(to->type), to->kind);
+  sprintf(name, "__convert_%c%d_%c%d", g95_type_letter(from->type), from->kind,
+	  g95_type_letter(to->type), to->kind);
 
   return name;
 }
@@ -144,8 +144,8 @@ int i;
 
 /* convert_constant()-- Master function to convert one constant to
  * another.  While this is used as a simplification function, it
- * requires the destination type and kind information with is supplied
- * by a special case in do_simplify(). */
+ * requires the destination type and kind information which is
+ * supplied by a special case in do_simplify(). */
 
 static g95_expr *convert_constant(g95_expr *e, bt type, int kind) {
 g95_expr *result;
@@ -2156,8 +2156,8 @@ int di, dr, dd, dl, dc, dz;
 
   make_generic("dim");
 
-  add_sym("dot_product", 1, 1, BT_REAL, dr, NULL, check_dot_product,
-	  va, BT_REAL, dr, 0, vb, BT_REAL, dr, 0, NULL);
+  add_sym("dot_product", 1, 1, BT_UNKNOWN, 0, g95_simplify_dot_product,
+	  check_dot_product,  va, BT_REAL, dr, 0, vb, BT_REAL, dr, 0, NULL);
 
   add_sym("dprod", 0, 1, BT_REAL, dd, g95_simplify_dprod, check_dprod,
 	  x, BT_REAL, dr, 0, y, BT_REAL, dr, 0, NULL);
@@ -3261,47 +3261,3 @@ bad:
   return FAILURE;
 }
 
-
-/* g95_simplify_intrinsic()-- Try to simplify an expression node that
- * (might) represent an intrinsic function call.  Most intrinsic
- * function calls are not simplified here-- most are simplified as
- * soon as the function is resolved as an intrinsic, but sometimes a
- * type conversion intrinsic is inserted before resolution and must be
- * simplified at some point.
- *
- * This subroutine works by making sure the function's library name
- * points to the lib_name member of an intrinsic_sym structure.  In
- * other words, it has to have already been decided that an intrinsic
- * is called for. */
-
-void g95_simplify_intrinsic(g95_expr *expr) {
-const char *lib_name;
-intrinsic_sym *sym;
-int i;
-
-  if (expr->expr_type != EXPR_FUNCTION) return;
-
-  lib_name = expr->value.function.name;
-
-  if (lib_name >= ((char *) functions) && 
-      lib_name <= ((char *) (functions+nfunc))) {
-    sym = functions; 
-
-    for(i=0; i<nfunc; i++, sym++)
-      if (lib_name == sym->lib_name) {
-	if (sym->simplify != NULL) do_simplify(sym, expr);
-	break;
-      }
-  }
-
-  if (lib_name >= ((char *) conversion) && 
-      lib_name <= ((char *) (conversion+nconv))) {
-    sym = conversion;
-
-    for(i=0; i<nconv; i++, sym++)
-      if (lib_name == sym->lib_name) {
-	if (sym->simplify != NULL) do_simplify(sym, expr);
-	break;
-      }
-  }
-}
