@@ -993,6 +993,8 @@ cleanup:
 
 void g95_free_iterator(g95_iterator *iter, int flag) {
 
+  if (iter == NULL) return;
+
   g95_free_expr(iter->var);
   g95_free_expr(iter->start);
   g95_free_expr(iter->end);
@@ -1145,13 +1147,20 @@ match g95_match_cycle(void) {
 /* g95_match_pause()-- Match the (deprecated) PAUSE statement */
 
 match g95_match_pause(void) {
+g95_expr *expr;
 
-  if (g95_match_eos() == MATCH_YES) {
-    g95_error("The PAUSE statement at %C is not allowed in Fortran 95.");
-    return MATCH_ERROR;
+  if (g95_match_eos() == MATCH_YES) goto got_match;
+
+  if (g95_match(" %e%t", &expr) == MATCH_YES) {
+    g95_free_expr(expr);
+    goto got_match;
   }
 
   return MATCH_NO;
+
+got_match:
+  g95_error("The PAUSE statement at %C is not allowed in Fortran 95.");
+  return MATCH_ERROR;
 }
 
 

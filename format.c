@@ -465,6 +465,10 @@ data_desc:
 
     break;
 
+  case FMT_H:
+    error = "The H format specifier is not allowed in Fortran 95";
+    goto syntax;
+
   case FMT_IBOZ:
     t = format_lex();
     if (t != FMT_ZERO && t != FMT_POSINT) {
