@@ -39,55 +39,56 @@ Boston, MA 02111-1307, USA.  */
 #include "trans-stmt.h"
 
 tree
-g95_trans_open (g95_code *code)
+g95_trans_open (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("IO statement not implemented");
+  g95_todo_error ("IO statement not implemented: OPEN");
 }
 
 tree
-g95_trans_close (g95_code *code)
+g95_trans_close (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("IO statement not implemented: CLOSE");
 }
 
 tree
-g95_trans_read (g95_code *code)
+g95_trans_read (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("IO statement not implemented: READ");
 }
 
 tree
-g95_trans_write (g95_code *code)
+g95_trans_write (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("IO statement not implemented: WRITE");
 }
 
 tree
-g95_trans_iolength (g95_code *code)
+g95_trans_iolength (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("IO statement not implemented: IOLENGTH");
 }
 
 tree
-g95_trans_backspace (g95_code *code)
+g95_trans_backspace (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("IO statement not implemented: BACKSPACE");
 }
 
 tree
-g95_trans_endfile (g95_code *code)
+g95_trans_endfile (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("IO statement not implemented: ENDFILE");
 }
 
 tree
-g95_trans_inquire (g95_code *code)
+g95_trans_inquire (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("IO statement not implemented: INQUIRE");
 }
 
 tree
-g95_trans_rewind (g95_code *code)
+g95_trans_rewind (g95_code *code ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Statement not implemented");
+  g95_todo_error ("IO statement not implemented: REWIND");
 }
+
