@@ -1174,6 +1174,7 @@ match m;
   if (g95_match_eos() == MATCH_YES) return MATCH_YES;
 
   old_loc = *g95_current_locus();
+  label = NULL;
   m = g95_match(" %l %t", &label);
   if (m == MATCH_YES)
     new_st.label = label;
@@ -1201,10 +1202,11 @@ syntax:
   g95_syntax_error(ST_STOP);
 
 cleanup:
-  g95_free_st_label(label);
+  if (label) g95_free_st_label(label);
+
   g95_free_expr(e);
   return MATCH_ERROR;
-}    
+}
 
 
 /* g95_match_continue()-- match a CONTINUE statement */
