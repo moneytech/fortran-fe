@@ -156,9 +156,16 @@ static try resolve_tag(io_tag *tag, g95_expr *e) {
     return FAILURE;
   }
 
-  if (e->rank != 0) {
-    g95_error("%s tag at %L must be scalar", tag->name, &e->where);
-    return FAILURE;
+  if (tag == &tag_format) {
+    if (e->rank != 1 && e->rank != 0) {
+      g95_error("FORMAT tag at %L cannot be array of strings", &e->where);
+      return FAILURE;
+    }
+  } else {
+    if (e->rank != 0) {
+      g95_error("%s tag at %L must be scalar", tag->name, &e->where);
+      return FAILURE;
+    }
   }
 
   return SUCCESS;
