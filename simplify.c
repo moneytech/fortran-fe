@@ -2796,46 +2796,48 @@ unsigned long exp2;
 
 g95_expr *g95_simplify_shape(g95_expr *source) {
 mpz_t shape[G95_MAX_DIMENSIONS];
-g95_constructor *head, *tail;
+g95_expr *result, *e, *f;
 g95_array_ref *ar;
-g95_expr *result;
-int n, size;
+int n;
+try t;
 
-  if (source->rank == 0)
-    size = 0;
-  else {
-    ar = g95_find_array_ref(source);
-    if (g95_array_ref_shape(ar, shape) == FAILURE) return NULL;
-    size = ar->dimen;
-  }
+  result = g95_start_constructor(BT_INTEGER, g95_default_integer_kind(),
+				 &source->where);
 
-  head = tail = NULL;
+  if (source->rank == 0) return result;
 
-  for(n=0; n<size; n++) {
-    if (head == NULL)
-      head = tail = g95_get_constructor();
-    else {
-      tail->next = g95_get_constructor();
-      tail = tail->next;
+  ar = g95_find_array_ref(source);
+
+  t = g95_array_ref_shape(ar, shape);
+
+  for(n=0; n<source->rank; n++) {
+    e = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+
+    if (t == SUCCESS) {
+      mpz_set(e->value.integer, shape[n]);
+      mpz_clear(shape[n]);
+    } else {
+      mpz_set_ui(e->value.integer, n+1);
+      e->where = source->where;
+
+      f = g95_simplify_size(source, e);
+      if (f == NULL) {
+	e = g95_build_funcall(NULL, g95_copy_expr(source), e, NULL);
+	e->value.function.isym = g95_find_function("size");
+
+	e->ts.type = BT_INTEGER;
+	e->ts.kind = g95_default_integer_kind();
+	e->where = source->where;
+
+      } else {
+	g95_free_expr(e);
+	e = f;
+      }
     }
 
-    tail->expr = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
-    tail->expr->where = source->where;
-
-    mpz_set(tail->expr->value.integer, shape[n]);
+    e->where = source->where;
+    g95_append_constructor(result, e);
   }
-
-  for(n=0; n<size; n++)
-    mpz_clear(shape[n]);
-
-  result = g95_get_expr();
-  result->ts.type = BT_INTEGER;
-  result->ts.kind = g95_default_integer_kind();
-
-  result->expr_type = EXPR_ARRAY;
-  result->rank = 1;
-  result->value.constructor = head;
-  result->where = source->where;
 
   return result;
 }

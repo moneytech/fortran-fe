@@ -362,10 +362,10 @@ static g95_intrinsic_sym *find_sym(g95_intrinsic_sym *start, int n, const char *
 }
 
 
-/* find_function()-- Given a name, find a function in the intrinsic
+/* g95_find_function()-- Given a name, find a function in the intrinsic
  * function table.  Returns NULL if not found. */
 
-static g95_intrinsic_sym *find_function(const char *name) {
+g95_intrinsic_sym *g95_find_function(const char *name) {
 
   return find_sym(functions, nfunc, name);
 }
@@ -386,7 +386,7 @@ static g95_intrinsic_sym *find_subroutine(const char *name) {
 int g95_generic_intrinsic(char *name) {
 g95_intrinsic_sym *sym;
 
-  sym = find_function(name);
+  sym = g95_find_function(name);
   return (sym == NULL) ? 0 : sym->generic;
 }
 
@@ -397,7 +397,7 @@ g95_intrinsic_sym *sym;
 int g95_specific_intrinsic(char *name) {
 g95_intrinsic_sym *sym;
 
-  sym = find_function(name);
+  sym = g95_find_function(name);
   return (sym == NULL) ? 0 : sym->specific;
 }
 
@@ -410,7 +410,7 @@ int g95_intrinsic_name(char *name, int subroutine_flag) {
 
   return subroutine_flag ?
     find_subroutine(name) != NULL :
-    find_function(name) != NULL;
+    g95_find_function(name) != NULL;
 }
 
 
@@ -425,7 +425,7 @@ g95_intrinsic_sym *g;
 
   if (sizing != SZ_NOTHING) return; 
 
-  g = find_function(name);
+  g = g95_find_function(name);
   if (g == NULL)
     g95_internal_error("make_generic(): Can't find generic symbol '%s'", name);
 
@@ -1156,7 +1156,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
   add_sym("shape", 0, 1, BT_INTEGER, di,
-	  g95_check_shape, g95_simplify_shape, g95_resolve_shape,
+	  g95_check_shape, g95_simplify_shape, NULL,
 	  src, BT_REAL, dr, 0, NULL);
 
   add_sym("sign", 1, 1, BT_REAL, dr,
@@ -1936,7 +1936,7 @@ int flag;
 
   name = expr->symbol->name;
 
-  isym = specific = find_function(name);
+  isym = specific = g95_find_function(name);
   if (isym == NULL) {
     g95_suppress_error = 0;
     return MATCH_NO;

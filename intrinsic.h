@@ -260,7 +260,6 @@ void g95_resolve_rrspacing(g95_expr *, g95_expr *);
 void g95_resolve_scale(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_scan(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_set_exponent(g95_expr *, g95_expr *, g95_expr *);
-void g95_resolve_shape(g95_expr *, g95_expr *);
 void g95_resolve_sign(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_sin(g95_expr *, g95_expr *);
 void g95_resolve_spacing(g95_expr *, g95_expr *);

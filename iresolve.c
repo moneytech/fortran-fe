@@ -698,16 +698,6 @@ void g95_resolve_set_exponent(g95_expr *f, g95_expr *x, g95_expr *i) {
 }
 
 
-void g95_resolve_shape(g95_expr *f, g95_expr *source) {
-
-  f->ts.type = BT_INTEGER;
-  f->ts.kind = g95_default_integer_kind();
-  f->rank = 1;
-  f->value.function.name = get_string("__shape_%c%d",
-		 g95_type_letter(source->ts.type), source->ts.kind);
-}
-
-
 void g95_resolve_sign(g95_expr *f, g95_expr *a, g95_expr *b) {
 
   f->ts = a->ts;

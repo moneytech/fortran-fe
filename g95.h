@@ -1243,6 +1243,7 @@ try g95_convert_type(g95_expr *, g95_typespec *, int);
 int g95_generic_intrinsic(char *);
 int g95_specific_intrinsic(char *);
 int g95_intrinsic_name(char *, int);
+g95_intrinsic_sym *g95_find_function(const char *);
 
 /* simplify.c */
 
@@ -1414,6 +1415,8 @@ match g95_match_array_spec(g95_array_spec **);
 match g95_match_array_ref(g95_array_ref *, g95_array_spec *, int);
 int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
 
+g95_expr *g95_start_constructor(bt, int, locus *);
+void g95_append_constructor(g95_expr *, g95_expr *);
 void g95_free_constructor(g95_constructor *);
 match g95_match_array_constructor(g95_expr **);
 try g95_simplify_iterator_var(g95_expr *);

@@ -505,8 +505,7 @@ int i;
 }
 
 
-/* g95_compare_array_spec()-- Does what it says.  MATCH_ERROR is never
- * returned. */
+/* g95_compare_array_spec()-- Compares two array specifications.  */
 
 int g95_compare_array_spec(g95_array_spec *as1, g95_array_spec *as2) {
 int i, a1, a2;
@@ -537,6 +536,49 @@ int i, a1, a2;
 error:
   g95_internal_error("g95_compare_type(): Array spec clobbered");
   return 0;        /* Keep the compiler happy */
+}
+
+
+/* g95_start_constructor()-- Start an array constructor.  The
+ * constructor starts with zero elements and should be appended to by
+ * g95_append_constructor(). */
+
+g95_expr *g95_start_constructor(bt type, int kind, locus *where) {
+g95_expr *result;
+
+  result = g95_get_expr();
+
+  result->expr_type = EXPR_ARRAY;
+  result->rank = 1;
+
+  result->ts.type = type;
+  result->ts.kind = kind;
+  result->where = *where;
+
+  return result;
+}
+
+
+/* g95_append_constructor()-- Given an array constructor expression,
+ * append the new expression node onto the constructor. */
+
+void g95_append_constructor(g95_expr *base, g95_expr *new) {
+g95_constructor *c;
+
+  if (base->value.constructor == NULL)
+    base->value.constructor = c = g95_get_constructor();
+  else {
+    c = base->value.constructor;
+    while(c->next)
+      c=c->next;
+
+    c->next = c = g95_get_constructor();
+  }
+
+  c->expr = new;
+
+  if (new->ts.type != base->ts.type || new->ts.kind != base->ts.kind)
+    g95_internal_error("g95_append_constructor(): New node has wrong kind");
 }
 
 
