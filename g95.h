@@ -1153,7 +1153,7 @@ void g95_set_implicit_none(void);
 match g95_match_implicit(void);
 void g95_set_implicit(void);
 try g95_set_default_type(g95_symbol *, int, g95_namespace *);
-try g95_check_assign(g95_expr *, g95_expr *);
+try g95_check_assign(g95_expr *, g95_expr *, int);
 try g95_check_pointer_assign(g95_expr *, g95_expr *);
 try g95_check_assign_symbol(g95_symbol *, g95_expr *);
 void g95_show_attr(symbol_attribute *);
@@ -1266,7 +1266,7 @@ match g95_match_intrinsic_op(g95_intrinsic_op *);
 const char *g95_op2string(int);
 match g95_match_char(char);
 match g95_match(const char *, ...);
-match g95_match_iterator(g95_iterator *);
+match g95_match_iterator(g95_iterator *, int);
 void g95_free_iterator(g95_iterator *, int);
 void g95_free_forall_iterator(g95_forall_iterator *);
 
@@ -1424,7 +1424,7 @@ try g95_check_iter_variable(g95_expr *);
 try g95_check_constructor(g95_expr *, try (*)(g95_expr *));
 g95_constructor *g95_copy_constructor(g95_constructor *src);
 g95_expr *g95_get_array_element(g95_expr *, int);
-int g95_array_size(g95_expr *);
+try g95_array_size(g95_expr *, mpz_t *);
 
 /* interface.c */
 

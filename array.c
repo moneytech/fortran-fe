@@ -653,7 +653,7 @@ match m;
   }
 
   for(;;) {
-    m = g95_match_iterator(&iter);
+    m = g95_match_iterator(&iter, 0);
     if (m == MATCH_YES) break;
     if (m == MATCH_ERROR) goto cleanup;
 
@@ -1228,94 +1228,153 @@ g95_expr *g95_get_array_element(g95_expr *array, int element) {
  * diagnostics here, we just return a negative number if something
  * goes wrong. */
 
-/* size_from_spec()-- Get the size of an array from the array
+
+/* size_from_spec()-- Get the size of single dimension of an array
  * specification.  The array is guaranteed to be one dimensional */
 
-static int size_from_spec(g95_array_spec *as) {
-int size;
+static try spec_dimen_size(g95_array_spec *as, int dimen, mpz_t *result) {
 
-  if (as == NULL || as->type != AS_EXPLICIT) return -1;
+  if (as == NULL || as->type != AS_EXPLICIT ||
+      as->lower[dimen]->expr_type != EXPR_CONSTANT ||
+      as->upper[dimen]->expr_type != EXPR_CONSTANT) {
 
-  if (as->lower[0]->expr_type != EXPR_CONSTANT ||
-      as->upper[0]->expr_type != EXPR_CONSTANT) return -1;
+    return FAILURE;
+  }
 
-  size = mpz_get_ui(as->upper[0]->value.integer)
-       - mpz_get_ui(as->lower[0]->value.integer) + 1;
+  mpz_init(*result);
 
-  if (size < 0 || size > G95_MAX_DIMENSIONS) return -1;
+  mpz_sub(*result, as->upper[dimen]->value.integer,
+	  as->lower[dimen]->value.integer);
 
-  return size;
+  mpz_add_ui(*result, *result, 1);
+
+  return SUCCESS;
 }
 
 
-/* size_from_ref()-- Get the number of elements in an array section */
+static try spec_size(g95_array_spec *as, mpz_t *result) {
+mpz_t size;
+int d;
 
-static int size_from_ref(g95_array_ref *ar) {
-int d, start, end, stride;
+  mpz_init_set_ui(*result, 1);
 
-  for(d=0; d<ar->rank; d++)
-    switch(ar->dimen_type[d]) {
-    case DIMEN_ELEMENT:
-      continue;
-
-    case DIMEN_VECTOR:
-      return g95_array_size(ar->start[d]);    /* Recurse! */
-
-    case DIMEN_RANGE:
-      if (ar->start[d]->expr_type != EXPR_CONSTANT ||
-	  ar->end[d]->expr_type != EXPR_CONSTANT ||
-	  ar->stride[d]->expr_type != EXPR_CONSTANT) return -1;
-
-      start = mpz_get_si(ar->start[d]->value.integer);
-      end = mpz_get_si(ar->end[d]->value.integer);
-      stride = mpz_get_si(ar->stride[d]->value.integer);
-
-      d = (end - start + stride) / stride;   /* Zero stride caught earlier */
-
-      if (d < 0 || d > G95_MAX_DIMENSIONS) return -1;
-      return d;
-
-    default:
-      g95_internal_error("size_from_section(): Bad dimen type");
+  for(d=0; d<as->rank; d++) {
+    if (spec_dimen_size(as, d, &size) == FAILURE) {
+      mpz_clear(*result);
+      return FAILURE;
     }
 
-  g95_internal_error("size_from_section(): No range elements!");
+    mpz_mul(*result, *result, size);
+    mpz_clear(size);
+  }
+
+  return SUCCESS;
 }
 
 
-/* g95_array_size()-- Given a shape argument to the RESHAPE intrinsic,
- * figure out how many elements are in the SHAPE specification.  Type
- * and rank have already been verified. Returns the rank of the
- * argument (>0) or a negative number to indicate an error. */
+/* ref_dimen_size()-- Get the number of elements in an array section */
 
-int g95_array_size(g95_expr *shape) {
+static try ref_dimen_size(g95_array_ref *ar, int dimen, mpz_t *result) {
+
+  switch(ar->dimen_type[dimen]) {
+  case DIMEN_ELEMENT:
+    mpz_init(*result); 
+    mpz_set_ui(*result, 1);
+    break;
+
+  case DIMEN_VECTOR:
+    return g95_array_size(ar->start[dimen], result);    /* Recurse! */
+
+  case DIMEN_RANGE:
+    if (ar->start[dimen]->expr_type != EXPR_CONSTANT ||
+	ar->end[dimen]->expr_type != EXPR_CONSTANT ||
+	ar->stride[dimen]->expr_type != EXPR_CONSTANT) {
+      return FAILURE;
+    }
+
+    mpz_init(*result);
+    mpz_sub(*result, ar->end[dimen]->value.integer,
+	    ar->start[dimen]->value.integer);
+    mpz_add(*result, *result, ar->stride[dimen]->value.integer);
+    mpz_div(*result, *result, ar->stride[dimen]->value.integer); 
+
+    /* Zero stride caught earlier */
+
+    if (mpz_cmp_ui(*result, 0) < 0) mpz_set_ui(*result, 0);
+    break;
+
+  default:
+    g95_internal_error("size_from_section(): Bad dimen type");
+  }
+
+  return SUCCESS;
+}
+
+
+static try ref_size(g95_array_ref *ar, mpz_t *result) {
+mpz_t size;
+int d;
+
+  mpz_init_set_ui(*result, 1);
+
+  for(d=0; d<ar->rank; d++) {
+    if (ref_dimen_size(ar, d, &size) == FAILURE) {
+      mpz_clear(*result);
+      return FAILURE;
+    }
+
+    mpz_mul(*result, *result, size);
+    mpz_clear(size);
+  }
+
+  return SUCCESS;
+}
+
+
+/* g95_array_size()-- Given a shape argument to the RESHAPE
+ * intrinsic, figure out how many elements are in the SHAPE
+ * specification.  Type and rank have already been verified. Returns
+ * the rank of the argument (>0) or a negative number to indicate an
+ * error. */
+
+try g95_array_size(g95_expr *array, mpz_t *result) {
 int flag, size;
 g95_ref *ref;
 
-  switch(shape->expr_type) {
+  switch(array->expr_type) {
   case EXPR_ARRAY:
     flag = g95_suppress_error;
     g95_suppress_error = 1;
-    g95_expand_constructor(shape);   /* Errors can be OK */
+    g95_expand_constructor(array);   /* Errors can be OK */
     g95_suppress_error = flag;
 
-    size = count_elements(shape->value.constructor);
+    size = count_elements(array->value.constructor);
+    mpz_init_set_ui(*result, size);
+
     break;
 
   case EXPR_VARIABLE:
-    for(ref=shape->ref; ref; ref=ref->next) {
+    for(ref=array->ref; ref; ref=ref->next) {
       if (ref->type != REF_ARRAY) continue;
 
-      if (ref->u.ar.type == AR_FULL) return size_from_spec(ref->u.ar.as);
-      if (ref->u.ar.type == AR_SECTION) return size_from_ref(&ref->u.ar);
+      if (ref->u.ar.type == AR_FULL) {
+	if (spec_size(ref->u.ar.as, result) == FAILURE) return FAILURE;
+	goto done;
+      }
+
+      if (ref->u.ar.type == AR_SECTION) {
+	if (ref_size(&ref->u.ar, result) == FAILURE) return FAILURE;
+	goto done;
+      }
     }
 
-    return size_from_spec(shape->symbol->as);
+    if (spec_size(array->symbol->as, result) == FAILURE) return FAILURE;
+    break;
 
   default:
-    size = -1;
-    break;
+    return FAILURE;
   }
 
-  return size;
+done:
+  return SUCCESS;
 }

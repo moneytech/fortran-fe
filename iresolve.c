@@ -653,9 +653,14 @@ void g95_resolve_repeat(g95_expr *f, g95_expr *string, g95_expr *ncopies) {
 
 void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
+mpz_t rank;
 
   f->ts = source->ts;
-  f->rank = g95_array_size(shape);
+
+  g95_array_size(shape, &rank);
+  f->rank = mpz_get_ui(rank);
+  mpz_clear(rank);
+
   f->value.function.name =
     get_string("__reshape_%c%d", g95_type_letter(source->ts.type),
 	       source->ts.kind);

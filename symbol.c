@@ -284,7 +284,7 @@ int i;
  * arbitrary expression, make sure that the assignment can take
  * place. */
 
-try g95_check_assign(g95_expr *lvalue, g95_expr *rvalue) {
+try g95_check_assign(g95_expr *lvalue, g95_expr *rvalue, int conform) {
 g95_symbol *sym;
 
   sym = lvalue->symbol;
@@ -312,8 +312,18 @@ g95_symbol *sym;
     return FAILURE;
   }
 
-  if (lvalue->ts.type == rvalue->ts.type &&
-      lvalue->ts.kind == rvalue->ts.kind) return SUCCESS;
+  if (g95_compare_types(&lvalue->ts, &rvalue->ts)) return SUCCESS;
+
+  if (!conform) {
+    if (g95_numeric_ts(&lvalue->ts) && g95_numeric_ts(&rvalue->ts))
+      return SUCCESS;
+
+    g95_error("Incompatable types in assignment at %L, %s to %s",
+	      &rvalue->where, g95_typename(&rvalue->ts),
+	      g95_typename(&lvalue->ts));
+
+    return FAILURE;
+  }
 
   return g95_convert_type(rvalue, &lvalue->ts, 1);
 }
@@ -388,7 +398,7 @@ g95_expr lvalue;
   lvalue.symbol = sym;
   lvalue.where = sym->declared_at;
 
-  return g95_check_assign(&lvalue, rvalue);
+  return g95_check_assign(&lvalue, rvalue, 1);
 }
 
 /******************** Symbol attribute stuff *********************/

@@ -1,5 +1,5 @@
 /* Perform type resolution on the various stuctures.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright (C) 2001-2 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GNU G95.
@@ -1300,39 +1300,47 @@ try t;
  * structure and require that they all be of integer type. */
 
 try g95_resolve_iterator(g95_iterator *iter) {
-try t;
 
-  t = SUCCESS; 
+  if (g95_resolve_expr(iter->var) == FAILURE) return FAILURE;
 
-  if (g95_resolve_expr(iter->var) == SUCCESS &&
-      iter->var->ts.type != BT_INTEGER) {
-    g95_error("Loop variable at %L must be INTEGER in Fortran 95",
+  if (iter->var->ts.type != BT_INTEGER || iter->var->rank != 0) {
+    g95_error("Loop variable at %L must be a scalar INTEGER",
 	      &iter->var->where);
-    t = FAILURE;
+    return FAILURE;
   }
 
-  if (g95_resolve_expr(iter->start) == SUCCESS &&
-      iter->start->ts.type != BT_INTEGER) {
-    g95_error("Start expression in DO loop at %L must be INTEGER",
+  if (g95_resolve_expr(iter->start) == FAILURE) return FAILURE;
+
+  if (iter->start->ts.type != BT_INTEGER || iter->start->rank != 0) {
+    g95_error("Start expression in DO loop at %L must be a scalar INTEGER",
 	      &iter->start->where);
-    t = FAILURE;
+    return FAILURE;
   }
 
-  if (g95_resolve_expr(iter->end) == SUCCESS &&
-      iter->end->ts.type != BT_INTEGER) {
-    g95_error("End expression in DO loop at %L must be INTEGER",
+  if (g95_resolve_expr(iter->end) == FAILURE) return FAILURE;
+
+  if (iter->end->ts.type != BT_INTEGER || iter->end->rank != 0) {
+    g95_error("End expression in DO loop at %L must be a scalar INTEGER",
 	      &iter->end->where);
-    t = FAILURE;
+    return FAILURE;
   }
 
-  if (g95_resolve_expr(iter->step) == SUCCESS &&
-      iter->step->ts.type != BT_INTEGER) {
-    g95_error("Step expression in DO loop at %L must be INTEGER",
+  if (g95_resolve_expr(iter->step) == FAILURE) return FAILURE;
+
+  if (iter->step->ts.type != BT_INTEGER || iter->step->rank != 0) {
+    g95_error("Step expression in DO loop at %L must be a scalar INTEGER",
 	      &iter->step->where);
-    t = FAILURE;
+    return FAILURE;
   }
 
-  return t;
+  if (iter->step->expr_type == EXPR_CONSTANT &&
+      mpz_cmp_ui(iter->step->value.integer, 0) == 0) {
+    g95_error("Step expression in DO loop at %L cannot be zero",
+	      &iter->step->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
 }
 
 
@@ -1432,7 +1440,7 @@ try t;
 
       if (g95_extend_assign(code, ns) == SUCCESS) break;
 
-      g95_check_assign(code->expr, code->expr2);
+      g95_check_assign(code->expr, code->expr2, 1);
       break;
 
     case EXEC_POINTER_ASSIGN:
@@ -1619,23 +1627,141 @@ static void resolve_symbol(g95_symbol *sym) {
 
 /************* Resolve DATA statements *************/
 
-
-#if 0
 static struct {
   g95_data_value *vnode;
   int left;
 } values;
 
 
-/* traverse_data_node()-- Type resolve variables in the variable list
- * of a DATA statement. */
+/* next_data_value()-- Advance the values structure to point to the
+ * next value in the data list */
 
-static try traverse_data_node(g95_data_variable *var) {
+static try next_data_value(void) {
 
-  if ()
+  while(values.left == 0) {
+    if (values.vnode->next == NULL) return FAILURE;
 
+    values.vnode = values.vnode->next;
+    values.left = values.vnode->repeat;
+  }
+
+  values.left--;
+  return SUCCESS;
 }
 
+
+static try check_data_variable(g95_data_variable *var, locus *where) {
+g95_expr *e;
+mpz_t size;
+try t;
+
+  if (g95_resolve_expr(var->expr) == FAILURE) return FAILURE;
+
+  e = var->expr;
+
+  if (e->expr_type != EXPR_VARIABLE)
+    g95_internal_error("check_data_variable(): Bad expression");
+
+  if (e->rank == 0)
+    mpz_init_set_ui(size, 1);
+  else {
+    if (g95_array_size(e, &size) == FAILURE) {
+      g95_error("Nonconstant array section at %L in DATA statement",
+		&e->where);
+      return FAILURE;
+    }
+  }
+
+  t = SUCCESS;
+
+  while(mpz_cmp_ui(size, 0) > 0) {
+    if (next_data_value() == FAILURE) {
+      g95_error("DATA statement at %L has more variables than values", where);
+      t = FAILURE;
+      break;
+    }
+
+    t = g95_check_assign(var->expr, values.vnode->expr, 0);
+    if (t == FAILURE) break;
+      
+    mpz_sub_ui(size, size, 1);
+  }
+
+  mpz_clear(size);
+
+  return t;
+}
+
+
+static try traverse_data_var(g95_data_variable *, locus *);
+
+/* traverse_data_list()-- Iterate over a list of elements in a DATA
+ * statement */
+
+static try traverse_data_list(g95_data_variable *var, locus *where) {
+mpz_t trip;
+
+  mpz_init_set(trip, var->iter.end->value.integer);
+  mpz_sub(trip, trip, var->iter.start->value.integer);
+  mpz_add(trip, trip, var->iter.step->value.integer);
+
+  mpz_div(trip, trip, var->iter.step->value.integer);
+
+  while(mpz_cmp_ui(trip, 0) > 0) {
+    if (traverse_data_var(var->list, where) == FAILURE) return FAILURE;
+
+    mpz_sub_ui(trip, trip, 1);
+  }
+
+  mpz_clear(trip);
+
+  return SUCCESS;
+}
+
+
+/* traverse_data_var()-- Type resolve variables in the variable list
+ * of a DATA statement. */
+
+static try traverse_data_var(g95_data_variable *var, locus *where) {
+try t;
+
+  for(; var; var=var->next) {
+    if (var->expr == NULL)
+      t = traverse_data_list(var, where);
+    else
+      t = check_data_variable(var, where);
+
+    if (t == FAILURE) return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
+/* resolve_data_variables()-- Resolve the expressions and iterators
+ * associated with a data statement.  This is separate from the
+ * assignment checking because data lists only should be resolved
+ * once. */
+
+static try resolve_data_variables(g95_data_variable *d) {
+
+  for(; d; d=d->next) {
+    if (d->list == NULL)
+      g95_resolve_expr(d->expr);
+    else {
+      if (g95_resolve_iterator(&d->iter) == FAILURE) return FAILURE;
+
+      if (d->iter.start->expr_type != EXPR_CONSTANT ||
+	  d->iter.end->expr_type != EXPR_CONSTANT ||
+	  d->iter.step->expr_type != EXPR_CONSTANT)
+	g95_internal_error("resolve_data_variables(): Bad iterator");
+	
+      if (resolve_data_variables(d->list) == FAILURE) return FAILURE;
+    }
+  }
+
+  return SUCCESS; 
+}
 
 /* resolve_data()-- Resolve a single DATA statement.  We implement
  * this by storing a pointer to the value list into static variables,
@@ -1644,18 +1770,19 @@ static try traverse_data_node(g95_data_variable *var) {
 
 static void resolve_data(g95_data *d) {
 
-  values.vnode = d->value;
-  values.left = (d->value == NULL) ? 0 : d->value.repeat;
+  if (resolve_data_variables(d->var) == FAILURE) return;
 
-  if (traverse_data_node(d->var) == FAILURE) return;
+  values.vnode = d->value;
+  values.left = (d->value == NULL) ? 0 : d->value->repeat;
+
+  if (traverse_data_var(d->var, &d->where) == FAILURE) return;
 
   /* At this point, we better not have any values left */
 
-  if (values.vnode != NULL)
+  if (next_data_value() == SUCCESS)
     g95_error("DATA statement at %L has more values than variables",
 	      &d->where);
 }
-#endif
 
 
 /* g95_resolve()-- This function is called after a complete program
@@ -1668,9 +1795,7 @@ static void resolve_data(g95_data *d) {
 void g95_resolve(g95_namespace *ns) {
 g95_namespace *old_ns, *n;
 g95_charlen *cl;
-#if 0
 g95_data *d;
-#endif
 
   old_ns = g95_current_ns;
   g95_current_ns = ns;
@@ -1697,10 +1822,8 @@ g95_data *d;
 
   if (ns->save_all) g95_save_all(ns);
 
-#if 0
   for(d=ns->data; d; d=d->next)
     resolve_data(d);
-#endif
 
   g95_resolve_code(ns->code, ns);
 

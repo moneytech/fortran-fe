@@ -1000,6 +1000,8 @@ try g95_check_repeat(g95_expr *x, g95_expr *y) {
 
 try g95_check_reshape(g95_expr *source, g95_expr *shape,
 		      g95_expr *pad, g95_expr *order) {
+mpz_t size;
+int m;
 
   if (array_check(source, 0) == FAILURE) return FAILURE;
 
@@ -1007,9 +1009,18 @@ try g95_check_reshape(g95_expr *source, g95_expr *shape,
 
   if (type_check(shape, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (g95_array_size(shape) < 0) {
+  if (g95_array_size(shape, &size) != SUCCESS) {
     g95_error("'shape' argument of 'reshape' intrinsic at %L must be an "
 	      "array of constant size", &shape->where);
+    return FAILURE;
+  }
+
+  m = mpz_cmp_ui(size, G95_MAX_DIMENSIONS);
+  mpz_clear(size);
+
+  if (m > 0) {
+    g95_error("'shape' argument of 'reshape' intrinsic at %L has more than "
+	      stringize(G95_MAX_DIMENSIONS) " elements");
     return FAILURE;
   }
 

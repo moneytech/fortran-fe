@@ -407,7 +407,7 @@ static mstring operators_out[] = {
  * expression is returned.  We don't return MATCH_ERROR until after
  * the equals sign is seen. */
 
-match g95_match_iterator(g95_iterator *iter) {
+match g95_match_iterator(g95_iterator *iter, int init_flag) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_expr *var, *e1, *e2, *e3;
 locus start;
@@ -444,13 +444,13 @@ match m;
     goto cleanup;
   }
 
-  m = g95_match_expr(&e1);
+  m = init_flag ? g95_match_init_expr(&e1) : g95_match_expr(&e1);
   if (m == MATCH_NO) goto syntax;
   if (m == MATCH_ERROR) goto cleanup;
 
   if (g95_match_char(',') != MATCH_YES) goto syntax;
 
-  m = g95_match_expr(&e2);
+  m = init_flag ? g95_match_init_expr(&e2) : g95_match_expr(&e2);
   if (m == MATCH_NO) goto syntax;
   if (m == MATCH_ERROR) goto cleanup;
 
@@ -459,7 +459,7 @@ match m;
     goto done;
   }
 
-  m = g95_match_expr(&e3);
+  m = init_flag ? g95_match_init_expr(&e3) : g95_match_expr(&e3);
   if (m == MATCH_ERROR) goto cleanup;
   if (m == MATCH_NO) {
     g95_error("Expected a step value in iterator at %C");
@@ -1029,7 +1029,7 @@ match m;
   g95_match_st_label(&label);  /* Can't error out */
   g95_match_char(',');         /* Optional comma */
 
-  m = g95_match_iterator(&iter);
+  m = g95_match_iterator(&iter, 0);
   if (m == MATCH_NO) return MATCH_NO;
   if (m == MATCH_ERROR) goto cleanup;
 
@@ -2035,7 +2035,7 @@ match m;
   for(;;) {
     if (g95_match_char(',') != MATCH_YES) goto syntax;
 
-    m = g95_match_iterator(&parent->iter);
+    m = g95_match_iterator(&parent->iter, 1);
     if (m == MATCH_YES) break;
     if (m == MATCH_ERROR) return MATCH_ERROR;
 
@@ -2203,6 +2203,7 @@ match m;
   
   for(;;) {
     new = g95_get_data();
+    new->where = *g95_current_locus();
 
     m = top_var_list(new);
     if (m != MATCH_YES) goto cleanup;

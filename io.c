@@ -855,7 +855,7 @@ match m;
   iter = g95_get_iterator();
 
   for(;;) {
-    m = g95_match_iterator(iter);
+    m = g95_match_iterator(iter, 0);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_YES) break;
 
