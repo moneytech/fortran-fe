@@ -1,3 +1,13 @@
+2002-09-06  Paul Brook  <paul@nowt.org>
+
+	* Make-lang.in (F95_ADDITIONAL_OBJS): Add tree_alias_comon.o
+	* f95-lang.c (g95_be_parse_file): Pass error and warning counts
+	back to top-level code.
+
+2002-09-06  Tobias Schlueter  <Tobias.Schlueter@physik.uni-muenchen.de>
+
+	* trans-stmt.c (g95_trans_allocate): Fix when ref==NULL.
+
 2002-09-04  Paul Brook  <paul@nowt.org>
 
 	* f95-lang.c (g95_create_decls): New function.

@@ -988,18 +988,18 @@ g95_trans_allocate (g95_code * code)
 
       ref = expr->ref;
 
-      /* Find the last reference in the chain.  */
-      while (ref->next != NULL)
-        {
-          assert (ref->type != REF_ARRAY || ref->u.ar.type == AR_ELEMENT);
-          ref = ref->next;
-        }
-
-      if (ref->type != REF_ARRAY)
-        ref = NULL;
-
       if (ref != NULL)
         {
+         /* Find the last reference in the chain.  */
+         while (ref->next != NULL)
+           {
+             assert (ref->type != REF_ARRAY || ref->u.ar.type == AR_ELEMENT);
+             ref = ref->next;
+           }
+
+         if (ref->type != REF_ARRAY)
+           ref = NULL;
+
           /* An array.  */
           g95_array_allocate (&se, ref, pstat);
         }

@@ -44,6 +44,7 @@ Boston, MA 02111-1307, USA.  */
 #include "flags.h"
 #include "target.h"
 #include "tree-optimize.h"
+#include "diagnostic.h"
 #include <assert.h>
 #define BACKEND_CODE
 #include "g95.h"
@@ -476,9 +477,17 @@ g95_create_decls (void)
 static void
 g95_be_parse_file (void *set_yydebug ATTRIBUTE_UNUSED)
 {
+  int errors;
+  int warnings;
+
   g95_create_decls ();
   g95_parse_file ();
   g95_generate_constructors ();
+
+  /* Tell the frontent about any errors.  */
+  g95_get_errors (&warnings, &errors);
+  errorcount += errors;
+  warningcount += warnings;
 }
 
 /* Routines Expected by GCC:  */
