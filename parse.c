@@ -1571,10 +1571,11 @@ int close_flag;
 
 static void parse_progunit(g95_statement);
 
-static void parse_contained(void) {
+static void parse_contained(int module) {
 g95_namespace *parent_ns;
 g95_state_data s1, s2;
 g95_statement st;
+g95_symbol *sym;
 
   push_state(&s1, COMP_CONTAINS, NULL);
   parent_ns = g95_current_ns;
@@ -1599,6 +1600,26 @@ g95_statement st;
 
       push_state(&s2, (st == ST_FUNCTION) ? COMP_FUNCTION : COMP_SUBROUTINE,
 		 g95_new_block);
+
+      /* For internal procedures, create/update the symbol in the
+       * parent namespace */
+
+      if (!module) {
+	if (g95_get_symbol(g95_new_block->name, parent_ns, 0, &sym))
+	  g95_error("Contained procedure '%s' at %C is already ambiguous",
+		    g95_new_block->name);
+	else {
+	  if (g95_add_procedure(&sym->attr, PROC_INTERNAL,
+				&g95_new_block->declared_at) == SUCCESS) {
+	    if (st == ST_FUNCTION)
+	      g95_add_function(&sym->attr, &g95_new_block->declared_at);
+	    else
+	      g95_add_subroutine(&sym->attr, &g95_new_block->declared_at);
+	  }
+	}
+
+	g95_commit_symbols();
+      }
 
       parse_progunit(ST_NONE);
 
@@ -1691,7 +1712,7 @@ contains:
     goto loop;
   }
 
-  parse_contained();
+  parse_contained(0);
 
 done:
   g95_current_ns->code = g95_state_stack->head;
@@ -1729,7 +1750,7 @@ loop:
 
   case ST_CONTAINS:
     accept_statement(st);
-    parse_contained();
+    parse_contained(1);
     break;
 
   case ST_END_MODULE:
