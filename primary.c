@@ -33,7 +33,7 @@ Boston, MA 02111-1307, USA.  */
 static match match_kind_param(int *kind) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
-const char *p;
+char *p;
 match m;
 
   m = g95_match_small_literal_int(kind);
@@ -196,10 +196,10 @@ g95_expr *e;
 
 static match match_boz_constant(g95_expr **result) {
 int radix, delim, length;
-const char *rname;
 locus old_loc;
 char *buffer;
 g95_expr *e;
+char *rname;
 
   old_loc = *g95_current_locus();
   g95_gobble_whitespace();
@@ -598,8 +598,8 @@ char *p, name[G95_MAX_SYMBOL_LEN+1];
 int i, c, kind, length, delimiter;
 locus old_locus, start_locus;
 g95_symbol *sym;
-const char *q;
 g95_expr *e;
+char *q;
 match m;
 
   old_locus = *g95_current_locus();

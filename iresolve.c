@@ -65,7 +65,7 @@ int h;
  * address of the resulting string.  If the name is not in the table,
  * it is added. */
 
-char *g95_get_string(const char *format, ...) {
+char *g95_get_string(char *format, ...) {
 char temp_name[50];
 string_node *p;
 va_list ap;

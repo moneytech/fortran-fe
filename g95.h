@@ -295,7 +295,7 @@ typedef struct g95_file {
 /* Structure for storing strings to be matched by g95_match_string */
 
 typedef struct {
-  const char *string, *mp;
+  char *string, *mp;
   int tag;
 } mstring;
 
@@ -988,7 +988,7 @@ int g95_next_char(void);
 int g95_peek_char(void);
 void g95_error_recovery(void);
 void g95_gobble_whitespace(void);
-try g95_new_file(const char *, g95_source_form);
+try g95_new_file(char *, g95_source_form);
 
 extern g95_file *g95_current_file;
 
@@ -997,16 +997,16 @@ extern g95_file *g95_current_file;
 void *g95_getmem(size_t);
 void g95_free(void *);
 void g95_clear_ts(g95_typespec *);
-FILE *g95_open_file(const char *);
-FILE *g95_open_included_file(const char *);
-const char *g95_article(const char *);
-const char *g95_basic_typename(bt);
+FILE *g95_open_file(char *);
+FILE *g95_open_included_file(char *);
+char *g95_article(char *);
+char *g95_basic_typename(bt);
 char *g95_typename(g95_typespec *);
 void g95_show_typespec(g95_typespec *);
 
-const char *g95_code2string(mstring *, int);
-int g95_string2code(mstring *, const char *);
-const char *g95_intent_string(sym_intent);
+char *g95_code2string(mstring *, int);
+int g95_string2code(mstring *, char *);
+char *g95_intent_string(sym_intent);
 
 void g95_init_1(void);
 void g95_init_2(void);
@@ -1015,7 +1015,7 @@ void g95_done_2(void);
 
 /* iresolve.c */
 
-char *g95_get_string(const char *, ...)
+char *g95_get_string(char *, ...)
 #ifdef __GNUC__
 __attribute__ ((format (printf, 1, 2)))
 #endif
@@ -1032,20 +1032,20 @@ void g95_init_options(void);
 void g95_error_init_1(void);
 void g95_buffer_error(int);
 
-void g95_warning(const char *, ...);
-void g95_warning_now(const char *, ...);
+void g95_warning(char *, ...);
+void g95_warning_now(char *, ...);
 void g95_clear_warning(void);
 void g95_warning_check(void);
 
-void g95_error(const char *, ...);
-void g95_error_now(const char *, ...);
-void g95_fatal_error(const char *, ...)
+void g95_error(char *, ...);
+void g95_error_now(char *, ...);
+void g95_fatal_error(char *, ...)
 #ifdef __GNUC__
  __attribute__ ((noreturn))
 #endif
 ;
 
-void g95_internal_error(const char *, ...)
+void g95_internal_error(char *, ...)
 #ifdef __GNUC__
  __attribute__ ((noreturn))
 #endif
@@ -1057,13 +1057,13 @@ void g95_syntax_error(g95_statement st);
 void g95_push_error(g95_error_buf *);
 void g95_pop_error(g95_error_buf *);
 
-void g95_status(const char *, ...)
+void g95_status(char *, ...)
 #ifdef __GNUC__
 __attribute__ ((format (printf, 1, 2)))
 #endif
 ;
 void g95_status_char(char);
-try g95_open_status(const char *);
+try g95_open_status(char *);
 try g95_close_status(void);
 
 void g95_get_errors(int *, int *);
@@ -1072,8 +1072,8 @@ void g95_get_errors(int *, int *);
 
 try g95_find_state(g95_compile_state);
 g95_state_data *g95_enclosing_unit(g95_compile_state *);
-const char *g95_ascii_statement(g95_statement);
-const char *g95_state_name(g95_compile_state);
+char *g95_ascii_statement(g95_statement);
+char *g95_state_name(g95_compile_state);
 void g95_reject_statement(void);
 try g95_parse_file(void);
 
@@ -1083,7 +1083,7 @@ extern g95_st_label * g95_statement_label;
 
 extern mpf_t pi, half_pi, minus_half_hpi, two_pi;
 
-const char *g95_arith_error(arith);
+char *g95_arith_error(arith);
 void g95_arith_init_1(void);
 void g95_arith_done_1(void);
 
@@ -1152,8 +1152,8 @@ g95_expr *g95_le(g95_expr *, g95_expr *);
 g95_expr *g95_unary_user(g95_expr *, g95_expr *);
 g95_expr *g95_user(g95_expr *, g95_expr *);
 
-g95_expr *g95_convert_integer(const char *, int, int, locus *);
-g95_expr *g95_convert_real(const char *, int, locus *);
+g95_expr *g95_convert_integer(char *, int, int, locus *);
+g95_expr *g95_convert_real(char *, int, locus *);
 g95_expr *g95_convert_complex(g95_expr *, g95_expr *, int);
 
 g95_expr *g95_int2int(g95_expr *, int);
@@ -1217,9 +1217,9 @@ void g95_clear_attr(symbol_attribute *);
 try g95_missing_attr(symbol_attribute *, locus *);
 try g95_copy_attr(symbol_attribute *, symbol_attribute *, locus *);
 
-try g95_add_component(g95_symbol *, const char *, g95_component **);
+try g95_add_component(g95_symbol *, char *, g95_component **);
 g95_symbol *g95_use_derived(g95_symbol *);
-g95_component *g95_find_component(g95_symbol *, const char *);
+g95_component *g95_find_component(g95_symbol *, char *);
 void g95_show_components(g95_symbol *);
 
 g95_st_label *g95_get_st_label(int);
@@ -1229,15 +1229,15 @@ void g95_define_st_label(g95_st_label *, g95_sl_type, locus *);
 try g95_reference_st_label(g95_st_label *, g95_sl_type);
 
 g95_namespace *g95_get_namespace(void);
-g95_symtree *g95_new_symtree(g95_symtree **, const char *);
-g95_symtree *g95_find_symtree(g95_symtree *, const char *);
-g95_user_op *g95_get_uop(const char *);
-g95_user_op *g95_find_uop(const char *, g95_namespace *);
+g95_symtree *g95_new_symtree(g95_symtree **, char *);
+g95_symtree *g95_find_symtree(g95_symtree *, char *);
+g95_user_op *g95_get_uop(char *);
+g95_user_op *g95_find_uop(char *, g95_namespace *);
 void g95_free_symbol(g95_symbol *);
-g95_symbol *g95_new_symbol(const char *, g95_namespace *);
-int g95_find_symbol(const char *, g95_namespace *, int, g95_symbol **);
-int g95_get_symbol(const char *, g95_namespace *, int, g95_symbol **);
-int g95_findget_symbol(const char *, g95_namespace *, int, g95_symbol **);
+g95_symbol *g95_new_symbol(char *, g95_namespace *);
+int g95_find_symbol(char *, g95_namespace *, int, g95_symbol **);
+int g95_get_symbol(char *, g95_namespace *, int, g95_symbol **);
+int g95_findget_symbol(char *, g95_namespace *, int, g95_symbol **);
 
 void g95_undo_symbols(void);
 void g95_commit_symbols(void);
@@ -1289,9 +1289,9 @@ int g95_match_strings(mstring *);
 match g95_match_name(char *);
 match g95_match_symbol(g95_symbol **);
 match g95_match_intrinsic_op(g95_intrinsic_op *);
-const char *g95_op2string(int);
+char *g95_op2string(int);
 match g95_match_char(char);
-match g95_match(const char *, ...);
+match g95_match(char *, ...);
 match g95_match_iterator(g95_iterator *, int);
 void g95_free_iterator(g95_iterator *, int);
 void g95_free_forall_iterator(g95_forall_iterator *);
@@ -1381,7 +1381,7 @@ match g95_match_init_expr(g95_expr **);
 /* expr.c */
 
 g95_actual_arglist *g95_copy_actual_arglist(g95_actual_arglist *);
-const char *g95_extract_int(g95_expr *, int *);
+char *g95_extract_int(g95_expr *, int *);
 
 g95_expr *g95_build_funcall(g95_symbol *func, ...);
 void g95_free_ref_list(g95_ref *);
@@ -1529,7 +1529,7 @@ void g95_module_done_2(void);
 match g95_match_module(void);
 void g95_free_rename(void);
 match g95_match_use(void);
-void g95_dump_module(const char *, int);
+void g95_dump_module(char *, int);
 void g95_use_module(void);
 
 #ifdef IN_GCC

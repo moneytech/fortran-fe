@@ -234,7 +234,7 @@ void g95_replace_expr(g95_expr *dest, g95_expr *src) {
  * result is set.  It is tempting to generate an error and return
  * SUCCESS or FAILURE, but failure is OK for some callers. */
 
-const char *g95_extract_int(g95_expr *expr, int *result) {
+char *g95_extract_int(g95_expr *expr, int *result) {
 
   if (expr->expr_type != EXPR_CONSTANT)
     return "Constant expression required at %C";
@@ -985,7 +985,7 @@ not_numeric:
 
 static try check_numeric_inquiry(g95_expr *e) {
 char *name;
-static const char *inquiry_function[] = {
+static char *inquiry_function[] = {
   "digits", "epsilon", "huge", "kind", "maxexponent", "minexponent",
   "precision", "radix", "range", "tiny", "bit_size", NULL
 };
@@ -1224,7 +1224,7 @@ g95_symbol *f;
 static try restricted_intrinsic(g95_expr *e) {
 g95_intrinsic_sym *sym;
 
-static struct { const char *name; int case_number; } *cp, cases[] = {
+static struct { char *name; int case_number; } *cp, cases[] = {
   { "repeat", 0 },             { "reshape", 0 },  { "selected_int_kind", 0 },
   { "selected_real_kind", 0 }, { "transfer", 0 }, { "trim", 0 },
 

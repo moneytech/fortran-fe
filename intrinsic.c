@@ -265,7 +265,7 @@ try t;
  *
  * the sequence is terminated by a NULL name. */
 
-static void add_sym(const char *name, int elemental, int actual_ok, bt type,
+static void add_sym(char *name, int elemental, int actual_ok, bt type,
 		    int kind, try (*check)(), g95_expr *(*simplify)(),
 		    void (*resolve)(), ...) {
 
@@ -344,7 +344,8 @@ va_list argp;
  * number of elements in the table and a pointer to a name.  Returns
  * the NULL pointer if a name is not found. */
 
-static g95_intrinsic_sym *find_sym(g95_intrinsic_sym *start, int n, const char *name) {
+static g95_intrinsic_sym *find_sym(g95_intrinsic_sym *start, int n,
+				   char *name) {
 
   while(n > 0) {
     if (strcmp(name, start->name) == 0) return start;
@@ -369,7 +370,7 @@ g95_intrinsic_sym *g95_find_function(char *name) {
 /* find_subroutine()-- Given a name, find a function in the intrinsic
  * subroutine table.  Returns NULL if not found. */
 
-static g95_intrinsic_sym *find_subroutine(const char *name) {
+static g95_intrinsic_sym *find_subroutine(char *name) {
 
   return find_sym(subroutines, nsub, name);
 }
@@ -415,7 +416,7 @@ int g95_intrinsic_name(char *name, int subroutine_flag) {
  * of the specifics currently in the table are placed into the list of
  * specific functions associated with that generic.  */
 
-static void make_generic(const char *name) {
+static void make_generic(char *name) {
 g95_intrinsic_sym *g;
 
   if (sizing != SZ_NOTHING) return; 
@@ -445,7 +446,7 @@ g95_intrinsic_sym *g;
  * Note that we use argument lists more than once, but all argument
  * lists are freed as a single block.  */
 
-static void make_alias(const char *name) {
+static void make_alias(char *name) {
 
   switch(sizing) {
   case SZ_FUNCS:
@@ -1669,7 +1670,7 @@ g95_actual_arglist *head, *tail, *next;
  * something is obviously wrong (say, a missing required argument) we
  * abort sorting and return FAILURE. */
 
-static try sort_actual(const char *name, g95_actual_arglist **ap,
+static try sort_actual(char *name, g95_actual_arglist **ap,
 		       g95_intrinsic_arg *formal, locus *where) {
 
 g95_actual_arglist *actual, *a;

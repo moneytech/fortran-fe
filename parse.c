@@ -45,7 +45,7 @@ static void check_statement_label(g95_statement);
  * rest of the statement.  For single keywords, the matching
  * subroutine is g95_match_eos(). */
 
-static match match_word(const char *str, match (*subr)(void),
+static match match_word(char *str, match (*subr)(void),
 			locus *old_locus) {
 match m;
 
@@ -559,8 +559,8 @@ g95_state_data *p;
 
 /* g95_ascii_statement()-- Translate a statement enum to a string */
 
-const char *g95_ascii_statement(g95_statement st) {
-const char *p;
+char *g95_ascii_statement(g95_statement st) {
+char *p;
 
   switch(st) {
   case ST_ARITHMETIC_IF:  p = "arithmetic IF"; break;
@@ -645,8 +645,8 @@ const char *p;
 
 /* g95_state_name()-- Return the name of a compile state */
 
-const char *g95_state_name(g95_compile_state state) {
-const char *p;
+char *g95_state_name(g95_compile_state state) {
+char *p;
 
   switch(state) {
   case COMP_PROGRAM:     p = "a PROGRAM"; break;

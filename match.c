@@ -140,7 +140,7 @@ int i;
 
 match g95_match_small_int(int *value) {
 g95_expr *expr;
-const char *p;
+char *p;
 match m;
 int i;
 
@@ -379,7 +379,7 @@ g95_intrinsic_op op;
 
 
 
-const char *g95_op2string(int i) {
+char *g95_op2string(int i) {
 static mstring operators_out[] = {
   minit("+", INTRINSIC_PLUS),      minit("-", INTRINSIC_MINUS),
   minit("+", INTRINSIC_UPLUS),     minit("-", INTRINSIC_UMINUS),
@@ -518,15 +518,15 @@ locus where;
  * %   Matches a required space (in free form) and optional spaces.
  */
 
-match g95_match(const char *target, ...) {
+match g95_match(char *target, ...) {
+g95_st_label **label;
 int matches, *ip;
-const char *p;
 locus old_loc;
 va_list argp;
 char c, *np;
 match m, n;
 void **vp;
-g95_st_label **label;
+char *p;
 
   old_loc = *g95_current_locus();
   va_start(argp, target);
@@ -2211,8 +2211,8 @@ match m;
 
 static match top_val_list(g95_data *data) {
 g95_data_value *new, *tail;
-const char *msg;
 g95_expr *expr;
+char *msg;
 match m;
 
   tail = NULL;

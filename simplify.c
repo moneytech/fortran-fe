@@ -89,7 +89,7 @@ static int xascii_table[256];
 /* range_check()-- Range checks an expression node.  If all goes well,
  * returns the node, otherwise returns &g95_bad_expr and frees the node. */
 
-static g95_expr *range_check(g95_expr *result, const char *name) {
+static g95_expr *range_check(g95_expr *result, char *name) {
 
   if (g95_range_check(result) == ARITH_OK)
     return result;
@@ -104,7 +104,7 @@ static g95_expr *range_check(g95_expr *result, const char *name) {
  * missing kind parameter.  Returns the kind, -1 if something went
  * wrong. */
 
-static int get_kind(bt type, g95_expr *k, const char *name, int default_kind) {
+static int get_kind(bt type, g95_expr *k, char *name, int default_kind) {
 int kind;
 
   if (k == NULL) return default_kind;
@@ -611,7 +611,7 @@ int c, kind;
 /* simplify_cmplx()-- Common subroutine for simplifying CMPLX and DCMPLX */
 
 static g95_expr *simplify_cmplx(g95_expr *x, g95_expr *y, int kind,
-				const char *name) {
+				char *name) {
 g95_expr *result;
 
   result = g95_constant_result(BT_COMPLEX, kind, &x->where);
@@ -2025,7 +2025,7 @@ int p, i, k;
 }
 
 
-static g95_expr *simplify_nint(const char *name, g95_expr *e, g95_expr *k) {
+static g95_expr *simplify_nint(char *name, g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *itrunc, *result;
 int kind, cmp;
 

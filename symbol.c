@@ -531,9 +531,9 @@ void g95_show_attr(symbol_attribute *attr) {
 #define conf2(a) if (attr->a) { a2 = a; goto conflict; }
 
 static try check_conflict(symbol_attribute *attr, locus *loc) {
-const char *a1, *a2;
+char *a1, *a2;
 
-static const char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
+static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
   *target = "TARGET", *external = "EXTERNAL", *intent = "INTENT",
   *intrinsic = "INTRINSIC", *allocatable = "ALLOCATABLE",
   *elemental = "ELEMENTAL", *private = "PRIVATE", *recursive = "RECURSIVE",
@@ -1127,7 +1127,7 @@ fail:
  * fails if the name is already present.  On success, the component
  * pointer is modified to point to the additional component structure. */
 
-try g95_add_component(g95_symbol *sym, const char *name,
+try g95_add_component(g95_symbol *sym, char *name,
 		      g95_component **component) {
 g95_component *p, *tail;
 
@@ -1255,7 +1255,7 @@ int i;
  * pointer if the component is not found or the components are
  * private. */
  
-g95_component *g95_find_component(g95_symbol *sym, const char *name) {
+g95_component *g95_find_component(g95_symbol *sym, char *name) {
 g95_component *p;
 
   if (name == NULL) return NULL;
@@ -1674,7 +1674,7 @@ static void insertFixup(g95_symtree **root, g95_symtree *x) {
 /* g95_new_symtree()-- Allocate a new red/black node and associate it
  * with the new symbol. */
 
-g95_symtree *g95_new_symtree(g95_symtree **root, const char *name) {
+g95_symtree *g95_new_symtree(g95_symtree **root, char *name) {
 g95_symtree *current, *parent, *x;
 
   current = *root;     /* find future parent */
@@ -1829,7 +1829,7 @@ g95_symtree *x, *y, *z;
 /* g95_find_symtree()-- Given a namespace and a name, try to find the
  * symbol within the namespace.  Returns NULL if the symbol is not found. */
 
-g95_symtree *g95_find_symtree(g95_symtree *root, const char *name) {
+g95_symtree *g95_find_symtree(g95_symtree *root, char *name) {
 g95_symtree *current = root;
 
   while(current != NIL) {
@@ -1847,7 +1847,7 @@ g95_symtree *current = root;
  * if it doesn't exist.  These are much simpler than symbols because
  * they can't be ambiguous with one another */
 
-g95_user_op *g95_get_uop(const char *name) {
+g95_user_op *g95_get_uop(char *name) {
 g95_user_op *uop;
 g95_symtree *st;
 
@@ -1868,7 +1868,7 @@ g95_symtree *st;
 /* g95_find_uop()-- Given a name find the user operator node.  Returns
  * NULL if it does not exist. */
 
-g95_user_op *g95_find_uop(const char *name, g95_namespace *ns) {
+g95_user_op *g95_find_uop(char *name, g95_namespace *ns) {
 g95_symtree *st;
 
   if (ns == NULL) ns = g95_current_ns;
@@ -1905,7 +1905,7 @@ void g95_free_symbol(g95_symbol *sym) {
 
 /* g95_new_symbol()-- Allocate and initialize a new symbol node */
 
-g95_symbol *g95_new_symbol(const char *name, g95_namespace *ns) {
+g95_symbol *g95_new_symbol(char *name, g95_namespace *ns) {
 g95_symbol *p;
 
   p = g95_getmem(sizeof(g95_symbol));
@@ -1933,7 +1933,7 @@ g95_symbol *p;
  * nonzero parent_flag.  Returns nonzero if the symbol is
  * ambiguous. */
 
-int g95_find_symbol(const char *name, g95_namespace *ns, int parent_flag,
+int g95_find_symbol(char *name, g95_namespace *ns, int parent_flag,
 		    g95_symbol **result) {
 g95_symtree *st;
 
@@ -1970,7 +1970,7 @@ g95_symtree *st;
  *
  * If nonzero, then an error was issued.  */
 
-int g95_get_symbol(const char *name, g95_namespace *ns, int parent_flag,
+int g95_get_symbol(char *name, g95_namespace *ns, int parent_flag,
 		   g95_symbol **result) {
 g95_namespace *current_ns;
 g95_symtree *st;
@@ -2049,7 +2049,7 @@ g95_symbol *p;
  * generating a host association error that g95_get_symbol() generates
  * if the symbol already exists.  */
 
-int g95_findget_symbol(const char *name, g95_namespace *ns, int parent_flag,
+int g95_findget_symbol(char *name, g95_namespace *ns, int parent_flag,
 		       g95_symbol **result) {
   
   if (g95_find_symbol(name, ns, parent_flag, result)) return 1;

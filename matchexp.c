@@ -35,7 +35,7 @@ static char expression_syntax[] = "Syntax error in expression at %C";
  * or not. */
 
 match g95_match_defined_op_name(char *result, int error_flag) {
-static const char *badops[] = {
+static char *badops[] = {
  "and", "or", "not", "eqv", "neqv", "eq", "ne", "ge", "le", "lt", "gt", NULL };
 
 char name[G95_MAX_SYMBOL_LEN+1];

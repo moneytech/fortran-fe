@@ -85,7 +85,7 @@ static void error_char(char c) {
 
 /* error_string()-- Copy a string to wherever it needs to go. */
 
-static void error_string(const char *p) {
+static void error_string(char *p) {
 
   while(*p)
     error_char(*p++);
@@ -96,7 +96,7 @@ static void error_string(const char *p) {
  * line give a locus.  Calls error_printf() recursively, but the
  * recursion is at most one level deep.  */
 
-static void error_printf(const char *, ...);
+static void error_printf(char *, ...);
 
 static void show_locus(int offset, locus *l) {
 g95_file *f;
@@ -244,11 +244,11 @@ separate:
 #define IBUF_LEN 30
 #define MAX_ARGS 10
 
-static void error_print(const char *type, const char *format0, va_list argp) {
+static void error_print(char *type, char *format0, va_list argp) {
 char c, *p, int_buf[IBUF_LEN], c_arg[MAX_ARGS], *cp_arg[MAX_ARGS];
 int i, n, have_l1, i_arg[MAX_ARGS];
 locus *l1, *l2, *loc;
-const char *format;
+char *format;
 
   l1 = l2 = loc = NULL;
 
@@ -359,7 +359,7 @@ const char *format;
 
 /* error_printf()-- Wrapper for error_print() */
 
-static void error_printf(const char *format, ...) {
+static void error_printf(char *format, ...) {
 va_list argp;
 
   va_start(argp, format);
@@ -370,7 +370,7 @@ va_list argp;
 
 /* g95_warning()-- Issue a warning. */
 
-void g95_warning(const char *format, ...) {
+void g95_warning(char *format, ...) {
 va_list argp;
 
   warning_buffer.flag = 1;
@@ -388,7 +388,7 @@ va_list argp;
 
 /* g95_warning_now()-- Immediate warning.  */
 
-void g95_warning_now(const char *format, ...) {
+void g95_warning_now(char *format, ...) {
 va_list argp;
 int i;
 
@@ -428,7 +428,7 @@ void g95_warning_check(void) {
 
 /* g95_error()-- Issue an error */
 
-void g95_error(const char *format, ...) {
+void g95_error(char *format, ...) {
 va_list argp;
 
   if (g95_suppress_error) return;
@@ -448,7 +448,7 @@ va_list argp;
 
 /* g95_error_now()-- Immediate error.  */
 
-void g95_error_now(const char *format, ...) {
+void g95_error_now(char *format, ...) {
 va_list argp;
 int i;
 
@@ -470,7 +470,7 @@ int i;
 
 /* g95_fatal_error()-- Fatal errors never return */
 
-void g95_fatal_error(const char *format, ...) {
+void g95_fatal_error(char *format, ...) {
 va_list argp;
 
   buffer_flag = 0;
@@ -485,7 +485,7 @@ va_list argp;
 
 /* g95_internal_error()-- This shouldn't happen... but sometimes does. */
 
-void g95_internal_error(const char *format, ...) {
+void g95_internal_error(char *format, ...) {
 va_list argp;
 
   buffer_flag = 0;
@@ -561,7 +561,7 @@ static FILE *status_out = NULL;
 
 /* g95_status()-- Debug wrapper for printf */
 
-void g95_status(const char *format, ...) {
+void g95_status(char *format, ...) {
 va_list argp;
 
   va_start(argp, format);
@@ -586,7 +586,7 @@ void g95_status_char(char c) {
 /* g95_open_status()-- Open a file that becomes the new desination of
  * g95_status() writes. */
 
-try g95_open_status(const char *filename) {
+try g95_open_status(char *filename) {
 FILE *fp;
 
   fp = fopen(filename, "w");

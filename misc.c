@@ -33,8 +33,8 @@ Boston, MA 02111-1307, USA.  */
 
 static struct 
 {
-  const char *option;
-  const char *description;
+  char *option;
+  char *description;
 }
 
 #ifndef BACKEND_CODE
@@ -92,9 +92,9 @@ void g95_clear_ts(g95_typespec *ts) {
 
 /* add_path()-- adds path to the list pointed to by list */
 
-static void add_path(g95_directorylist **list, const char *path) {
+static void add_path(g95_directorylist **list, char *path) {
 g95_directorylist *dir;
-const char *p;
+char *p;
 
   p = path; 
   while (*p == ' ' || *p == '\t') /* someone might do 'g95 "-I include"' */
@@ -120,7 +120,7 @@ const char *p;
 
 /* g95_open_file()-- Open a file for reading */
 
-FILE *g95_open_file(const char *name) {
+FILE *g95_open_file(char *name) {
 struct stat statbuf;
 
   if (stat(name, &statbuf) < 0) return NULL;
@@ -134,7 +134,7 @@ struct stat statbuf;
 /* g95_open_included_file()-- opens file for reading, searching
  * through the include directories given if necessary */
 
-FILE *g95_open_included_file(const char *name) {
+FILE *g95_open_included_file(char *name) {
 char fullname[PATH_MAX];
 g95_directorylist *p;
 FILE *f;
@@ -158,8 +158,8 @@ FILE *f;
 
 /* g95_article()-- Given a word, return the correct article */
 
-const char *g95_article(const char *word) {
-const char *p;
+char *g95_article(char *word) {
+char *p;
 
   switch(*word) {
   case 'a': case 'A':  case 'e': case 'E':  case 'i': case 'I':
@@ -177,8 +177,8 @@ const char *p;
 
 /* g95_typename()-- Return a string for each type */
 
-const char *g95_basic_typename(bt type) {
-const char *p;
+char *g95_basic_typename(bt type) {
+char *p;
 
   switch(type) {
   case BT_INTEGER:    p = "INTEGER";    break;
@@ -252,7 +252,7 @@ void g95_show_typespec(g95_typespec *ts) {
 /* g95_code2string()-- Given an mstring array and a code, locate the
  * code in the table, returning a pointer to the string. */
 
-const char *g95_code2string(mstring *m, int code) {
+char *g95_code2string(mstring *m, int code) {
 
   while(m->string != NULL) {
     if (m->tag == code) return m->string;
@@ -268,7 +268,7 @@ const char *g95_code2string(mstring *m, int code) {
  * the value of the tag field.  Returns the final tag if no matches to
  * the string are found. */
 
-int g95_string2code(mstring *m, const char *string) {
+int g95_string2code(mstring *m, char *string) {
 
   for(; m->string != NULL; m++)
     if (strcmp(m->string, string) == 0) return m->tag;
@@ -279,7 +279,7 @@ int g95_string2code(mstring *m, const char *string) {
 
 /* g95_intent_string()-- Convert an intent code to a string. */
 
-const char *g95_intent_string(sym_intent i) {
+char *g95_intent_string(sym_intent i) {
 static mstring intents[] = {
   minit("UNKNOWN-INTENT", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
   minit("OUT", INTENT_OUT),                 minit("INOUT", INTENT_INOUT),

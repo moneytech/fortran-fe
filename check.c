@@ -37,7 +37,7 @@ Boston, MA 02111-1307, USA.  */
 /* must_be()-- The fundamental complaint function of this source file.
  * This function can be called in all kinds of ways. */
 
-static void must_be(g95_expr *e, int n, const char *thing) {
+static void must_be(g95_expr *e, int n, char *thing) {
 
   g95_error("'%s' argument of '%s' intrinsic at %L must be %s",
 	    g95_current_intrinsic_arg[n], g95_current_intrinsic, &e->where,

@@ -29,7 +29,7 @@ static g95_st_label format_asterisk_ =
 static g95_st_label * format_asterisk = &format_asterisk_;
 
 typedef struct { 
-  const char *name, *spec;
+  char *name, *spec;
   bt type;
 } io_tag;
 
@@ -781,8 +781,8 @@ g95_expr *e;
 
 /* io_kind_name()-- Given an io_kind, return its name */
 
-static const char *io_kind_name(io_kind k) {
-const char *name;
+static char *io_kind_name(io_kind k) {
+char *name;
 
   switch(k) {
   case M_READ:     name = "READ";     break;

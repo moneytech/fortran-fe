@@ -225,7 +225,7 @@ int c;
 
 int g95_check_include(void) {
 char c, quote, path[PATH_MAX+1];
-const char *include;
+char *include;
 locus start;
 int i;
 
@@ -589,7 +589,7 @@ int c;
  * leave the next character in the source region. */
 
 static void load_line(FILE *input, g95_source_form form, char *buffer,
-		      const char *filename, int linenum) {
+		      char *filename, int linenum) {
 int c, maxlen, i, trunc_flag;
 
   maxlen = (form == FORM_FREE) ? 132 : g95_option.fixed_line_length;
@@ -689,9 +689,9 @@ linebuf *lp;
 /* form_from_filename() -- determines the source form from the
  * filename extension.  We assume case insensitivity. */
 
-static g95_source_form form_from_filename(const char *filename) {
+static g95_source_form form_from_filename(char *filename) {
 
-static struct { const char *extension; g95_source_form form; } exttype[] = {
+static struct { char *extension; g95_source_form form; } exttype[] = {
   {".f90", FORM_FREE }, 
   {".f95", FORM_FREE }, 
   {".f",   FORM_FIXED}, 
@@ -699,7 +699,7 @@ static struct { const char *extension; g95_source_form form; } exttype[] = {
   {"",     FORM_UNKNOWN} };   /* sentinel value */
        
 g95_source_form  f_form;
-const char *fileext;
+char *fileext;
 int i;
 
   /* find end of file name */
@@ -741,7 +741,7 @@ int i;
  * Every new file gets a g95_file node, even if it is a duplicate file.
  * Returns zero if everything went OK, nonzero otherwise. */
 
-try g95_new_file(const char *filename, g95_source_form form) {
+try g95_new_file(char *filename, g95_source_form form) {
 g95_file *fp, *fp2;
 FILE *input;
 int len;

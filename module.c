@@ -277,7 +277,7 @@ static g95_module *loaded_modules, *new_modules;
 /* find_module()-- See if a module can be found in a list of modules.
  * Returns zero if not, nonzero if so. */
 
-static int find_module(g95_module *m, const char *name) {
+static int find_module(g95_module *m, char *name) {
 
   for(; m; m=m->next)
     if (strcmp(name, m->name) == 0) return 1;
@@ -290,7 +290,7 @@ static int find_module(g95_module *m, const char *name) {
  * before.  Returns zero if not, nonzero if we have.  As a side
  * effect, not-seen before modules are placed in the new_modules list. */
 
-static int check_module(const char *name) {
+static int check_module(char *name) {
 g95_module *m;
 
   if (find_module(loaded_modules, name)) return 1;
@@ -364,8 +364,8 @@ static char *atom_string, atom_name[MAX_ATOM_SIZE];
  * not very elaborate, since this sorts of errors shouldn't really
  * happen.  This subroutine never returns.  */
 
-static void bad_module(const char *message) {
-const char *p;
+static void bad_module(char *message) {
+char *p;
 
   switch(iomode) {
   case IO_INPUT:   p = "Reading";  break;
@@ -582,8 +582,8 @@ atom_type a;
 
 static void require_atom(atom_type type) {
 module_locus m;
-const char *p;
 atom_type t;
+char *p;
 
   get_module_locus(&m); 
 
@@ -645,10 +645,10 @@ static void write_char(char out) {
  * of a deal, since the file really isn't meant to be read by people
  * anyway. */
 
-static void write_atom(atom_type atom, const void *v) {
+static void write_atom(atom_type atom, void *v) {
 char buffer[20];
-const char *p;
 int i, len;
+char *p;
 
   switch(atom) {
   case ATOM_STRING:
@@ -665,7 +665,7 @@ int i, len;
     break;
 
   case ATOM_INTEGER:
-    i = *((const int *) v);
+    i = *((int *) v);
     if (i < 0) g95_internal_error("write_atom(): Writing negative integer");
 
     sprintf(buffer, "%d", i);
@@ -980,7 +980,7 @@ static int serial=0;
 
 /* check_unique_name()-- See if a name is a generated name. */
 
-static int check_unique_name(const char *name) {
+static int check_unique_name(char *name) {
 
   return *name == '@';
 }
@@ -2273,7 +2273,7 @@ int i;
  * error while processing the module, dump_flag will be set to zero
  * and we delete the module file, even if it was already there. */
 
-void g95_dump_module(const char *name, int dump_flag) {
+void g95_dump_module(char *name, int dump_flag) {
 char filename[PATH_MAX], *p;
 g95_file *g;
 time_t now;
