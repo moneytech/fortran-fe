@@ -2249,7 +2249,8 @@ static void set_sym_defaults(g95_symbol *sym) {
 
   if (sym->ts.type != BT_UNKNOWN) return;
 
-  if (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER)
+  if (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER ||
+      (sym->attr.flavor == FL_PROCEDURE && sym->attr.function))
     g95_set_default_type(sym, 0, NULL);
 }
 
