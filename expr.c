@@ -1263,7 +1263,7 @@ try t;
       m = g95_intrinsic_func_interface(e);
 
       if (m == MATCH_NO)
-	g95_error("Function '%s' in initialization expression must at %L "
+	g95_error("Function '%s' in initialization expression at %L "
 		  "must be an intrinsic function", e->symbol->name, &e->where);
 
       if (m != MATCH_YES) t = FAILURE;
