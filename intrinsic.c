@@ -564,17 +564,23 @@ g95_expr *x;
 
 static try check_amin0_amax0(g95_actual_arglist *arg) {
 
+  if (arg == NULL) return FAILURE; 
+
   return check_rest(BT_INTEGER, g95_default_integer_kind(), arg);
 }
 
 
 static try check_amin1_amax1(g95_actual_arglist *arg) {
 
+  if (arg == NULL) return FAILURE; 
+
   return check_rest(BT_REAL, g95_default_real_kind(), arg);
 }
 
 
 static try check_dmin1_dmax1(g95_actual_arglist *arg) {
+
+  if (arg == NULL) return FAILURE; 
 
   return check_rest(BT_REAL, g95_default_double_kind(), arg); 
 }
@@ -875,7 +881,6 @@ static try check_sign(g95_expr *a, g95_expr *b) {
 
   return SUCCESS;
 }
-
 
 static try check_spread(g95_expr *source, g95_expr *dim, g95_expr *ncopies) {
 
@@ -1943,7 +1948,7 @@ intrinsic_arg *f;
 
     if (a->name[0] != '\0') goto keywords;
 
-    f->actual = a;
+    f->actual = a; 
 
     f = f->next;
     a = a->next;
