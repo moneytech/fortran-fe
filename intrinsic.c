@@ -924,11 +924,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("conjg", 0, BT_COMPLEX, dz, g95_simplify_conjg, NULL,
 	  z, BT_COMPLEX, dz, 0, NULL);
 
-  add_sym("cos",  0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("cos",  0, BT_REAL,    dr, NULL, NULL,
 	  x, BT_REAL,    dr, 0, NULL);
-  add_sym("dcos", 0, BT_REAL,    dd, NULL, not_ready,
+  add_sym("dcos", 0, BT_REAL,    dd, NULL, NULL,
 	  x, BT_REAL,    dd, 0, NULL);
-  add_sym("ccos", 0, BT_COMPLEX, dz, NULL, not_ready,
+  add_sym("ccos", 0, BT_COMPLEX, dz, NULL, NULL,
 	  x, BT_COMPLEX, dz, 0, NULL);
   make_generic("cos");
 
