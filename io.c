@@ -220,7 +220,7 @@ match g95_match_open(void) {
 g95_open *open;
 match m;
 
-  m = g95_match(" (");
+  m = g95_match_char('(');
   if (m == MATCH_NO) return m;
 
   open = g95_getmem(sizeof(g95_open));
@@ -235,8 +235,8 @@ match m;
   }
 
   for(;;) {
-    if (g95_match(" )") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
 
     m = match_open_element(open);
     if (m == MATCH_ERROR) goto cleanup;
@@ -292,7 +292,7 @@ match g95_match_close(void) {
 g95_close *close;
 match m;
 
-  m = g95_match(" (");
+  m = g95_match_char('(');
   if (m == MATCH_NO) return m;
 
   close = g95_getmem(sizeof(g95_close));
@@ -307,8 +307,8 @@ match m;
   }
 
   for(;;) {
-    if (g95_match(" )") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
 
     m = match_close_element(close);
     if (m == MATCH_ERROR) goto cleanup;
@@ -375,7 +375,7 @@ match m;
 
   fp = g95_getmem(sizeof(g95_filepos));
 
-  if (g95_match(" (") == MATCH_NO) {
+  if (g95_match_char('(') == MATCH_NO) {
     m = g95_match_expr(&fp->unit);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
@@ -392,8 +392,8 @@ match m;
   }
 
   for(;;) {
-    if (g95_match(" )") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
 
     m = match_file_element(fp);
     if (m == MATCH_ERROR) goto cleanup;
@@ -464,14 +464,14 @@ int unit;
 static match match_dt_unit(io_kind k, g95_dt *dt) {
 g95_expr *e;
 
-  if (g95_match(" *") == MATCH_YES) {
+  if (g95_match_char('*') == MATCH_YES) {
     if (dt->io_unit != NULL) goto conflict;
 
     dt->io_unit = default_unit(k);
     return MATCH_YES;
   }
 
-  if (g95_match(" %e", &e) == MATCH_YES) {
+  if (g95_match_expr(&e) == MATCH_YES) {
     if (dt->io_unit != NULL) {
       g95_free_expr(e);
       goto conflict;
@@ -495,14 +495,14 @@ static match match_dt_format(g95_dt *dt) {
 g95_expr *e;
 int label;
 
-  if (g95_match(" *") == MATCH_YES) {
+  if (g95_match_char('*') == MATCH_YES) {
     if (dt->format_expr != NULL || dt->format_label != 0) goto conflict;
 
     dt->format_label = -1;
     return MATCH_YES;
   }
 
-  if (g95_match(" %l", &label) == MATCH_YES) {
+  if (g95_match_st_label(&label) == MATCH_YES) {
     if (dt->format_expr != NULL || dt->format_label != 0) goto conflict;
 
     if (g95_reference_st_label(label, ST_LABEL_FORMAT) == FAILURE)
@@ -512,7 +512,7 @@ int label;
     return MATCH_YES;
   }
 
-  if (g95_match(" %e", &e) == MATCH_YES) {
+  if (g95_match_expr(&e) == MATCH_YES) {
     if (dt->format_expr != NULL || dt->format_label != 0) {
       g95_free_expr(e);
       goto conflict;
@@ -760,12 +760,12 @@ match m;
   head = tail = NULL; 
   old_loc = *g95_current_locus();
 
-  if (g95_match(" (") != MATCH_YES) return MATCH_NO;
+  if (g95_match_char('(') != MATCH_YES) return MATCH_NO;
 
   m = match_io_element(k, &head);
   tail = head;
 
-  if (m != MATCH_YES || g95_match(" ,") != MATCH_YES) {
+  if (m != MATCH_YES || g95_match_char(',') != MATCH_YES) {
     g95_set_locus(&old_loc);     /* Can't be an IO iterator */
     g95_free_statements(head);
     return MATCH_NO;
@@ -786,10 +786,10 @@ match m;
 
     tail = g95_append_code(tail, new);
 
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
-  if (g95_match(" )") != MATCH_YES) goto syntax;
+  if (g95_match_char(')') != MATCH_YES) goto syntax;
 
   new = g95_get_code();
   new->op = EXEC_DO;
@@ -823,10 +823,10 @@ match m;
   if (m == MATCH_YES) return MATCH_YES;
 
   if (k == M_READ) {
-    m = g95_match(" %v", &expr);
+    m = g95_match_variable(&expr, 0);
     if (m == MATCH_NO) g95_error("Expected variable in READ statement at %C");
   } else {
-    m = g95_match(" %E", &expr);
+    m = g95_match_expr(&expr);
     if (m == MATCH_NO) g95_error("Expected expression in %s statement at %C",
 				 io_kind_name(k));
   }
@@ -857,7 +857,7 @@ match m;
     if (head == NULL) head = new;
 
     if (g95_match_eos() == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   *head_p = head;
@@ -885,7 +885,7 @@ match m;
   comma_flag = 0;
   dt = g95_getmem(sizeof(g95_dt));
 
-  if (g95_match(" (") == MATCH_NO) {
+  if (g95_match_char('(') == MATCH_NO) {
     if (k == M_WRITE) goto syntax;
 
     m = match_dt_format(dt);
@@ -902,8 +902,8 @@ match m;
   if (match_dt_element(k, dt) == MATCH_YES) goto next;
   if (match_dt_unit(k, dt) != MATCH_YES) goto loop;
 
-  if (g95_match(" )") == MATCH_YES) goto get_io_list;
-  if (g95_match(" ,") != MATCH_YES) goto syntax; 
+  if (g95_match_char(')') == MATCH_YES) goto get_io_list;
+  if (g95_match_char(',') != MATCH_YES) goto syntax; 
 
   if (match_dt_element(k, dt) == MATCH_YES) goto next;
 
@@ -911,7 +911,7 @@ match m;
   if (m == MATCH_YES) goto next;
   if (m == MATCH_ERROR) goto cleanup;
 
-  if (g95_match(" %s", &sym) == MATCH_YES && sym->namelist != NULL) {
+  if (g95_match_symbol(&sym) == MATCH_YES && sym->namelist != NULL) {
     dt->namelist = sym;
     goto next;
   }
@@ -919,8 +919,8 @@ match m;
   goto loop;   /* No matches, try regular elements */
 
 next:
-  if (g95_match(" )") == MATCH_YES) goto get_io_list;
-  if (g95_match(" ,") != MATCH_YES) goto syntax; 
+  if (g95_match_char(')') == MATCH_YES) goto get_io_list;
+  if (g95_match_char(',') != MATCH_YES) goto syntax; 
 
 loop:
   for(;;) {
@@ -928,16 +928,17 @@ loop:
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
 
-    if (g95_match(" )") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
 get_io_list:
-  if (!comma_flag) g95_match(" ,"); /* Optional leading comma (non-standard) */
+  if (!comma_flag) g95_match_char(',');
+     /* Optional leading comma (non-standard) */
 
   io_code = NULL;
   if (g95_match_eos() != MATCH_YES) {
-    if (comma_flag && g95_match(" ,") != MATCH_YES) {
+    if (comma_flag && g95_match_char(',') != MATCH_YES) {
       g95_error("Expected comma in I/O list at %C");
       m = MATCH_ERROR;
       goto cleanup;
@@ -1066,7 +1067,7 @@ g95_inquire *inquire;
 g95_code *code;
 match m;
 
-  m = g95_match(" (");
+  m = g95_match_char('(');
   if (m == MATCH_NO) return m;
 
   inquire = g95_getmem(sizeof(g95_inquire));
@@ -1082,7 +1083,7 @@ match m;
 /* See if we have the IOLENGTH form of the inquire statement */
 
   if (inquire->iolength != NULL) {
-    if (g95_match(" )") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') != MATCH_YES) goto syntax;
 
     m = match_io_list(M_INQUIRE, &code);
     if (m == MATCH_ERROR) goto cleanup;
@@ -1099,8 +1100,8 @@ match m;
 /* At this point, we have the non-IOLENGTH inquire statement */
 
   for(;;) {
-    if (g95_match(" )") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
 
     m = match_inquire_element(inquire);
     if (m == MATCH_ERROR) goto cleanup;

@@ -66,44 +66,44 @@ static sym_intent match_intent_spec(void) {
 /* char_len_param_value()-- Matches a character length specification,
  * which is either a specification expression or a '*'. */
 
-static match char_len_param_value(g95_expr **exp) {
+static match char_len_param_value(g95_expr **expr) {
 
-  if (g95_match(" *") == MATCH_YES) {
-    exp = NULL;
+  if (g95_match_char('*') == MATCH_YES) {
+    expr = NULL;
     return MATCH_YES;
   }
 
-  return g95_match(" %e", exp);
+  return g95_match_expr(expr);
 }
 
 
 /* match_char_length()-- A character length is a '*' followed by a
  * literal integer or a char_len_param_value in parenthesis. */
 
-static match match_char_length(g95_expr **exp) {
+static match match_char_length(g95_expr **expr) {
 int length;
 match m;
 
-  m = g95_match(" *");
+  m = g95_match_char('*');
   if (m != MATCH_YES) return m;
 
   m = g95_match_small_literal_int(&length);
   if (m == MATCH_ERROR) return m;
 
   if (m == MATCH_YES) {
-    *exp = g95_int_expr(length);
+    *expr = g95_int_expr(length);
     return m;
   }
 
-  if (g95_match(" (") == MATCH_NO) goto syntax;
+  if (g95_match_char('(') == MATCH_NO) goto syntax;
 
-  m = char_len_param_value(exp);
+  m = char_len_param_value(expr);
   if (m == MATCH_ERROR) return m;
   if (m == MATCH_NO) goto syntax;
 
-  if (g95_match(" )") == MATCH_NO) {
-    g95_free_expr(*exp);
-    *exp = NULL;
+  if (g95_match_char(')') == MATCH_NO) {
+    g95_free_expr(*expr);
+    *expr = NULL;
     goto syntax;
   }
 
@@ -367,7 +367,7 @@ try t;
 
       initializer->ts = current_ts;
 
-    } else if (g95_match(" =") == MATCH_YES) {
+    } else if (g95_match_char('=') == MATCH_YES) {
       if (current_attr.pointer) {
 	g95_error("Pointer initialization at %C requires '=>', not '='");
 	m = MATCH_ERROR;
@@ -415,7 +415,7 @@ cleanup:
 match g95_match_old_kind_spec(g95_typespec *ts) {
 match m;
   
-  if (g95_match(" *") != MATCH_YES) return MATCH_NO;
+  if (g95_match_char('*') != MATCH_YES) return MATCH_NO;
 
   m = g95_match_small_literal_int(&ts->kind);
   if (m != MATCH_YES) return MATCH_ERROR;
@@ -452,7 +452,7 @@ match m, n;
 
   where = *g95_current_locus();
 
-  if (g95_match(" (") == MATCH_NO) return MATCH_NO;
+  if (g95_match_char('(') == MATCH_NO) return MATCH_NO;
 
 /* Also gobbles optional text */
   if (g95_match(" kind = ") == MATCH_YES) m = MATCH_ERROR;
@@ -485,7 +485,7 @@ match m, n;
     goto no_match;
   }
 
-  if (g95_match(" )") != MATCH_YES) {
+  if (g95_match_char(')') != MATCH_YES) {
     g95_error("Missing right paren at %C");
     goto no_match;
   }
@@ -523,7 +523,7 @@ match m;
     goto done;
   }
 
-  m = g95_match(" (");
+  m = g95_match_char('(');
   if (m != MATCH_YES) {
     m = MATCH_YES;  /* character without length is a single char */
     goto done;
@@ -554,7 +554,7 @@ match m;
     if (m == MATCH_ERROR) goto done;
     seen_length = 1;
 
-    if (g95_match(" )") == MATCH_YES) goto done;
+    if (g95_match_char(')') == MATCH_YES) goto done;
 
     if (g95_match(" , kind =") != MATCH_YES) goto syntax;
 
@@ -575,10 +575,10 @@ match m;
   if (m == MATCH_ERROR) goto done;
   seen_length = 1;
 
-  m = g95_match(" )");
+  m = g95_match_char(')');
   if (m == MATCH_YES) goto done;
 
-  if (g95_match(" ,") != MATCH_YES) goto syntax;
+  if (g95_match_char(',') != MATCH_YES) goto syntax;
 
   g95_match(" kind =");   /* Gobble optional text */
 
@@ -589,7 +589,7 @@ match m;
 /* require a right-paren at this point */
 
 rparen:
-  m = g95_match(" )");
+  m = g95_match_char(')');
   if (m == MATCH_YES) goto done;
 
 syntax:
@@ -975,7 +975,7 @@ ok:
  * list. */
 
   if (m == MATCH_NO && current_ts.type == BT_CHARACTER && old_char_selector)
-    g95_match(" ,");
+    g95_match_char(',');
 
 /* Give the types/attributes to symbols that follow */
 
@@ -985,7 +985,7 @@ ok:
     if (m == MATCH_NO) break;
 
     if (g95_match_eos() == MATCH_YES) goto cleanup;
-    if (g95_match(" ,") != MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) break;
   }
   
   g95_error("Syntax error in data declaration at %C");
@@ -1056,15 +1056,15 @@ match m;
 
   head = tail = NULL;
 
-  if (g95_match(" (") != MATCH_YES) {
+  if (g95_match_char('(') != MATCH_YES) {
     if (!st_flag) goto ok;
     return MATCH_NO;
   }
 
-  if (g95_match(" )") == MATCH_YES) goto ok;
+  if (g95_match_char(')') == MATCH_YES) goto ok;
 
   for(;;) {
-    if (g95_match(" *") == MATCH_YES)
+    if (g95_match_char('*') == MATCH_YES)
       sym = NULL;
     else {
       m = g95_match_name(name);
@@ -1107,9 +1107,9 @@ match m;
       goto cleanup;
     }
 
-    if (g95_match(" )") == MATCH_YES) goto ok;
+    if (g95_match_char(')') == MATCH_YES) goto ok;
 
-    m = g95_match(" ,");
+    m = g95_match_char(',');
     if (m != MATCH_YES) {      
       g95_error("Unexpected junk in formal argument list at %C");
       goto cleanup;
@@ -1602,7 +1602,7 @@ match m;
       break;
     }
 
-    if (g95_match(" ,") != MATCH_YES) {
+    if (g95_match_char(',') != MATCH_YES) {
       g95_error("Unexpected character in variable list at %C");
       m = MATCH_ERROR;
       break;
@@ -1749,7 +1749,7 @@ match m;
       break;
     }
 
-    if (g95_match(" ,") == MATCH_NO) break;
+    if (g95_match_char(',') == MATCH_NO) break;
   }
 
   if (g95_match_eos() != MATCH_YES) goto syntax;
@@ -1821,7 +1821,7 @@ match m;
 
   var_locus = *g95_current_locus();
 
-  if (g95_match(" =") == MATCH_NO) {
+  if (g95_match_char('=') == MATCH_NO) {
     g95_error("Expected = sign in PARAMETER statement at %C");
     return MATCH_ERROR;
   }
@@ -1858,7 +1858,7 @@ cleanup:
 match g95_match_parameter(void) {
 match m;
 
-  if (g95_match(" (") == MATCH_NO) return MATCH_NO;
+  if (g95_match_char('(') == MATCH_NO) return MATCH_NO;
 
   for(;;) {
     m = do_parm();
@@ -1866,7 +1866,7 @@ match m;
 
     if (g95_match(" )%t") == MATCH_YES) break;
 
-    if (g95_match(" ,") != MATCH_YES) {
+    if (g95_match_char(',') != MATCH_YES) {
       g95_error("Unexpected characters in PARAMETER statement at %C");
       m = MATCH_ERROR;
       break;
@@ -1903,7 +1903,7 @@ match m;
   g95_match(" ::");
 
   for(;;) { 
-    m = g95_match(" %s", &sym);
+    m = g95_match_symbol(&sym);
     switch(m) {
     case MATCH_YES:
       if (g95_add_save(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
@@ -1925,7 +1925,7 @@ match m;
 
   next_item:
     if (g95_match_eos() == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   return MATCH_YES;
@@ -1968,7 +1968,7 @@ match m;
     if (g95_add_interface(sym) == FAILURE) return MATCH_ERROR;
 
     if (g95_match_eos() == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   return MATCH_YES;

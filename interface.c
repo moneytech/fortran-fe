@@ -121,7 +121,7 @@ int i;
     if (m == MATCH_NO) goto syntax;
     if (m != MATCH_YES) return MATCH_ERROR;
 
-    m = g95_match(" )");
+    m = g95_match_char(')');
     if (m == MATCH_NO) goto syntax;
     if (m != MATCH_YES) return MATCH_ERROR;
 

@@ -128,13 +128,13 @@ match m;
 
 /* Match an expression in parenthesis */
 
-  if (g95_match(" (") != MATCH_YES) return MATCH_NO;
+  if (g95_match_char('(') != MATCH_YES) return MATCH_NO;
 
   m = g95_match_expr(result);
   if (m == MATCH_NO) goto syntax;
   if (m == MATCH_ERROR) return m;
 
-  m = g95_match(" )");
+  m = g95_match_char(')');
   if (m == MATCH_NO)
     g95_error("Expected a right parenthesis in expression at %C");
 

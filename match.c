@@ -432,18 +432,18 @@ match m;
   if (m == MATCH_NO) goto syntax;
   if (m == MATCH_ERROR) goto cleanup;
 
-  if (g95_match(" ,") != MATCH_YES) goto syntax;
+  if (g95_match_char(',') != MATCH_YES) goto syntax;
 
   m = g95_match_expr(&e2);
   if (m == MATCH_NO) goto syntax;
   if (m == MATCH_ERROR) goto cleanup;
 
-  if (g95_match(" ,") != MATCH_YES) {
+  if (g95_match_char(',') != MATCH_YES) {
     e3 = g95_int_expr(1);
     goto done;
   }
 
-  m = g95_match(" %e", &e3);
+  m = g95_match_expr(&e3);
   if (m == MATCH_ERROR) goto cleanup;
   if (m == MATCH_NO) {
     g95_error("Expected a step value in iterator at %C");
@@ -466,6 +466,22 @@ cleanup:
   g95_free_expr(e3);
 
   return MATCH_ERROR;
+}
+
+
+/* g95_match_char()-- Tries to match the next non-whitespace character
+ * on the input.  This subroutine does not return MATCH_ERROR.  */
+
+match g95_match_char(char c) {
+locus where;
+
+  where = *g95_current_locus();
+  g95_gobble_whitespace();
+
+  if (g95_next_char() == c) return MATCH_YES;
+
+  g95_set_locus(&where);
+  return MATCH_NO;
 }
 
 
@@ -742,7 +758,7 @@ match m, n;
   m = g95_match(" if ( %e", &expr);
   if (m != MATCH_YES) return m;
 
-  if (g95_match(" )") != MATCH_YES) {
+  if (g95_match_char(')') != MATCH_YES) {
     g95_error("Syntax error in IF-expression at %C");
     g95_free_expr(expr);
     return MATCH_ERROR;
@@ -1001,7 +1017,7 @@ match m;
   m = g95_match_st_label(&label);
   if (m == MATCH_ERROR) goto cleanup;
 
-  g95_match(" ,");      /* Optional comma */
+  g95_match_char(',');      /* Optional comma */
 
   m = g95_match_iterator(&iter);
   if (m == MATCH_NO) return MATCH_NO;
@@ -1223,7 +1239,7 @@ match m;
 
 /* The assigned GO TO statement is not allowed in Fortran 95 */
 
-  if (g95_match(" %v", &expr) == MATCH_YES) {
+  if (g95_match_variable(&expr, 0) == MATCH_YES) {
     g95_free_expr(expr);
     g95_error("The assigned GO TO statement at %C is not allowed in "
 	      "Fortran 95");
@@ -1232,7 +1248,7 @@ match m;
 
 /* Last chance is a computed GO TO statement */
 
-  if (g95_match(" (") != MATCH_YES) {
+  if (g95_match_char('(') != MATCH_YES) {
     g95_syntax_error(ST_GOTO);
     return MATCH_ERROR;
   }
@@ -1241,7 +1257,7 @@ match m;
   i = 1;
 
   do {
-    m = g95_match(" %l", &label);
+    m = g95_match_st_label(&label);
     if (m != MATCH_YES) goto syntax;
 
     if (g95_reference_st_label(label, ST_LABEL_TARGET) == FAILURE)
@@ -1263,9 +1279,9 @@ match m;
     tail->next = g95_get_code();
     tail->next->op = EXEC_GOTO;
     tail->next->label = label;
-  } while(g95_match(" ,") == MATCH_YES);
+  } while(g95_match_char(',') == MATCH_YES);
 
-  if (g95_match(" )") != MATCH_YES) goto syntax;
+  if (g95_match_char(')') != MATCH_YES) goto syntax;
 
   if (head == NULL) {
     g95_error("Statement label list in GOTO at %C cannot be empty");
@@ -1274,7 +1290,7 @@ match m;
 
 /* Get the rest of the statement */
 
-  g95_match(" ,");
+  g95_match_char(',');
 
   if (g95_match(" %e%t", &expr) != MATCH_YES) goto syntax;
 
@@ -1318,7 +1334,7 @@ match m;
   head = tail = NULL;
   stat = NULL;
 
-  if (g95_match(" (") != MATCH_YES) goto syntax;
+  if (g95_match_char('(') != MATCH_YES) goto syntax;
 
   for(;;) {
     if (head == NULL) 
@@ -1328,7 +1344,7 @@ match m;
       tail = tail->next;
     }
 
-    m = g95_match(" %v", &tail->expr);
+    m = g95_match_variable(&tail->expr, 0);
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
 
@@ -1348,7 +1364,7 @@ match m;
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
-    if (g95_match(" ,") != MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) break;
 
     m = g95_match(" stat = %v", &stat);
     if (m == MATCH_ERROR) goto cleanup;
@@ -1381,7 +1397,7 @@ symbol_attribute attr;
 match m;
 
   head = tail = NULL;
-  if (g95_match(" (") != MATCH_YES) goto syntax;
+  if (g95_match_char('(') != MATCH_YES) goto syntax;
 
   for(;;) {
     if (head == NULL) 
@@ -1391,7 +1407,7 @@ match m;
       tail = tail->next;
     }
 
-    m = g95_match(" %v", &tail->expr);
+    m = g95_match_variable(&tail->expr, 0);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
@@ -1401,8 +1417,8 @@ match m;
       goto cleanup;
     }
 
-    if (g95_match(" )") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   new_st.op = EXEC_NULLIFY;
@@ -1430,7 +1446,7 @@ match m;
   head = tail = NULL;
   stat = NULL;
 
-  if (g95_match(" (") != MATCH_YES) goto syntax;
+  if (g95_match_char('(') != MATCH_YES) goto syntax;
 
   for(;;) {
     if (head == NULL)
@@ -1440,7 +1456,7 @@ match m;
       tail = tail->next;
     }
 
-    m = g95_match(" %v", &tail->expr);
+    m = g95_match_variable(&tail->expr, 0);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
@@ -1451,7 +1467,7 @@ match m;
       goto cleanup;
     }
 
-    if (g95_match(" ,") != MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) break;
 
     m = g95_match(" stat = %v", &stat);
     if (m == MATCH_ERROR) goto cleanup;
@@ -1630,7 +1646,7 @@ match m, m2;
 /* Grab the list of symbols */
 
     for(;;) {
-      m = g95_match(" %s", &sym);
+      m = g95_match_symbol(&sym);
       if (m == MATCH_ERROR) goto cleanup;
       if (m == MATCH_NO) goto syntax;
 
@@ -1673,9 +1689,9 @@ match m, m2;
 
       if (g95_match_eos() == MATCH_YES) goto done;
 
-      m = g95_match(" ,");
+      m = g95_match_char(',');
 
-      if (g95_match(" /") == MATCH_YES) {
+      if (g95_match_char('/') == MATCH_YES) {
 	m2 = g95_match(" %s /", &common_name);
 	if (m2 == MATCH_YES) break;
 	if (m2 == MATCH_NO) goto syntax;
@@ -1754,7 +1770,7 @@ match m, m2;
       return MATCH_ERROR;
 
     for(;;) {
-      m = g95_match(" %s", &sym);
+      m = g95_match_symbol(&sym);
       if (m == MATCH_NO) goto syntax;
       if (m == MATCH_ERROR) goto error;
 
@@ -1775,9 +1791,9 @@ match m, m2;
 
       if (g95_match_eos() == MATCH_YES) goto done;
 
-      m = g95_match(" ,");
+      m = g95_match_char(',');
 
-      if (g95_match(" /") == MATCH_YES) {
+      if (g95_match_char('/') == MATCH_YES) {
 	m2 = g95_match(" %s /", &group_name);
 	if (m2 == MATCH_YES) break;
 	if (m2 == MATCH_ERROR) goto error;
@@ -1845,7 +1861,7 @@ match m;
     eq->next = g95_current_ns->equiv;
     g95_current_ns->equiv = eq;
 
-    if (g95_match(" (") != MATCH_YES) goto syntax;
+    if (g95_match_char('(') != MATCH_YES) goto syntax;
 
     set = eq;
 
@@ -1861,15 +1877,15 @@ match m;
 	  goto cleanup;
 	}
 
-      if (g95_match(" )") == MATCH_YES) break;
-      if (g95_match(" ,") != MATCH_YES) goto syntax;
+      if (g95_match_char(')') == MATCH_YES) break;
+      if (g95_match_char(',') != MATCH_YES) goto syntax;
 
       set->eq = g95_get_equiv();
       set = set->eq;
     }
 
     if (g95_match_eos() == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   return MATCH_YES;
@@ -1899,7 +1915,7 @@ g95_symbol *sym;
 g95_expr *expr;
 match m;
 
-  m = g95_match(" %s", &sym);
+  m = g95_match_symbol(&sym);
   if (m != MATCH_YES) return m;
 
   g95_push_error(&old_error);
@@ -1992,7 +2008,7 @@ match m;
   parent->list = tail;
 
   for(;;) {
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
 
     m = g95_match_iterator(&parent->iter);
     if (m == MATCH_YES) break;
@@ -2008,7 +2024,7 @@ match m;
     *tail = var;
   }
 
-  if (g95_match(" )") != MATCH_YES) goto syntax;
+  if (g95_match_char(')') != MATCH_YES) goto syntax;
   return MATCH_YES;
 
 syntax:
@@ -2024,9 +2040,9 @@ static match var_element(g95_data_variable *new) {
 
   memset(new, '\0', sizeof(g95_data_variable));
 
-  if (g95_match(" (") == MATCH_YES) return var_list(new);
+  if (g95_match_char('(') == MATCH_YES) return var_list(new);
 
-  return g95_match(" %v", &new->expr);
+  return g95_match_variable(&new->expr, 0);
 }
 
 
@@ -2053,8 +2069,8 @@ match m;
 
     tail = new;
 
-    if (g95_match(" /") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char('/') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   return MATCH_YES;
@@ -2081,7 +2097,7 @@ match m;
   m = g95_match_null(result);
   if (m != MATCH_NO) return m;
 
-  m = g95_match(" %s", &sym);
+  m = g95_match_symbol(&sym);
   if (m != MATCH_YES) return m;
 
   if (sym->attr.flavor != FL_PARAMETER) {
@@ -2120,7 +2136,7 @@ match m;
 
     tail = new;
 
-    if (expr->ts.type != BT_INTEGER || g95_match(" *") != MATCH_YES) {
+    if (expr->ts.type != BT_INTEGER || g95_match_char('*') != MATCH_YES) {
       tail->expr = expr;
       tail->repeat = 1;
     } else {
@@ -2142,8 +2158,8 @@ match m;
       g95_status("\n");
     }
 
-    if (g95_match(" /") == MATCH_YES) break;
-    if (g95_match(" ,") == MATCH_NO) goto syntax;
+    if (g95_match_char('/') == MATCH_YES) break;
+    if (g95_match_char(',') == MATCH_NO) goto syntax;
   }
 
   return MATCH_YES;
@@ -2173,7 +2189,7 @@ match m;
     g95_current_ns->data = new;
 
     if (g95_match_eos() == MATCH_YES) break;
-    g95_match(" ,");
+    g95_match_char(',');
   }
 
   return MATCH_YES;
@@ -2244,12 +2260,12 @@ match m;
 
   expr = NULL;
 
-  if (g95_match(" (") == MATCH_YES) {
+  if (g95_match_char('(') == MATCH_YES) {
     m = g95_match_expr(&expr);
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) return MATCH_ERROR;
 
-    if (g95_match(" )") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') != MATCH_YES) goto syntax;
   }
 
   if (g95_match_eos() != MATCH_YES) { /* Better be a name at this point */
@@ -2315,7 +2331,7 @@ match m;
   m = g95_match_variable(&iter->var, 0);
   if (m != MATCH_YES) goto cleanup;
 
-  if (g95_match(" =") != MATCH_YES) {
+  if (g95_match_char('=') != MATCH_YES) {
     m = MATCH_NO;
     goto cleanup;
   }
@@ -2324,13 +2340,13 @@ match m;
   if (m == MATCH_NO) goto syntax;
   if (m == MATCH_ERROR) goto cleanup;
 
-  if (g95_match(" :") != MATCH_YES) goto syntax;
+  if (g95_match_char(':') != MATCH_YES) goto syntax;
 
   m = g95_match_expr(&iter->end);
   if (m == MATCH_NO) goto syntax;
   if (m == MATCH_ERROR) goto cleanup;
 
-  if (g95_match(" :") == MATCH_NO)
+  if (g95_match_char(':') == MATCH_NO)
     iter->stride = g95_int_expr(1);
   else {
     m = g95_match_expr(&iter->stride);
@@ -2377,7 +2393,7 @@ match m0, m;
   head = tail = new;
 
   for(;;) {
-    if (g95_match(" ,") != MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) break;
 
     m = match_forall_iterator(&new);
     if (m == MATCH_ERROR) goto cleanup;
@@ -2396,7 +2412,7 @@ match m0, m;
     break;
   }
 
-  if (g95_match(" )") == MATCH_NO) goto syntax;
+  if (g95_match_char(')') == MATCH_NO) goto syntax;
 
   if (g95_match_eos() == MATCH_YES) {
     *st = ST_FORALL_BLOCK;

@@ -1176,6 +1176,7 @@ match g95_match_name(char *);
 match g95_match_symbol(g95_symbol **);
 match g95_match_intrinsic_op(g95_intrinsic_op *);
 const char *g95_op2string(int);
+match g95_match_char(char);
 match g95_match(const char *, ...);
 match g95_match_iterator(g95_iterator *);
 void g95_free_iterator(g95_iterator *, int);

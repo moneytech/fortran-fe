@@ -140,14 +140,14 @@ interface_type type;
 int operator;
 match m;
 
-  m = g95_match(" %n", module_name);
+  m = g95_match_name(module_name);
   if (m != MATCH_YES) return m;
 
   g95_free_rename();
   only_flag = 0;
 
   if (g95_match_eos() == MATCH_YES) return MATCH_YES;
-  if (g95_match(" ,") != MATCH_YES) goto syntax;
+  if (g95_match_char(',') != MATCH_YES) goto syntax;
 
   if (g95_match(" only :") == MATCH_YES) only_flag = 1;
 
@@ -185,7 +185,7 @@ match m;
 	else {
 	  strcpy(new->local_name, name);
 
-	  m = g95_match(" %n", new->use_name);
+	  m = g95_match_name(new->use_name);
 	  if (m == MATCH_NO) goto syntax;
 	  if (m == MATCH_ERROR) goto cleanup;
 	}
@@ -193,7 +193,7 @@ match m;
 	if (m != MATCH_YES) goto syntax;
 	strcpy(new->local_name, name);
 
-	m = g95_match(" %n", new->use_name);
+	m = g95_match_name(new->use_name);
 	if (m == MATCH_NO) goto syntax;
 	if (m == MATCH_ERROR) goto cleanup;
       }
@@ -210,7 +210,7 @@ match m;
     }
 
     if (g95_match_eos() == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   return MATCH_YES;

@@ -223,7 +223,7 @@ int i;
   ar->c_where[i] = *g95_current_locus();
   ar->start[i] = ar->end[i] = ar->stride[i] = NULL;
 
-  if (g95_match(" :") == MATCH_YES) goto end_element;
+  if (g95_match_char(':') == MATCH_YES) goto end_element;
 
   /* Get start element */
 
@@ -246,7 +246,7 @@ int i;
     return MATCH_YES;
   }
 
-  if (g95_match(" :") == MATCH_NO) goto done;
+  if (g95_match_char(':') == MATCH_NO) goto done;
 
 /* Get an optional end element */
 
@@ -264,7 +264,7 @@ end_element:
 
 /* See if we have an optional stride */
 
-  if (g95_match(" :") == MATCH_NO)
+  if (g95_match_char(':') == MATCH_NO)
     ar->stride[i] = g95_int_expr(1);
   else {
     m = init ? g95_match_init_expr(&ar->stride[i])
@@ -290,7 +290,7 @@ match m;
   ar->where = *g95_current_locus(); 
   ar->as = as;
 
-  if (g95_match(" (") != MATCH_YES) {
+  if (g95_match_char('(') != MATCH_YES) {
     ar->type = AR_FULL;
     return MATCH_YES;
   }
@@ -304,9 +304,9 @@ match m;
     m = match_subscript(ar, init);
     if (m == MATCH_ERROR) goto error;
 
-    if (g95_match(" )") == MATCH_YES) goto matched;
+    if (g95_match_char(')') == MATCH_YES) goto matched;
 
-    if (g95_match(" ,") != MATCH_YES) {
+    if (g95_match_char(',') != MATCH_YES) {
       g95_error("Invalid form of array reference at %C");
       goto error;
     }
@@ -442,19 +442,19 @@ match m;
   lower = &as->lower[as->rank - 1];
   upper = &as->upper[as->rank - 1];
 
-  if (g95_match(" *") == MATCH_YES) {
+  if (g95_match_char('*') == MATCH_YES) {
     *lower = g95_int_expr(1);
     return AS_ASSUMED_SIZE;
   }
 
-  if (g95_match(" :") == MATCH_YES) return AS_DEFERRED;
+  if (g95_match_char(':') == MATCH_YES) return AS_DEFERRED;
 
-  m = g95_match(" %e", upper);
+  m = g95_match_expr(upper);
   if (m == MATCH_NO)
     g95_error("Expected expression in array specification at %C");
   if (m != MATCH_YES) return AS_UNKNOWN;
 
-  if (g95_match(" :") == MATCH_NO) {
+  if (g95_match_char(':') == MATCH_NO) {
     *lower = g95_int_expr(1);
     return AS_EXPLICIT;
   }
@@ -462,9 +462,9 @@ match m;
   *lower = *upper;
   *upper = NULL;
 
-  if (g95_match(" *") == MATCH_YES) return AS_ASSUMED_SIZE;
+  if (g95_match_char('*') == MATCH_YES) return AS_ASSUMED_SIZE;
 
-  m = g95_match(" %e", upper);
+  m = g95_match_expr(upper);
   if (m == MATCH_ERROR) {
     g95_free_expr(*lower);
     return AS_UNKNOWN;
@@ -484,7 +484,7 @@ array_type current_type;
 g95_array_spec *as;
 int i;
 
-  if (g95_match(" (") != MATCH_YES) {
+ if (g95_match_char('(') != MATCH_YES) {
     *asp = NULL;
     return MATCH_NO;
   }
@@ -545,9 +545,9 @@ int i;
 	  goto cleanup;	  
       }
 
-    if (g95_match(" )") == MATCH_YES) break;
+    if (g95_match_char(')') == MATCH_YES) break;
 
-    if (g95_match(" ,") != MATCH_YES) {
+    if (g95_match_char(',') != MATCH_YES) {
       g95_error("Expected another dimension in array declaration at %C");
       goto cleanup;
     }
@@ -802,7 +802,7 @@ match m;
 
   old_loc = *g95_current_locus();
 
-  if (g95_match(" (") == MATCH_NO) return MATCH_NO;
+  if (g95_match_char('(') == MATCH_NO) return MATCH_NO;
 
   memset(&iter, '\0', sizeof(g95_iterator));
 
@@ -814,7 +814,7 @@ match m;
 
   tail = head;
 
-  if (g95_match(" ,") != MATCH_YES) {
+  if (g95_match_char(',') != MATCH_YES) {
     g95_free_constructor(head);
     g95_set_locus(&old_loc);
     return MATCH_NO;
@@ -832,10 +832,10 @@ match m;
     tail->next = new;
     tail = new;
 
-    if (g95_match(" ,") != MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) break;
   }
 
-  if (g95_match(" )") != MATCH_YES) goto syntax;
+  if (g95_match_char(')') != MATCH_YES) goto syntax;
 
   if (check_duplicate_iterator(head, iter.var->symbol)) goto cleanup;
 
@@ -916,7 +916,7 @@ match m;
 
     tail = new;
 
-    if (g95_match(" ,") == MATCH_NO) break;
+    if (g95_match_char(',') == MATCH_NO) break;
   }
 
   if (g95_match(" /)") == MATCH_NO) goto syntax;

@@ -67,7 +67,7 @@ static int get_kind(void) {
 int kind;
 match m;
 
-  if (g95_match("_") != MATCH_YES) return -2;
+  if (g95_match_char('_') != MATCH_YES) return -2;
 
   m = match_kind_param(&kind);
   if (m == MATCH_NO) g95_error("Missing kind-parameter at %C");
@@ -884,7 +884,7 @@ match m;
   old_loc = *g95_current_locus();
   real = imag = e = NULL;
 
-  m = g95_match(" (");
+  m = g95_match_char('(');
   if (m != MATCH_YES) return m;
 
   g95_push_error(&old_error);
@@ -892,7 +892,7 @@ match m;
   m = match_complex_part(&real);
   if (m == MATCH_NO) goto cleanup;
 
-  if (g95_match(" ,") == MATCH_NO) {
+  if (g95_match_char(',') == MATCH_NO) {
     g95_pop_error(&old_error);
     m = MATCH_NO;
     goto cleanup;
@@ -908,7 +908,7 @@ match m;
   if (m == MATCH_NO) goto syntax;
   if (m == MATCH_ERROR) goto cleanup;
 
-  m = g95_match(" )");
+  m = g95_match_char(')');
   if (m == MATCH_NO) goto syntax;
 
   if (m == MATCH_ERROR) goto cleanup;
@@ -1030,7 +1030,7 @@ int c;
  * character is a left parenthesis.  If not, the actual argument is
  * the procedure. */
 
-    if (g95_match(" (") == MATCH_YES) break;
+    if (g95_match_char('(') == MATCH_YES) break;
 
     e = g95_get_expr();
     e->symbol = sym;
@@ -1059,7 +1059,7 @@ match m;
   m = g95_match_name(name);
 
   if (m != MATCH_YES) goto cleanup;
-  if (g95_match(" =") != MATCH_YES) goto cleanup;
+  if (g95_match_char('=') != MATCH_YES) goto cleanup;
 
   m = match_actual_arg(&actual->expr);
   if (m != MATCH_YES) goto cleanup;
@@ -1103,9 +1103,10 @@ match m;
   arg_number = 1;
   seen_keyword = 0;
 
-  if (g95_match(" (") == MATCH_NO) return (sub_flag) ? MATCH_YES : MATCH_NO;
+  if (g95_match_char('(') == MATCH_NO)
+    return (sub_flag) ? MATCH_YES : MATCH_NO;
 
-  if (g95_match(" )") == MATCH_YES) return MATCH_YES;
+  if (g95_match_char(')') == MATCH_YES) return MATCH_YES;
   head = NULL;
 
   for(;;) {
@@ -1116,7 +1117,7 @@ match m;
       tail = tail->next;
     }
 
-    if (sub_flag && g95_match(" *") == MATCH_YES) {
+    if (sub_flag && g95_match_char('*') == MATCH_YES) {
       m = g95_match_st_label(&label);
       if (m == MATCH_NO) g95_error("Expected alternate return label at %C");
       if (m != MATCH_YES) goto cleanup;
@@ -1153,8 +1154,8 @@ match m;
     tail->arg_number = arg_number++;
 
   next:
-    if (g95_match(" )") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   *argp = head;
@@ -1200,10 +1201,10 @@ match m;
 
   old_loc = *g95_current_locus();
 
-  m = g95_match(" (");
+  m = g95_match_char('(');
   if (m != MATCH_YES) return MATCH_NO;
 
-  if (g95_match(" :") != MATCH_YES) {
+  if (g95_match_char(':') != MATCH_YES) {
     if (init)
       m = g95_match_init_expr(&start);
     else
@@ -1214,11 +1215,11 @@ match m;
       goto cleanup;
     }
 
-    m = g95_match(" :");
+    m = g95_match_char(':');
     if (m != MATCH_YES) goto cleanup;
   }
 
-  if (g95_match(" )") != MATCH_YES) {
+  if (g95_match_char(')') != MATCH_YES) {
     if (init)
       m = g95_match_init_expr(&end);
     else
@@ -1227,7 +1228,7 @@ match m;
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
 
-    m = g95_match(" )");
+    m = g95_match_char(')');
     if (m == MATCH_NO) goto syntax;
   }
 
@@ -1319,7 +1320,7 @@ match m;
   primary->ts = sym->ts;
 
   if (sym->ts.type != BT_DERIVED ||
-      g95_match(" %%") != MATCH_YES) goto check_substring;
+      g95_match_char('%') != MATCH_YES) goto check_substring;
 
   sym = sym->ts.derived;
 
@@ -1347,7 +1348,7 @@ match m;
       if (m != MATCH_YES) return m;
     }
 
-    if (component->ts.type != BT_DERIVED || g95_match(" %%") != MATCH_YES)
+    if (component->ts.type != BT_DERIVED || g95_match_char('%') != MATCH_YES)
       break;
 
     sym = component->ts.derived;
@@ -1452,7 +1453,7 @@ match m;
 
   head = tail = NULL;
 
-  if (g95_match(" (") != MATCH_YES) goto syntax;
+  if (g95_match_char('(') != MATCH_YES) goto syntax;
 
   where = *g95_current_locus();
 
@@ -1470,7 +1471,7 @@ match m;
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
 
-    if (g95_match(" ,") == MATCH_YES) {
+    if (g95_match_char(',') == MATCH_YES) {
       if (comp->next == NULL) {
 	g95_error("Too many components in structure constructor at %C");
 	goto cleanup;
@@ -1482,7 +1483,7 @@ match m;
     break;
   }
 
-  if (g95_match(" )") != MATCH_YES) goto syntax;
+  if (g95_match_char(')') != MATCH_YES) goto syntax;
 
   if (comp->next != NULL) {
     g95_error("Too few components in structure constructor at %C");

@@ -303,7 +303,7 @@ match m;
 
   c = g95_get_case();
 
-  if (g95_match(" :") == MATCH_YES) {
+  if (g95_match_char(':') == MATCH_YES) {
     m = g95_match_scalar_expr(&c->high);
     if (m == MATCH_NO) goto need_expr;
     if (m == MATCH_ERROR) goto cleanup;
@@ -316,7 +316,7 @@ match m;
   if (m == MATCH_ERROR) goto cleanup;
   if (m == MATCH_NO) goto need_expr;
 
-  if (g95_match(" :") != MATCH_YES)
+  if (g95_match_char(':') != MATCH_YES)
     c->high = c->low;      /* Make a range out of a single target */
   else {
     m = g95_match_scalar_expr(&c->high);
@@ -388,7 +388,7 @@ match m;
     return MATCH_YES;
   }
 
-  if (g95_match(" (") != MATCH_YES) goto syntax;
+  if (g95_match_char('(') != MATCH_YES) goto syntax;
 
   for(;;) {
     if (match_case_selector(&c) == MATCH_ERROR) goto cleanup;
@@ -400,8 +400,8 @@ match m;
 
     tail = c;
 
-    if (g95_match(" )") == MATCH_YES) break;
-    if (g95_match(" ,") != MATCH_YES) goto syntax;
+    if (g95_match_char(')') == MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   m = match_case_eos();
