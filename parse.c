@@ -1299,6 +1299,8 @@ g95_statement st;
     default:
       g95_error("Unexpected %s statement in FORALL block at %C",
 		g95_ascii_statement(st));
+
+      g95_reject_statement();
       break;
     }
   } while(st != ST_END_FORALL);
