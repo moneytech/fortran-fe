@@ -1442,6 +1442,43 @@ g95_conv_intrinsic_len_trim (g95_se * se, g95_expr * expr)
   se->expr = convert (type, se->expr);
 }
 
+static void
+g95_conv_intrinsic_size (g95_se * se, g95_expr * expr)
+{
+  g95_actual_arglist *actual;
+  tree args;
+  tree type;
+  tree fndecl;
+  g95_se argse;
+  g95_ss *ss;
+
+  g95_init_se (&argse, NULL);
+  actual =expr->value.function.actual;
+
+  ss = g95_walk_expr (g95_ss_terminator, actual->expr);
+  assert (ss != g95_ss_terminator);
+  g95_conv_array_parameter (&argse, actual->expr, ss);
+  g95_add_block_to_block (&se->pre, &argse.pre);
+  g95_add_block_to_block (&se->post, &argse.post);
+  args = g95_chainon_list (NULL_TREE, argse.expr);
+
+  actual = actual->next;
+  if (actual->expr)
+    {
+      g95_init_se (&argse, NULL);
+      g95_conv_expr_type (&argse, actual->expr, g95_array_index_type);
+      g95_add_block_to_block (&se->pre, &argse.pre);
+      args = g95_chainon_list (args, argse.expr);
+      fndecl = gfor_fndecl_size1;
+    }
+  else
+    fndecl = gfor_fndecl_size0;
+
+  se->expr = g95_build_function_call (fndecl, args);
+  type = g95_typenode_for_spec (&expr->ts);
+  se->expr = convert (type, se->expr);
+}
+
 /* Generate code for an intrinsic function.  Some map directly to library
    calls, others get special handling.  In some cases the name of the function
    used depends on the type specifiers.  */
@@ -1516,8 +1553,6 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_RESHAPE:
     case G95_ISYM_SCAN:
     case G95_ISYM_SET_EXPONENT:
-    case G95_ISYM_SHAPE:
-    case G95_ISYM_SIZE:
     case G95_ISYM_SPREAD:
     case G95_ISYM_SYSTEM_CLOCK:
     case G95_ISYM_TRANSFER:
@@ -1655,6 +1690,10 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
       g95_conv_intrinsic_sign (se, expr);
       break;
 
+    case G95_ISYM_SIZE:
+      g95_conv_intrinsic_size (se, expr);
+      break;
+
     case G95_ISYM_SUM:
       g95_conv_intrinsic_arith (se, expr, PLUS_EXPR);
       break;
@@ -1750,6 +1789,7 @@ g95_is_intrinsic_libcall (g95_expr * expr)
     case G95_ISYM_MINVAL:
     case G95_ISYM_PRODUCT:
     case G95_ISYM_SUM:
+    case G95_ISYM_SHAPE:
       return 1;
 
     default:

@@ -882,7 +882,6 @@ g95_conv_function_val (g95_se * se, g95_symbol * sym)
     }
   else
     {
-      /* TODO: We should already have a decl for contained procedures.  */
       if (! sym->backend_decl)
         sym->backend_decl = g95_get_extern_function_decl (sym);
 
@@ -1036,11 +1035,6 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
 
       if (flag_bounds_check)
         {
-          /* Check the stride has been set to 1. */
-          tmp = g95_conv_descriptor_stride (info->descriptor, g95_rank_cst[0]);
-          tmp = build (NE_EXPR, boolean_type_node, tmp, integer_one_node);
-          g95_trans_runtime_check (tmp, g95_strconst_wrong_return, &se->pre);
-
           /* Check the data pointer hasn't been modified.  This would happen
              in a function returning a pointer.  */
           tmp = g95_conv_descriptor_data (info->descriptor);

@@ -357,6 +357,10 @@ extern GTY(()) tree gfor_fndecl_compare_string;
 extern GTY(()) tree gfor_fndecl_concat_string;
 extern GTY(()) tree gfor_fndecl_string_len_trim;
 
+/* Other misc. runtime library functions.  */
+extern GTY(()) tree gfor_fndecl_size0;
+extern GTY(()) tree gfor_fndecl_size1;
+
 /* True if node is an integer constant.  */
 #define INTEGER_CST_P(node) (TREE_CODE(node) == INTEGER_CST)
 

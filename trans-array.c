@@ -1936,7 +1936,7 @@ g95_could_be_alias (g95_ss * lss, g95_ss * rss)
      component ref.  */
   for (lref = lss->expr->ref; lref != lss->data.info.ref; lref = lref->next)
     {
-      if (lref->type != COMPONENT_REF)
+      if (lref->type != REF_COMPONENT)
         continue;
 
       if (g95_symbols_could_alias (lref->u.c.sym, rss->expr->symbol))
@@ -1944,7 +1944,7 @@ g95_could_be_alias (g95_ss * lss, g95_ss * rss)
 
       for (rref = rss->expr->ref; rref != rss->data.info.ref; rref = rref->next)
         {
-          if (rref->type != COMPONENT_REF)
+          if (rref->type != REF_COMPONENT)
             continue;
 
           if (g95_symbols_could_alias (lref->u.c.sym, rref->u.c.sym))
@@ -1954,7 +1954,7 @@ g95_could_be_alias (g95_ss * lss, g95_ss * rss)
 
   for (rref = rss->expr->ref; rref != rss->data.info.ref; rref = rref->next)
     {
-      if (rref->type != COMPONENT_REF)
+      if (rref->type != REF_COMPONENT)
         break;
 
       if (g95_symbols_could_alias (rref->u.c.sym, lss->expr->symbol))
@@ -2011,14 +2011,12 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
 
               switch (lref->type)
                 {
-                case COMPONENT_REF:
+                case REF_COMPONENT:
                   if (lref->u.c.component != rref->u.c.component)
                     same = 0;
-                  else
-                    lref = aref->next;
                   break;
 
-                case ARRAY_REF:
+                case REF_ARRAY:
                   assert (lref->u.ar.type == AR_ELEMENT);
                   /* TODO: Not all elmental array refs conflict.  */
                   /* We have a potential dependency.  */
@@ -2437,7 +2435,7 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
   return stride;
 }
 
-/* Initialises the descriptor and generates a call to __g95_allocate.  Does
+/* Initialises the descriptor and generates a call to _gfor_allocate.  Does
    the work for an ALLOCATE statement.  */
 /*GCC ARRAYS*/
 void
@@ -2511,10 +2509,10 @@ g95_array_allocate (g95_se * se, g95_ref * ref, tree pstat)
     {
       tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pointer)), pointer);
       tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
-      tmp = build1 (ADDR_EXPR, TREE_TYPE (pointer), tmp);
+      pointer = build1 (ADDR_EXPR, TREE_TYPE (pointer), tmp);
     }
   base = g95_conv_descriptor_base (se->expr);
-  tmp = build (MODIFY_EXPR, TREE_TYPE (base), base, tmp);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (base), base, pointer);
   g95_add_expr_to_block (&se->pre, tmp);
 
   /* Initialize the pointers for a character array.  */
@@ -3273,6 +3271,8 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
   tree tmp;
   tree desc;
   stmtblock_t block;
+  tree start;
+  tree offset;
 
   assert (ss != g95_ss_terminator);
 
@@ -3392,7 +3392,6 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
       tree type;
       tree parm;
       tree parmtype;
-      tree offset;
       tree stride;
       g95_ss_info *info;
       int full;
@@ -3468,13 +3467,24 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
 
           for (n = 0; n < info->ref->u.ar.dimen; n++)
             {
+              stride = g95_conv_array_stride (desc, n);
+
               /* Work out the offset.  */
               tmp = g95_conv_array_lbound (desc, n);
-              tmp = fold (build (MINUS_EXPR, TREE_TYPE (tmp), info->start[dim],
-                                 tmp));
+              if (info->ref->u.ar.dimen_type[n] == DIMEN_ELEMENT)
+                {
+                  assert (info->subscript[n]
+                          && info->subscript[n]->type == G95_SS_SCALAR);
+                  start = info->subscript[n]->data.scalar.expr;
+                }
+              else
+                {
+                  start = info->start[n];
+                  /* We will reuse this.  */
+                  stride = g95_evaluate_now (stride, &loop.pre);
+                }
 
-              stride = g95_conv_array_stride (desc, n);
-              stride = g95_evaluate_now (stride, &loop.pre);
+              tmp = fold (build (MINUS_EXPR, TREE_TYPE (tmp), start, tmp));
 
               tmp = fold (build (MULT_EXPR, TREE_TYPE (tmp), tmp, stride));
               offset = fold (build (PLUS_EXPR, TREE_TYPE (tmp), offset, tmp));

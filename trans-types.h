@@ -45,6 +45,7 @@ extern GTY(()) tree g95_type_nodes[NUM_F95_TYPES];
 extern int g95_array_index_kind;
 extern GTY(()) tree g95_array_index_type;
 extern GTY(()) tree ppvoid_type_node;
+extern GTY(()) tree pvoid_type_node;
 extern GTY(()) tree pchar_type_node;
 
 #define g95_int1_type_node  g95_type_nodes[F95_INT1_TYPE]

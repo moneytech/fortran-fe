@@ -55,6 +55,7 @@ tree g95_type_nodes[NUM_F95_TYPES];
 
 int g95_array_index_kind;
 tree g95_array_index_type;
+tree pvoid_type_node;
 tree ppvoid_type_node;
 tree pchar_type_node;
 static GTY(()) tree g95_desc_dim_type = NULL;
@@ -133,7 +134,8 @@ g95_init_types (void)
     PUSH_TYPE ("c_char", char_type_node);
 #undef PUSH_TYPE
 
-  ppvoid_type_node = build_pointer_type (build_pointer_type (void_type_node));
+  pvoid_type_node = build_pointer_type (void_type_node);
+  ppvoid_type_node = build_pointer_type (pvoid_type_node);
   pchar_type_node = build_pointer_type (g95_character1_type_node);
 
   g95_array_index_kind = TYPE_PRECISION (integer_type_node) / 8;

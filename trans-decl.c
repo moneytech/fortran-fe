@@ -93,6 +93,10 @@ tree gfor_fndecl_compare_string;
 tree gfor_fndecl_concat_string;
 tree gfor_fndecl_string_len_trim;
 
+/* Other misc. runtime library functions.  */
+tree gfor_fndecl_size0;
+tree gfor_fndecl_size1;
+
 static void
 g95_add_decl_to_parent_function (tree decl)
 {
@@ -1001,15 +1005,24 @@ g95_build_intrinsic_function_decls (void)
                                      g95_real8_type_node,
                                      1, g95_real8_type_node);
   gfor_fndecl_math_ishftc4 =
-    g95_build_library_function_decl (get_identifier ("__gfor_ishftc4"),
+    g95_build_library_function_decl (get_identifier ("_gfor_ishftc4"),
                                      g95_int4_type_node,
                                      3, g95_int4_type_node,
                                      g95_int4_type_node, g95_int4_type_node);
   gfor_fndecl_math_ishftc8 =
-    g95_build_library_function_decl (get_identifier ("__gfor_ishftc8"),
+    g95_build_library_function_decl (get_identifier ("_gfor_ishftc8"),
                                      g95_int8_type_node,
                                      3, g95_int8_type_node,
                                      g95_int8_type_node, g95_int8_type_node);
+  /* Other functions.  */
+  gfor_fndecl_size0 =
+    g95_build_library_function_decl (get_identifier ("_gfor_size0"),
+                                     g95_array_index_type,
+                                     1, pvoid_type_node);
+  gfor_fndecl_size1 =
+    g95_build_library_function_decl (get_identifier ("_gfor_size1"),
+                                     g95_array_index_type,
+                                     2, pvoid_type_node, g95_array_index_type);
 }
 
 /* Make prototypes for runtime library functions.  */

@@ -1,3 +1,17 @@
+2002-10-10  Paul Brook  <paul@nowt.org>
+
+	* trans-decl.c (gfor_fndecl_size?): Declare and initialize.
+	* trans-expr.c (g95_conv_function_call): Remove unreliable return value
+	check.
+	* trans-intrinsic.c (g95_conv_intrinsic_size): New function.
+	(g95_conv_intrinsic_function): Handle size and shape intrinsics.
+	(g95_is_intrinsic_libcall): Add G95_ISYM_SHAPE.
+	* trans-types.c (pvoid_type_node): Declare and initialize.
+	* trans-array.c: Fix typo COMPONENT_REF->REF_COMPONENT
+	(g95_array_allocate): Fix when base==data.
+	(g95_conv_array_parameter): Correctly handle reduced rank sections.
+	* trans-io.c (g95_trans_write): Correctly handle string modifiers.
+
 2002-10-09  Paul Brook  <paul@nowt.org>
 
 	* (g95_conv_expr_reference): Handle character strings correctly.

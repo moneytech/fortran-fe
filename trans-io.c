@@ -256,7 +256,8 @@ g95_trans_write (g95_code * code)
     {
       field = gforio_state_adv;
       g95_init_se (&se, NULL);
-      g95_conv_expr_val (&se, dt->advance);
+      g95_conv_expr (&se, dt->advance);
+      g95_conv_string_parameter (&se);
       g95_add_block_to_block (&block, &se.pre);
       g95_add_block_to_block (&postblock, &se.post);
 
@@ -274,7 +275,8 @@ g95_trans_write (g95_code * code)
     {
       field = gforio_state_fmt;
       g95_init_se (&se, NULL);
-      g95_conv_expr_val (&se, dt->advance);
+      g95_conv_expr (&se, dt->format_expr);
+      g95_conv_string_parameter (&se);
       g95_add_block_to_block (&block, &se.pre);
       g95_add_block_to_block (&postblock, &se.post);
 
