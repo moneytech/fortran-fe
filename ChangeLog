@@ -1,3 +1,12 @@
+2002-10-31  Paul Brook  <paul@nowt.org>
+
+	* f95-tree.c: Remove tree copying stuff that's now in gimple.c
+	* trans-expr.c (g95_conv_component_ref): Handle character string
+	components.
+	(g95_conv_string_parameter): Ditto.
+	* trans-types.c (g95_get_derived_type): Add length decl to caracter
+	string components.
+
 2002-10-10  Paul Brook  <paul@nowt.org>
 
 	* trans-decl.c (gfor_fndecl_size?): Declare and initialize.

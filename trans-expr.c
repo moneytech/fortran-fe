@@ -181,14 +181,17 @@ g95_conv_component_ref (g95_se * se, g95_ref * ref)
 {
   g95_component *c;
   tree tmp;
+  tree decl;
+  tree field;
 
   c = ref->u.c.component;
 
   assert (c->backend_decl);
 
-  tmp = c->backend_decl;
-  assert (TREE_CODE (tmp) == FIELD_DECL);
-  tmp = build (COMPONENT_REF, TREE_TYPE (tmp), se->expr, tmp);
+  field = c->backend_decl;
+  assert (TREE_CODE (field) == FIELD_DECL);
+  decl= se->expr;
+  tmp = build (COMPONENT_REF, TREE_TYPE (field), decl, field);
 
   if (! c->dimension)
     {
@@ -204,6 +207,15 @@ g95_conv_component_ref (g95_se * se, g95_ref * ref)
         tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
     }
   se->expr = tmp;
+
+  if (c->ts.type == BT_CHARACTER)
+    {
+      tmp = G95_DECL_STRING_LENGTH (field);
+      assert (tmp);
+      if (! INTEGER_CST_P (tmp))
+        g95_todo_error ("Unknown length character component");
+      se->string_length = tmp;
+    }
 }
 
 /* Return the contents of a variable. Also handles refrence/pointer
@@ -1220,13 +1232,16 @@ g95_conv_string_parameter (g95_se * se)
   type = TREE_TYPE (se->expr);
   if (TYPE_STRING_FLAG (type))
     {
-      assert (TREE_CODE (se->expr) == VAR_DECL);
+      assert (TREE_CODE (se->expr) == VAR_DECL
+              || TREE_CODE (se->expr) == COMPONENT_REF);
       TREE_ADDRESSABLE (se->expr) = 1;
       se->expr = build1 (ADDR_EXPR, build_pointer_type (type), se->expr);
       se->expr = fold (convert (pchar_type_node, se->expr));
     }
 
   assert (POINTER_TYPE_P (TREE_TYPE (se->expr)));
+  assert (se->string_length
+          && TREE_CODE (TREE_TYPE (se->string_length)) == INTEGER_TYPE);
 }
 
 /* Generate code for assignment of scalar variables.  Includes character

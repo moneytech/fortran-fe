@@ -902,6 +902,7 @@ static tree
 g95_get_derived_type (g95_symbol * derived)
 {
   tree typenode, field, field_type, fieldlist;
+  tree tmp;
   g95_component * c;
 
   assert (derived && derived->attr.flavor == FL_DERIVED);
@@ -942,6 +943,16 @@ g95_get_derived_type (g95_symbol * derived)
       field = build_decl (FIELD_DECL,
                           get_identifier (c->name),
                           field_type);
+
+      if (c->ts.type == BT_CHARACTER)
+        {
+          g95_allocate_lang_decl (field);
+          tmp = TREE_TYPE (field);
+          assert (TREE_CODE (tmp) == ARRAY_TYPE);
+          tmp = TYPE_MAX_VALUE (TYPE_DOMAIN (tmp));
+          assert (INTEGER_CST_P (tmp));
+          G95_DECL_STRING_LENGTH (field) = tmp;
+        }
 
       DECL_CONTEXT (field) = typenode;
       DECL_PACKED (field) |= TYPE_PACKED (typenode);
