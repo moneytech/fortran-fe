@@ -3416,7 +3416,8 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
                  even more checking, but it doesn't seem worth it.  */
               if (info->ref->u.ar.start[n]
                   || info->ref->u.ar.end[n]
-                  || ! g95_expr_is_one (info->ref->u.ar.stride[n], 0))
+                  || (info->ref->u.ar.stride[n]
+                      && ! g95_expr_is_one (info->ref->u.ar.stride[n], 0)))
                 {
                   full = 0;
                   break;

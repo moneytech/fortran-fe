@@ -251,7 +251,7 @@ g95_get_character_type (int kind, g95_charlen * cl)
   if (cl && cl->length && cl->length->expr_type == EXPR_CONSTANT)
     {
       len = g95_conv_mpz_to_tree (cl->length->value.integer,
-                                 cl->length->ts.kind);
+                                  cl->length->ts.kind);
     }
   else
     len = NULL_TREE;
