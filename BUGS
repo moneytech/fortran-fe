@@ -9,8 +9,6 @@ Fix IMPLICIT to allow forward references of derived types.
 
 Add binary tree to SELECT statement to detect overlapping cases
 
-Add parsing of substrings
-
 Array issues in expressions and intrinsics
 
 USE statement
@@ -19,9 +17,7 @@ USE statement
   Renaming of symbols
 
 Resolve scoping issues
-
   Create symbols in correct namespaces
-
 
 Pointer resolution
 
@@ -44,7 +40,7 @@ Runtime Library
 
 
 Known bugs:
----------------------
+-----------
 
 Failure to set the expr_locus field in g95_expr structures.
 

@@ -874,6 +874,7 @@ done:
 
 
 
+#if 0
 static mstring array_ref_types[] = {
   minit("FULL", AR_FULL),         minit("ELEMENT", AR_ELEMENT),
   minit("SECTION", AR_SECTION),   minit(NULL, -1)
@@ -909,6 +910,7 @@ int i;
 
   mio_rparen();
 }
+#endif
 
 
 
@@ -1118,10 +1120,12 @@ g95_constructor *c, *tail;
 }
 
 
+#if 0
 static mstring ref_types[] = {
   minit("ARRAY", REF_ARRAY),            minit("COMPONENT", REF_COMPONENT),
   minit("SUBSTRING", REF_SUBSTRING),    minit(NULL, -1)
 };
+#endif
 
 
 
@@ -1150,10 +1154,12 @@ char name[G95_MAX_SYMBOL_LEN+1];
 
 
 
+#if 0
 static void mio_ref_list(g95_ref **rp) {
 
 
 }
+#endif
 
 
 
