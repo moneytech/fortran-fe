@@ -471,7 +471,7 @@ int b;
 
 
 g95_expr *g95_simplify_ceiling(g95_expr *e, g95_expr *k) {
-g95_expr *result;
+g95_expr *ceil, *result;
 int kind;
 
   kind = get_kind(k, "CEILING", g95_default_real_kind());
@@ -479,10 +479,14 @@ int kind;
 
   if (e->ts.type != EXPR_CONSTANT) return NULL;
 
-  result = g95_constant_result(BT_REAL, kind);
+  result = g95_constant_result(BT_INTEGER, kind);
   result->where = e->where;
   
-  mpf_ceil(result->value.real, e->value.real);
+  ceil = g95_copy_expr(e);
+  mpf_ceil(ceil->value.real, e->value.real);
+  result=g95_real2int(ceil, kind);
+
+  g95_free(ceil);
 
   return range_check(result, "CEILING");
 }
@@ -563,7 +567,7 @@ int kind;
   	 	  &x->where);
               return &g95_bad_expr;
 	case BT_INTEGER:
-	      result = g95_constant_result(BT_REAL, kind);
+	      result = g95_constant_result(BT_COMPLEX, kind);
   	      result->where = x->where;
 	      mpf_set_z(result->value.complex.r, x->value.integer);
 	      if ( y->ts.type == BT_INTEGER ) 
@@ -572,7 +576,7 @@ int kind;
       	        mpf_set(result->value.complex.i, y->value.real);
               return range_check(result, "CMPLX");
 	case BT_REAL:
-	      result = g95_constant_result(BT_REAL, kind);
+	      result = g95_constant_result(BT_COMPLEX, kind);
   	      result->where = x->where;
 	      if ( y->ts.type == BT_INTEGER ) 
       	        mpf_set_z(result->value.complex.i, y->value.integer);
@@ -669,10 +673,34 @@ int i, digits;
 g95_expr *g95_simplify_dim(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL;
+
+  if ( y == NULL ) {
+    g95_error("Second argument of DIM missing at %L", &x->where);
+    return &g95_bad_expr;
+  }
+
+  if (x->ts.type != BT_REAL || x->ts.type != BT_INTEGER ) {
+    g95_error("Type of arguments to DIM at %L must be integer or real", 
+		    x->where);
+    return &g95_bad_expr;
+  }
+
+  if (x->ts.type != y->ts.type ) {
+    g95_error("Type of arguments to DIM at %L must agree", x->where);
+    return &g95_bad_expr;
+  }
+
+  if (x->ts.kind != y->ts.kind ) {
+    g95_error("Kind of arguments to DIM at %L must agree", x->where);
+    return &g95_bad_expr;
+  }
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where;
+
   switch (x->ts.type) {
   case BT_INTEGER: 
-    result = g95_constant_result(BT_INTEGER, x->ts.kind);
-    result->where = x->where;
     if (mpz_cmp(x->value.integer, y->value.integer) > 0)
       mpz_sub(result->value.integer, x->value.integer, y->value.integer);
     else
@@ -681,8 +709,6 @@ g95_expr *result;
     break;
 
   case BT_REAL: 
-    result = g95_constant_result(BT_REAL, x->ts.kind);
-    result->where = x->where;
     if (mpf_cmp(x->value.real, y->value.real) > 0)
       mpf_sub(result->value.real, x->value.real, y->value.real);
     else
@@ -700,6 +726,7 @@ g95_expr *result;
 
 g95_expr *g95_simplify_dprod(g95_expr *x, g95_expr *y) {
 g95_expr *mult1, *mult2, *result;
+int kx, ky;
 
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -713,10 +740,20 @@ g95_expr *mult1, *mult2, *result;
      return &g95_bad_expr;
   }
 
+  kx = g95_validate_kind(x->ts.type, x->ts.kind);
+  ky = g95_validate_kind(y->ts.type, y->ts.kind);
+  if ( kx != g95_default_real_kind() || ky != g95_default_real_kind() ) {
+    g95_error("Arguments of DPROD at %L must be of default real kind",
+		    x->where);
+  }
+
   mult1 = g95_real2real(x, g95_default_double_kind());
   mult2 = g95_real2real(y, g95_default_double_kind());
 
   mpf_mul(result->value.real, mult1->value.real, mult2->value.real);
+
+  g95_free(mult1);
+  g95_free(mult2);
 
   return range_check(result, "DPROD");
 
@@ -746,11 +783,7 @@ g95_expr *g95_simplify_exp(g95_expr *e) {
 
 /* We haven't implemented the extension of evaluation of transcendentals yet 
   //  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of EXP at %L must be real", &e->where);
-    return &g95_bad_expr;
-  } */
+*/
 }
 
 
@@ -761,8 +794,7 @@ g95_expr *g95_simplify_exponent(g95_expr *e) {
 
 //  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-/* Not done yet */
-/* Type checking 
+/* Not done yet 
 
   if (arg->ts.type != BT_REAL) {
     g95_warning("Argument of EXPONENT at %L must be real", &e->where);
@@ -775,7 +807,7 @@ g95_expr *g95_simplify_exponent(g95_expr *e) {
 
 /* simplify_floor */
 g95_expr *g95_simplify_floor(g95_expr *e, g95_expr *k) {
-g95_expr *result;
+g95_expr *floor, *result;
 int kind;
 
   kind = get_kind(k, "FLOOR", g95_default_real_kind());
@@ -783,10 +815,14 @@ int kind;
 
   if (e->ts.type != EXPR_CONSTANT) return NULL;
 
-  result = g95_constant_result(BT_REAL, kind);
+  result = g95_constant_result(BT_INTEGER, kind);
   result->where = e->where;
   
+  floor = g95_copy_expr(e);
   mpf_floor(result->value.real, e->value.real);
+  result=g95_real2int(floor, kind);
+
+  g95_free(floor);
 
   return range_check(result, "FLOOR");
 
@@ -2030,9 +2066,11 @@ int kind;
 
 g95_expr *g95_simplify_repeat(g95_expr *e, g95_expr *n) {
 g95_expr *result;
+/*
 int ncopies;
 int i, len, m;
 char *copy;
+*/
 
    return NULL;
 /*
@@ -2419,8 +2457,21 @@ g95_expr *g95_simplify_tanh(g95_expr *e) {
 
 
 g95_expr *g95_simplify_tiny(g95_expr *e) {
+g95_expr *result;
+int i;
 
-  return NULL;
+  i = g95_validate_kind(e->ts.type, e->ts.kind);
+  if (i == -1) goto bad_type;
+
+  result = g95_constant_result(e->ts.type, e->ts.kind);
+  result->where = e->where;
+
+  mpf_init_set(result->value.real, g95_real_kinds[i].epsilon);
+
+  bad_type:
+    g95_internal_error("g95_simplify_tiny(): Bad type");
+
+  return result;
 }
 
 
