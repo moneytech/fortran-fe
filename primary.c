@@ -930,11 +930,10 @@ locus where;
     g95_find_symbol(name, NULL, 1, &sym);
     if (sym == NULL || sym->attr.flavor != FL_PROCEDURE) break;
 
-/* If the name is a function name, we have to peek ahead yet again to
- * see if the next character is a left parenthesis.  If so, the
- * argument is a function call. */
+/* Peek ahead yet again to see if the next character is a left
+ * parenthesis.  If not, the actual argument is the procedure. */
 
-    if (sym->attr.function && g95_match(" (") == MATCH_YES) break;
+    if (g95_match(" (") == MATCH_YES) break;
 
     e = g95_get_expr();
     e->symbol = sym;
