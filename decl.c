@@ -1834,7 +1834,7 @@ syntax:
 
 match g95_match_modproc(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_symbol *sym, *generic;
+g95_symbol *sym, *generic_sym;
 match m;
 
   if (g95_state_stack->state != COMP_INTERFACE ||
@@ -1845,7 +1845,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  generic = g95_state_stack->previous->sym;
+  generic_sym = current_interface.sym;
 
   for(;;) {
     m = g95_match_name(name);
@@ -1860,13 +1860,13 @@ match m;
 
     /* Insert the symbol into the right list of interfaces */
 
-    if (sym->generic != NULL) {
+    if (sym->next_if != NULL) {
       g95_error("Symbol %s at %C already has a generic interface", sym->name);
       return MATCH_ERROR;
     }
 
-    sym->generic = generic;
-    generic->generic = sym;
+    sym->next_if = generic_sym->generic;
+    generic_sym->generic = sym;
 
     if (g95_match_eos() == MATCH_YES) break;
     if (g95_match(" ,") != MATCH_YES) goto syntax;

@@ -981,6 +981,7 @@ try g95_reference_st_label(int, g95_sl_type);
 g95_namespace *g95_get_namespace(void);
 g95_symtree *g95_get_symtree(char *, int *);
 void g95_free_symbol(g95_symbol *);
+g95_symbol *g95_new_symbol(char *, g95_namespace *);
 g95_symbol *g95_find_symbol(char *, g95_namespace *, int);
 g95_symbol *g95_find_local_symbol(char *, g95_namespace *);
 int g95_get_symbol(char *, g95_namespace *, int, g95_symbol **);

@@ -1236,7 +1236,7 @@ int i;
  
   ns = g95_getmem(sizeof(g95_namespace));
   ns->root = NIL;
-  ns->default_access = ACCESS_PUBLIC;
+  ns->default_access = ACCESS_UNKNOWN;
 
   for(i=0; i<G95_INTRINSIC_OPS; i++)
     ns->operator_access[i] = ACCESS_UNKNOWN;
@@ -1585,9 +1585,9 @@ void g95_free_symbol(g95_symbol *sym) {
 }
 
 
-/* new_symbol()-- Allocate and initialize a new symbol node */
+/* g95_new_symbol()-- Allocate and initialize a new symbol node */
 
-static g95_symbol *new_symbol(char *name, g95_namespace *ns) {
+g95_symbol *g95_new_symbol(char *name, g95_namespace *ns) {
 g95_symbol *p;
 
   p = g95_getmem(sizeof(g95_symbol));
@@ -1603,13 +1603,6 @@ g95_symbol *p;
   if (strlen(name) > G95_MAX_SYMBOL_LEN)
     g95_internal_error("new_symbol(): Symbol name too long");
   strcpy(p->name, name);
-
-/* Add to the tentative list of tentative symbols. */
-
-  p->old_symbol = NULL;
-  p->tlink = changed;
-  p->mark = 1;
-  changed = p;
 
   return p;
 }
@@ -1670,7 +1663,13 @@ static g95_symbol *mark_new_symbol(g95_symbol *p, char *name,
   }
 
   if (p == NULL) {
-    p = new_symbol(name, ns);
+    p = g95_new_symbol(name, ns);
+
+    p->old_symbol = NULL;   /* Add to the list of tentative symbols. */
+    p->tlink = changed;
+    p->mark = 1;
+    changed = p;
+
     insert_node(ns, name)->sym = p;
     p->refs++;
   }

@@ -46,7 +46,7 @@ typedef struct g95_use_rename {
 static FILE *module_fp;
 
 static char module_name[G95_MAX_SYMBOL_LEN+1];
-static int module_line, module_column, sym_num, only_flag;
+static int module_line, module_column, sym_num, visible_num, only_flag;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
 
 static g95_use_rename *g95_rename_list;
@@ -389,7 +389,7 @@ int len;
     get_module_locus(&m);
 
     c = module_char();
-    if (!isalnum(c) && c != '_') break;
+    if (!isalnum(c) && c != '_' && c != '-') break;
 
     *p++ = c;
     if (++len > G95_MAX_SYMBOL_LEN) bad_module("Name too long");
@@ -450,11 +450,13 @@ atom_type a;
 
 static void require_atom(atom_type type) {
 module_locus m;
+atom_type t;
 char *p;
 
   get_module_locus(&m); 
 
-  if (parse_atom() != type) {
+  t = parse_atom();
+  if (t != type) {
     switch(type) {
     case ATOM_NAME:     p = "Expected name";               break;
     case ATOM_LPAREN:   p = "Expected left parenthesis";   break;
@@ -1324,6 +1326,10 @@ g95_expr *e;
  * symbol node is already fixed on input and the name/module has
  * already been filled in */
 
+static void read_namespace(g95_namespace *);
+static void write_namespace(g95_namespace *);
+
+
 static void mio_symbol(g95_symbol *sym) {
 
   mio_lparen();
@@ -1348,7 +1354,7 @@ static void mio_symbol(g95_symbol *sym) {
   mio_symbol_ref(&sym->common_head);
   mio_symbol_ref(&sym->common_next);
 
-  //  sym->ns = g95_current_ns;
+  // Save/restore namespaces
 
   mio_rparen();
 
@@ -1402,22 +1408,45 @@ int level;
 }
 
 
-static void read_module(void) {
-int serial, ambiguous, i, n, new_flag;
+
+/* get_unique_symtree()-- Return a symtree node with a name that is
+ * guaranteed to be unique within the namespace and corresponds to an
+ * illegal fortran name */
+
+static g95_symtree *get_unique_symtree(void) {
+char name[G95_MAX_SYMBOL_LEN+1]; 
+static int serial=0;
+int dummy;
+
+  sprintf(name, "@%d", serial++); 
+  return g95_get_symtree(name, &dummy);
+}
+
+
+
+static void read_namespace(g95_namespace *ns) {
+int serial, ambiguous, i, new_flag, sym_save, visible_save;
+g95_symbol *sym, *next, **sym_table_save;
 g95_use_rename *u;
-g95_symbol *sym;
 g95_symtree *st;
+
+  sym_table_save = sym_table; 
+  sym_save = sym_num;
+  visible_save = visible_num;
 
   mio_lparen(); 
 
   require_atom(ATOM_INTEGER);
-  n = atom_int;
+  sym_num = atom_int;
 
-  sym_table = g95_getmem(n*sizeof(g95_symbol *));
+  require_atom(ATOM_INTEGER);
+  visible_num = atom_int;
+
+  sym_table = g95_getmem(sym_num*sizeof(g95_symbol *));
 
   mio_lparen();
 
-  for(i=0; i<n; i++) {
+  for(i=0; i<sym_num; i++) {
     require_atom(ATOM_NAME);
     strcpy(true_module, atom_name);
 
@@ -1428,13 +1457,12 @@ g95_symtree *st;
     search_result = NULL;
 
     if (check_module(true_module)) {  /* Search via brute force traversal */
-      g95_traverse_symtree(g95_current_ns, find_true_name);
+      g95_traverse_symtree(ns, find_true_name);
       sym = search_result;
     }
 
     if (sym == NULL) {
-      sym = g95_getmem(sizeof(g95_symbol));
-      strcpy(sym->name, true_name);
+      sym = g95_new_symbol(true_name, ns);
       strcpy(sym->module, true_module);
     }
 
@@ -1495,11 +1523,37 @@ g95_symtree *st;
 
     mio_integer(&i);
 
-    if (sym_table[i]->mark)
-      skip_list();
-    else {
+    if (i >= visible_num) {       /* Load a hidden symbol */
       mio_symbol(sym_table[i]);
       sym_table[i]->attr.use_assoc = 1;
+
+      st = get_unique_symtree();
+      st->sym = sym_table[i];
+      st->sym->refs++;
+      st->sym->mark = 0;
+      continue;
+    }
+
+    if (sym_table[i]->mark) {
+      skip_list();
+      continue;
+    }
+
+    mio_symbol(sym_table[i]);
+    sym_table[i]->attr.use_assoc = 1;
+  }
+
+  mio_rparen();
+
+  mio_lparen();
+  for(i=0; i<G95_INTRINSIC_OPS; i++) {
+    mio_symbol_ref(&sym);
+
+    for(; sym; sym=next) { /* TODO: Make sure new interface doesn't conflict */
+      next = sym->next_if;
+
+      sym->next_if = ns->operator[i];
+      g95_current_ns->operator[i] = sym;
     }
   }
 
@@ -1507,10 +1561,50 @@ g95_symtree *st;
 
 /* Clean up symbol nodes that were never loaded */
 
-  for(i=0; i<n; i++)
+  for(i=0; i<sym_num; i++)
     if (sym_table[i]->mark) g95_free(sym_table[i]);
 
   g95_free(sym_table);
+
+  sym_table = sym_table_save;
+  sym_num = sym_save;
+  visible_num = visible_save;
+
+  mio_rparen();
+}
+
+
+/* mark_intrinsic_ops()-- Given a namespace, mark the symbols
+ * associated with intrinsic operator interfaces for writing to the
+ * module. */
+
+static void mark_intrinsic_ops(g95_namespace *ns) {
+g95_symbol *sym;
+int i;
+
+  for(i=0; i<G95_INTRINSIC_OPS; i++)
+    if (ns->operator_access[i] == ACCESS_PUBLIC ||
+	(ns->default_access != ACCESS_PRIVATE &&
+	 ns->operator_access[i] != ACCESS_PRIVATE)) 
+      for(sym=ns->operator[i]; sym; sym=sym->next_if)
+	if (sym->serial == -1) sym->serial = sym_num++;
+}
+
+
+/* find_invisibles()-- Worker function called by g95_traverse_ns to
+ * find those symbols that aren't scheduled to be written, but need to
+ * be written as invisible symbols. */
+
+static void find_invisibles(g95_symbol *sym) {
+g95_symbol *s;
+
+  if (sym->serial == -1) return;
+
+  for(s=sym->operator; s; s=s->next_if)
+    if (s->serial == -1) s->serial = sym_num++;
+
+  for(s=sym->generic; s; s=s->next_if)
+    if (s->serial == -1) s->serial = sym_num++;
 }
 
 
@@ -1540,7 +1634,6 @@ static void find_writables(g95_symbol *sym) {
     break;
   }
 }
-
 
 
 /* write_symbol()-- Write a symbol to the module.  Different symbol
@@ -1592,7 +1685,7 @@ static void write_true_name(g95_symbol *sym) {
 
 static void write_symtree(g95_symtree *st) {
 
-  if (st->sym->serial == -1) return;
+  if (st->sym->serial == -1 || st->sym->serial >= visible_num) return;
 
   mio_lparen();
   write_atom(ATOM_NAME, st->name);
@@ -1602,22 +1695,35 @@ static void write_symtree(g95_symtree *st) {
 }
 
 
-static void write_module(void) {
+static void write_namespace(g95_namespace *ns) {
+g95_symbol *sym, **sym_table_save;
+int i, sym_save, visible_save;
+
+  sym_table_save = sym_table; 
+  sym_save = sym_num;
+  visible_save = visible_num;
 
   mio_lparen();
 
   sym_num = 0;
 
-  g95_traverse_ns(g95_current_ns, find_writables);
+  g95_traverse_ns(ns, find_writables);
+
+  visible_num = sym_num;  /* Symbols marked for saving after here are hidden */
+
+  mark_intrinsic_ops(g95_current_ns);
+
+  g95_traverse_ns(ns, find_invisibles);
 
   write_atom(ATOM_INTEGER, &sym_num);
+  write_atom(ATOM_INTEGER, &visible_num);
 
   mio_lparen();
-  g95_traverse_ns(g95_current_ns, write_true_name);
+  g95_traverse_ns(ns, write_true_name);
   mio_rparen();
 
   mio_lparen();
-  g95_traverse_symtree(g95_current_ns, write_symtree);
+  g95_traverse_symtree(ns, write_symtree);
   mio_rparen();
 
 /* Write symbols.  The only ordering issue I can think of at the
@@ -1629,12 +1735,32 @@ static void write_module(void) {
   mio_lparen();
 
   for(phase=1; phase<=2; phase++)
-    g95_traverse_ns(g95_current_ns, write_symbol);
+    g95_traverse_ns(ns, write_symbol);
 
   mio_rparen();
+
+/* Write the heads of operator interfaces */
+
+  mio_lparen();
+  sym = NULL;
+
+  for(i=0; i<G95_INTRINSIC_OPS; i++) {
+    if (ns->operator_access[i] == ACCESS_PUBLIC ||
+	(ns->default_access != ACCESS_PRIVATE &&
+	 ns->operator_access[i] != ACCESS_PRIVATE))
+      mio_symbol_ref(&ns->operator[i]);
+    else
+      mio_symbol_ref(&sym);
+  }
+
+  mio_rparen();
+
+  sym_table = sym_table_save;
+  sym_num = sym_save;
+  visible_num = visible_save;
+
   mio_rparen();
 }
-
 
 
 /* g95_dump_module()-- Given module, dump it to disk */
@@ -1657,7 +1783,7 @@ char filename[PATH_MAX];
 
   iomode = IO_OUTPUT;
 
-  write_module();
+  write_namespace(g95_current_ns);
 
   write_char('\n');
 
@@ -1700,7 +1826,7 @@ int c;
     if (p->state == COMP_MODULE && strcmp(p->sym->name, module_name) == 0)
       g95_fatal_error("Can't USE the same module we're building!");
 
-  read_module();
+  read_namespace(g95_current_ns);
 
   fclose(module_fp);
 
