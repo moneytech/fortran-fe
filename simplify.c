@@ -1173,7 +1173,7 @@ int i;
 
 g95_expr *g95_simplify_iachar(g95_expr *e) {
 g95_expr *result;
-int i, index;
+int i, index=-1;
 char c;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -1418,20 +1418,10 @@ g95_expr *result;
 g95_expr *g95_simplify_index(g95_expr *x, g95_expr *y, g95_expr *b) {
 g95_expr *result;
 int back, len, lensub;
-int i, j, k, count, index, start;
+int i, j, k, count, index=0, start;
   
-  if (x->ts.kind != y->ts.kind) {
-    g95_error("KIND of arguments of INDEX at %L must agree", &x->where);
-    return &g95_bad_expr;
-  }
-
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  
     return NULL;
-
-  if (b != NULL && b->ts.type != BT_LOGICAL) {
-    g95_error("Optional argument of INDEX at %L must be logical", &b->where);
-    return &g95_bad_expr;
-  }
 
   if (b != NULL && b->value.logical != 0)
     back = 1;
@@ -1703,6 +1693,7 @@ int i, *bits;
 
   if (shift == 0) {
     mpz_set(result->value.integer,e->value.integer);
+    g95_free(bits);
     return range_check(result,"ISHFTC");
   }
 
@@ -1717,6 +1708,7 @@ int i, *bits;
       if (bits[i] == 1) mpz_setbit(result->value.integer, i-delta);
     }
 
+    g95_free(bits);
     return range_check(result,"ISHFTC");
   } 
 
@@ -1731,10 +1723,10 @@ int i, *bits;
       if (bits[i] == 1) mpz_setbit(result->value.integer, i+delta);
     }
 
+    g95_free(bits);
     return range_check(result, "ISHFTC");
   }
 
-  g95_free(bits);
 }
 
 
@@ -1961,7 +1953,7 @@ int kind;
 /* Max family */
 
 g95_expr *g95_simplify_max(g95_actual_arglist *arg) {
-g95_expr *x, *y, *result;
+g95_expr *x, *y, *result=NULL;
 mpz_t max_val;
 mpf_t rmax_val;
 bt my_type;
@@ -2125,7 +2117,7 @@ int i;
 /* Min family */
 
 g95_expr *g95_simplify_min(g95_actual_arglist *arg) {
-g95_expr *x, *y, *result;
+g95_expr *x, *y, *result=NULL;
 mpz_t min_val;
 mpf_t rmin_val;
 bt my_type;
@@ -2544,17 +2536,18 @@ int i;
 g95_expr *g95_simplify_range(g95_expr *e) {
 g95_expr *result;
 int i;
+long j;
 
   i = g95_validate_kind(e->ts.type, e->ts.kind);
   if (i < 0) goto bad_type;
 
   switch(e->ts.type) {
   case BT_INTEGER:
-    i = g95_integer_kinds[i].range;
+    j = g95_integer_kinds[i].range;
     break;
 
   case BT_REAL:
-    i = g95_real_kinds[i].range;
+    j = g95_real_kinds[i].range;
     break;
 
   bad_type:
@@ -2562,7 +2555,7 @@ int i;
     g95_internal_error("g95_simplify_range(): Bad kind");
   }
 
-  result = g95_int_expr(i);
+  result = g95_int_expr(j);
   result->where = e->where;
 
   return result;
@@ -2645,7 +2638,9 @@ int i, j, len, ncopies, nlen;
 g95_expr *g95_simplify_reshape(g95_expr *source, g95_expr *shape_exp,
 			       g95_expr *pad, g95_expr *order_exp) {
 
-int i, rank, nsource, npad, x[G95_MAX_DIMENSIONS];
+unsigned long j;
+size_t nsource;
+int i, rank, npad, x[G95_MAX_DIMENSIONS];
 int order[G95_MAX_DIMENSIONS], shape[G95_MAX_DIMENSIONS];
 g95_constructor *head, *tail;
 g95_array_shape *s;
@@ -2767,12 +2762,12 @@ g95_expr *e;
       goto done;
     }
 
-    i = mpz_get_ui(index);
+    j = mpz_get_ui(index);
 
-    if (i < nsource)
-      e = g95_get_array_element(source, i);
+    if (j < nsource)
+      e = g95_get_array_element(source, j);
     else { 
-      i = i - nsource;
+      j = j - nsource;
 
       if (npad == 0) {
 	g95_error("PAD parameter required for short SOURCE parameter at %L",
@@ -2780,8 +2775,8 @@ g95_expr *e;
 	goto done;
       }
 
-      i = i % npad;
-      e = g95_get_array_element(pad, i);
+      j = j % npad;
+      e = g95_get_array_element(pad, j);
     }
 
     if (head == NULL)
@@ -2912,7 +2907,7 @@ unsigned long exp2;
 g95_expr *g95_simplify_scan(g95_expr *e, g95_expr *c, g95_expr *b) {
 g95_expr *result;
 int back;
-int indx, len, lenc;
+size_t indx, len, lenc;
 
   if (e->expr_type != EXPR_CONSTANT || c->expr_type != EXPR_CONSTANT)  
     return NULL;
@@ -2936,7 +2931,7 @@ int indx, len, lenc;
     if (back != 0 && indx != 0) indx = len - indx + 1;
   }
 
-  mpz_set_si(result->value.integer,indx);
+  mpz_set_ui(result->value.integer,indx);
   return range_check(result,"SCAN");
 }
 
@@ -3164,10 +3159,7 @@ g95_expr *result;
 
   if (a->expr_type != EXPR_CONSTANT) return NULL;
 
-  result = g95_constant_result(BT_REAL, g95_default_double_kind());
-  result->where = a->where;
-  mpf_init_set(result->value.real, a->value.real);
-
+  result=g95_real2real(a,g95_default_real_kind());
   return range_check(result, "SNGL");
 }
 
@@ -3454,21 +3446,11 @@ int count, i, len, lentrim;
 
 g95_expr *g95_simplify_verify(g95_expr *s, g95_expr *set, g95_expr *b) {
 g95_expr *result;
-int back, len, lenset;
-int index;
-  
-  if (s->ts.kind != set->ts.kind) {
-    g95_error("KIND of arguments of VERIFY at %L must agree", &s->where);
-    return &g95_bad_expr;
-  }
+int back;
+size_t index, len, lenset;
 
   if (s->expr_type != EXPR_CONSTANT || set->expr_type != EXPR_CONSTANT)  
     return NULL;
-
-  if (b != NULL && b->ts.type != BT_LOGICAL) {
-    g95_error("Optional argument of INDEX at %L must be logical", &b->where);
-    return &g95_bad_expr;
-  }
 
   if (b != NULL && b->value.logical != 0)
     back = 1;
@@ -3482,13 +3464,13 @@ int index;
   lenset = set->value.character.length;
 
   if (len == 0) {
-    mpz_set_si(result->value.integer, 0);
+    mpz_set_ui(result->value.integer, 0);
     return result;
   }
 
   if (back == 0) {
     if (lenset == 0) {
-      mpz_set_si(result->value.integer,len);
+      mpz_set_ui(result->value.integer,len);
       return result;
     }
 
@@ -3497,14 +3479,14 @@ int index;
 
   } else {
     if (lenset == 0) {
-      mpz_set_si(result->value.integer,1);
+      mpz_set_ui(result->value.integer,1);
       return result;
     }
 
     index = len-strspn(s->value.character.string, set->value.character.string);
   }
 
-  mpz_set_si(result->value.integer, index);
+  mpz_set_ui(result->value.integer, index);
   return result;
 }
 

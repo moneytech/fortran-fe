@@ -556,7 +556,7 @@ static try check_digits(g95_expr *x) {
 static try check_dim(g95_expr *x, g95_expr *y) {
 
     if (y == NULL) {
-    intrinsic_error("Second argument of DIM missing at %%L");
+    intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
@@ -1256,7 +1256,7 @@ static try check_nint(g95_expr *x, g95_expr *kind) {
 }
 
 
-static try check_idnint(g95_expr *x, g95_expr *kind) {
+static try check_idnint(g95_expr *x) {
 
   if (x->ts.type != BT_REAL) {
     type_error(x);
@@ -1264,7 +1264,7 @@ static try check_idnint(g95_expr *x, g95_expr *kind) {
   }
 
   if (x->ts.kind != g95_default_double_kind()) {
-    kind_error(kind);
+    kind_error(x);
     return FAILURE;
   }
 
@@ -1382,7 +1382,7 @@ static try check_range(g95_expr *x) {
   return SUCCESS;
 }
 
-
+/* real, float, sngl */
 static try check_real(g95_expr *a, g95_expr *kind) {
 
   if (!g95_numeric_ts(&a->ts)) {
@@ -1398,6 +1398,39 @@ static try check_real(g95_expr *a, g95_expr *kind) {
 
   return SUCCESS;
 }
+
+static try check_float(g95_expr *x) {
+
+  if (x->ts.type != BT_INTEGER) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (x->ts.kind != g95_default_integer_kind()) {
+    kind_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+
+static try check_sngl(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (x->ts.kind != g95_default_double_kind()) {
+    kind_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+/* end of this family */
 
 static try check_repeat(g95_expr *x, g95_expr *y) {
 
@@ -1468,7 +1501,7 @@ static try check_reshape(g95_expr *source, g95_expr *shape,
 static try check_scan(g95_expr *x, g95_expr *y, g95_expr *z) {
 
     if (y == NULL) {
-    intrinsic_error("Second argument of DIM missing at %%L");
+    intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
@@ -1709,7 +1742,36 @@ static try check_unpack(g95_expr *vector, g95_expr *mask, g95_expr *field) {
 }
 
 
+static try check_verify(g95_expr *x, g95_expr *y, g95_expr *z) {
 
+    if (y == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (x->ts.type != BT_CHARACTER ) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (y->ts.type != BT_CHARACTER ) {
+    type_error(y);
+    return FAILURE;
+  }
+
+  if (z!=NULL && z->ts.type != BT_LOGICAL ) {
+    type_error(z);
+    return FAILURE;
+  }
+
+  if (x->ts.kind != y->ts.kind) {
+    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
 
 
 
@@ -2386,10 +2448,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f2("real",  1, BT_REAL, dr, g95_simplify_real, check_real,
 	     a, BT_INTEGER, di, 0,   knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym_f1("float", 1, BT_REAL, dr, g95_simplify_float, NULL,
+  add_sym_f1("float", 1, BT_REAL, dr, g95_simplify_float, check_float,
 	     a, BT_INTEGER, di, 0, NULL);
 
-  add_sym_f1("sngl",  1, BT_REAL, dr, g95_simplify_sngl, NULL,
+  add_sym_f1("sngl",  1, BT_REAL, dr, g95_simplify_sngl, check_sngl,
 	     a, BT_REAL, dd, 0, NULL);
 
   add_sym_f2("repeat", 1, BT_CHARACTER, dc, g95_simplify_repeat, check_repeat,
@@ -2402,10 +2464,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("rrspacing",0, BT_REAL, dr, g95_simplify_rrspacing, NULL,
 	     x, BT_REAL, dr, 0, NULL);
 
-  add_sym_f2("scale", 0, BT_REAL, dr, g95_simplify_scale, check_scan,
+  add_sym_f2("scale", 0, BT_REAL, dr, g95_simplify_scale, NULL,
 	     x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
-  add_sym_f3("scan", 0, BT_INTEGER, di, g95_simplify_scan, NULL,
+  add_sym_f3("scan", 0, BT_INTEGER, di, g95_simplify_scan, check_scan,
 	     stg, BT_CHARACTER, dc, 0,  set, BT_CHARACTER, dc, 0,
 	     bck, BT_LOGICAL, dl, 1, NULL);
 
@@ -2488,7 +2550,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f3("unpack", 1, BT_REAL, dr, NULL, check_unpack, v, BT_REAL, dr, 0,
 	     msk, BT_LOGICAL, dl, 0,   f, BT_REAL, dr, 0, NULL);
 
-  add_sym_f3("verify", 0, BT_INTEGER, di, g95_simplify_verify, NULL,
+  add_sym_f3("verify", 0, BT_INTEGER, di, g95_simplify_verify, check_verify,
 	     stg, BT_CHARACTER, dc, 0,  set, BT_CHARACTER, dc, 0,
 	     bck, BT_LOGICAL, dl, 1, NULL);
 }
