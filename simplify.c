@@ -739,17 +739,6 @@ g95_expr *g95_simplify_exponent(g95_expr *e) {
 }
 
 
-g95_expr *g95_simplify_float_sngl(g95_expr *e) {
-g95_expr *kind, *result;
-
-  kind = g95_int_expr(g95_default_real_kind());
-  result = g95_simplify_real(e, kind);
-  g95_free_expr(kind);
-
-  return result;
-}
-
-
 /* simplify_floor */
 g95_expr *g95_simplify_floor(g95_expr *e, g95_expr *k) {
 g95_expr *result;

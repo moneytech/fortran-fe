@@ -16,6 +16,9 @@ g95: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ date.o $(OBJS) -L$(GMPDIR)/.libs $(LIBS)
 	@rm date.o
 
+intrinsic.o: intrinsic.c simplify.h g95.h
+	$(CC) $(CFLAGS) -I$(GMPDIR) intrinsic.c
+
 simplify.o: simplify.c simplify.h g95.h
 	$(CC) $(CFLAGS) -I$(GMPDIR) simplify.c
 
