@@ -1169,6 +1169,8 @@ g95_component *p;
 
   if (name == NULL) return NULL;
 
+  sym = g95_use_derived(sym);
+
   for(p=sym->components; p; p=p->next)
     if (strcmp(p->name, name) == 0) break;
 
