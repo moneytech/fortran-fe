@@ -152,7 +152,7 @@ typedef enum { INTRINSIC_NONE=-1, INTRINSIC_UPLUS=0, INTRINSIC_UMINUS,
 /* Arithmetic results */
 
 typedef enum { ARITH_OK=1, ARITH_OVERFLOW, ARITH_UNDERFLOW,
-               ARITH_DIV0, ARITH_0TO0
+               ARITH_DIV0, ARITH_0TO0, ARITH_INCOMMENSURATE
 } arith;
 
 /* Statements */

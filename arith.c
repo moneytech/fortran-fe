@@ -106,7 +106,7 @@ int i, p;
     if (i % 2 == 0)
       mpf_sub(log, log, t);
     else
-      mpf_add(log, log, t); 
+      mpf_add(log, log, t);
   }
 
   /* Add in the log (e^p) = p */
@@ -223,7 +223,7 @@ int i, sign;
   mpf_init_set(x, *arg);
 
 /* Special case (we do not treat multiples of pi due to roundoff issues) */
-  if ( mpf_cmp_ui(x,0) ==  0) {
+  if (mpf_cmp_ui(x,0) ==  0) {
     mpf_set_ui(*result,0);
   }
 
@@ -235,27 +235,30 @@ int i, sign;
     mpf_init(denom);
     mpf_init(term);
 
-    mpf_div(q,x,mpf_tpi);
-    mpf_floor(factor,q);
-    mpf_mul(q,factor,mpf_tpi);
-    mpf_sub(r,x,q);
+    mpf_div(q, x, mpf_tpi);
+    mpf_floor(factor, q);
+    mpf_mul(q, factor, mpf_tpi);
+    mpf_sub(r, x, q);
 
     mpf_init_set_ui(xp, 0);
     mpf_init_set_ui(num, 1);
     mpf_init_set_ui(denom, 1);
 
     sign = -1;
-    for(i=1; i<G95_REAL_BITS+10; i++) { 
-      mpf_mul(num,num,r);
-      mpf_mul_ui(denom,denom,i);
-      if ( i%2 != 0 ) {
-        sign = sign*(-1);
-        mpf_div(term,num,denom);
-        if ( sign > 0) mpf_add(xp,xp,term);
-        else mpf_sub(xp,xp,term);
-      }
+    for(i=1; i<G95_REAL_BITS+10; i++) {
+      mpf_mul(num, num, r);
+      mpf_mul_ui(denom, denom, i);
+      if (i%2 == 0) continue;
+
+      sign = -sign;
+      mpf_div(term, num, denom);
+      if (sign > 0)
+	mpf_add(xp, xp, term);
+      else
+	mpf_sub(xp,xp,term);
     }
-    mpf_set(*result,xp);
+
+    mpf_set(*result, xp);
 
     mpf_clear(q);
     mpf_clear(r);
@@ -277,11 +280,9 @@ int i, sign;
   mpf_init_set(x, *arg);
 
 /* Special case (we do not treat multiples of pi due to roundoff issues) */
-  if ( mpf_cmp_ui(x,0) ==  0) {
-    mpf_set_ui(*result,1);
-  }
-
-  else {
+  if (mpf_cmp_ui(x,0) == 0) {
+    mpf_set_ui(*result, 1);
+  } else {
     mpf_init(q);
     mpf_init(r);
     mpf_init(factor);
@@ -289,27 +290,29 @@ int i, sign;
     mpf_init(denom);
     mpf_init(term);
 
-    mpf_div(q,x,mpf_tpi);
-    mpf_floor(factor,q);
-    mpf_mul(q,factor,mpf_tpi);
-    mpf_sub(r,x,q);
+    mpf_div(q, x, mpf_tpi);
+    mpf_floor(factor, q);
+    mpf_mul(q, factor, mpf_tpi);
+    mpf_sub(r, x, q);
 
     mpf_init_set_ui(xp, 1);
     mpf_init_set_ui(num, 1);
     mpf_init_set_ui(denom, 1);
 
     sign = 1;
-    for(i=1; i<G95_REAL_BITS+10; i++) { 
-      mpf_mul(num,num,r);
-      mpf_mul_ui(denom,denom,i);
-      if ( i%2 == 0 ) {
-        sign = sign*(-1);
-        mpf_div(term,num,denom);
-        if ( sign > 0) mpf_add(xp,xp,term);
-        else mpf_sub(xp,xp,term);
-      }
+    for(i=1; i<G95_REAL_BITS+10; i++) {
+      mpf_mul(num, num, r);
+      mpf_mul_ui(denom, denom, i);
+      if (i%2 != 0) continue;
+
+      sign = -sign;
+      mpf_div(term, num, denom);
+      if (sign > 0)
+	mpf_add(xp, xp, term);
+      else
+	mpf_sub(xp, xp, term);
     }
-    mpf_set(*result,xp);
+    mpf_set(*result, xp);
 
     mpf_clear(q);
     mpf_clear(r);
@@ -332,31 +335,25 @@ int i, sign;
   mpf_init_set(x, *arg);
 
 /* Special cases */
-  if ( mpf_cmp_ui(x,0) ==  0 ) {
-    mpf_set_ui(*result,0);
-  }
-  else if ( mpf_cmp_ui(x,1) ==  0 ) {
+  if (mpf_cmp_ui(x, 0) == 0) {
+    mpf_set_ui(*result, 0);
+  } else if (mpf_cmp_ui(x,1) == 0) {
     mpf_init(num);
-    mpf_div_ui(num,mpf_hpi,2);
-    mpf_set(*result,num);
+    mpf_div_ui(num, mpf_hpi, 2);
+    mpf_set(*result, num);
     mpf_clear(num);
-  }
-  else if ( mpf_cmp_si(x,-1) == 0 ) {
+  } else if (mpf_cmp_si(x,-1) == 0) {
     mpf_init(num);
-    mpf_div_ui(num,mpf_hpi,2);
-    mpf_neg(*result,num);
+    mpf_div_ui(num, mpf_hpi, 2);
+    mpf_neg(*result, num);
     mpf_clear(num);
-  }
-/* General cases */
-
-  else {
+  } else { /* General cases */
 
     mpf_init(absval);
+    mpf_abs(absval, x);
 
-    mpf_abs(absval,x);
-
-    mpf_init_set_d(convgu,1.5);
-    mpf_init_set_d(convgl,0.5);
+    mpf_init_set_d(convgu, 1.5);
+    mpf_init_set_d(convgl, 0.5);
     mpf_init_set_ui(num, 1);
     mpf_init(term);
 
@@ -365,28 +362,28 @@ int i, sign;
       sign = -1;
       for(i=1; i<G95_REAL_BITS+10; i++) {
         mpf_mul(num, num, absval);
-        if (i%2 != 0) {
-          sign = -sign;
-	  mpf_div_ui(term, num, i);
-	  if (sign > 0)
-	    mpf_add(xp, xp, term);
-	  else
-	    mpf_sub(xp, xp, term);
-        }
+	if (i%2 == 0) continue;
+
+	sign = -sign;
+	mpf_div_ui(term, num, i);
+	if (sign > 0)
+	  mpf_add(xp, xp, term);
+	else
+	  mpf_sub(xp, xp, term);
       }
     } else if (mpf_cmp(absval, convgu) >= 0) {
       mpf_init_set(xp, mpf_hpi);
       sign = 1;
       for(i=1; i<G95_REAL_BITS+10; i++) {
         mpf_div(num, num, absval);
-        if (i%2 != 0) {
-    	  sign = -sign;
-	  mpf_div_ui(term, num, i);
-	  if (sign > 0)
-	    mpf_add(xp, xp, term);
-	  else
-	    mpf_sub(xp, xp, term);
-        }
+	if (i%2 == 0) continue;
+
+	sign = -sign;
+	mpf_div_ui(term, num, i);
+	if (sign > 0)
+	  mpf_add(xp, xp, term);
+	else
+	  mpf_sub(xp, xp, term);
       }
     } else {
       mpf_init_set_ui(xp, 0);
@@ -400,15 +397,15 @@ int i, sign;
       sign = -1;
       for(i=1; i<G95_REAL_BITS+10; i++) {
         mpf_mul(num, num, absval);
-        if (i%2 != 0) {
-  	  sign = -sign;
-	  mpf_div_ui(term, num, i);
-	  if (sign > 0)
-	    mpf_add(xp, xp, term);
-	  else
-	    mpf_sub(xp, xp, term);
-        }
+	if (i%2 == 0) continue;
+	sign = -sign;
+	mpf_div_ui(term, num, i);
+	if (sign > 0)
+	  mpf_add(xp, xp, term);
+	else
+	  mpf_sub(xp, xp, term);
       }
+
       mpf_div_ui(term, mpf_hpi, 2);
       mpf_add(xp, term, xp);
     }
@@ -442,13 +439,13 @@ mpf_t neg, term1, term2, x, xp;
   mpf_init(term2);
   mpf_init(xp);
 
-  mpf_neg(neg,x);
+  mpf_neg(neg, x);
 
-  exponential(&x,&term1);
-  exponential(&neg,&term2);
+  exponential(&x, &term1);
+  exponential(&neg, &term2);
 
-  mpf_add(xp,term1,term2);
-  mpf_div_ui(*result,xp,2);
+  mpf_add(xp, term1, term2);
+  mpf_div_ui(*result, xp, 2);
 
   mpf_clear(neg);
   mpf_clear(term1);
@@ -468,13 +465,13 @@ mpf_t neg, term1, term2, x, xp;
   mpf_init(term2);
   mpf_init(xp);
 
-  mpf_neg(neg,x);
+  mpf_neg(neg, x);
 
-  exponential(&x,&term1);
-  exponential(&neg,&term2);
+  exponential(&x, &term1);
+  exponential(&neg, &term2);
 
-  mpf_sub(xp,term1,term2);
-  mpf_div_ui(*result,xp,2);
+  mpf_sub(xp, term1, term2);
+  mpf_div_ui(*result, xp, 2);
 
   mpf_clear(neg);
   mpf_clear(term1);
@@ -491,12 +488,13 @@ const char *g95_arith_error(arith code) {
 const char *p;
 
   switch(code) {
-    case ARITH_OK:         p = "Arithmetic OK"; break;
-    case ARITH_OVERFLOW:   p = "Arithmetic overflow"; break;
-    case ARITH_UNDERFLOW:  p = "Arithmetic underflow"; break;
-    case ARITH_DIV0:       p = "Division by zero"; break;
-    case ARITH_0TO0:       p = "Indeterminate form 0 ** 0"; break;
-    default: g95_internal_error("g95_arith_error(): Bad error code");
+  case ARITH_OK:              p = "Arithmetic OK"; break;
+  case ARITH_OVERFLOW:        p = "Arithmetic overflow"; break;
+  case ARITH_UNDERFLOW:       p = "Arithmetic underflow"; break;
+  case ARITH_DIV0:            p = "Division by zero"; break;
+  case ARITH_0TO0:            p = "Indeterminate form 0 ** 0"; break;
+  case ARITH_INCOMMENSURATE:  p = "Array operands are incommensurate"; break;
+  default: g95_internal_error("g95_arith_error(): Bad error code");
   }
 
   return p;
@@ -512,25 +510,25 @@ mpf_t a, b;
 mpz_t r;
 int i, n, limit;
 
-/* Set the default precision for GMP computations */  
+/* Set the default precision for GMP computations */
   mpf_set_default_prec(G95_REAL_BITS+30);
 
 /* Calculate e, needed by the natural_logarithm() subroutine. */
 
   mpf_init(b);
   mpf_init_set_ui(e, 0);
-  mpf_init_set_ui(a, 1);   
+  mpf_init_set_ui(a, 1);
 
   for(i=1; i<100; i++) {
     mpf_add(e, e, a);
     mpf_div_ui(a, a, i);   /* 1/(i!) */
   }
 
-/* Calculate pi, 2pi, pi/2, and -pi/2, needed for trigonometric functions 
+/* Calculate pi, 2pi, pi/2, and -pi/2, needed for trigonometric functions
  * We use the Bailey, Borwein and Plouffe formula:
  *
  * pi = \sum{n=0}^\infty (1/16)^n [4/(8n+1) - 2/(8n+4) - 1/(8n+5) - 1/(8n+6)]
- * 
+ *
  * which gives about four bits per iteration.
  */
 
@@ -574,7 +572,7 @@ int i, n, limit;
 /* Convert the minimum/maximum values for each kind into their Gnu MP
  * representation. */
 
-  mpz_init(r); 
+  mpz_init(r);
 
   for(int_info=g95_integer_kinds; int_info->kind != 0; int_info++) {
     /* Huge */
@@ -631,7 +629,7 @@ int i, n, limit;
     mpf_neg(b, b);
 
     if (mpf_cmp(a, b) > 0) mpf_set(a, b);  /* a = min(a, b) */
- 
+
     mpf_trunc(a, a);
     mpz_set_f(r, a);
     real_info->range = mpz_get_si(r);
@@ -660,42 +658,23 @@ int i, n, limit;
 
 /* g95_default_*_kind()-- Return default kinds */
 
-int g95_default_integer_kind(void) 
-{ 
-  if ( g95_option.i8 == 1 ) {
-    return g95_integer_kinds[1].kind; 
-  }
-  else {
-    return g95_integer_kinds[0].kind; 
-  }
+int g95_default_integer_kind(void) {
+  return g95_integer_kinds[g95_option.i8 ? 1 : 0].kind;
 }
 
-int g95_default_real_kind(void)      
-{ 
-  if ( g95_option.r8 == 1 ) {
-    return g95_real_kinds[1].kind; 
-  }
-  else {
-    return g95_real_kinds[0].kind; 
-  }
+int g95_default_real_kind(void) {
+  return g95_real_kinds[g95_option.i8 ? 1 : 0].kind;
 }
 
 int g95_default_double_kind(void)    { return g95_real_kinds[1].kind; }
 
 int g95_default_character_kind(void) { return 1; }
 
-int g95_default_logical_kind(void)   
-{ 
-  if ( g95_option.i8 == 1 ) {
-    return g95_logical_kinds[1].kind; 
-  }
-  else {
-    return g95_logical_kinds[0].kind; 
-  }
+int g95_default_logical_kind(void) {
+  return g95_logical_kinds[g95_option.i8 ? 1 : 0].kind;
 }
 
 int g95_default_complex_kind(void)   { return g95_default_real_kind(); }
-
 
 
 /* validate_integer()-- Make sure that a valid kind is present.
@@ -933,11 +912,11 @@ arith rc;
   switch(e->ts.type) {
   case BT_INTEGER:
     rc = g95_check_integer_range(e->value.integer, e->ts.kind);
-    break;    
+    break;
 
   case BT_REAL:
     rc = g95_check_real_range(e->value.real, e->ts.kind);
-    break;    
+    break;
 
   case BT_COMPLEX:
     rc = g95_check_real_range(e->value.complex.r, e->ts.kind);
@@ -1406,7 +1385,7 @@ int rc;
   case BT_REAL:
     rc = mpf_cmp(op1->value.real, op2->value.real);
     break;
-    
+
   case BT_CHARACTER:
     rc = g95_compare_string(op1, op2, NULL);
     break;
@@ -1445,7 +1424,7 @@ int len, alen, blen, i, ac, bc;
   blen = b->value.character.length;
 
   len = (alen > blen) ? alen : blen;
-  
+
   for(i=0; i<len; i++) {
     ac = (i < alen) ? a->value.character.string[i] : ' ';
     bc = (i < blen) ? b->value.character.string[i] : ' ';
@@ -1535,10 +1514,169 @@ g95_expr *result;
 }
 
 
-typedef union {
-  arith (*f2)(g95_expr *, g95_expr **);
-  arith (*f3)(g95_expr *, g95_expr *, g95_expr **);
-}  eval_f;
+
+
+static arith reduce_unary(arith (*eval)(), g95_expr *op, g95_expr **result) {
+g95_constructor *c, *head;
+g95_expr *r;
+arith rc;
+
+  if (op->expr_type == EXPR_CONSTANT) return eval(op, result);
+
+  rc = ARITH_OK;
+
+  head = op->value.constructor;
+  op->value.constructor = NULL;   /* Reuse the constructor */
+
+  for(c=head; c; c=c->next) {
+    rc = eval(c->expr, &r);
+    if (rc != ARITH_OK) break;
+
+    g95_replace_expr(c->expr, r);
+  }
+
+  if (rc != ARITH_OK)
+    g95_free_constructor(head);
+  else {
+    r = g95_get_expr();
+    r->expr_type = EXPR_ARRAY;
+    r->value.constructor = head;
+    r->ts = op->ts;
+
+    *result = r;
+  }
+
+  return rc;
+}
+
+
+
+
+static arith reduce_binary_ac(arith (*eval)(), g95_expr *op1, g95_expr *op2,
+			      g95_expr **result) {
+g95_constructor *c, *head;
+g95_expr *r;
+arith rc;
+
+  head = op1->value.constructor;   /* Re-use constructor list */ 
+  op1->value.constructor = NULL;
+
+  rc = ARITH_OK;
+
+  for(c=head; c; c=c->next) {
+    rc = eval(c->expr, op2, &r);
+    if (rc != ARITH_OK) break;
+
+    g95_replace_expr(c->expr, r);
+  }
+
+  if (rc != ARITH_OK)
+    g95_free_constructor(head);
+  else {
+    r = g95_get_expr();
+    r->expr_type = EXPR_ARRAY;
+    r->value.constructor = head;
+    r->ts = op1->ts;
+
+    *result = r;
+  }
+
+  return rc;
+}
+
+
+static arith reduce_binary_ca(arith (*eval)(), g95_expr *op1, g95_expr *op2,
+			      g95_expr **result) {
+g95_constructor *c, *head;
+g95_expr *r;
+arith rc;
+
+  head = op2->value.constructor;   /* Re-use constructor list */ 
+  op2->value.constructor = NULL;
+
+  rc = ARITH_OK;
+
+  for(c=head; c; c=c->next) {
+    rc = eval(c->expr, op1, &r);
+    if (rc != ARITH_OK) break;
+
+    g95_replace_expr(c->expr, r);
+  }
+
+  if (rc != ARITH_OK)
+    g95_free_constructor(head);
+  else {
+    r = g95_get_expr();
+    r->expr_type = EXPR_ARRAY;
+    r->value.constructor = head;
+    r->ts = op2->ts;
+
+    *result = r;
+  }
+
+  return rc;
+}
+
+
+
+static arith reduce_binary_aa(arith (*eval)(), g95_expr *op1, g95_expr *op2,
+			      g95_expr **result) {
+g95_constructor *c, *d, *head;
+g95_expr *r;
+arith rc;
+
+  head = op1->value.constructor;   /* Re-use constructor list */ 
+  op1->value.constructor = NULL;
+
+  rc = ARITH_OK;
+  d = op2->value.constructor;
+
+  for(c=head; c; c=c->next, d=d->next) {
+    if (d == NULL) {
+      rc = ARITH_INCOMMENSURATE;
+      break;
+    }
+
+    rc = eval(c->expr, d->expr, &r);
+    if (rc != ARITH_OK) break;
+
+    g95_replace_expr(c->expr, r);
+  }
+
+  if (d != NULL) rc = ARITH_INCOMMENSURATE;
+
+  if (rc != ARITH_OK)
+    g95_free_constructor(head);
+  else {
+    r = g95_get_expr();
+    r->expr_type = EXPR_ARRAY;
+    r->value.constructor = head;
+    r->ts = op1->ts;
+
+    *result = r;
+  }
+
+  return rc;
+}
+
+
+
+
+static arith reduce_binary(arith (*eval)(), g95_expr *op1, g95_expr *op2,
+			   g95_expr **result) {
+
+  if (op1->expr_type == EXPR_CONSTANT && op2->expr_type == EXPR_CONSTANT)
+    return eval(op1, op2, result);
+
+  if (op1->expr_type == EXPR_CONSTANT && op2->expr_type == EXPR_ARRAY)
+    return reduce_binary_ca(eval, op1, op2, result);
+
+  if (op1->expr_type == EXPR_ARRAY && op2->expr_type == EXPR_CONSTANT)
+    return reduce_binary_ac(eval, op1, op2, result);
+
+  return reduce_binary_aa(eval, op1, op2, result);
+}
+
 
 /* High level arithmetic subroutines.  These subroutines go into
  * eval_intrinsic(), which can do one of several things to it's
@@ -1551,13 +1689,13 @@ typedef union {
  * operands are array constructors. */
 
 static g95_expr *eval_intrinsic(g95_intrinsic_op operator,
-				eval_f eval,
+				arith (*eval)(),
 				g95_expr *op1, g95_expr *op2) {
 g95_expr temp, *result;
 int unary;
 arith rc;
 
-  g95_clear_ts(&temp.ts); 
+  g95_clear_ts(&temp.ts);
 
   switch(operator) {
   case INTRINSIC_NOT:    /* Logical unary */
@@ -1652,10 +1790,20 @@ arith rc;
   if (operator == INTRINSIC_POWER && op2->ts.type != BT_INTEGER)
     goto incompatible;
 
-  if (op1->expr_type != EXPR_CONSTANT ||
-      (op2 != NULL && op2->expr_type != EXPR_CONSTANT)) goto incompatible;
 
-  rc = (unary) ? (*eval.f2)(op1, &result) : (*eval.f3)(op1, op2, &result);
+  if (op1->expr_type != EXPR_CONSTANT &&
+      (op1->expr_type != EXPR_ARRAY || !g95_is_constant_expr(op1)))
+    goto incompatible;
+
+  if (op2 != NULL && op2->expr_type != EXPR_CONSTANT &&
+      (op2->expr_type != EXPR_ARRAY || !g95_is_constant_expr(op2)))
+    goto incompatible;
+
+  if (unary)
+    rc = reduce_unary(eval, op1, &result);
+  else
+    rc = reduce_binary(eval, op1, op2, &result);
+
   if (rc != ARITH_OK) {     /* Something went wrong */
     g95_error("%s at %L", g95_arith_error(rc), &op1->where);
     return NULL;
@@ -1683,20 +1831,17 @@ incompatible:
 }
 
 static g95_expr *eval_intrinsic_f2(g95_intrinsic_op operator,
-				arith (*eval)(g95_expr *, g95_expr **),
-				g95_expr *op1, g95_expr *op2) {
-eval_f f;
-  f.f2 = eval;
-  return eval_intrinsic(operator, f, op1, op2);
+				   arith (*eval)(g95_expr *, g95_expr **),
+				   g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(operator, eval, op1, op2);
 }
 
 static g95_expr *eval_intrinsic_f3(g95_intrinsic_op operator,
-				arith (*eval)(g95_expr *, g95_expr *,
-                                              g95_expr **),
-				g95_expr *op1, g95_expr *op2) {
-eval_f f;
-  f.f3 = eval;
-  return eval_intrinsic(operator, f, op1, op2);
+				   arith (*eval)(g95_expr *, g95_expr *,
+						 g95_expr **),
+				   g95_expr *op1, g95_expr *op2) {
+
+  return eval_intrinsic(operator, eval, op1, op2);
 }
 
 
@@ -1939,7 +2084,7 @@ g95_expr *result;
 g95_expr *g95_real2complex(g95_expr *src, int kind) {
 g95_expr *result;
 
-  result = g95_constant_result(BT_COMPLEX, kind); 
+  result = g95_constant_result(BT_COMPLEX, kind);
   result->where = src->where;
 
   mpf_set(result->value.complex.r, src->value.real);

@@ -136,34 +136,33 @@ int i;
  * supplied by a special case in do_simplify(). */
 
 static g95_expr *convert_constant(g95_expr *e, bt type, int kind) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
+g95_expr *result, *(*f)(g95_expr *, int);
+g95_constructor *head, *c, *tail;
 
   switch(e->ts.type) {
   case BT_INTEGER:
     switch(type) {
-    case BT_INTEGER:  result = g95_int2int(e, kind);          break;
-    case BT_REAL:     result = g95_int2real(e, kind);         break;
-    case BT_COMPLEX:  result = g95_int2complex(e, kind);      break;
+    case BT_INTEGER:  f = g95_int2int;          break;
+    case BT_REAL:     f = g95_int2real;         break;
+    case BT_COMPLEX:  f = g95_int2complex;      break;
     default: goto oops;
     }
     break;
 
   case BT_REAL:
     switch(type) {
-    case BT_INTEGER:  result = g95_real2int(e, kind);         break;
-    case BT_REAL:     result = g95_real2real(e, kind);        break;
-    case BT_COMPLEX:  result = g95_real2complex(e, kind);     break;
+    case BT_INTEGER:  f = g95_real2int;         break;
+    case BT_REAL:     f = g95_real2real;        break;
+    case BT_COMPLEX:  f = g95_real2complex;     break;
     default: goto oops;
     }
     break;
 
   case BT_COMPLEX:
     switch(type) {
-    case BT_INTEGER:  result = g95_complex2int(e, kind);      break;
-    case BT_REAL:     result = g95_complex2real(e, kind);     break;
-    case BT_COMPLEX:  result = g95_complex2complex(e, kind);  break;
+    case BT_INTEGER:  f = g95_complex2int;      break;
+    case BT_REAL:     f = g95_complex2real;     break;
+    case BT_COMPLEX:  f = g95_complex2complex;  break;
 
     default: goto oops;
     }
@@ -173,7 +172,53 @@ g95_expr *result;
     g95_internal_error("convert_constant(): Unexpected type");
   }
 
-  if (result == NULL) result = &g95_bad_expr;
+  result = NULL;
+
+  /* Convert a constant */
+
+  switch(e->expr_type) {
+  case EXPR_CONSTANT:
+    result = f(e, kind);
+    if (result == NULL) return &g95_bad_expr;
+    break;
+
+  case EXPR_ARRAY:
+    if (!g95_is_constant_expr(e)) break;
+
+    head = NULL;
+
+    for(c=e->value.constructor; c; c=c->next) {
+      if (c->iterator != NULL)
+	g95_internal_error("convert_constant(): Iterator present");
+
+      if (head == NULL)
+	head = tail = g95_get_constructor();
+      else {
+	tail->next = g95_get_constructor();
+	tail = tail->next;
+      }
+
+      tail->where = c->where;
+      tail->expr = f(c->expr, kind);
+      if (tail->expr == NULL) {
+	g95_free_constructor(head);
+	return &g95_bad_expr;
+      }
+
+    }
+
+    result = g95_get_expr();
+    result->ts.type = type;
+    result->ts.kind = kind;
+    result->expr_type = EXPR_ARRAY;
+    result->value.constructor = head;
+    result->where = e->where;
+    break;
+
+  default:
+    break;
+  }
+
   return result;
 }
 
@@ -1974,7 +2019,7 @@ g95_expr *new;
   g95_free(new);
   expr->ts = *ts;
 
-  if (expr->value.function.actual->expr->expr_type == EXPR_CONSTANT &&
+  if (g95_is_constant_expr(expr->value.function.actual->expr) &&
       do_simplify(sym, expr) == FAILURE) {
 
     if (eflag == 2) goto bad;
