@@ -1960,6 +1960,8 @@ int i;
   for(i=0; i<G95_INTRINSIC_OPS; i++)
     g95_free_interface(ns->operator[i]);
 
+  g95_free_data(ns->data);
+
   g95_free(ns);
 }
 

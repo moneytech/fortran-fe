@@ -310,11 +310,11 @@ g95_component *dt1, *dt2;
 }
 
 
-/* g95_compare_formal_arglist()-- Compare two formal argument lists
+/* compare_formal_arglist()-- Compare two formal argument lists
  * for equality. */
 
-int g95_compare_formal_arglist(g95_formal_arglist *a1,
-			       g95_formal_arglist *a2) {
+static int compare_formal_arglist(g95_formal_arglist *a1,
+				  g95_formal_arglist *a2) {
 g95_symbol *s1, *s2;
  
   for(;;) {
@@ -360,7 +360,7 @@ int args;
 
     if (new->formal == NULL) continue;
 
-    if (g95_compare_formal_arglist(new->formal, ip->sym->formal)==MATCH_YES) {
+    if (compare_formal_arglist(new->formal, ip->sym->formal)==MATCH_YES) {
       g95_error("Interface ending at %C is the same as the interface at %L",
 		&ip->where);
 

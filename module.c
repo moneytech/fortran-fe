@@ -360,7 +360,7 @@ int c;
 /* parse_string()-- Parse a string constant.  The delimiter is
  * guaranteed to be a single quote. */
 
-void parse_string(void) {
+static void parse_string(void) {
 module_locus start;
 int len, c;
 char *p;
@@ -1100,19 +1100,19 @@ g95_actual_arglist *a, *tail;
 }
 
 
-
+#if 0
 /* mio_namespace()-- Read and write namespaces.  This subroutine is
  * for reading and writing namespaces that contain formal parameters,
  * not top-level module namespaces */
 
-void mio_namespace(g95_namespace *ns) {
+static void mio_namespace(g95_namespace *ns) {
 
   mio_lparen();
 
 
   mio_rparen();
 }
-
+#endif
 
 
 

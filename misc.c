@@ -237,7 +237,7 @@ void g95_done_2(void) {
 
 static void display_help(void) {
 
-  g95_status("GNU Fortran 95 Compiler (C) 2000 Free Software Foundation\n"
+  g95_status("GNU Fortran 95 Compiler (C) 2000-2001 Free Software Foundation\n"
     "Compiled %s\n\n"
     "Usage: g95 [options] file\n"
     "Options:\n"

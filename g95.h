@@ -916,7 +916,11 @@ void g95_syntax_error(g95_statement st);
 void g95_push_error(g95_error_buf *);
 void g95_pop_error(g95_error_buf *);
 
-void g95_status(const char *, ...);
+void g95_status(const char *, ...)
+#ifdef __GNUC__
+__attribute__ ((format (printf, 1, 2)))
+#endif
+;
 void g95_status_char(char);
 try g95_open_status(const char *);
 try g95_close_status(void);
@@ -1150,6 +1154,7 @@ match g95_match_namelist(void);
 void g95_free_equiv(g95_equiv *);
 match g95_match_equivalence(void);
 match g95_match_st_function(void);
+void g95_free_data(g95_data *);
 match g95_match_data(void);
 match g95_match_where(g95_statement *);
 match g95_match_elsewhere(void);
