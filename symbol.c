@@ -1681,6 +1681,20 @@ g95_symbol *p;
 }
 
 
+/* ambiguous_symbol()-- Generate an error if a symbol is ambiguous. */
+
+static void ambiguous_symbol(char *name, g95_symtree *st) {
+
+  if (st->n.sym->module[0])
+    g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
+	      "from module '%s'", name, st->n.sym->name,
+	      st->n.sym->module);
+  else
+    g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
+	      "from current program unit", name, st->n.sym->name);
+}
+
+
 /* g95_find_symbol()-- search for a symbol starting in the current
  * namespace, resorting to any parent namespaces if requested by a
  * nonzero parent_flag.  Returns nonzero if the symbol is
@@ -1695,9 +1709,12 @@ g95_symtree *st;
   do {
     st = g95_find_symtree(ns->sym_root, name);
     if (st != NULL) {
-      if (st->ambiguous) return 1;
-
       *result = st->n.sym;
+      if (st->ambiguous) {
+	ambiguous_symbol(name, st);
+	return 1;
+      }
+
       return 0;
     }
 
@@ -1761,16 +1778,8 @@ g95_symbol *p;
     p->refs++;
 
   } else {    /* Make sure the existing symbol is OK */
-
     if (st->ambiguous) {
-      if (st->n.sym->module[0])
-	g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
-		  "from module '%s'", name, st->n.sym->name,
-		  st->n.sym->module);
-      else
-	g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
-		  "from current program unit", name, st->n.sym->name);
-
+      ambiguous_symbol(name, st);
       return 1;
     }
 
