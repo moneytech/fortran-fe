@@ -505,7 +505,8 @@ g95_formal_arglist *f;
  * actual.  If found, returns a pointer to the symbol of the correct
  * interface.  Returns NULL if not found. */
 
-g95_symbol *search_interface(g95_interface *intr, g95_actual_arglist *actual) {
+static g95_symbol *search_interface(g95_interface *intr,
+				    g95_actual_arglist *actual) {
 
   for(; intr; intr=intr->next)
     if (g95_compare_actual_formal(actual, intr->sym->formal)) return intr->sym;

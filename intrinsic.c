@@ -128,7 +128,7 @@ static char name[30];
  * node that corresponds to the conversion.  Returns NULL if the
  * conversion isn't found. */
 
-intrinsic_sym *find_conv(g95_typespec *from, g95_typespec *to) {
+static intrinsic_sym *find_conv(g95_typespec *from, g95_typespec *to) {
 intrinsic_sym *sym;
 char *target;
 int i;
@@ -2327,7 +2327,7 @@ intrinsic_arg *formal;
  * on an error of the simplification, SUCCESS if the simplification
  * worked, even if nothing has changed in the expression itself */
 
-try do_simplify(intrinsic_sym *specific, g95_expr *e) {
+static try do_simplify(intrinsic_sym *specific, g95_expr *e) {
 g95_expr *result, *a1, *a2, *a3, *a4;
 g95_actual_arglist *arg;
 

@@ -692,7 +692,7 @@ static g95_symbol io_integer = { "_io_integer" },
  * that call the IO library with a pointer(s) to the correct thing. 
  * This possibly generates a store to a temporary */
 
-g95_code *gen_io_pointer(g95_expr *e) {
+static g95_code *gen_io_pointer(g95_expr *e) {
 g95_code *c;
 
   switch(e->ts.type) {

@@ -1570,7 +1570,7 @@ int close_flag;
 
 static void parse_progunit(g95_statement);
 
-void parse_contained(void) {
+static void parse_contained(void) {
 g95_namespace *parent_ns;
 g95_state_data s1, s2;
 g95_statement st;

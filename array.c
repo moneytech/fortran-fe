@@ -184,7 +184,7 @@ oops:
 /* compare_spec_to_ref()-- Compare an array reference with an
  * array specification. */
 
-try compare_spec_to_ref(g95_array_ref *ar, g95_array_spec *as) {
+static try compare_spec_to_ref(g95_array_ref *ar, g95_array_spec *as) {
 try t;
 int i;
 
@@ -1377,7 +1377,7 @@ g95_constructor *dest;
 
 /* get_element()-- Recursive work function for g95_get_array_element(). */
 
-g95_expr *get_element(g95_constructor *c, int *element) {
+static g95_expr *get_element(g95_constructor *c, int *element) {
 g95_expr *e;
 
   for(;; c=c->next) {

@@ -1560,7 +1560,7 @@ static void deleteFixup(g95_namespace *ns, g95_symtree *x) {
 /* delete_node()-- delete a symbol from the tree.  Does not free the
  * symbol itself! */
 
-void delete_node(g95_namespace *ns, g95_symbol *sym) {
+static void delete_node(g95_namespace *ns, g95_symbol *sym) {
 g95_symtree *x, *y, *z;
 
   /* find node in tree */

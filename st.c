@@ -196,7 +196,7 @@ void g95_undo_statement(void) {
 /******************** Name Resolution **********************/
 
 
-void resolve_call(g95_symbol *sym, g95_actual_arglist **arg) {
+static void resolve_call(g95_symbol *sym, g95_actual_arglist **arg) {
 
 }
 

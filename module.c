@@ -774,7 +774,7 @@ access_types[] = {
  * The access field is not saved-- it controls what symbols are
  * exported when a module is written. */
 
-void mio_symbol_attribute(symbol_attribute *attr) {
+static void mio_symbol_attribute(symbol_attribute *attr) {
 atom_type t;
 
   mio_lparen();
