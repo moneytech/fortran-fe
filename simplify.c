@@ -200,7 +200,7 @@ mpf_t a, b;
 
   mpf_init(b);
   mpf_mul(b, e->value.complex.i, e->value.complex.i);
-    
+
   mpf_add(a, a, b);
   mpf_sqrt(result->value.real, a);
 
@@ -368,6 +368,36 @@ int kind;
 }
 
 
+g95_expr *g95_simplify_dint(g95_expr *e) {
+g95_expr *rtrunc, *result;
+int kind;
+
+  kind = e->ts.kind;
+  if (kind != g95_default_double_kind()) {
+    g95_error("Kind of DINT() at %L must be double", &e->where);
+    return &g95_bad_expr;
+  }
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  rtrunc = g95_constant_result(BT_REAL, kind);
+  rtrunc->where = e->where;
+
+  mpf_trunc(rtrunc->value.real, e->value.real);
+
+  result=g95_real2real(rtrunc,kind);
+  if ( result == NULL ) {
+    g95_error("Result of DINT() overflows its kind at %L", &e->where);
+    g95_free_expr(rtrunc);
+    return &g95_bad_expr;
+  }
+  else {
+    g95_free_expr(rtrunc);
+    return range_check(result,"DINT");
+  }
+}
+
+
 g95_expr *g95_simplify_anint(g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *result;
 int kind;
@@ -397,6 +427,42 @@ int kind;
   else {
     g95_free_expr(rtrunc);
     return range_check(result,"ANINT");
+  }
+}
+
+
+g95_expr *g95_simplify_dnint(g95_expr *e) {
+g95_expr *rtrunc, *result;
+int kind;
+
+  kind = e->ts.kind;
+  if (kind != g95_default_double_kind()) {
+    g95_error("Kind of DINT() at %L must be double", &e->where);
+    return &g95_bad_expr;
+  }
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  rtrunc = g95_copy_expr(e);
+
+  if ( mpf_cmp_si(e->value.real,0) > 0 ) {
+    mpf_ceil(rtrunc->value.real,e->value.real);
+    }
+  else if ( mpf_cmp_si(e->value.real,0) < 0 ) {
+    mpf_floor(rtrunc->value.real,e->value.real);
+  }
+  else 
+    mpf_set_si(rtrunc->value.real,0);
+
+  result=g95_real2real(rtrunc,kind);
+  if ( result == NULL ) {
+    g95_error("Result of DNINT() overflows its kind at %L", &e->where);
+    g95_free_expr(rtrunc);
+    return &g95_bad_expr;
+  }
+  else {
+    g95_free_expr(rtrunc);
+    return range_check(result,"DNINT");
   }
 }
 
@@ -750,6 +816,8 @@ int i;
 g95_expr *g95_simplify_exp(g95_expr *x) {
   return NULL;
 /* Not ready yet -- extension, will need to flag under pendantic
+   NB allowing an integer argument won't trigger main flag but is itself
+   an extension
 g95_expr *result;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
@@ -758,6 +826,9 @@ g95_expr *result;
   result->where = x->where; 
 
   switch (x->ts.type) {
+  case BT_INTEGER: 
+    if (g95_option.pedantic == 1) 
+        g95_warning("Integer initialization constant to EXP at %L is nonstandard",&x->where);
   case BT_REAL: 
     break;
 
@@ -1335,6 +1406,48 @@ int kind;
 }
 
 
+g95_expr *g95_simplify_ifix(g95_expr *e) {
+g95_expr *rtrunc, *result;
+int kind;
+
+  kind = e->ts.kind;
+  if (kind != g95_default_real_kind()) {
+    g95_error("Kind of IFIX() at %L must be single", &e->where);
+    return &g95_bad_expr;
+  }
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  rtrunc = g95_copy_expr(e);
+  mpf_trunc(rtrunc->value.real, e->value.real);
+  result = g95_real2int(rtrunc, kind);
+  g95_free_expr(rtrunc);
+  return range_check(result,"IFIX");
+
+}
+
+
+g95_expr *g95_simplify_idint(g95_expr *e) {
+g95_expr *rtrunc, *result;
+int kind;
+
+  kind = e->ts.kind;
+  if (kind != g95_default_double_kind()) {
+    g95_error("Kind of IDINT() at %L must be double", &e->where);
+    return &g95_bad_expr;
+  }
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  rtrunc = g95_copy_expr(e);
+  mpf_trunc(rtrunc->value.real, e->value.real);
+  result = g95_real2int(rtrunc, kind);
+  g95_free_expr(rtrunc);
+  return range_check(result,"IDINT");
+
+}
+
+
 g95_expr *g95_simplify_ior(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 
@@ -1606,31 +1719,51 @@ int tv;
 
 g95_expr *g95_simplify_log(g95_expr *x) {
 g95_expr *result;
-/* Extension -- need to add pedantic warning*/
+mpf_t ri;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
 
-  if (x->ts.type == BT_REAL ) {
+  switch(x->ts.type) {
+  case BT_INTEGER:
+    if (g95_option.pedantic == 1) 
+    g95_warning("Integer initialization constant to LOG at %L is nonstandard",
+                 &x->where);
+    if ( mpz_cmp(x->value.integer, mpz_zero) <= 0 ) {
+    g95_error("Argument of LOG at %L cannot be less than or equal to zero",
+                  &x->where);
+    return &g95_bad_expr;
+    }
+    mpf_init(ri);
+    mpf_set_z(ri,x->value.integer);
+
+    natural_logarithm(&ri,&result->value.real);
+    break;
+
+  case BT_REAL:
     if ( mpf_cmp(x->value.real, mpf_zero) <= 0 ) {
       g95_error("Argument of LOG at %L cannot be less than or equal to zero",
                   &x->where);
       return &g95_bad_expr;
     }
 
-  natural_logarithm(&x->value.real,&result->value.real);
-  }
+    natural_logarithm(&x->value.real,&result->value.real);
+    break;
 
-  if (x->ts.type == BT_COMPLEX ) {
+  case BT_COMPLEX:
     if ( (mpf_cmp(x->value.complex.r, mpf_zero) == 0) &&
          (mpf_cmp(x->value.complex.i, mpf_zero) == 0) ) {
       g95_error("Complex argument of LOG at %L cannot be zero",
                   &x->where);
       return &g95_bad_expr;
     }
-  g95_warning("LOG at %L not done for complex expressions yet",x->where);
+    g95_warning("LOG at %L not done for complex expressions yet",&x->where);
+    break;
+
+  default:
+    g95_internal_error("g95_simplify_max: bad type");
   }
 
   return range_check(result,"LOG");
@@ -1640,31 +1773,39 @@ g95_expr *result;
 
 g95_expr *g95_simplify_log10(g95_expr *x) {
 g95_expr *result;
-/* Extension -- need to add pedantic warning*/
+mpf_t ri;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
 
-  if (x->ts.type == BT_REAL ) {
+  switch(x->ts.type) {
+  case BT_INTEGER:
+    if (g95_option.pedantic == 1) 
+        g95_warning("Integer initialization constant to LOG10 at %L is nonstandard", &x->where);
+    if ( mpz_cmp(x->value.integer, mpz_zero) <= 0 ) {
+      g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
+                  &x->where);
+      return &g95_bad_expr;
+    }
+    mpf_init(ri);
+    mpf_set_z(ri,x->value.integer);
+
+    common_logarithm(&ri,&result->value.real);
+    break;
+
+  case BT_REAL:
     if ( mpf_cmp(x->value.real, mpf_zero) <= 0 ) {
     g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
                 &x->where);
     return &g95_bad_expr;
     }
-  common_logarithm(&x->value.real,&result->value.real);
-  }
+    common_logarithm(&x->value.real,&result->value.real);
+    break;
 
-  if (x->ts.type == BT_COMPLEX ) {
-    if ( (mpf_cmp(x->value.complex.r, mpf_zero) == 0) &&
-         (mpf_cmp(x->value.complex.i, mpf_zero) == 0) ) {
-      g95_error("Complex argument of LOG at %L cannot be zero",
-                  &x->where);
-      return &g95_bad_expr;
-    }
-  g95_warning("LOG10 at %L not done for complex expressions yet",x->where);
-      return &g95_bad_expr;
+  default:
+    g95_internal_error("g95_simplify_max: bad type");
   }
 
   return range_check(result,"LOG10");
@@ -2199,6 +2340,43 @@ int kind;
 
   g95_free_expr(rtrunc);
   return range_check(result,"NINT");
+}
+
+
+g95_expr *g95_simplify_idnint(g95_expr *e) {
+g95_expr *rtrunc, *result;
+int kind;
+
+  kind = e->ts.kind;
+  if (kind != g95_default_double_kind()) {
+    g95_error("Kind of IDNINT() at %L must be double", &e->where);
+    return &g95_bad_expr;
+  }
+
+  if (e->expr_type != EXPR_CONSTANT ) return NULL;
+
+  rtrunc = g95_copy_expr(e);
+
+  if ( mpf_cmp_si(e->value.real,0) > 0 ) {
+    mpf_ceil(rtrunc->value.real,e->value.real);
+  }
+  else if ( mpf_cmp_si(e->value.real,0) < 0 ) {
+    mpf_floor(rtrunc->value.real,e->value.real);
+  }
+  else {
+    mpf_set_si(rtrunc->value.real,0);
+  }
+
+  result = g95_real2int(rtrunc, kind);
+
+  if (result == NULL) {
+    g95_error("Result of IDNINT() overflows its kind at %L", &e->where);
+    g95_free_expr(rtrunc);
+    return &g95_bad_expr;
+  }
+
+  g95_free_expr(rtrunc);
+  return range_check(result,"IDNINT");
 }
 
 
@@ -2769,12 +2947,12 @@ int i, p;
 
 g95_expr *g95_simplify_sqrt(g95_expr *e) {
 g95_expr *sroot, *result;
-
-/* Evaluation of sqrt for constant arguments is an extension */
-/* Will do complex case later */
+mpf_t ac, ad, s, t, w;
 
   switch (e->ts.type) {
-  	case BT_INTEGER:
+      case BT_INTEGER:
+          if (g95_option.pedantic == 1) 
+          g95_warning("Integer initialization constant to SQRT at %L is nonstandard", &e->where);
 	  if (mpz_cmp_si(e->value.integer,0) < 0) {
 	    g95_error("Argument of SQRT at %L has a negative value", &e->where);
 	    return &g95_bad_expr;
@@ -2792,18 +2970,95 @@ g95_expr *sroot, *result;
 	    return &g95_bad_expr;
 	  }
 	  else {
-	    result = g95_copy_expr(e);
+            result = g95_constant_result(BT_REAL, e->ts.kind);
+	    result->where = e->where;
             mpf_sqrt(result->value.real, e->value.real);
 	    return result;
 	  }
 	case BT_COMPLEX:
-	  /* Need to compute principle value */
-	  g95_warning("Complex constant sqrt not implemented yet %L",&e->where);
-	  return NULL;
+	  /*Formula taken from Numerical Recipes to avoid over- and underflow*/
+
+          result = g95_constant_result(BT_COMPLEX, e->ts.kind);
+	  result->where = e->where;
+
+	  mpf_init(ac);
+	  mpf_init(ad);
+	  mpf_init(s);
+	  mpf_init(t);
+	  mpf_init(w);
+
+	  if (mpf_cmp_ui(e->value.complex.r,0)==0 && 
+			  mpf_cmp_ui(e->value.complex.i,0)==0) {
+	    mpf_set_ui(result->value.complex.r,0);
+	    mpf_set_ui(result->value.complex.i,0);
+	    return result;
+	  }
+
+	  mpf_abs(ac,e->value.complex.r);
+	  mpf_abs(ad,e->value.complex.i);
+
+	  if (mpf_cmp(ac,ad) >= 0) {
+	    mpf_div(t,e->value.complex.i,e->value.complex.r);
+	    mpf_mul(t,t,t);
+	    mpf_add_ui(t,t,1);
+	    mpf_sqrt(t,t);
+	    mpf_add_ui(t,t,1);
+	    mpf_div_ui(t,t,2);
+	    mpf_sqrt(t,t);
+	    mpf_sqrt(s,ac);
+	    mpf_mul(w,s,t);
+	  }
+	  else {
+	    mpf_div(s,e->value.complex.r,e->value.complex.i);
+	    mpf_mul(t,s,s);
+	    mpf_add_ui(t,t,1);
+	    mpf_sqrt(t,t);
+	    mpf_abs(s,s);
+	    mpf_add(t,t,s);
+	    mpf_div_ui(t,t,2);
+	    mpf_sqrt(t,t);
+	    mpf_sqrt(s,ad);
+	    mpf_mul(w,s,t);
+	  }
+
+	  if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0) >=0){
+	    mpf_mul_ui(t,w,2);
+	    mpf_div(result->value.complex.i,e->value.complex.i,t);
+	    mpf_set(result->value.complex.r,w);
+	  }
+	  else if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0)<0 &&
+			  mpf_cmp_ui(e->value.complex.i,0)>=0) {
+	    mpf_mul_ui(t,w,2);
+	    mpf_div(result->value.complex.r,e->value.complex.i,t);
+	    mpf_set(result->value.complex.i,w);
+	  }
+	  else if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0)<0 &&
+			  mpf_cmp_ui(e->value.complex.i,0)<0) {
+	    mpf_mul_ui(t,w,2);
+	    mpf_div(result->value.complex.r,ad,t);
+	    mpf_neg(w,w);
+	    mpf_set(result->value.complex.i,w);
+	  }
+	  else {
+	    g95_internal_error("invalid complex argument of SQRT at %L", 
+			    &e->where);
+    	    mpf_clear(s);  mpf_clear(t); mpf_clear(ac); 
+ 	    mpf_clear(ad); mpf_clear(w);
+	    return &g95_bad_expr;
+	  }
+
+	  mpf_clear(s);
+	  mpf_clear(t);
+	  mpf_clear(ac);
+	  mpf_clear(ad);
+	  mpf_clear(w);
+
+	  return result;
+
 	  break;
 
         default:
-	    g95_error("Invalid argument of SQRT at %L", &e->where);
+	    g95_internal_error("invalid argument of SQRT at %L", &e->where);
 	    return &g95_bad_expr;
   }
 }

@@ -785,6 +785,7 @@ static try simplify_constructor(g95_constructor *c, int type) {
 
 try g95_simplify_expr(g95_expr *p, int type) {
 g95_actual_arglist *ap;
+int *type_flag;
 
   if (p == NULL) return SUCCESS;
 
@@ -798,7 +799,8 @@ g95_actual_arglist *ap;
     for(ap=p->value.function.actual; ap; ap=ap->next) 
       if (g95_simplify_expr(ap->expr, type) == FAILURE) return FAILURE;
 
-    if (g95_intrinsic_func_interface(p, 0) == MATCH_ERROR) return FAILURE;
+    if (g95_intrinsic_func_interface(p, type_flag, 0) == MATCH_ERROR) 
+        return FAILURE;
     break;
 
   case EXPR_SUBSTRING:
@@ -846,6 +848,7 @@ g95_actual_arglist *ap;
 static try resolve_function(g95_expr *expr) {
 g95_actual_arglist *arg;
 try t;
+int *type_flag;
 
   arg = expr->value.function.actual;
   t = SUCCESS;
@@ -863,7 +866,7 @@ try t;
 /* Now resolve the function itself.  For now, we just see if the function
  * is compatible with an intrinsic. */
 
-  if (g95_intrinsic_func_interface(expr, 0) == MATCH_NO) {
+  if (g95_intrinsic_func_interface(expr, type_flag, 0) == MATCH_NO) {
     expr->value.function.name = expr->symbol->name;
     expr->ts = expr->symbol->ts;
   }
@@ -1141,7 +1144,7 @@ try t;
 
     if (op1->as != NULL && op2->as != NULL) {
 
-      // g95_check_conformability(op1->as, op2->as);
+      /* g95_check_conformability(op1->as, op2->as); */
 
       e->as = g95_copy_array_spec(op1->as);
     }
@@ -1356,6 +1359,7 @@ static try check_init_expr(g95_expr *e) {
 g95_actual_arglist *ap;
 match m;
 try t;
+int *type_flag;
 
   if (e == NULL) return SUCCESS;
 
@@ -1379,11 +1383,17 @@ try t;
     }
 
     if (t == SUCCESS) {
-      m = g95_intrinsic_func_interface(e, 1);
+      m = g95_intrinsic_func_interface(e, type_flag, 1);
 
       if (m == MATCH_NO)
 	g95_error("Function '%s' in initialization expression at %L "
 		  "must be an intrinsic function", e->symbol->name, &e->where);
+
+/* Trying to get pedantic warning for types not integer or character
+      if (m == MATCH_YES && *type_flag && g95_option.pedantic) 
+	g95_error("Type in initialization expression '%s' at %L is nonstandard",
+                   e->symbol->name, &e->where);
+*/
 
       if (m != MATCH_YES) t = FAILURE;
     }
@@ -1460,7 +1470,7 @@ match m;
 
 
 /* check_spec_expr()-- Verify that an expression is a
- * specification expression.  Like it's cousin check_init_expr(),
+ * specification expression.  Like its cousin check_init_expr(),
  * an error message is generated if we return FAILURE. */
 
 try check_spec_expr(g95_expr *e) {
@@ -1468,6 +1478,7 @@ g95_actual_arglist *ap;
 g95_symbol *sym;
 match m;
 try t;
+int type_flag;
 
   if (e == NULL) return SUCCESS;
 
@@ -1488,7 +1499,7 @@ try t;
       }
 
     if (t == SUCCESS) {
-      m = g95_intrinsic_func_interface(e, 0);
+      m = g95_intrinsic_func_interface(e, 0, type_flag);
 
       if (m == MATCH_NO)
 	g95_error("Function '%s' in specification expression at %L "

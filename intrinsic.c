@@ -39,6 +39,7 @@ extern g95_real_info g95_real_kinds[];
 extern g95_expr g95_bad_expr;
 
 static int is_intrinsic;
+static int is_inittype;
 
 
 /* If a validation of an intrinsic symbol/interface fails for some
@@ -194,9 +195,58 @@ g95_expr *result;
 
 /***** Check functions *****/
 
-static try check_bit_size(g95_expr *x) {
 
-  if (x->ts.type != BT_INTEGER) return FAILURE;
+static try check_aint(g95_expr *a, g95_expr *kind) {
+
+  if ( a->ts.type != BT_REAL ) return FAILURE;
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
+    return FAILURE;
+
+  is_inittype=0;
+
+  return SUCCESS;
+}
+
+
+static try check_anint(g95_expr *a, g95_expr *kind) {
+
+  if ( a->ts.type != BT_REAL ) return FAILURE;
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
+    return FAILURE;
+
+  is_inittype=0;
+
+  return SUCCESS;
+}
+
+
+static try check_ceiling(g95_expr *a, g95_expr *kind) {
+
+  if ( a->ts.type != BT_REAL ) return FAILURE;
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
+    return FAILURE;
+
+  is_inittype=0;
+
+  return SUCCESS;
+}
+
+
+static try check_char(g95_expr *a, g95_expr *kind) {
+
+  if ( a->ts.type != BT_INTEGER ) return FAILURE;
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
+    return FAILURE;
+
+  is_inittype=1;
 
   return SUCCESS;
 }
@@ -215,13 +265,33 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
+  is_inittype=0;
+
+  return SUCCESS;
+}
+
+
+static try check_dble(g95_expr *x) {
+
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  if (x->ts.type == BT_INTEGER)
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
   return SUCCESS;
 }
 
 
 static try check_digits(g95_expr *x) {
 
-  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
+
+  if (x->ts.type == BT_INTEGER)
+    is_inittype = 1;
+  else
+    is_inittype = 0;
 
   return SUCCESS;
 }
@@ -231,15 +301,39 @@ static try check_dim(g95_expr *x, g95_expr *y) {
 
   if ((x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) ||
       (y->ts.type != BT_INTEGER && y->ts.type != BT_REAL) ||
-      x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
+    x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
+
+  if ((x->ts.type == BT_INTEGER) && y->ts.type == BT_INTEGER) 
+    is_inittype = 1;
+  else
+    is_inittype = 0;
 
   return SUCCESS;
 }
 
 
-static try check_epsilon(g95_expr *x) {
+static try check_exp(g95_expr *x) {
 
-  if (x->ts.type != BT_REAL) return FAILURE;
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  if (x->ts.type == BT_INTEGER)
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
+  return SUCCESS;
+}
+
+
+static try check_floor(g95_expr *a, g95_expr *kind) {
+
+  if ( a->ts.type != BT_REAL ) return FAILURE;
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
+    return FAILURE;
+
+  is_inittype=0;
 
   return SUCCESS;
 }
@@ -248,6 +342,11 @@ static try check_epsilon(g95_expr *x) {
 static try check_huge(g95_expr *x) {
 
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
+
+  if (x->ts.type == BT_INTEGER)
+    is_inittype = 1;
+  else
+    is_inittype = 0;
 
   return SUCCESS;
 }
@@ -261,6 +360,11 @@ static try check_int(g95_expr *x, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
+  if (x->ts.type == BT_INTEGER)
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
   return SUCCESS;
 }
 
@@ -269,8 +373,40 @@ static try check_kind(g95_expr *x) {
 
   if (x->ts.type == BT_DERIVED) return FAILURE;
 
+  if (x->ts.type == BT_INTEGER) 
+    is_inittype = 1;
+  else 
+    is_inittype = 0;
+
   return SUCCESS;
 }
+
+
+static try check_log(g95_expr *x) {
+
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  if (x->ts.type == BT_INTEGER)
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
+  return SUCCESS;
+}
+
+
+static try check_log10(g95_expr *x) {
+
+  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
+
+  if (x->ts.type == BT_INTEGER)
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
+  return SUCCESS;
+}
+
 
 
 static try check_min_max(g95_actual_arglist *arg) {
@@ -280,14 +416,17 @@ g95_expr *x, *y;
   arg = arg->next;
 
   if (arg == NULL) {
-    g95_error("Too few arguments to intrinsic at %L",x->where);
+    g95_error("Too few arguments to intrinsic at %L",&x->where);
     return FAILURE;
   }
+
+  is_inittype = 1;
 
   while(arg != NULL) {
     y = arg->expr;
     if ((x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) ||
-         x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
+        (x->ts.type != y->ts.type)||(x->ts.kind != y->ts.kind)) return FAILURE;
+    if (x->ts.type != BT_INTEGER) is_inittype=0;
     x = y;
     arg = arg->next;
   }
@@ -303,7 +442,7 @@ g95_expr *x, *y;
   arg = arg->next;
 
   if ( arg == NULL ) {
-    g95_error("Too few arguments to intrinsic at %L",x->where);
+    g95_error("Too few arguments to intrinsic at %L",&x->where);
     return FAILURE;
   }
 
@@ -314,6 +453,8 @@ g95_expr *x, *y;
     x=y;
     arg=arg->next;
   }
+
+  is_inittype=1;
 
   return SUCCESS;
 }
@@ -326,7 +467,7 @@ g95_expr *x, *y;
   arg = arg->next;
 
   if (arg == NULL) {
-    g95_error("Too few arguments to intrinsic at %L",x->where);
+    g95_error("Too few arguments to intrinsic at %L",&x->where);
     return FAILURE;
   }
 
@@ -337,6 +478,8 @@ g95_expr *x, *y;
     x = y;
     arg = arg->next;
   }
+
+  is_inittype=0;
 
   return SUCCESS;
 }
@@ -350,10 +493,43 @@ static try check_min_max_exponent(g95_expr *x) {
 }
 
 
+static try check_mod(g95_expr *a, g95_expr *p) {
+
+  if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL) ||
+      a->ts.type != p->ts.type || a->ts.kind != p->ts.kind) return FAILURE;
+
+  if ((a->ts.type == BT_INTEGER) && p->ts.type == BT_INTEGER) 
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
+  return SUCCESS;
+}
+
+
 static try check_modulo(g95_expr *a, g95_expr *p) {
 
   if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL) ||
       a->ts.type != p->ts.type || a->ts.kind != p->ts.kind) return FAILURE;
+
+  if ((a->ts.type == BT_INTEGER) && p->ts.type == BT_INTEGER) 
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
+  return SUCCESS;
+}
+
+
+static try check_nint(g95_expr *x, g95_expr *kind) {
+
+  if (x->ts.type != BT_REAL) return FAILURE;
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
+    return FAILURE;
+
+  is_inittype = 0;
 
   return SUCCESS;
 }
@@ -363,6 +539,8 @@ static try check_precision(g95_expr *x) {
 
   if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) return FAILURE;
 
+  is_inittype = 0;
+
   return SUCCESS;
 }
 
@@ -371,6 +549,11 @@ static try check_radix(g95_expr *x) {
 
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
 
+  if (x->ts.type == BT_INTEGER) 
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
   return SUCCESS;
 }
 
@@ -378,6 +561,11 @@ static try check_radix(g95_expr *x) {
 static try check_range(g95_expr *x) {
 
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  if (x->ts.type == BT_INTEGER) 
+    is_inittype = 1;
+  else
+    is_inittype = 0;
 
   return SUCCESS;
 }
@@ -391,6 +579,11 @@ static try check_real(g95_expr *a, g95_expr *kind) {
 		       kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
+  if (a->ts.type == BT_INTEGER) 
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
   return SUCCESS;
 }
 
@@ -399,13 +592,37 @@ static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
 
   if (p == NULL && r == NULL) return FAILURE;
 
+  if (p->ts.type != BT_INTEGER || r->ts.type != BT_INTEGER) return FAILURE;
+
+  is_inittype = 1;
+
   return SUCCESS;
 }
 
 
-static try check_tiny(g95_expr *x) {
+static try check_sign(g95_expr *a, g95_expr *b) {
 
-  if (x->ts.type != BT_REAL) return FAILURE;
+  if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL) ||
+      (b->ts.type != BT_INTEGER && b->ts.type != BT_REAL) ||
+    a->ts.type != b->ts.type || a->ts.kind != b->ts.kind) return FAILURE;
+
+  if (a->ts.type == BT_INTEGER) 
+    is_inittype = 1;
+  else
+    is_inittype = 0;
+
+  return SUCCESS;
+}
+
+
+static try check_sqrt(g95_expr *x) {
+
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  if (x->ts.type == BT_INTEGER)
+    is_inittype = 1;
+  else
+    is_inittype = 0;
 
   return SUCCESS;
 }
@@ -672,11 +889,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("aimag", 0, BT_REAL, dr, g95_simplify_aimag, NULL,
 	  z, BT_COMPLEX, dz, 0, NULL);
 
-  add_sym("aint", 0, BT_REAL, dr, g95_simplify_aint, NULL,
+  add_sym("aint", 0, BT_REAL, dr, g95_simplify_aint, check_aint,
 	  a, BT_REAL, dr, 0,   knd, BT_INTEGER, di, 1, NULL);
-  add_sym("dint", 0, BT_REAL, dd, g95_simplify_aint, NULL, a,
+
+  add_sym("dint", 0, BT_REAL, dd, g95_simplify_dint, NULL, a,
 	  BT_REAL, dd, 0, NULL);
-  make_generic("aint");
 
 /* KAH Takes logical array input */
   add_sym("all", 1, BT_LOGICAL, dl, NULL, not_ready,
@@ -686,11 +903,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("allocated", 1, BT_LOGICAL, dl, NULL, not_ready,
 	  ar, BT_REAL, dr, 0, NULL);
 
-  add_sym("anint", 0, BT_REAL, dr, g95_simplify_anint, NULL,
+  add_sym("anint", 0, BT_REAL, dr, g95_simplify_anint, check_anint,
 	  a, BT_REAL, dr, 0,  knd, BT_INTEGER, di, 1, NULL);
-  add_sym("dnint", 0, BT_REAL, dd, g95_simplify_anint, NULL,
+
+  add_sym("dnint", 0, BT_REAL, dd, g95_simplify_dnint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
-  make_generic("anint");
 
 /* KAH Takes logical array input */
   add_sym("any", 1, BT_LOGICAL, dl, NULL, not_ready,
@@ -716,16 +933,16 @@ int di, dr, dd, dl, dc, dz;
 	  y, BT_REAL, dd, 0, x, BT_REAL, dd, 0, NULL);
   make_generic("atan2");
 
-  add_sym("bit_size", 1, BT_INTEGER, di, g95_simplify_bit_size, check_bit_size,
+  add_sym("bit_size", 1, BT_INTEGER, di, g95_simplify_bit_size, NULL,
 	  i, BT_INTEGER, di, 0, NULL);
 
   add_sym("btest", 0, BT_LOGICAL, dl, g95_simplify_btest, NULL,
 	  i, BT_INTEGER, di, 0, pos, BT_INTEGER, di, 0, NULL);
 
-  add_sym("ceiling", 0, BT_INTEGER, di, g95_simplify_ceiling, NULL,
+  add_sym("ceiling", 0, BT_INTEGER, di, g95_simplify_ceiling, check_ceiling,
 	  a, BT_REAL, dr, 0,   knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("char", 0, BT_CHARACTER, dc, g95_simplify_char, NULL,
+  add_sym("char", 0, BT_CHARACTER, dc, g95_simplify_char, check_char,
 	  i, BT_INTEGER, di, 0,   knd, BT_INTEGER, di, 1, NULL);
 
   add_sym("cmplx", 0, BT_COMPLEX, dz, g95_simplify_cmplx, check_cmplx,
@@ -755,7 +972,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("cshift", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  sh, BT_INTEGER, di, 0, dm, BT_INTEGER, di, 1, NULL);
 
-  add_sym("dble", 0, BT_REAL, dd, g95_simplify_dble, not_ready,
+  add_sym("dble", 0, BT_REAL, dd, g95_simplify_dble, check_dble,
 	  a, BT_REAL, dr, 0, NULL);
 
   add_sym("digits", 1, BT_INTEGER, di, g95_simplify_digits, check_digits,
@@ -782,22 +999,19 @@ int di, dr, dd, dl, dc, dz;
 	  ar, BT_REAL, dr, 0, sh, BT_INTEGER, di, 0,
 	  bd, BT_REAL, dr, 1, dm, BT_INTEGER, di, 1, NULL);
 
-  add_sym("epsilon", 1, BT_REAL, dr, g95_simplify_epsilon, check_epsilon,
-	  x, BT_UNKNOWN, dr, 0, NULL);
-
-  add_sym("exp",  0, BT_REAL,    dr, g95_simplify_exp, NULL,
+  add_sym("epsilon", 1, BT_REAL, dr, g95_simplify_epsilon, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
+  add_sym("exp",  0, BT_REAL, dr, g95_simplify_exp, check_exp,
+	  x, BT_REAL, dr, 0, NULL);
   add_sym("dexp", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,    dd, 0, NULL);
-
   add_sym("cexp", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX, dz, 0, NULL);
-
   make_generic("exp");
 
   add_sym("exponent", 0, BT_INTEGER, di, g95_simplify_exponent, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
-  add_sym("floor", 0, BT_INTEGER, di, g95_simplify_floor, NULL,
+  add_sym("floor", 0, BT_INTEGER, di, g95_simplify_floor, check_floor,
 	  a, BT_REAL, dr, 0, knd, BT_INTEGER, di, 1, NULL);
 
   add_sym("fraction", 0, BT_REAL, dr, g95_simplify_fraction, NULL,
@@ -834,11 +1048,12 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("int",   0, BT_INTEGER, di, g95_simplify_int, check_int,
 	  a, BT_REAL, dr, 0, knd, BT_INTEGER, di, 1, NULL);
+
   add_sym("ifix",  0, BT_INTEGER, di, g95_simplify_int, NULL,
 	  a, BT_REAL, dr, 0, NULL);
+
   add_sym("idint", 0, BT_INTEGER, di, g95_simplify_int, NULL,
 	  a, BT_REAL, dd, 0, NULL);
-  make_generic("int");
 
   add_sym("ior", 0, BT_INTEGER, di, g95_simplify_ior, NULL,
 	  i, BT_INTEGER, di, 0, j, BT_INTEGER, di, 0, NULL);
@@ -875,7 +1090,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("llt", 0, BT_LOGICAL, dl, g95_simplify_llt, NULL,
 	  sta, BT_CHARACTER, dc, 0, stb, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("log",  0, BT_REAL,    dr, g95_simplify_log, NULL,
+  add_sym("log",  0, BT_REAL,    dr, g95_simplify_log, check_log,
 	  x, BT_REAL,    dr, 0, NULL);
   add_sym("alog", 0, BT_REAL,    dr, g95_simplify_log, NULL,
 	  x, BT_REAL,    dr, 0, NULL);
@@ -885,7 +1100,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_COMPLEX, dz, 0, NULL);
   make_generic("log");
 
-  add_sym("log10",  0, BT_REAL, dr, g95_simplify_log10, NULL,
+  add_sym("log10",  0, BT_REAL, dr, g95_simplify_log10, check_log10,
 	  x, BT_REAL, dr, 0, NULL);
   add_sym("alog10", 0, BT_REAL, dr, g95_simplify_log10, NULL,
 	  x, BT_REAL, dr, 0, NULL);
@@ -965,7 +1180,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("minval", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("mod",  0, BT_INTEGER, di, g95_simplify_mod, NULL,
+  add_sym("mod",  0, BT_INTEGER, di, g95_simplify_mod, check_mod,
 	  a, BT_INTEGER, di, 0, p, BT_INTEGER, di, 0, NULL);
   add_sym("amod", 0, BT_REAL,    dr, g95_simplify_mod, NULL,
 	  a, BT_REAL,    dr, 0, p, BT_REAL,    dr, 0, NULL);
@@ -979,11 +1194,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("nearest", 0, BT_REAL, dr, g95_simplify_nearest, NULL,
 	  x, BT_REAL, dr, 0, s, BT_REAL, dr, 0, NULL);
 
-  add_sym("nint",   0, BT_INTEGER, di, g95_simplify_nint, NULL,
+  add_sym("nint",   0, BT_INTEGER, di, g95_simplify_nint, check_nint,
 	  a, BT_REAL, dr, 0,   knd, BT_INTEGER, di, 1, NULL);
+
   add_sym("idnint", 0, BT_INTEGER, di, g95_simplify_nint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
-  make_generic("nint");
 
   add_sym("not", 0, BT_INTEGER, di, g95_simplify_not, NULL,
 	  i, BT_INTEGER, di, 0, NULL);
@@ -1054,7 +1269,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("shape", 1, BT_INTEGER, di, NULL, not_ready,
 	  src, BT_REAL, dr, 0, NULL);
 
-  add_sym("sign",  0, BT_REAL,    dr, g95_simplify_sign, NULL,
+  add_sym("sign",  0, BT_REAL,    dr, g95_simplify_sign, check_sign,
 	  a, BT_REAL,    dr, 0, b, BT_REAL,    dr, 0, NULL);
   add_sym("isign", 0, BT_INTEGER, di, g95_simplify_sign, NULL,
 	  a, BT_INTEGER, di, 0, b, BT_INTEGER, di, 0, NULL);
@@ -1082,11 +1297,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("spread", 1, BT_REAL, dr, NULL, not_ready, src, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 0, n, BT_INTEGER, di, 0, NULL);
 
-  add_sym("sqrt",  1, BT_REAL,    dr, g95_simplify_sqrt, NULL,
+  add_sym("sqrt",  1, BT_REAL,    dr, g95_simplify_sqrt, check_sqrt,
 	  x, BT_REAL,    dr, 0, NULL);
   add_sym("dsqrt", 1, BT_REAL,    dd, g95_simplify_sqrt, NULL,
 	  x, BT_REAL,    dd, 0, NULL);
-  add_sym("csqrt", 1, BT_COMPLEX, dz, NULL, NULL,
+  add_sym("csqrt", 1, BT_COMPLEX, dz, g95_simplify_sqrt, NULL,
 	  x, BT_COMPLEX, dz, 0, NULL);
   make_generic("sqrt");
 
@@ -1106,8 +1321,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dtanh", 1, BT_REAL, dd, NULL, NULL,  x, BT_REAL, dd, 0, NULL);
   make_generic("tanh");
 
-  add_sym("tiny", 0, BT_REAL, dr, g95_simplify_tiny, check_tiny,
-	  x, BT_UNKNOWN, dr, 0, NULL);
+  add_sym("tiny", 0, BT_REAL, dr, g95_simplify_tiny, NULL,
+	  x, BT_REAL, dr, 0, NULL);
 
 /* KAH Array function */
   add_sym("transfer", 0, BT_REAL, dr, NULL, not_ready, src, BT_REAL, dr, 0,
@@ -1439,6 +1654,8 @@ intrinsic_arg *formal;
   formal = sym->arg;
   actual = *ap;
 
+  is_inittype = 1;
+
   for(; formal; formal=formal->next, actual=actual->next) {
     if (actual->expr == NULL) continue;
 
@@ -1457,6 +1674,9 @@ intrinsic_arg *formal;
 		      actual->expr->ts.kind);
       return FAILURE;
     }
+
+    if (formal->ts.type != BT_INTEGER || formal->ts.type != BT_CHARACTER) 
+      is_inittype = 0;
   }
 
   return SUCCESS;
@@ -1596,7 +1816,7 @@ try t;
  * generated even if a MATCH_NO is returned.
  */
 
-match g95_intrinsic_func_interface(g95_expr *expr, int intrinsic_flag) {
+match g95_intrinsic_func_interface(g95_expr *expr, int *type_flag, int intrinsic_flag ) {
 intrinsic_sym *isym, *specific;
 char *name;
 
@@ -1624,6 +1844,16 @@ char *name;
 
  got_specific:
   if (do_simplify(specific, expr) == FAILURE) return MATCH_ERROR;
+
+  if (expr->ts.type != BT_INTEGER || expr->ts.type != BT_CHARACTER) {
+    is_inittype = 0;
+  }
+  else if ( is_inittype ) {
+    is_inittype = 1;
+  }
+
+  type_flag = &is_inittype;
+
   return MATCH_YES;
 }
 
