@@ -994,7 +994,7 @@ static g95_statement parse_spec(g95_statement);
 
 static void parse_interface(void) {
 g95_compile_state new_state, current_state;
-g95_symbol *prog_unit, *sym;
+g95_symbol *prog_unit, *sym, *proc;
 g95_interface_info save;
 g95_state_data s1, s2;
 g95_statement st=0;
@@ -1026,11 +1026,13 @@ loop:
   case ST_SUBROUTINE:
     new_state = COMP_SUBROUTINE;
     g95_new_block->attr.interface = 1;
+    proc = g95_new_block;
     break;
 
   case ST_FUNCTION: 
     new_state = COMP_FUNCTION;
     g95_new_block->attr.interface = 1;
+    proc = g95_new_block;
     break;
 
   case ST_MODULE_PROC:  /* The module procedure matcher makes sure the
@@ -1095,7 +1097,7 @@ loop:
 
   seen_body = 1;
 
-  g95_set_sym_defaults(g95_current_ns);
+  g95_resolve_formal_arglist(proc->formal);
   g95_add_interface(prog_unit);
 
   pop_state();
