@@ -230,7 +230,7 @@ g95_module *next;
 /* Module reading and writing */
 
 typedef enum {
-  ATOM_NAME, ATOM_LPAREN, ATOM_RPAREN, ATOM_INTEGER, ATOM_STRING, ATOM_EOF
+  ATOM_NAME, ATOM_LPAREN, ATOM_RPAREN, ATOM_INTEGER, ATOM_STRING
 } atom_type;
 
 
@@ -295,6 +295,8 @@ static int module_char(void) {
 int c;
 
   c = fgetc(module_fp);
+
+  if (c == EOF) bad_module("Unexpected EOF");
 
   if (c == '\n') {
     module_line++;
@@ -407,7 +409,6 @@ int c;
     c = module_char();
   } while (c == ' ' || c == '\n');
 
-  if (c == EOF) return ATOM_EOF;
   if (c == '(') return ATOM_LPAREN;
   if (c == ')') return ATOM_RPAREN;
 
@@ -460,7 +461,6 @@ char *p;
     case ATOM_RPAREN:   p = "Expected right parenthesis";  break;
     case ATOM_INTEGER:  p = "Expected integer";            break;
     case ATOM_STRING:   p = "Expected string";             break;
-    case ATOM_EOF:      p = "Expected end of file";        break;
     }
 
     set_module_locus(&m);
@@ -541,9 +541,6 @@ int len;
   case ATOM_INTEGER:
     sprintf(buffer, "%d", *((int *) v));
     p = buffer;
-    break;
-
-  case ATOM_EOF:
     break;
   }
 
@@ -1331,6 +1328,8 @@ g95_expr *e;
 
     break;
   }
+
+  mio_rparen();
 }
 
 
@@ -1408,7 +1407,6 @@ int level;
 
     case ATOM_NAME:
     case ATOM_INTEGER:
-    case ATOM_EOF:
       break;
     }
   } while(level > 0);
