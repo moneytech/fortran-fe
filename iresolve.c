@@ -272,16 +272,6 @@ void g95_resolve_dble(g95_expr *f, g95_expr *a) {
 }
 
 
-void g95_resolve_digits(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = BT_INTEGER;
-  f->ts.kind = g95_default_integer_kind();
-
-  f->value.function.name =
-    get_string("__digits_%c%d", g95_type_letter(x->ts.type), x->ts.kind);
-}
-
-
 void g95_resolve_dim(g95_expr *f, g95_expr *x, g95_expr *y) {
 
   f->ts = x->ts;
@@ -355,14 +345,6 @@ void g95_resolve_fraction(g95_expr *f, g95_expr *x) {
 }
 
 
-void g95_resolve_huge(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = x->ts.type;
-  f->ts.kind = x->ts.kind;
-  f->value.function.name = get_string("__huge_%d", x->ts.kind);
-}
-
-
 void g95_resolve_ichar(g95_expr *f, g95_expr *c) {
 
   f->ts.type = BT_INTEGER;
@@ -401,14 +383,6 @@ int s_kind;
   f->ts = i->ts;
   f->value.function.name =
     get_string("__ishftc_%d_%d_%d", i->ts.kind, shift->ts.kind, s_kind);
-}
-
-
-void g95_resolve_kind(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = BT_INTEGER;
-  f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = get_string("__kind_%d", x->ts.kind);
 }
 
 
@@ -523,14 +497,6 @@ static char maxloc0[] = "__maxloc0", maxloc1[] = "__maxloc1";
 }
 
 
-void g95_resolve_maxexponent(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = BT_INTEGER;
-  f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = get_string("__maxexponent_%d", x->ts.kind);
-}
-
-
 void g95_resolve_maxval(g95_expr *f, g95_expr *array, g95_expr *dim,
 			g95_expr *mask) {
 
@@ -587,15 +553,6 @@ static char minloc0[] = "__minloc0", minloc1[] = "__minloc1";
     f->rank = array->rank - 1;
   }
 }
-
-
-void g95_resolve_minexponent(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = BT_INTEGER;
-  f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = get_string("__minexponent_%d", x->ts.kind);
-}
-
 
 void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
 			     g95_expr *mask) {
@@ -657,15 +614,6 @@ void g95_resolve_pack(g95_expr *f, g95_expr *array, g95_expr *mask,
 }
 
 
-void g95_resolve_precision(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = BT_INTEGER;
-  f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = get_string("__precision_%c%d", 
-		  g95_type_letter(x->ts.type), x->ts.kind);
-}
-
-
 void g95_resolve_product(g95_expr *f, g95_expr *array, g95_expr *dim,
 			 g95_expr *mask) {
 
@@ -673,24 +621,6 @@ void g95_resolve_product(g95_expr *f, g95_expr *array, g95_expr *dim,
   f->value.function.name =
     get_string("__product_%c%d", g95_type_letter(array->ts.type),
 	       array->ts.kind);
-}
-
-
-void g95_resolve_radix(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = BT_INTEGER;
-  f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = get_string("__radix_%c%d", 
-		  g95_type_letter(x->ts.type), x->ts.kind);
-}
-
-
-void g95_resolve_range(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = BT_INTEGER;
-  f->ts.kind = g95_default_integer_kind();
-  f->value.function.name = get_string("__range_%c%d",
-		  g95_type_letter(x->ts.type), x->ts.kind);
 }
 
 
@@ -815,14 +745,6 @@ void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
 
   f->value.function.name =
     get_string("__sum_%c%d", g95_type_letter(array->ts.type), array->ts.kind);
-}
-
-
-void g95_resolve_tiny(g95_expr *f, g95_expr *x) {
-
-  f->ts.type = x->ts.type;
-  f->ts.kind = x->ts.kind;
-  f->value.function.name = get_string("__tiny_%d", x->ts.kind);
 }
 
 

@@ -734,7 +734,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("dble");
 
   add_sym("digits", 0, 1, BT_INTEGER, di,
-	  g95_check_digits, g95_simplify_digits, g95_resolve_digits,
+	  g95_check_digits, g95_simplify_digits, NULL,
 	  x, BT_UNKNOWN, dr, 0, NULL);
 
   add_sym("dim", 1, 1, BT_REAL, dr,
@@ -809,7 +809,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("huge", 0, 1, BT_REAL, dr,
-	  g95_check_huge, g95_simplify_huge, g95_resolve_huge,
+	  g95_check_huge, g95_simplify_huge, NULL,
 	  x, BT_UNKNOWN, dr, 0,  NULL);
 
   add_sym("iachar", 1, 1, BT_INTEGER, di,
@@ -878,7 +878,7 @@ int di, dr, dd, dl, dc, dz;
 	  sz, BT_INTEGER, di, 1, NULL);
 
   add_sym("kind", 0, 1, BT_INTEGER, di,
-	  g95_check_kind, g95_simplify_kind, g95_resolve_kind,
+	  g95_check_kind, g95_simplify_kind, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("lbound", 0, 1, BT_INTEGER, di,
@@ -995,7 +995,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("max");
 
   add_sym("maxexponent", 0, 1, BT_INTEGER, di,
-	  g95_check_x, g95_simplify_maxexponent, g95_resolve_maxexponent,
+	  g95_check_x, g95_simplify_maxexponent, NULL,
 	  x, BT_UNKNOWN, dr, 0, NULL);
 
   add_sym("maxloc", 0, 1, BT_INTEGER, di,
@@ -1042,7 +1042,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("min");
 
   add_sym("minexponent", 0, 1, BT_INTEGER, di,
-	  g95_check_x, g95_simplify_minexponent, g95_resolve_minexponent,
+	  g95_check_x, g95_simplify_minexponent, NULL,
 	  x, BT_UNKNOWN, dr, 0, NULL);
 
   add_sym("minloc", 0, 1, BT_INTEGER, di,
@@ -1101,7 +1101,7 @@ int di, dr, dd, dl, dc, dz;
 	  v, BT_REAL, dr, 1, NULL);
 
   add_sym("precision", 0, 1, BT_INTEGER, di,
-	  g95_check_precision, g95_simplify_precision, g95_resolve_precision,
+	  g95_check_precision, g95_simplify_precision, NULL,
 	  x, BT_UNKNOWN, 0, 0, NULL);
 
   add_sym("present", 0, 1, BT_LOGICAL, dl,
@@ -1114,11 +1114,11 @@ int di, dr, dd, dl, dc, dz;
 	  msk, BT_LOGICAL, dl, 1, NULL);
 
   add_sym("radix", 0, 1, BT_INTEGER, di,
-	  g95_check_radix, g95_simplify_radix, g95_resolve_radix,
+	  g95_check_radix, g95_simplify_radix, NULL,
 	  x, BT_UNKNOWN, 0, 0, NULL);
 
   add_sym("range", 0, 1, BT_INTEGER, di,
-	  g95_check_range, g95_simplify_range, g95_resolve_range,
+	  g95_check_range, g95_simplify_range, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("real", 1, 0, BT_REAL, dr,
@@ -1279,7 +1279,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("tanh");
 
   add_sym("tiny", 0, 1, BT_REAL, dr,
-	  g95_check_x, g95_simplify_tiny, g95_resolve_tiny,
+	  g95_check_x, g95_simplify_tiny, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("transfer", 0, 1, BT_REAL, dr,
