@@ -1320,7 +1320,8 @@ g95_expr *g95_get_array_element(g95_expr *array, int element) {
 
   iter_stack = NULL;
 
-  if (expand_constructor(array->value.constructor.head) == FAILURE) return NULL;
+  if (expand_constructor(array->value.constructor.head) == FAILURE)
+    return NULL;
 
   return extracted;
 }

@@ -1006,7 +1006,7 @@ try t;
     goto bad_op;
 
   default:
-    g95_internal_error("g95_resolve_expr(): Bad intrinsic");
+    g95_internal_error("resolve_operator(): Bad intrinsic");
   }
 
 /* Deal with arrayness of an operand through an operator */
@@ -1472,6 +1472,8 @@ try t;
     expression_rank(e);
 
     t = g95_resolve_array_constructor(e);
+
+    if (t == SUCCESS) t = g95_expand_constructor(e);
     break;
 
   case EXPR_STRUCTURE:
