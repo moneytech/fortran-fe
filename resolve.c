@@ -1924,6 +1924,15 @@ static void resolve_symbol(g95_symbol *sym) {
     return;
   }  
 
+  /* Make sure a parameter that has been implicitly typed still
+   * matches the implicit type, since PARAMETER statements can precede
+   * IMPLICIT statements. */
+
+  if (sym->attr.flavor == FL_PARAMETER && sym->attr.implicit_type &&
+      !g95_compare_types(&sym->ts, g95_get_default_type(sym, sym->ns)))
+    g95_error("Implicitly typed PARAMETER '%s' at %L doesn't match a "
+	      "later IMPLICIT type", sym->name, &sym->declared_at);
+  
   /* Make sure the types of derived parameters are consistent.  This
    * type checking is deferred until resolution because the type may
    * refer to a derived type from the host. */

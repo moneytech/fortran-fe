@@ -206,6 +206,14 @@ g95_expr *init;
     }
   }
 
+/* If this variable declaration is confirming an implicit parameter
+ * type, then an initialization expression is not allowed. */
+
+  if (sym->attr.flavor == FL_PARAMETER && *initp != NULL) {
+    g95_error("Initializer not allowed for PARAMETER '%s' at %C", sym->name);
+    return FAILURE;
+  }
+
   if (sym->ts.type == BT_CHARACTER) sym->ts.cl = cl;
 
 /* Add dimension attribute if present. */
@@ -224,7 +232,7 @@ g95_expr *init;
 /* Add initializer, required for PARAMETERs. */
 
   if (init == NULL) {
-    if (sym->attr.flavor == FL_PARAMETER) {
+    if (attr.flavor == FL_PARAMETER) {
       g95_error("PARAMETER at %L is missing an initializer", var_locus);
       return FAILURE;
     }
