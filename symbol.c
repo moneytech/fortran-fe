@@ -781,8 +781,6 @@ try g95_add_entry(symbol_attribute *attr, locus *loc) {
 
 try g95_add_function(symbol_attribute *attr, locus *loc) {
 
-  if (check_used(attr, loc)) return FAILURE;
-
   if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_DUMMY_PROC &&
       attr->flavor != FL_MODULE_PROC && attr->flavor != FL_GENERIC &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
@@ -792,8 +790,6 @@ try g95_add_function(symbol_attribute *attr, locus *loc) {
 }
 
 try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
-
-  if (check_used(attr, loc)) return FAILURE;
 
   if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_MODULE_PROC &&
       attr->flavor != FL_GENERIC &&
