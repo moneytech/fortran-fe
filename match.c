@@ -1318,7 +1318,9 @@ match m;
  * equivalent SELECT statement constructed. */
 
   new_st.op = EXEC_SELECT;
-  new_st.expr = expr;
+  new_st.expr = NULL;
+  /* For a "real" SELECT, the expression is in expr. We put it in expr2. */
+  new_st.expr2 = expr;
   new_st.block = head;
   return MATCH_YES;
 

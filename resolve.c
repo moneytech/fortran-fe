@@ -1653,9 +1653,9 @@ try t;
 
     switch(b->op) {
     case EXEC_IF:
-      if (t == SUCCESS && b->expr != NULL &&
-	  b->expr->ts.type != BT_LOGICAL)
-	g95_error("ELSE IF clause at %L requires a LOGICAL expression",
+      if (t == SUCCESS && b->expr != NULL
+	  && (b->expr->ts.type != BT_LOGICAL || b->expr->rank != 0))
+	g95_error("ELSE IF clause at %L requires a scalar LOGICAL expression",
 		  &b->expr->where);
       break;
 
@@ -1758,8 +1758,8 @@ try t;
 
     case EXEC_IF:
       if (t == SUCCESS && code->expr != NULL &&
-	  code->expr->ts.type != BT_LOGICAL)
-	g95_error("IF clause at %L requires a LOGICAL expression",
+	  (code->expr->ts.type != BT_LOGICAL || code->expr->rank != 0))
+	g95_error("IF clause at %L requires a scalar LOGICAL expression",
 		  &code->expr->where);
       break;
 
@@ -1768,7 +1768,9 @@ try t;
       break;
 
     case EXEC_SELECT:
-      g95_resolve_select(code, ns);      /* Select is complicated */
+      /* Select is complicated. Also, a SELECT construct could be
+         a transformed computed GOTO.  */
+      g95_resolve_select(code, ns);
       break;
 
     case EXEC_DO:

@@ -456,6 +456,11 @@ static try check_case_expr(g95_expr *e, bt type) {
  *   Make sure that the selection expression is not of the wrong type
  *   Make sure that all case expressions are of the same type/kind
  *   Make sure that no case ranges overlap
+ *
+ * We have the additional caveat that a SELECT construct could have
+ * been a computed GOTO in the source code. Furtunately we're done
+ * here prety quick: all we have to make sure is that the case_expr
+ * is a scalar integer expression.
  */
 
 void g95_resolve_select(g95_code *code, g95_namespace *ns) {
@@ -467,12 +472,33 @@ int kind, overlap;
 bt type;
 try t;
 
+  if (code->expr == NULL) 
+  {
+    /* This was actually a computed GOTO statement.  */
+    expr = code->expr2;
+    if ((expr->ts.type != BT_INTEGER)
+        || (expr->rank != 0))
+      g95_error("Selection expression in COMPUTED GOTO statement "
+                "at %L must be a scalar integer expression",
+                &expr->where);
+    return; /* Either way, we're done.  */
+  }
+ 
   expr = code->expr;
+    
   kind = -1;
   if (expr->ts.type == BT_DERIVED || expr->ts.type == BT_REAL ||
-      expr->ts.type == BT_COMPLEX)
+      expr->ts.type == BT_COMPLEX) {
     g95_error("Argument of SELECT statement at %L cannot be %s",
-	      &code->expr->where, g95_typename(&expr->ts));
+               &expr->where, g95_typename(&expr->ts));
+    return; /* Going on here just produce more garbage error messages.  */
+  }
+
+  if (expr->rank != 0) {
+    g95_error("Argument of SELECT statement at %L must be a scalar "
+              "expression", &expr->where);
+    return;
+  }
 
   type = expr->ts.type;
   if (type == BT_CHARACTER) kind = expr->ts.kind;
