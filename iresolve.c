@@ -214,9 +214,15 @@ void g95_resolve_cmplx(g95_expr *f, g95_expr *x, g95_expr *y, g95_expr *kind) {
   f->ts.kind = (kind == NULL) ? g95_default_real_kind()
     : mpz_get_ui(kind->value.integer);
 
-  f->value.function.name =
-    get_string("__cmplx%d_%c%d_%c%d", f->ts.kind, g95_type_letter(x->ts.type),
-	       x->ts.kind, g95_type_letter(y->ts.type), y->ts.kind);
+  if (y == NULL)
+    f->value.function.name =
+      get_string("__cmplx0_%d_%c%d", f->ts.kind,
+		 g95_type_letter(x->ts.type), x->ts.kind);
+  else
+    f->value.function.name =
+      get_string("__cmplx1_%d_%c%d_%c%d", f->ts.kind,
+		 g95_type_letter(x->ts.type), x->ts.kind,
+		 g95_type_letter(y->ts.type), y->ts.kind);
 }
 
 
