@@ -476,7 +476,6 @@ accessibility[] = {
 };
 
 
-
 /* g95_show_attr()-- Show symbol attributes.  The flavor and intent
  * are followed by whatever single bit attributes are present */
 
@@ -525,7 +524,7 @@ void g95_show_attr(symbol_attribute *attr) {
 #define conf(a, b) if (attr->a && attr->b) { a1 = a; a2 = b; goto conflict; }
 #define conf2(a) if (attr->a) { a2 = a; goto conflict; }
 
-static try check_conflict(symbol_attribute *attr, locus *loc) {
+static try check_conflict(symbol_attribute *attr, locus *where) {
 char *a1, *a2;
 
 static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
@@ -536,7 +535,7 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
   *public = "PUBLIC", *optional = "OPTIONAL", *entry = "ENTRY",
   *function = "FUNCTION", *subroutine = "SUBROUTINE";
 
-  if (loc == NULL) loc = g95_current_locus();
+  if (where == NULL) where = g95_current_locus();
 
   if (attr->pointer && attr->intent != INTENT_UNKNOWN) {
     a1 = pointer; a2 = intent; goto conflict; }
@@ -555,7 +554,7 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
 
     if (a1 != NULL) {
       g95_error("%s attribute not allowed in BLOCK DATA program unit at %L",
-		a1, loc);
+		a1, where);
       return FAILURE;
     }
   }
@@ -649,7 +648,7 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
   return SUCCESS;
 
 conflict:
-  g95_error("%s attribute conflicts with %s attribute at %L", a1, a2, loc);
+  g95_error("%s attribute conflicts with %s attribute at %L", a1, a2, where);
   return FAILURE;
 }
 
@@ -662,212 +661,264 @@ conflict:
  * has been use-associated.  Returns zero if it is OK to change the
  * symbol, nonzero if not.  */
 
-static int check_used(symbol_attribute *attr, locus *loc) {
+static int check_used(symbol_attribute *attr, locus *where) {
 
   if (attr->use_assoc == 0) return 0;
 
-  if (loc == NULL) loc = g95_current_locus();
+  if (where == NULL) where = g95_current_locus();
 
-  g95_error("Cannot change attributes of USE-associated symbol at %L", loc);
+  g95_error("Cannot change attributes of USE-associated symbol at %L", where);
 
   return 1;
 }
 
 
-try g95_add_allocatable(symbol_attribute *attr, locus *loc) {
+/* duplicate_attr()-- Generate an error because of a duplicate attribute */
 
-  if (check_used(attr, loc)) return FAILURE;
+static void duplicate_attr(char *attr, locus *where) {
+
+  if (where == NULL) where = g95_current_locus();
+
+  g95_error("Duplicate %s attribute specified at %L", attr, where);
+}
+
+
+try g95_add_allocatable(symbol_attribute *attr, locus *where) {
+
+  if (check_used(attr, where)) return FAILURE;
+
+  if (attr->allocatable) {
+    duplicate_attr("ALLOCATABLE", where);
+    return FAILURE;
+  }
 
   attr->allocatable = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_dimension(symbol_attribute *attr, locus *loc) {
+try g95_add_dimension(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+
+  if (attr->dimension) {
+    duplicate_attr("DIMENSION", where);
+    return FAILURE;
+  }
 
   attr->dimension = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_external(symbol_attribute *attr, locus *loc) {
+try g95_add_external(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+  
+  if (attr->external) {
+    duplicate_attr("EXTERNAL", where);
+    return FAILURE;
+  }
 
   attr->external = 1;
 
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_intrinsic(symbol_attribute *attr, locus *loc) {
+try g95_add_intrinsic(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+
+  if (attr->intrinsic) {
+    duplicate_attr("INTRINSIC", where);
+    return FAILURE;
+  }
 
   attr->intrinsic = 1;
 
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_optional(symbol_attribute *attr, locus *loc) {
+try g95_add_optional(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+
+  if (attr->optional) {
+    duplicate_attr("OPTIONAL", where);
+    return FAILURE;
+  }
 
   attr->optional = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_pointer(symbol_attribute *attr, locus *loc) {
+try g95_add_pointer(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   attr->pointer = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_result(symbol_attribute *attr, locus *loc) {
+try g95_add_result(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   attr->result = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_save(symbol_attribute *attr, locus *loc) {
+try g95_add_save(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   if (g95_pure(NULL)) {
-    g95_error("Symbol at %L cannot be SAVEd in a PURE procedure", loc);
+    g95_error("SAVE attribute at %L cannot be specified in a PURE procedure",
+	      where);
+    return FAILURE;
+  }
+
+  if (attr->save) {
+    duplicate_attr("SAVE", where);
     return FAILURE;
   }
 
   attr->save = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_saved_common(symbol_attribute *attr, locus *loc) {
+try g95_add_saved_common(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+
+  if (attr->saved_common) {
+    duplicate_attr("SAVE", where);
+    return FAILURE;
+  }
 
   attr->saved_common = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_target(symbol_attribute *attr, locus *loc) {
+try g95_add_target(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+
+  if (attr->target) {
+    duplicate_attr("TARGET", where);
+    return FAILURE;
+  }
 
   attr->target = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_dummy(symbol_attribute *attr, locus *loc) {
+try g95_add_dummy(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+
+  /* Duplicate dummy arguments are allow due to ENTRY statements */
 
   attr->dummy = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_data(symbol_attribute *attr, locus *loc) {
+try g95_add_common(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
-
-  attr->data = 1;
-  return check_conflict(attr, loc);
-}
-
-try g95_add_common(symbol_attribute *attr, locus *loc) {
-
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   attr->common = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_in_common(symbol_attribute *attr, locus *loc) {
+try g95_add_in_common(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+
+  /* Duplicate attribute already checked for */
 
   attr->in_common = 1;
-  if (check_conflict(attr, loc) == FAILURE) return FAILURE;
+  if (check_conflict(attr, where) == FAILURE) return FAILURE;
 
   if (attr->flavor == FL_VARIABLE) return SUCCESS;
 
-  return g95_add_flavor(attr, FL_VARIABLE, loc);
+  return g95_add_flavor(attr, FL_VARIABLE, where);
 }
 
-try g95_add_in_namelist(symbol_attribute *attr, locus *loc) {
+try g95_add_in_namelist(symbol_attribute *attr, locus *where) {
 
   attr->in_namelist = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_sequence(symbol_attribute *attr, locus *loc) {
+try g95_add_sequence(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   attr->sequence = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_elemental(symbol_attribute *attr, locus *loc) {
+try g95_add_elemental(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   attr->elemental = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_pure(symbol_attribute *attr, locus *loc) {
+try g95_add_pure(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   attr->pure = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_recursive(symbol_attribute *attr, locus *loc) {
+try g95_add_recursive(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   attr->recursive = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_entry(symbol_attribute *attr, locus *loc) {
+try g95_add_entry(symbol_attribute *attr, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
+
+  if (attr->entry) {
+    duplicate_attr("ENTRY", where);
+    return FAILURE;
+  }
 
   attr->entry = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_function(symbol_attribute *attr, locus *loc) {
+try g95_add_function(symbol_attribute *attr, locus *where) {
 
   if (attr->flavor != FL_PROCEDURE &&
-      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+      g95_add_flavor(attr, FL_PROCEDURE, where) == FAILURE) return FAILURE;
 
   attr->function = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
+try g95_add_subroutine(symbol_attribute *attr, locus *where) {
 
   if (attr->flavor != FL_PROCEDURE &&
-      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+      g95_add_flavor(attr, FL_PROCEDURE, where) == FAILURE) return FAILURE;
 
   attr->subroutine = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
-try g95_add_generic(symbol_attribute *attr, locus *loc) {
+try g95_add_generic(symbol_attribute *attr, locus *where) {
 
   if (attr->flavor != FL_PROCEDURE &&
-      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+      g95_add_flavor(attr, FL_PROCEDURE, where) == FAILURE) return FAILURE;
 
   attr->generic = 1;
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
 
@@ -875,42 +926,42 @@ try g95_add_generic(symbol_attribute *attr, locus *loc) {
  * what fortran considers attributes and can be reaffirmed multiple
  * times. */
 
-try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
+try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *where) {
 
   if ((f == FL_PROGRAM || f == FL_BLOCK_DATA || f == FL_MODULE ||
        f == FL_PARAMETER || f == FL_LABEL || f == FL_DERIVED ||
-       f == FL_NAMELIST) && check_used(attr, loc)) return FAILURE;
+       f == FL_NAMELIST) && check_used(attr, where)) return FAILURE;
 
   if (attr->flavor == f && f == FL_VARIABLE) return SUCCESS;
 
   if (attr->flavor != FL_UNKNOWN) {
-    if (loc == NULL) loc = g95_current_locus();
+    if (where == NULL) where = g95_current_locus();
 
     g95_error("%s attribute conflicts with %s attribute at %L",
 	      g95_code2string(flavors, attr->flavor),
-	      g95_code2string(flavors, f), loc);
+	      g95_code2string(flavors, f), where);
 
     return FAILURE;
   }
 
   attr->flavor = f;
 
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
 
-try g95_add_procedure(symbol_attribute *attr, procedure_type t, locus *loc) {
+try g95_add_procedure(symbol_attribute *attr, procedure_type t, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   if (attr->flavor != FL_PROCEDURE &&
-      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+      g95_add_flavor(attr, FL_PROCEDURE, where) == FAILURE) return FAILURE;
 
-  if (loc == NULL) loc = g95_current_locus();
+  if (where == NULL) where = g95_current_locus();
 
   if (attr->proc != PROC_UNKNOWN) {
     g95_error("%s procedure at %L is already %s %s procedure",
-	      g95_code2string(procedures, t), loc,
+	      g95_code2string(procedures, t), where,
 	      g95_article(g95_code2string(procedures, attr->proc)),
 	      g95_code2string(procedures, attr->proc));
 
@@ -922,57 +973,57 @@ try g95_add_procedure(symbol_attribute *attr, procedure_type t, locus *loc) {
 /* Statement functions are always functions */
 
   if (t == PROC_ST_FUNCTION && !attr->function &&
-      g95_add_function(attr, loc) == FAILURE) return FAILURE;
+      g95_add_function(attr, where) == FAILURE) return FAILURE;
 
-  return check_conflict(attr, loc);
+  return check_conflict(attr, where);
 }
 
 
-try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *loc) {
+try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *where) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if (check_used(attr, where)) return FAILURE;
 
   if (attr->intent == INTENT_UNKNOWN) {
     attr->intent = intent;
-    return check_conflict(attr, loc);
+    return check_conflict(attr, where);
   }
 
-  if (loc == NULL) loc = g95_current_locus();
+  if (where == NULL) where = g95_current_locus();
 
   g95_error("INTENT (%s) conflicts with INTENT(%s) at %L",
 	    g95_intent_string(attr->intent),
-	    g95_intent_string(intent), loc);
+	    g95_intent_string(intent), where);
 
   return FAILURE;
 }
 
 /* No checks for use-association in public and private statements */
 
-try g95_add_access(symbol_attribute *attr, g95_access access, locus *loc) {
+try g95_add_access(symbol_attribute *attr, g95_access access, locus *where) {
 
   if (attr->access == ACCESS_UNKNOWN) {
     attr->access = access;
-    return check_conflict(attr, loc);
+    return check_conflict(attr, where);
   }
 
-  if (loc == NULL) loc = g95_current_locus();
-  g95_error("ACCESS specification at %L was already specified", loc);
+  if (where == NULL) where = g95_current_locus();
+  g95_error("ACCESS specification at %L was already specified", where);
 
   return FAILURE;
 }
 
 
 try g95_add_explicit_interface(g95_symbol *sym, ifsrc source,
-			       g95_formal_arglist *formal, locus *loc) {
+			       g95_formal_arglist *formal, locus *where) {
 
-  if (check_used(&sym->attr, loc)) return FAILURE;
+  if (check_used(&sym->attr, where)) return FAILURE;
 
-  if (loc == NULL) loc = g95_current_locus();
+  if (where == NULL) where = g95_current_locus();
 
   if (sym->attr.if_source != IFSRC_UNKNOWN &&
       sym->attr.if_source != IFSRC_DECL) {
     g95_error("Symbol '%s' at %L already has an explicit interface",
-	      sym->name, loc);
+	      sym->name, where);
     return FAILURE;
   }
 
@@ -1075,53 +1126,58 @@ void g95_clear_attr(symbol_attribute *attr) {
  * symbol.  Currently does nothing, but it's not clear that it is
  * unnecessary yet.  AEV 7/4/01 */
 
-try g95_missing_attr(symbol_attribute *attr, locus *loc) {
+try g95_missing_attr(symbol_attribute *attr, locus *where) {
 
   return SUCCESS;
 }
 
 
-/* g95_copy_attr()-- copy one attribute over another, bit by bit.
- * Some attributes have a lot of side-effects but cannot be present
- * given where we are called from, so we ignore some bits */
+/* g95_copy_attr()-- copy an attribute to a symbol attribute, bit by
+ * bit.  Some attributes have a lot of side-effects but cannot be
+ * present given where we are called from, so we ignore some bits */
 
-try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src, locus *loc) {
+try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src,
+		  locus *where) {
 
-  if (src->allocatable && g95_add_allocatable(dest, loc) == FAILURE) goto fail;
-  if (src->dimension && g95_add_dimension(dest, loc) == FAILURE) goto fail;
-  if (src->optional && g95_add_optional(dest, loc) == FAILURE) goto fail;
-  if (src->pointer && g95_add_pointer(dest, loc) == FAILURE) goto fail;
-  if (src->save && g95_add_save(dest, loc) == FAILURE) goto fail;
-  if (src->target && g95_add_target(dest, loc) == FAILURE) goto fail;
-  if (src->dummy && g95_add_dummy(dest, loc) == FAILURE) goto fail;
-  if (src->common && g95_add_common(dest, loc) == FAILURE) goto fail;
-  if (src->result && g95_add_result(dest, loc) == FAILURE) goto fail;
+  if (src->allocatable && g95_add_allocatable(dest, where) == FAILURE)
+    goto fail;
+
+  if (src->dimension && g95_add_dimension(dest, where) == FAILURE) goto fail;
+  if (src->optional && g95_add_optional(dest, where) == FAILURE) goto fail;
+  if (src->pointer && g95_add_pointer(dest, where) == FAILURE) goto fail;
+  if (src->save && g95_add_save(dest, where) == FAILURE) goto fail;
+  if (src->target && g95_add_target(dest, where) == FAILURE) goto fail;
+  if (src->dummy && g95_add_dummy(dest, where) == FAILURE) goto fail;
+  if (src->common && g95_add_common(dest, where) == FAILURE) goto fail;
+  if (src->result && g95_add_result(dest, where) == FAILURE) goto fail;
   if (src->entry) dest->entry = 1;
 
-  if (src->data && g95_add_data(dest, loc) == FAILURE) goto fail;
-  if (src->in_namelist && g95_add_in_namelist(dest, loc) == FAILURE) goto fail;
-  if (src->in_common && g95_add_in_common(dest, loc) == FAILURE) goto fail;
-  if (src->saved_common && g95_add_saved_common(dest, loc)==FAILURE) goto fail;
+  if (src->in_namelist && g95_add_in_namelist(dest, where) == FAILURE)
+    goto fail;
 
-  if (src->generic && g95_add_generic(dest, loc) == FAILURE) goto fail;
-  if (src->function && g95_add_function(dest, loc) == FAILURE) goto fail;
-  if (src->subroutine && g95_add_subroutine(dest, loc) == FAILURE) goto fail;
+  if (src->in_common && g95_add_in_common(dest, where) == FAILURE) goto fail;
+  if (src->saved_common && g95_add_saved_common(dest, where)==FAILURE)
+    goto fail;
 
-  if (src->sequence && g95_add_sequence(dest, loc) == FAILURE) goto fail;
-  if (src->elemental && g95_add_elemental(dest, loc) == FAILURE) goto fail;
-  if (src->pure && g95_add_pure(dest, loc) == FAILURE) goto fail;
-  if (src->recursive && g95_add_recursive(dest, loc) == FAILURE) goto fail;
+  if (src->generic && g95_add_generic(dest, where) == FAILURE) goto fail;
+  if (src->function && g95_add_function(dest, where) == FAILURE) goto fail;
+  if (src->subroutine && g95_add_subroutine(dest, where) == FAILURE) goto fail;
+
+  if (src->sequence && g95_add_sequence(dest, where) == FAILURE) goto fail;
+  if (src->elemental && g95_add_elemental(dest, where) == FAILURE) goto fail;
+  if (src->pure && g95_add_pure(dest, where) == FAILURE) goto fail;
+  if (src->recursive && g95_add_recursive(dest, where) == FAILURE) goto fail;
 
   if (src->flavor != FL_UNKNOWN &&
-      g95_add_flavor(dest, src->flavor, loc) == FAILURE) goto fail;
+      g95_add_flavor(dest, src->flavor, where) == FAILURE) goto fail;
 
   if (src->intent != INTENT_UNKNOWN &&
-      g95_add_intent(dest, src->intent, loc) == FAILURE) goto fail;
+      g95_add_intent(dest, src->intent, where) == FAILURE) goto fail;
 
   if (src->access != ACCESS_UNKNOWN &&
-      g95_add_access(dest, src->access, loc) == FAILURE) goto fail;
+      g95_add_access(dest, src->access, where) == FAILURE) goto fail;
 
-  if (g95_missing_attr(dest, loc) == FAILURE) goto fail;
+  if (g95_missing_attr(dest, where) == FAILURE) goto fail;
 
 /* The subroutines that set these bits also cause flavors to be set,
  * and that has already happened in the original, so don't let to

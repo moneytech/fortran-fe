@@ -1179,7 +1179,6 @@ try g95_add_save(symbol_attribute *, locus *);
 try g95_add_saved_common(symbol_attribute *, locus *);
 try g95_add_target(symbol_attribute *, locus *);
 try g95_add_dummy(symbol_attribute *, locus *);
-try g95_add_data(symbol_attribute *, locus *);
 try g95_add_generic(symbol_attribute *, locus *);
 try g95_add_common(symbol_attribute *, locus *);
 try g95_add_in_common(symbol_attribute *, locus *);

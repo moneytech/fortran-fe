@@ -1121,7 +1121,7 @@ static try copy_prefix(symbol_attribute *dest, locus *where) {
 
 match g95_match_formal_arglist(g95_symbol *progname, int st_flag,
 			       int null_flag) {
-g95_formal_arglist *head, *tail, *p;
+g95_formal_arglist *head, *tail, *p, *q;
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 match m;
@@ -1156,10 +1156,9 @@ match m;
 
     tail->sym = sym;
 
-/* Duplicate symbols in an argument list are detected when we add the
- * DUMMY flavor.  We don't add the VARIABLE flavor because the name
- * could be a dummy procedure.  We don't apply these attributes to
- * formal arguments of statement functions. */
+/* We don't add the VARIABLE flavor because the name could be a dummy
+ * procedure.  We don't apply these attributes to formal arguments of
+ * statement functions. */
 
     if (sym != NULL && !st_flag &&
 	(g95_add_dummy(&sym->attr, NULL) == FAILURE ||
@@ -1189,6 +1188,23 @@ match m;
   }
 
 ok:
+  /* Check for duplicate symbols in the formal argument list */
+
+  if (head != NULL) {
+    for(p=head; p->next; p=p->next) {
+      if (p->sym == NULL) continue;
+
+      for(q=p->next; q; q=q->next)
+	if (p->sym == q->sym) {
+	  g95_error("Duplicate symbol '%s' in formal argument list at %C",
+		    p->sym->name);
+
+	  m = MATCH_ERROR;
+	  goto cleanup;
+	}
+    }
+  }
+
   if (g95_add_explicit_interface(progname, IFSRC_DECL, head, NULL)==FAILURE) {
     m = MATCH_ERROR;
     goto cleanup;
