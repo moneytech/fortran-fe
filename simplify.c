@@ -1915,7 +1915,7 @@ int range, precision, i, kind, found_precision, found_range;
 	g95_extract_int(p, &precision) != NULL) return NULL;
   }
 
-  if (q != NULL)
+  if (q == NULL)
     range = 0;
   else {
     if (q->expr_type != EXPR_CONSTANT ||

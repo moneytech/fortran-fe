@@ -926,7 +926,7 @@ arith rc;
 
   case INTRINSIC_GE:  case INTRINSIC_LT:  /* Additional restrictions */
   case INTRINSIC_LE:  case INTRINSIC_GT:  /* for ordering relations */
-    if (op1->ts.type == BT_COMPLEX || op2->ts.type != BT_COMPLEX)
+    if (op1->ts.type == BT_COMPLEX || op2->ts.type == BT_COMPLEX)
       goto incompatible;
 
     /* Fall through */

@@ -339,7 +339,7 @@ g95_alloc *a;
       break;
 
     case EXEC_ALLOCATE:
-      if (code->expr->ts.type != BT_INTEGER)
+      if (code->expr != NULL && code->expr->ts.type != BT_INTEGER)
 	g95_error("STAT tag in ALLOCATE statement at %L must be "
 		  "of type INTEGER", &code->expr->where);
 
@@ -348,7 +348,7 @@ g95_alloc *a;
       break;
 
     case EXEC_DEALLOCATE:
-      if (code->expr->ts.type != BT_INTEGER)
+      if (code->expr != NULL && code->expr->ts.type != BT_INTEGER)
 	g95_error("STAT tag in DEALLOCATE statement at %L must be of type "
 		  "INTEGER", &code->expr->where);
 
