@@ -595,7 +595,7 @@ static void load_line(FILE *input, g95_source_form form, char *buffer,
 		      const char *filename, int linenum) {
 int c, maxlen, i, trunc_flag;
 
-  maxlen = (form == FORM_FREE) ? 132 : (g95_option.fixed_80 ? 80 : 72);
+  maxlen = (form == FORM_FREE) ? 132 : g95_option.fixed_line_length;
 
   i = 0;
 

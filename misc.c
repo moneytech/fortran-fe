@@ -323,7 +323,12 @@ int i;
   }
 
   if (strcmp(option, "-ffixed-line-length-80") == 0) {
-    g95_option.fixed_80 = 1;
+    g95_option.fixed_line_length = 80;
+    return 1;
+  }
+
+  if (strcmp(option, "-ffixed-line-length-132") == 0) {
+    g95_option.fixed_line_length = 132;
     return 1;
   }
 
@@ -427,7 +432,7 @@ static void init_options(void) {
   g95_option.verbose = 0;
   g95_option.pedantic = 0;
   g95_option.line_truncation = 0;
-  g95_option.fixed_80 = 0;
+  g95_option.fixed_line_length = 72;
   g95_option.fmode = 0;
   g95_option.form = FORM_UNKNOWN;
   g95_option.i8 = 0;
