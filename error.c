@@ -360,6 +360,7 @@ va_list argp;
   use_warning_buffer = 1;
 
   va_start(argp, format);
+  if (buffer_flag == 0) warnings++;
   error_print("Warning:", format, argp);
   va_end(argp);
 
@@ -375,6 +376,7 @@ int i;
 
   i = buffer_flag;
   buffer_flag = 0;
+  warnings++;
 
   va_start(argp, format);
   error_print("Warning:", format, argp);
