@@ -650,10 +650,6 @@ g95_expr *e;
 /* Sanity checks on data transfer statements */
 
   if (e->ts.type == BT_CHARACTER) {
-    if (e->symbol->attr.intent == INTENT_IN)
-      g95_error("Internal file '%s' at %L is INTENT(IN)",
-		e->symbol->name, &e->where);
-
     if (dt->rec != NULL)
       g95_error("REC tag at %L is incompatible with internal file",
 		&dt->rec->where);
@@ -1015,6 +1011,15 @@ get_io_list:
     g95_append_code(io_code, term);
 
 /* A full IO statement has been matched */
+
+  if (dt->io_unit->expr_type == EXPR_VARIABLE && k == M_WRITE &&
+      dt->io_unit->ts.type == BT_CHARACTER &&
+      dt->io_unit->symbol->attr.intent == INTENT_IN) {
+    g95_error("Internal file '%s' at %L is INTENT(IN)",
+	      dt->io_unit->symbol->name, &dt->io_unit->where);
+    m = MATCH_ERROR;
+    goto cleanup;
+  }
 
   expr = dt->format_expr;
 
