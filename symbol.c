@@ -620,6 +620,8 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
     break;
 
   case FL_PROCEDURE:
+    conf2(intent);
+
     switch(attr->proc) {
     case PROC_ST_FUNCTION:
       conf2(in_common);
