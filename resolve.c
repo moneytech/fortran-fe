@@ -2173,7 +2173,7 @@ static void resolve_values(g95_symbol *sym) {
 
 static void resolve_symbol(g95_symbol *sym) {
 static int formal_ns_flag = 1; /* Zero if we are checking a formal namespace */
-int formal_ns_save, check_constant;
+int formal_ns_save, check_constant, mp_flag;
 
   if (sym->attr.flavor == FL_UNKNOWN) {
     if (sym->attr.external == 0 && sym->attr.intrinsic == 0)
@@ -2184,6 +2184,14 @@ int formal_ns_save, check_constant;
     }
   }
 
+  /* Symbols that are module procedures with results (functions) have
+   * the types and array specification copied for type checking in
+   * procedures that call them, as well as for saving to a module
+   * file.  These symbols can't stand the scrutiny that their results
+   * can. */
+
+  mp_flag = sym->result != NULL && sym->result != sym;
+
   /* Assign default type to symbols that need one and don't have one */
 
   if (sym->ts.type == BT_UNKNOWN) {
@@ -2191,7 +2199,7 @@ int formal_ns_save, check_constant;
       g95_set_default_type(sym, 0, NULL);
 
     if (sym->attr.flavor == FL_PROCEDURE && sym->attr.function) {
-      if (sym->result == sym || sym->result == NULL)
+      if (!mp_flag)
 	g95_set_default_type(sym, 0, NULL);
       else {
 	resolve_symbol(sym->result);  /* Result may be in another namespace */
@@ -2202,9 +2210,11 @@ int formal_ns_save, check_constant;
     }
   }
 
-  if (sym->as != NULL && sym->as->type == AS_ASSUMED_SIZE &&
+  if (sym->as != NULL && (sym->as->type == AS_ASSUMED_SIZE || 
+			  sym->as->type == AS_ASSUMED_SHAPE ) &&
       sym->attr.dummy == 0) {
-    g95_error("Assumed size array at %L must be a dummy argument",
+    g95_error("Assumed %s array at %L must be a dummy argument",
+	      sym->as->type == AS_ASSUMED_SIZE ? "size" : "shape",
 	      &sym->declared_at);
     return;
   }
@@ -2217,7 +2227,7 @@ int formal_ns_save, check_constant;
     g95_error("Entity with assumed character length at %L must be a "
 	      "dummy argument or a PARAMETER", &sym->declared_at);
     return;
-  }  
+  }
 
   /* Make sure a parameter that has been implicitly typed still
    * matches the implicit type, since PARAMETER statements can precede
@@ -2227,7 +2237,7 @@ int formal_ns_save, check_constant;
       !g95_compare_types(&sym->ts, g95_get_default_type(sym, sym->ns)))
     g95_error("Implicitly typed PARAMETER '%s' at %L doesn't match a "
 	      "later IMPLICIT type", sym->name, &sym->declared_at);
-  
+
   /* Make sure the types of derived parameters are consistent.  This
    * type checking is deferred until resolution because the type may
    * refer to a derived type from the host. */
@@ -2247,10 +2257,11 @@ int formal_ns_save, check_constant;
     g95_error("Symbol at %L is not a DUMMY variable", &sym->declared_at);
     return;
   }
-  
-  /* Constraints on deferred shape variable */
 
-  if (sym->attr.flavor == FL_VARIABLE) {
+  /* Constraints on deferred shape variables. */
+
+  if (sym->attr.flavor == FL_VARIABLE || 
+      (sym->attr.flavor == FL_PROCEDURE && sym->attr.function)) {
     if (sym->as == NULL || sym->as->type != AS_DEFERRED) {
       if (sym->attr.allocatable) {
 	g95_error("Allocatable array at %L must have a deferred shape",
@@ -2265,7 +2276,8 @@ int formal_ns_save, check_constant;
       }
 
     } else {
-      if (!sym->attr.allocatable && !sym->attr.pointer && !sym->attr.dummy) {
+      if (!mp_flag && !sym->attr.allocatable && !sym->attr.pointer &&
+	  !sym->attr.dummy) {
 	g95_error("Array at %L cannot have a deferred shape",
 		  &sym->declared_at);
 	return;
@@ -2273,6 +2285,12 @@ int formal_ns_save, check_constant;
     }
   }
 
+  /* Make sure that an intrinsic exists */
+
+  if (sym->attr.intrinsic && !g95_intrinsic_name(sym->name, 0)
+      && !g95_intrinsic_name(sym->name, 1)) 
+    g95_error("Intrinsic at %L does not exist", &sym->declared_at);
+      
   /* Resolve array specifier. Check as well some constraints 
    * on COMMON blocks */
 

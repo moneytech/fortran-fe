@@ -546,7 +546,7 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
   *elemental = "ELEMENTAL", *private = "PRIVATE", *recursive = "RECURSIVE",
   *in_common = "COMMON", *result = "RESULT", *in_namelist = "NAMELIST",
   *public = "PUBLIC", *optional = "OPTIONAL", *entry = "ENTRY",
-  *function = "FUNCTION", *subroutine = "SUBROUTINE";
+  *function = "FUNCTION", *subroutine = "SUBROUTINE", *dimension = "DIMENSION";
 
   if (where == NULL) where = g95_current_locus();
 
@@ -578,6 +578,7 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
   conf(pointer, intrinsic);
   conf(target, external);
   conf(target, intrinsic);
+  conf(external, dimension);
 
   conf(external, intrinsic);
   conf(allocatable, pointer);
@@ -621,6 +622,11 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
 
   case FL_PROCEDURE:
     conf2(intent);
+    if (attr->subroutine) {
+      conf2(save);        conf2(pointer);     conf2(target);
+      conf2(allocatable); conf2(result);      conf2(in_namelist);
+      conf2(function);
+    }
 
     switch(attr->proc) {
     case PROC_ST_FUNCTION:
