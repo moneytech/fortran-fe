@@ -1278,6 +1278,7 @@ cleanup:
 
 match g95_match_rvalue(g95_expr **result) {
 g95_actual_arglist *actual_arglist;
+g95_state_data *st;
 g95_symbol *sym;
 locus where;
 g95_expr *e;
@@ -1326,8 +1327,24 @@ match m;
       break;
     }
 
-/* At this point, the name has to be a function and can either be a
- * function call or dummy reference.  Fall through */
+/* At this point, the name has to be a non-statement function.  If the
+ * name is the same as the current function being compiled, then we
+ * have a variable reference (to the function result) if the name is
+ * non-recursive. */
+
+    st = g95_enclosing_unit(NULL);
+
+    if (st != NULL && st->state == COMP_FUNCTION && st->sym == sym &&
+	!sym->attr.recursive) {
+      e = g95_get_expr();
+      e->symbol = sym;
+      e->expr_type = EXPR_VARIABLE;
+      
+      m = match_varspec(e);
+      break;
+    }
+
+    /* Fall through to matching a function reference */
 
   case FL_ST_FUNCTION:
   function0:
@@ -1492,6 +1509,7 @@ match m;
  * not been previously seen, we assume it is a variable. */
 
 match g95_match_variable(g95_expr **result) {
+g95_state_data *st;
 g95_symbol *sym;
 g95_expr *expr;
 locus where;
@@ -1501,11 +1519,25 @@ match m;
   if (m != MATCH_YES) return m;
   where = *g95_current_locus(); 
 
-  if (sym->attr.flavor == FL_UNKNOWN &&
-      g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE)
-    return MATCH_ERROR;
+  switch(sym->attr.flavor) {
+  case FL_VARIABLE:
+    break;
 
-  if (sym->attr.flavor != FL_VARIABLE) {
+  case FL_UNKNOWN:
+    if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE)
+      return MATCH_ERROR;
+    break;
+
+  case FL_PROCEDURE:  /* Check for a nonrecursive function result */
+    if (sym->attr.function) {
+      st = g95_enclosing_unit(NULL);
+      if (st != NULL && st->state == COMP_FUNCTION && st->sym == sym &&
+	  !sym->attr.recursive) break;
+    }
+
+    /* Fall through to error */
+
+  default:
     g95_error("Expected VARIABLE at %C");
     return MATCH_ERROR;
   }

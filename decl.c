@@ -141,6 +141,26 @@ normal:
 }
 
 
+/* get_proc_name()-- Special subroutine for getting a symbol node
+ * associated with a procedure name, used in SUBROUTINE and FUNCTION
+ * statements.  Normally, we just g95_get_symbol() without searching
+ * any parent units.  If we are compiling an interface or a contained
+ * program unit, we search/create in the parent unit and create a link
+ * from the current namespace.  Returns nonzero if there was a
+ * problem, zero otherwise. */
+
+static int get_proc_name(char *name, g95_symbol **result) {
+
+  if (g95_current_state() != COMP_INTERFACE &&
+      g95_current_state() != COMP_CONTAINS)
+    return g95_get_symbol(name, NULL, 0, result);
+
+  if (g95_get_symbol(name, g95_current_ns->parent, 0, result)) return 1;
+
+  return 0;
+}
+
+
 /* build_sym()-- Function called by variable_decl() that adds a name
  * to the symbol table. */
 
@@ -1001,6 +1021,16 @@ match m;
       goto cleanup;
     }
 
+/* The name of a program unit can be in a different namespace, so
+ * check for it explicitly.  After the statement is accepted, the name
+ * is checked for especially in g95_get_symbol(). */
+
+    if (g95_new_block != NULL && strcmp(sym->name, g95_new_block->name) == 0) {
+      g95_error("Name '%s' at %C is the name of the procedure", sym->name);
+      m = MATCH_ERROR;
+      goto cleanup;
+    }
+
     if (g95_match(" )") == MATCH_YES) goto ok;
 
     m = g95_match(" ,");
@@ -1066,7 +1096,6 @@ match g95_match_function_decl(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_formal_arglist *arglist;
 g95_symbol *sym, *result;
-g95_namespace *ns;
 locus old_loc;
 match m;
 
@@ -1088,10 +1117,8 @@ match m;
     return MATCH_NO;
   }
 
-  ns = (g95_current_state() == COMP_INTERFACE) ?
-    current_interface.ns : NULL;
-
-  if (g95_get_symbol(name, ns, 0, &sym)) return MATCH_ERROR;
+  if (get_proc_name(name, &sym)) return MATCH_ERROR;
+  g95_new_block = sym;
 
   m = g95_match_formal_arglist(sym, 1);
   if (m == MATCH_NO)
@@ -1119,19 +1146,14 @@ match m;
     goto cleanup;
   }
 
-  if (g95_current_state() == COMP_INTERFACE || current_attr.recursive) {
-    if (g95_add_function(&sym->attr, NULL) == FAILURE ||
-	g95_missing_attr(&sym->attr, NULL) == FAILURE) goto cleanup;
-  } else {
-    if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) goto cleanup;
-  }
+  if (g95_add_function(&sym->attr, NULL) == FAILURE ||
+      g95_missing_attr(&sym->attr, NULL) == FAILURE) goto cleanup;
 
   if (g95_copy_attr(&sym->attr, &current_attr, NULL) == FAILURE) goto cleanup;
 
   sym->ts = current_ts; 
   sym->result = result;
 
-  g95_new_block = sym;
   return MATCH_YES;
 
 cleanup:
@@ -1154,7 +1176,7 @@ match m;
   m = g95_match_formal_arglist(entry, 1);
   if (m != MATCH_YES) return MATCH_ERROR;
 
-  state = g95_enclosing_unit();
+  g95_enclosing_unit(&state);
   switch(state) {
   case COMP_SUBROUTINE:
     if (g95_current_state() != COMP_SUBROUTINE) goto exec_construct;
@@ -1219,9 +1241,8 @@ exec_construct:
 
 match g95_match_subroutine(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
+g95_symbol *sym, *result;
 symbol_attribute attr;
-g95_namespace *ns;
-g95_symbol *sym;
 locus old_loc;
 match m;
 
@@ -1237,11 +1258,7 @@ match m;
     return m;
   }
 
-  ns = (g95_current_state() == COMP_INTERFACE) ?
-    current_interface.ns : NULL;
-
-  if (g95_get_symbol(name, ns, 1, &sym)) return MATCH_ERROR;
-
+  if (get_proc_name(name, &sym)) return MATCH_ERROR;
   g95_new_block = sym;
 
   if (g95_add_subroutine(&sym->attr, NULL) == FAILURE) {

@@ -505,15 +505,20 @@ g95_state_data *p;
  * is.  This will be a function, subroutine, program, block data or
  * module. */
 
-g95_compile_state g95_enclosing_unit(void) {
+g95_state_data *g95_enclosing_unit(g95_compile_state *result) {
 g95_state_data *p;
 
   for(p=g95_state_stack; p; p=p->previous)
     if (p->state == COMP_FUNCTION || p->state == COMP_SUBROUTINE ||
 	p->state == COMP_MODULE || p->state == COMP_BLOCK_DATA ||
-	p->state == COMP_PROGRAM) return p->state;
+	p->state == COMP_PROGRAM) {
 
-  return COMP_PROGRAM;
+      if (result != NULL) *result = p->state;
+      return p;
+    }
+
+  if (result != NULL) *result = COMP_PROGRAM;
+  return NULL;
 }
 
 
@@ -666,6 +671,10 @@ static void accept_statement(g95_statement st) {
 
   case ST_IMPLICIT:
     g95_set_implicit();
+    break;
+
+  case ST_FUNCTION: case ST_SUBROUTINE:
+    g95_current_ns->proc_name = g95_new_block;
     break;
 
   case ST_ENDDO:  case ST_ENDIF:    case ST_END_SELECT:

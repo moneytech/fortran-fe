@@ -1696,6 +1696,13 @@ g95_symbol *p;
     st = find_node(current_ns, name);
     if (st != NULL) break;
 
+    if (current_ns->proc_name != NULL &&
+	strcmp(current_ns->proc_name->name, name) == 0) {
+      *result = p = current_ns->proc_name;
+      mark_new_symbol(p, name, p->ns);
+      return 0;
+    }
+
     if (!parent_flag) break;
 
     current_ns = current_ns->parent;
@@ -2094,6 +2101,8 @@ sym_flavor flavor;
 void g95_set_sym_defaults(g95_namespace *ns) {
 
   g95_traverse_ns(ns, set_sym_defaults);
+
+  if (ns->proc_name != NULL) set_sym_defaults(ns->proc_name);
 }
 
 
@@ -2112,6 +2121,11 @@ int i;
     for(i=0; i<G95_LETTERS; i++) {
       g95_status(" %c: ", i+'A');
       g95_show_typespec(&ns->default_type[i]);
+    }
+
+    if (ns->proc_name != NULL) {
+      show_indent();
+      g95_status("procedure name = %s", ns->proc_name->name);
     }
 
     g95_traverse_symtree(ns, clear_sym_mark);

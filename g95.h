@@ -461,7 +461,7 @@ typedef struct g95_namespace {
   int set_flag[G95_LETTERS];
   g95_typespec default_type[G95_LETTERS];    /* IMPLICIT typespecs */
 
-  struct g95_symbol *operator[G95_INTRINSIC_OPS];
+  struct g95_symbol *proc_name, *operator[G95_INTRINSIC_OPS];
   struct g95_namespace *parent, *contained, *sibling;
   struct g95_code *code;
   g95_symbol *blank_common;
@@ -869,7 +869,7 @@ void g95_get_errors(int *, int *);
 /* parse.c */
 
 try g95_find_state(g95_compile_state);
-g95_compile_state g95_enclosing_unit(void);
+g95_state_data *g95_enclosing_unit(g95_compile_state *);
 char *g95_ascii_statement(g95_statement);
 char *g95_state_name(g95_compile_state);
 void g95_reject_statement(void);

@@ -1423,6 +1423,13 @@ int dummy;
 }
 
 
+/* check_unique_name()-- See if a name is a generated name. */
+
+static int check_unique_name(char *name) {
+
+  return *name == '@';
+}
+
 
 static void read_namespace(g95_namespace *ns) {
 int serial, ambiguous, i, new_flag, sym_save, visible_save;
@@ -1616,6 +1623,8 @@ g95_symbol *s;
 static void find_writables(g95_symbol *sym) {
 
   sym->serial = -1;
+
+  if (check_unique_name(sym->name)) return;
 
   switch(sym->attr.flavor) {
   case FL_UNKNOWN:      case FL_PROGRAM:     case FL_BLOCK_DATA:
