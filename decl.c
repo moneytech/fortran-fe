@@ -970,7 +970,7 @@ g95_formal_arglist *q;
 
 /* g95_match_formal_arglist()-- Match a formal argument list. */
 
-match g95_match_formal_arglist(g95_symbol *progname, int null_flag) {
+match g95_match_formal_arglist(g95_symbol *progname, int st_flag) {
 g95_formal_arglist *head, *tail, *p;
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
@@ -979,7 +979,7 @@ match m;
   head = tail = NULL;
 
   if (g95_match(" (") != MATCH_YES) {
-    if (null_flag) goto ok;
+    if (!st_flag) goto ok;
     return MATCH_NO;
   }
 
@@ -1008,10 +1008,12 @@ match m;
 
 /* Duplicate symbols in an argument list are detected when we add the
  * DUMMY flavor.  We don't add the VARIABLE flavor because the name
- * could be a dummy procedure */
+ * could be a dummy procedure.  We don't apply these attributes to
+ * formal arguments of statement functions. */
 
-    if (sym != NULL && (g95_add_dummy(&sym->attr, NULL) == FAILURE ||
-			g95_missing_attr(&sym->attr, NULL) == FAILURE)) {
+    if (sym != NULL && !st_flag &&
+	(g95_add_dummy(&sym->attr, NULL) == FAILURE ||
+	 g95_missing_attr(&sym->attr, NULL) == FAILURE)) {
       m = MATCH_ERROR;
       goto cleanup;
     }
@@ -1116,7 +1118,7 @@ match m;
   if (get_proc_name(name, &sym)) return MATCH_ERROR;
   g95_new_block = sym;
 
-  m = g95_match_formal_arglist(sym, 1);
+  m = g95_match_formal_arglist(sym, 0);
   if (m == MATCH_NO)
     g95_error("Expected formal argument list in function definition at %C");
   if (m != MATCH_YES) goto cleanup;
@@ -1178,7 +1180,7 @@ match m;
   m = g95_match_symbol(&entry);
   if (m != MATCH_YES) return m;
 
-  m = g95_match_formal_arglist(entry, 1);
+  m = g95_match_formal_arglist(entry, 0);
   if (m != MATCH_YES) return MATCH_ERROR;
 
   g95_enclosing_unit(&state);
@@ -1271,7 +1273,7 @@ match m;
     goto error;
   }
 
-  m = g95_match_formal_arglist(sym, 1);
+  m = g95_match_formal_arglist(sym, 0);
   if (m != MATCH_YES) goto error;
 
   m = g95_match_eos();
