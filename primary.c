@@ -1528,6 +1528,7 @@ match m;
       return MATCH_ERROR;
     break;
 
+  case FL_MODULE_PROC:
   case FL_PROCEDURE:  /* Check for a nonrecursive function result */
     if (sym->attr.function) {
       st = g95_enclosing_unit(NULL);

@@ -2082,14 +2082,25 @@ void g95_save_all(g95_namespace *ns) {
  * g95_set_sym_defaults() via traverse_ns(). */
 
 static void set_sym_defaults(g95_symbol *sym) {
-sym_flavor flavor;
 
   if (sym->ts.type != BT_UNKNOWN) return;
 
-  flavor = sym->attr.flavor;
+  switch(sym->attr.flavor) {
+  case FL_VARIABLE:
+  case FL_PARAMETER:
+  case FL_ST_FUNCTION:
+    break;
 
-  if (!sym->attr.function && flavor != FL_VARIABLE &&
-      flavor != FL_PARAMETER && flavor != FL_ST_FUNCTION) return;
+  case FL_MODULE_PROC:
+  case FL_DUMMY_PROC:
+  case FL_PROCEDURE:
+    if (!sym->attr.function || sym->attr.recursive || sym->result != NULL)
+      return;
+    break;
+
+  default:
+    return;
+  }
 
   g95_set_default_type(sym);
 }

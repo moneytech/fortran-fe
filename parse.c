@@ -1596,6 +1596,7 @@ g95_statement st;
 
   do {
     g95_current_ns = g95_get_namespace();
+    g95_current_ns->parent = parent_ns;
 
     st = next_statement();
     if (st != ST_FUNCTION && st != ST_SUBROUTINE) {

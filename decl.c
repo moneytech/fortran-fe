@@ -273,6 +273,7 @@ match m;
 try t;
 
   initializer = NULL;
+  as = NULL;
 
   m = g95_match_name(name);
   if (m != MATCH_YES) goto cleanup;
@@ -980,6 +981,7 @@ g95_formal_arglist *q;
 
 match g95_match_formal_arglist(g95_symbol *progname, int null_flag) {
 g95_formal_arglist *head, *tail, *p;
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 match m;
 
@@ -996,8 +998,10 @@ match m;
     if (g95_match(" *") == MATCH_YES)
       sym = NULL;
     else {
-      m = g95_match_symbol(&sym);
+      m = g95_match_name(name);
       if (m != MATCH_YES) goto cleanup;
+
+      if (g95_get_symbol(name, NULL, 0, &sym)) goto cleanup;
     }
 
     p = g95_getmem(sizeof(g95_formal_arglist));
@@ -1241,8 +1245,8 @@ exec_construct:
 
 match g95_match_subroutine(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_symbol *sym, *result;
 symbol_attribute attr;
+g95_symbol *sym;
 locus old_loc;
 match m;
 
