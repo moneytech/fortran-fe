@@ -701,9 +701,9 @@ int len;
   strcpy(fp->filename, filename);
 
   if (g95_current_file == NULL) {
-    input = g95_open_file(NULL, filename);
+    input = fopen(filename, "r");
   } else {
-    input = g95_open_file(g95_option.include_dirs, filename);
+    input = g95_open_included_file(filename);
   }
 
   if (input == NULL) {

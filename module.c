@@ -50,7 +50,6 @@ static int module_line, module_column;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
 
 static int sym_num;
-static g95_symtree *name_index;
 
 static g95_symbol **sym_table;
 
@@ -135,6 +134,17 @@ cleanup:
   return MATCH_ERROR;
 }
 
+
+/* find_use_name()-- Try to find the use name in the current list */
+
+static g95_use_rename *find_use_name(char *name) {
+g95_use_rename *u;
+
+  for(u=g95_rename_list; u; u=u->next)
+    if (strcmp(u->use_name, name) == 0) return u;
+
+  return NULL;
+}
 
 
 /*****************************************************************/
@@ -974,6 +984,22 @@ g95_actual_arglist *a, *tail;
 }
 
 
+
+/* mio_namespace()-- Read and write namespaces.  This subroutine is
+ * for reading and writing namespaces that contain formal parameters,
+ * not top-level module namespaces */
+
+void mio_namespace(g95_namespace *ns) {
+
+  mio_lparen();
+
+
+  mio_rparen();
+
+}
+
+
+
 static void mio_interface(g95_interface **p) {
 
 
@@ -1277,7 +1303,7 @@ g95_expr *e;
     break;
 
   case EXPR_CONSTANT:
-    switch(e->expr_type) {
+    switch(e->ts.type) {
     case BT_INTEGER:
       mio_gmp_integer(&e->value.integer);
       break;
@@ -1318,6 +1344,7 @@ g95_expr *e;
 static void mio_symbol(g95_symbol *sym) {
 
   mio_lparen();
+  mio_integer(&sym->serial);
 
   mio_typespec(&sym->ts);
   mio_symbol_attribute(&sym->attr);
@@ -1346,28 +1373,163 @@ static void mio_symbol(g95_symbol *sym) {
 /************************* Top level subroutines *************************/
 
 
+static char true_name[G95_MAX_SYMBOL_LEN+1],
+            true_module[G95_MAX_SYMBOL_LEN+1];
 
-static void read_ns(g95_namespace *ns) {
-int i, n;
+static g95_symbol *search_result;
+
+static void find_true_name(g95_symtree *symtree) {
+g95_symbol *sym;
+
+  sym = symtree->sym;
+
+  if (strcmp(sym->name, true_name) == 0 &&
+      strcmp(sym->module, true_module) == 0) 
+    search_result = sym;
+}
+
+
+/* skip_list()-- Skip a list between balenced left and right parens. */
+
+static void skip_list(void) {
+int level; 
+
+  level = 0;
+  do {
+    switch(parse_atom()) {
+    case ATOM_LPAREN:
+      level++;
+      break;
+
+    case ATOM_RPAREN:
+      level--;
+      break;
+
+    case ATOM_STRING:
+      g95_free(atom_string);
+      break;
+
+    case ATOM_NAME:
+    case ATOM_INTEGER:
+    case ATOM_EOF:
+      break;
+    }
+  } while(level > 0);
+}
+
+
+static void read_module(void) {
+int serial, ambiguous, i, n, new_flag;
+g95_symbol *sym, new;
+g95_use_rename *u;
+g95_symtree *st;
+
+  mio_lparen(); 
 
   require_atom(ATOM_INTEGER);
   n = atom_int;
 
-  name_index = g95_getmem(n*sizeof(g95_symtree *));
+  sym_table = g95_getmem(n*sizeof(g95_symbol *));
+
+  mio_lparen();
 
   for(i=0; i<n; i++) {
     require_atom(ATOM_NAME);
-    //    name_index[i] = get_symbol(atom_name);
+    strcpy(true_module, atom_name);
+
+    require_atom(ATOM_NAME);
+    strcpy(true_name, atom_name);
+
+    sym = NULL;
+    search_result = NULL;
+
+    if (check_module(true_module)) {  /* Search via brute force traversal */
+      g95_traverse_symtree(g95_current_ns, find_true_name);
+      sym = search_result;
+    }
+
+    if (sym == NULL) {
+      sym = g95_getmem(sizeof(g95_symbol));
+      strcpy(sym->name, true_name);
+      strcpy(sym->module, true_module);
+    }
+
+    sym_table[i] = sym;
+    sym->mark = (search_result == NULL);
   }
 
-  /* Read zero or more symbol definitions */
+  mio_rparen();
+
+  /* Read the symtree definitions */
+
+  mio_lparen();
 
   for(;;) {
     if (peek_atom() == ATOM_RPAREN) break;
-    //    read_symbol();
-  }
-}
 
+    mio_lparen();
+
+    require_atom(ATOM_NAME);
+
+    require_atom(ATOM_INTEGER);
+    serial = atom_int;
+
+    require_atom(ATOM_INTEGER);
+    ambiguous = atom_int;
+
+    mio_rparen();
+
+/* Figure out what to do with this name */
+
+    u = find_use_name(atom_name);
+
+    if (only_flag && u == NULL) continue;
+
+    if (u != NULL && u->local_name[0] != '\0')
+      strcpy(atom_name, u->local_name);
+
+    st = g95_get_symtree(atom_name, &new_flag);
+
+    if (new_flag) {
+      if (st->sym != sym_table[serial]) st->ambiguous = 1;
+    } else {
+      st->sym = sym_table[serial];
+      st->ambiguous = ambiguous;
+      st->sym->mark = 0;
+    }
+  }
+
+  mio_rparen();
+
+/* Get the symbol info */
+
+  mio_lparen();
+
+  for(;;) {
+    if (peek_atom() == ATOM_RPAREN) break;
+
+    mio_integer(&i);
+
+    if (sym_table[i]->mark)
+      skip_list();
+    else {
+      memset(&new, '\0', sizeof(g95_symbol));
+      mio_symbol(&new);
+
+      new.mark = 0;
+      *sym_table[i] = new;
+    }
+  }
+
+  mio_rparen();
+
+/* Clean up symbol nodes that were never loaded */
+
+  for(i=0; i<n; i++)
+    if (sym_table[i]->mark) g95_free(sym_table[i]);
+
+  g95_free(sym_table);
+}
 
 
 /* find_writables()-- Worker function called by g95_traverse_ns to
@@ -1407,12 +1569,18 @@ static void write_symbol(g95_symbol *sym) {
 
   switch(sym->attr.flavor) {
   case FL_DERIVED:
-    if (phase == 1) mio_symbol(sym);
+    if (phase == 1) {
+      mio_integer(&sym->serial);
+      mio_symbol(sym);
+    }
     break;
 
   case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
   case FL_PROCEDURE:    case FL_NAMELIST:    case FL_GENERIC:
-    if (phase == 2) mio_symbol(sym);
+    if (phase == 2) {
+      mio_integer(&sym->serial);
+      mio_symbol(sym);
+    }
     break;
 
   default:
@@ -1453,11 +1621,12 @@ static void write_symtree(g95_symtree *st) {
 
 static void write_module(void) {
 
+  mio_lparen();
+
   sym_num = 0;
 
   g95_traverse_ns(g95_current_ns, find_writables);
 
-  mio_lparen();
   write_atom(ATOM_INTEGER, &sym_num);
 
   mio_lparen();
@@ -1484,33 +1653,16 @@ static void write_module(void) {
 }
 
 
-/* mio_namespace()-- Read and write namespaces (modules).  This
- * subroutine is unlike all of the other mio_* subroutines in that the
- * reading mode updates an existing structure. */
-
-void mio_namespace(g95_namespace *ns) {
-g95_symtree *name_index_save;
-
-  name_index_save = name_index;
-  name_index = NULL;
-
-  mio_lparen();
-
-  /* The first task is to list the symbols we're about to spew */
-
-  mio_rparen();
-
-  if (name_index != NULL) g95_free(name_index);
-  name_index = name_index_save;
-}
-
 
 /* g95_dump_module()-- Given module, dump it to disk */
 
 void g95_dump_module(char *name) {
-char filename[G95_MAX_SYMBOL_LEN+5];
+char filename[PATH_MAX];
 
-  strcpy(filename, name);
+  filename[0] = '\0';
+  if (g95_option.module_dir != NULL) strcpy(filename, g95_option.module_dir);
+
+  strcat(filename, name);
   strcat(filename, MODULE_EXTENSION);
 
   module_fp = fopen(filename, "w");
@@ -1529,6 +1681,47 @@ char filename[G95_MAX_SYMBOL_LEN+5];
   if (fclose(module_fp))
     g95_fatal_error("Error writing module file '%s' for writing: %s", 
 		    filename, sys_errlist[errno]);
+}
+
+
+
+/* g95_use_module()-- Process a USE directive. */
+
+void g95_use_module(char *name) {
+char filename[G95_MAX_SYMBOL_LEN+5];
+g95_state_data *p;
+int c;
+
+  strcpy(filename, name);
+  strcat(filename, MODULE_EXTENSION);
+
+  module_fp = fopen(filename, "r");
+
+  if (module_fp == NULL)
+    g95_fatal_error("Can't open module file '%s' for reading: %s", 
+		    filename, sys_errlist[errno]);
+
+/* Skip the first line of the module */
+
+  for(;;) {
+    c = module_char();
+    if (c == EOF) bad_module("Unexpected end of module");
+    if (c == '\n') break;
+  }
+
+  iomode = IO_INPUT;
+
+  /* Make sure we're not reading the same module that we may be building */
+
+  for(p=g95_state_stack; p; p=p->previous)
+    if (p->state == COMP_MODULE && strcmp(p->sym->name, name) == 0)
+      g95_fatal_error("Can't USE the same module we're building!");
+
+  read_module();
+
+  fclose(module_fp);
+
+  save_modules();
 }
 
 

@@ -787,7 +787,8 @@ typedef struct g95_directorylist {
 typedef struct {
   char *source, *object;
   int verbose, pedantic, resolve, line_truncation, fixed_80, fmode;
-  g95_directorylist *include_dirs, *module_dirs;
+  g95_directorylist *include_dirs;
+  char *module_dir;
 } g95_option_t;
 
 extern g95_option_t g95_option;
@@ -835,7 +836,7 @@ extern g95_file *g95_current_file;
 
 void *g95_getmem(int);
 void g95_free(void *);
-FILE *g95_open_file(g95_directorylist *, const char *);
+FILE *g95_open_included_file(const char *);
 char *g95_typename(bt);
 void g95_show_typespec(g95_typespec *);
 
@@ -989,6 +990,7 @@ void g95_define_st_label(int, locus *, int);
 try g95_reference_st_label(int, g95_sl_type);
 
 g95_namespace *g95_get_namespace(void);
+g95_symtree *g95_get_symtree(char *, int *);
 void g95_free_symbol(g95_symbol *);
 g95_symbol *g95_find_symbol(char *, g95_namespace *);
 g95_symbol *g95_find_local_symbol(char *, g95_namespace *);

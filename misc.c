@@ -81,9 +81,10 @@ const char *p;
 
 
 
-/* g95_open_file()-- opens file for reading, searching thorugh list if necessary */
+/* g95_open_included_file()-- opens file for reading, searching through 
+   the include directories given if necessary */
 
-FILE *g95_open_file(g95_directorylist *list, const char *name) {
+FILE *g95_open_included_file(const char *name) {
 g95_directorylist *p;
 FILE *f;
 char fullname[PATH_MAX];
@@ -91,7 +92,7 @@ char fullname[PATH_MAX];
   f = fopen(name, "r"); 
   if (f != NULL) return f;
 
-  p = list;
+  p = g95_option.include_dirs;
   while(p != NULL) {
     strcpy(fullname, p->path);
     strcat(fullname, name);
@@ -234,7 +235,10 @@ static void display_help(void) {
     "  -ffixed-line-length-80  80 character line width in fixed mode\n"
     "  -pedantic               Warn about use of non-standard features\n"
     "  -r                      Run the resolution phase\n"
-    "  -I[directory]           Add directory to the include file search path\n"
+    "  -I[directory]           Append directory to the include/module\n"
+    "                          file search path\n"
+    "  -M[directory]           put generated module files in directory,\n"
+    "                          search there for modules"
     "\n"
     "See http://g95.sourceforge.net for more information.\n\n");
 
@@ -296,6 +300,28 @@ char *option;
     }
   }
 
+  if (option[0] == '-' && option[1] == 'M') {
+    if (g95_option.module_dir!=NULL) {
+      g95_status("g95: Only one -M option allowed\n");
+      exit(3);
+    }
+    if (option[2] != '\0') {
+      g95_option.module_dir = (char *)g95_getmem(strlen(&option[2])+2);
+      strcpy(g95_option.module_dir, &option[2]);
+      strcat(g95_option.module_dir, "/");
+      return 1;
+    } else {
+      if (argv[1][0] == '-') {
+	g95_status("g95: Directory required after -M\n");
+	exit(3);
+      }
+      g95_option.module_dir = (char *)g95_getmem(strlen(argv[1])+2);
+      strcpy(g95_option.module_dir, argv[1]);
+      strcat(g95_option.module_dir, "/");
+      return 2;
+    }
+  }
+
   if (option[0] == '-') {
     g95_status("g95: Unrecognised option '%s'\n", option);
     exit(3);
@@ -317,7 +343,7 @@ static void init_options(void) {
 
   g95_option.source = NULL;
   g95_option.include_dirs = NULL;
-  g95_option.module_dirs = NULL;
+  g95_option.module_dir = NULL;
   g95_option.verbose = 0;
   g95_option.pedantic = 0;
   g95_option.resolve = 0;
