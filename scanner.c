@@ -49,8 +49,6 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-locus current_loc;
-
 static g95_file *first_file;
 g95_file *g95_current_file;
 static int continue_flag, end_flag;

@@ -32,15 +32,10 @@ Boston, MA 02111-1307, USA.  */
 #include "intrinsic.h"
 
 
-extern g95_integer_info g95_integer_kinds[];
-extern g95_real_info g95_real_kinds[];
-
 int g95_intrinsic_extension;
 
-/* Pointers to a intrinsic function and its argument names being checked.
- * The mvbits() subroutine requires the most arguments-- five. */
-
-#define MAX_INTRINSIC_ARGS 5
+/* Pointers to a intrinsic function and its argument names being
+ * checked. */
 
 char *g95_current_intrinsic, *g95_current_intrinsic_arg[MAX_INTRINSIC_ARGS];
 locus *g95_current_intrinsic_where;

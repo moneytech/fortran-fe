@@ -589,7 +589,7 @@ g95_constructor *c;
  * elements in a constructor.  If we hit an iterator, we give up and
  * return -1.  */
 
-int count_elements(g95_constructor *c) {
+static int count_elements(g95_constructor *c) {
 g95_expr *e;
 int i, total;
 

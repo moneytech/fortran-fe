@@ -182,7 +182,7 @@ static void resolve_formal_arglists(g95_namespace *ns) {
  * If a function doesn't already have a type, the only way it can get
  * one is through an IMPLICIT type or a RESULT variable. */
 
-void resolve_contained_functions(g95_namespace *ns) {
+static void resolve_contained_functions(g95_namespace *ns) {
 g95_symbol *sym_upper, *sym_lower, *result;
 g95_namespace *child;
 
@@ -257,8 +257,7 @@ try t;
 
 typedef enum { PTYPE_GENERIC=1, PTYPE_SPECIFIC, PTYPE_UNKNOWN } proc_type;
 
-
-proc_type procedure_kind(g95_symbol *sym) {
+static proc_type procedure_kind(g95_symbol *sym) {
 g95_symbol *s;
 char *name;
 
@@ -1180,7 +1179,7 @@ g95_typespec ts;
  * the stored reference to references.  Component references can
  * provide an additional array specification. */
 
-void find_array_spec(g95_expr *e) {
+static void find_array_spec(g95_expr *e) {
 g95_array_spec *as;
 g95_component *c;
 g95_ref *ref;
@@ -1265,7 +1264,7 @@ int i;
 }
 
 
-try resolve_substring(g95_ref *ref) {
+static try resolve_substring(g95_ref *ref) {
 
   if (ref->u.ss.start != NULL) {
     if (g95_resolve_expr(ref->u.ss.start) == FAILURE) return FAILURE;

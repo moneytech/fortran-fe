@@ -484,8 +484,8 @@ mpf_t neg, term1, term2, x, xp;
 /* g95_arith_error()-- Given an arithmetic error code, return a
  * pointer to a string that explains the error. */
 
-const char *g95_arith_error(arith code) {
-const char *p;
+char *g95_arith_error(arith code) {
+char *p;
 
   switch(code) {
   case ARITH_OK:              p = "Arithmetic OK"; break;

@@ -22,11 +22,8 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "intrinsic.h"
 
-#include <ctype.h>
 #include <string.h>
 
-
-extern mpf_t mpf_pi, mpf_hpi, mpf_nhpi, mpf_tpi;
 
 static g95_expr *integer_zero, *real_zero;
 static mpf_t mpf_zero, mpf_half, mpf_one;

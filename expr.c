@@ -638,8 +638,6 @@ done:
 /* is_constant_constructor()-- Recursively checks all elements of a
  * constructor to see if everything is constant. */
 
-int g95_is_constant_expr(g95_expr *);
-
 static int is_constant_constructor(g95_constructor *c) {
 
   if (c == NULL) return 1;
@@ -1259,25 +1257,6 @@ try t;
   }
 
   return t;
-}
-
-
-/* g95_match_spec_expr()-- Match a specification expression. */
-
-match g95_match_spec_expr(g95_expr **result) {
-g95_expr *expr;
-match m;
-
-  m = g95_match_expr(&expr); 
-  if (m != MATCH_YES) return m;
-
-  if (check_spec_expr(expr) == FAILURE) {
-    g95_free_expr(expr);
-    return MATCH_ERROR;
-  }
-
-  *result = expr;
-  return MATCH_YES;
 }
 
 

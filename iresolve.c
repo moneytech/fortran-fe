@@ -65,7 +65,13 @@ int h;
  * of the resulting string.  If the name is not in the table, it is
  * added. */
 
-static char *get_string(const char *format, ...) {
+static char *get_string(char *format, ...)
+#ifdef __GNUC__
+__attribute__ ((format (printf, 1, 2)))
+#endif
+;
+
+static char *get_string(char *format, ...) {
 char temp_name[50];
 string_node *p;
 va_list ap;

@@ -1064,7 +1064,9 @@ extern int g95_statement_label;
 
 /* arith.c */
 
-const char *g95_arith_error(arith);
+extern mpf_t mpf_pi, mpf_hpi, mpf_nhpi, mpf_tpi;
+
+char *g95_arith_error(arith);
 void g95_arith_init_1(void);
 
 void natural_logarithm(mpf_t *, mpf_t *); 
@@ -1178,7 +1180,6 @@ try g95_add_pure(symbol_attribute *, locus *);
 try g95_add_recursive(symbol_attribute *, locus *);
 try g95_add_function(symbol_attribute *, locus *);
 try g95_add_subroutine(symbol_attribute *, locus *);
-try g95_add_generic(symbol_attribute *, locus *);
 
 try g95_add_access(symbol_attribute *, g95_access, locus *);
 try g95_add_flavor(symbol_attribute *, sym_flavor, locus *);
@@ -1198,7 +1199,7 @@ g95_symbol *g95_use_derived(g95_symbol *);
 g95_component *g95_find_component(g95_symbol *, const char *);
 void g95_show_components(g95_symbol *);
 
-int g95_new_internal_label();
+int g95_new_internal_label(void);
 void g95_define_st_label(int, locus *, g95_sl_type);
 try g95_reference_st_label(int, g95_sl_type);
 

@@ -1144,7 +1144,8 @@ int c;
 
 /* match_keyword_arg()-- Match a keyword argument. */
 
-match match_keyword_arg(g95_actual_arglist *actual, g95_actual_arglist *base) {
+static match match_keyword_arg(g95_actual_arglist *actual,
+			       g95_actual_arglist *base) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_actual_arglist *a;
 locus name_locus;

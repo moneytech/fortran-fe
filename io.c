@@ -22,7 +22,6 @@ Boston, MA 02111-1307, USA.  */
 /* io.c-- Deal with input/output statements */
 
 #include "g95.h"
-#include <string.h>
 
 
 typedef struct { 

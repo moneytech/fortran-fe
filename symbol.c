@@ -1374,7 +1374,7 @@ g95_st_label *lp;
 
 /* g95_new_internal_label() -- create a branch label for g95 internal use */
 
-int g95_new_internal_label() {
+int g95_new_internal_label(void) {
 static int next_label = 100000; /* only initialized at startup! */
 
   return next_label++;

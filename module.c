@@ -1769,38 +1769,11 @@ g95_namespace *ns;
 }
 
 
-/* append_interface()-- This subroutine is called when we load a
- * symbol, but the symbol is already present.  We still have to append
- * the interface information found in the module to the symbol in
- * memory, since additional interfaces could have been picked up along
- * the way.  This subroutine makes assumptions about where
- * mio_symbol() puts the interfaces with the symbol data. */
-
-void append_interface(symbol_info *info) {
-module_locus save;
-g95_symbol *sym;
-
-  get_module_locus(&save); 
-
-  set_module_locus(&info->where);
-  sym = info->sym;
-
-  mio_lparen();
-
-  skip_list();
-  skip_list();
-
-  mio_interface(&sym->generic);
-
-  set_module_locus(&save);
-}
-
-
 /* load_operator_interfaces()-- Load operator interfaces from the
  * module.  Interfaces are unusual in that they attach themselves to
  * existing symbols. */
 
-void load_operator_interfaces(void) {
+static void load_operator_interfaces(void) {
 char *p, name[G95_MAX_SYMBOL_LEN+1], module[G95_MAX_SYMBOL_LEN+1];
 g95_user_op *uop;
 
@@ -1831,7 +1804,7 @@ g95_user_op *uop;
  * Interfaces are unusual in that they attach themselves to existing
  * symbols.  */
 
-void load_generic_interfaces(void) {
+static void load_generic_interfaces(void) {
 char *p, name[G95_MAX_SYMBOL_LEN+1], module[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 

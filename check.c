@@ -33,10 +33,6 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "intrinsic.h"
 
-extern int g95_intrinsic_extension;
-extern char *g95_current_intrinsic, *g95_current_intrinsic_arg[5];
-extern locus *g95_current_intrinsic_where;
-
 
 /* must_be()-- The fundamental complaint function of this source file.
  * This function can be called in all kinds of ways. */

@@ -387,11 +387,11 @@ static int compare_type_rank_if(g95_symbol *s1, g95_symbol *s2) {
 }
 
 
-/* g95_find_keyword_arg()-- Given a formal argument list and a keyword
+/* find_keyword_arg()-- Given a formal argument list and a keyword
  * name, search the list for that keyword.  Returns the correct symbol
  * node if found, NULL if not found. */
 
-g95_symbol *g95_find_keyword_arg(char *name, g95_formal_arglist *f) {
+static g95_symbol *find_keyword_arg(char *name, g95_formal_arglist *f) {
 
   for(; f; f=f->next)
     if (strcmp(f->sym->name, name) == 0) return f->sym;
@@ -686,7 +686,7 @@ g95_symbol *sym;
     for(g=f1; g; g=g->next) {
       if (g->sym->attr.optional) continue;
 
-      sym = g95_find_keyword_arg(g->sym->name, f2_save);
+      sym = find_keyword_arg(g->sym->name, f2_save);
       if (sym == NULL || !compare_type_rank(g->sym, sym)) return 1;
     }
 

@@ -810,6 +810,7 @@ static try verify_st_order(st_state *p, g95_statement st) {
   case ST_IMPLICIT:
     if (p->state > ORDER_IMPLICIT) goto order;
     p->state = ORDER_IMPLICIT;
+    break;
 
   case ST_FORMAT:
   case ST_ENTRY:
