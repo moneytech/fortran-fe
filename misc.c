@@ -386,6 +386,11 @@ int i;
     return 1;
   }
 
+  if (strcmp(option, "-fquiet") == 0) {
+    g95_option.quiet = 1;
+    return 1;
+  }
+
   if (strcmp(option, "-i8") == 0) {
     g95_option.i8 = 1;
     return 1;
@@ -467,6 +472,7 @@ static void init_options(void) {
   g95_option.form = FORM_UNKNOWN;
   g95_option.i8 = 0;
   g95_option.q_kind = g95_default_double_kind();
+  g95_option.quiet = 0;
   g95_option.r8 = 0;
   g95_option.l1 = g95_default_logical_kind();
 }
@@ -502,7 +508,9 @@ int errors, warnings, i;
   g95_done_1();
 
   g95_get_errors(&warnings, &errors);
-  g95_status("Warnings: %d  Errors: %d\n", warnings, errors);
+
+  if (!g95_option.quiet)
+    g95_status("Warnings: %d  Errors: %d\n", warnings, errors);
 
   if (errors > 0) return 2;
   if (warnings > 0) return 1;
