@@ -35,6 +35,9 @@ typedef struct code_stack {
 static code_stack *cs_base = NULL;
 
 
+static int forall_flag;   /* Nonzero if we're inside a FORALL block */
+
+
 /* namespace_kind()-- Given a namespace, figure out what kind it is.
  * We return one of the g95_compile_state enums COMP_NONE,
  * COMP_MODULE, COMP_SUBROUTINE or COMP_FUNCTION. */
@@ -579,6 +582,28 @@ g95_typespec *ts;
 }
 
 
+/* pure_function()-- Figure out if if a function reference is pure or
+ * not.  Also sets the name of the function for a potential error
+ * message.  Returns nonzero if the function is PURE, zero if not. */
+
+static int pure_function(g95_expr *e, char **name) {
+int pure;
+
+  if (e->value.function.esym) {
+    pure = g95_pure(e->value.function.esym);
+    *name = e->value.function.esym->name;
+  } else if (e->value.function.isym) {
+    pure = e->value.function.isym->pure;
+    *name = e->value.function.isym->name;
+  } else {    /* Implicit functions are not pure */
+    pure = 0;
+    *name = e->value.function.name;
+  }
+
+  return pure;
+}
+
+
 /* resolve_function()-- Resolve a function call, which means resolving
  * the arguments, then figuring out which entity the name refers to.
  * TODO: Check procedure arguments so that an INTENT(IN) isn't passed
@@ -587,7 +612,6 @@ g95_typespec *ts;
 static try resolve_function(g95_expr *expr) {
 g95_actual_arglist *arg;
 char *name;
-int flag;
 try t;
 
   if (resolve_actual_arglist(expr->value.function.actual) == FAILURE)
@@ -621,41 +645,33 @@ try t;
   /* If the expression is still a function (it might have simplified),
    * then we check to see if we are calling an elemental function */
 
-  if (expr->expr_type == EXPR_FUNCTION) {
-    if (expr->value.function.actual != NULL &&
-	((expr->value.function.esym != NULL &&
-	  expr->value.function.esym->attr.elemental) ||
-	 (expr->value.function.isym != NULL &&
-	  expr->value.function.isym->elemental))) {
+  if (expr->expr_type != EXPR_FUNCTION) return t;
 
-      /* The rank of an elemental is the rank of its array argument(s) */
+  if (expr->value.function.actual != NULL &&
+      ((expr->value.function.esym != NULL &&
+	expr->value.function.esym->attr.elemental) ||
+       (expr->value.function.isym != NULL &&
+	expr->value.function.isym->elemental))) {
 
-      for(arg=expr->value.function.actual; arg; arg=arg->next) {
-	if (arg->expr != NULL && arg->expr->rank > 0) {
-	  expr->rank = arg->expr->rank;
-	  break;
-	}
+    /* The rank of an elemental is the rank of its array argument(s) */
+
+    for(arg=expr->value.function.actual; arg; arg=arg->next) {
+      if (arg->expr != NULL && arg->expr->rank > 0) {
+	expr->rank = arg->expr->rank;
+	break;
       }
     }
+  }
 
-    if (g95_pure(NULL)) {
-      if (expr->value.function.esym) {
-	flag = g95_pure(expr->value.function.esym);
-	name = expr->value.function.esym->name;
-      } else if (expr->value.function.isym) {
-	flag = expr->value.function.isym->pure;
-	name = expr->value.function.isym->name;
-      } else {
-        /* function declared implicitly, hence not pure */
-        flag = 0;
-        name = expr->value.function.name;
-      }
-
-      if (!flag) {
-	g95_error("Function reference to '%s' at %L is to a non-PURE "
-		  "procedure within a PURE procedure", name, &expr->where);
-	t = FAILURE;
-      }
+  if (!pure_function(expr, &name)) {
+    if (forall_flag) {
+      g95_error("Function reference to '%s' at %L is inside a FORALL block",
+		name, &expr->where);
+      t = FAILURE;
+    } else if (g95_pure(NULL)) {
+      g95_error("Function reference to '%s' at %L is to a non-PURE "
+		"procedure within a PURE procedure", name, &expr->where);
+      t = FAILURE;
     }
   }
 
@@ -667,9 +683,14 @@ try t;
 
 static void pure_subroutine(g95_code *c, g95_symbol *sym) {
 
-  if (!g95_pure(NULL) || g95_pure(sym)) return;
+  if (g95_pure(sym)) return;
 
-  g95_error("Subroutine call to '%s' at %L is not PURE", c->sub_name, &c->loc);
+  if (forall_flag)
+    g95_error("Subroutine call to '%s' in FORALL block at %L is not PURE",
+	      c->sub_name, &c->loc);
+  else if (g95_pure(NULL))
+    g95_error("Subroutine call to '%s' at %L is not PURE", c->sub_name,
+	      &c->loc);
 }
 
 
@@ -1682,6 +1703,7 @@ try t;
  * everything pointed to by this code block */
 
 void resolve_code(g95_code *code, g95_namespace *ns) {
+int forall_save=0;
 code_stack frame;
 g95_alloc *a;
 try t;
@@ -1693,8 +1715,14 @@ try t;
   for(; code; code=code->next) {
     frame.current = code; 
 
-    if (code->op != EXEC_WHERE || code->expr != NULL)
-      resolve_blocks(code->block, ns);
+    if (code->op == EXEC_FORALL) {
+      forall_save = forall_flag;
+      forall_flag = 1;
+    }
+
+    resolve_blocks(code->block, ns);
+
+    if (code->op == EXEC_FORALL) forall_flag = forall_save;
 
     t = g95_resolve_expr(code->expr);
     if (g95_resolve_expr(code->expr2) == FAILURE) t = FAILURE;
@@ -2202,6 +2230,7 @@ g95_data *d;
     g95_resolve(n);
   }
 
+  forall_flag = 0;
   g95_check_interfaces(ns);
 
   for(cl=ns->cl_list; cl; cl=cl->next) {
