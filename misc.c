@@ -22,6 +22,7 @@ Boston, MA 02111-1307, USA.  */
 /* misc.c-- Miscellaneous stuff that doesn't fit anywhere else */
 
 #include <stdlib.h>
+#include <string.h>
 #include "g95.h"
 
 g95_option_t g95_option;
@@ -49,6 +50,57 @@ void g95_free(void *p) {
 
 #define free temp
 #undef temp
+
+
+/* add_path()-- adds path to the list pointed to by list */
+
+void add_path(g95_directorylist **list, const char *path) {
+g95_directorylist *this; 
+
+  if (*path == '\0')
+    return; 
+
+  this = *list; 
+  if (this) {
+    while(this->next) {
+      this = this->next;
+    }
+    this->next = (g95_directorylist *)g95_getmem(sizeof(g95_directorylist));
+    this = this->next;
+  } else {
+    this = *list = (g95_directorylist *)g95_getmem(sizeof(g95_directorylist));
+  }
+
+  this->next = NULL;
+  this->path = (char *)g95_getmem(strlen(path)+1);
+  strcpy(this->path, path);
+  strcpy(&this->path[strlen(path)], "/"); /* make '/' last character */ 
+}
+
+
+
+/* g95_open_file()-- opens file for reading, searching thorugh list if necessary */
+
+FILE *g95_open_file(g95_directorylist *list, const char *name) {
+g95_directorylist *this;
+FILE *f;
+char fullname[PATH_MAX];
+
+  if((f = fopen(name, "r")) != NULL)
+    return f;
+
+  this = list;
+  while(this != NULL) {
+    strcpy(fullname, this->path);
+    strcat(fullname, name);
+    if((f = fopen(fullname, "r")) != NULL)
+      return f;
+    this = this->next;
+  }
+
+  return NULL;
+}
+    
 
 
 /* g95_typename()-- Return a string for each type */
@@ -212,12 +264,7 @@ char *option;
   }
 
   if (option[0] == '-' && option[1] == 'I') {
-    if(g95_option.includepath) {
-      g95_status("g95: Only one -I option allowed\n");
-      exit(3);
-    }
-    g95_option.includepath = (char *)g95_getmem(strlen(&option[2]));
-    strcpy(g95_option.includepath, &option[2]);
+    add_path(&g95_option.include_dirs, &option[2]);
     return 1;
   }
     
@@ -242,7 +289,8 @@ char *option;
 static void init_options(void) {
 
   g95_option.source = NULL;
-  g95_option.includepath = NULL;
+  g95_option.include_dirs = NULL;
+  g95_option.module_dirs = NULL;
   g95_option.verbose = 0;
   g95_option.pedantic = 0;
   g95_option.resolve = 0;

@@ -19,6 +19,7 @@ along with GNU G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
+#include <stdio.h> /* need FILE * here */
 
 /* g95.h-- It's probably insane to have just one header file, but it
  * seemed like everything had to be recompiled anyway when a change
@@ -750,11 +751,19 @@ typedef struct g95_data {
 #define g95_get_data() g95_getmem(sizeof(g95_data))
 
 
+/* Structure for holding module and include file search path */
+
+typedef struct g95_directorylist {
+  char *path;
+  struct g95_directorylist *next; 
+} g95_directorylist;
+
 /* Structure for holding compile options */
 
 typedef struct {
-  char *source, *object, *includepath;
+  char *source, *object;
   int verbose, pedantic, resolve, line_truncation, fixed_80;
+  g95_directorylist *include_dirs, *module_dirs;
 } g95_option_t;
 
 extern g95_option_t g95_option;
@@ -802,6 +811,7 @@ extern g95_file *g95_current_file;
 
 void *g95_getmem(int);
 void g95_free(void *);
+FILE *g95_open_file(g95_directorylist *, const char *);
 char *g95_typename(bt);
 void g95_show_typespec(g95_typespec *);
 
