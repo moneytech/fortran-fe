@@ -372,6 +372,16 @@ tree tmp;
 }
 
 
+/* set_flag()-- Set a member of the ioparm structure to one. */
+
+static void set_flag(stmtblock_t *block, tree var) {
+tree tmp;
+
+  tmp = build(COMPONENT_REF, TREE_TYPE(var), ioparm_var, var);
+  g95_add_modify_expr(block, tmp, integer_one_node);
+}
+
+
 /* add_case()-- Add a case to a IO-result switch */
 
 static void add_case(int label_value, g95_st_label *label, stmtblock_t *body) {
@@ -493,6 +503,8 @@ tree tmp;
 
   if (p->iostat) set_parameter_ref(&block, ioparm_iostat, p->iostat);
 
+  if (p->err) set_flag(&block, ioparm_err);
+
   tmp = g95_build_function_call(iocall_open, NULL_TREE);
   g95_add_expr_to_block(&block, tmp);
 
@@ -524,6 +536,8 @@ tree tmp;
 
   if (p->iostat) set_parameter_ref(&block, ioparm_iostat, p->iostat);
 
+  if (p->err) set_flag(&block, ioparm_err);
+
   tmp = g95_build_function_call(iocall_close, NULL_TREE);
   g95_add_expr_to_block(&block, tmp);
 
@@ -552,6 +566,8 @@ tree tmp;
   if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
 
   if (p->iostat) set_parameter_ref(&block, ioparm_iostat, p->iostat);
+
+  if (p->err) set_flag(&block, ioparm_err);
 
   tmp = g95_build_function_call(function, NULL);
   g95_add_expr_to_block(&block, tmp);
@@ -661,6 +677,8 @@ tree tmp;
   if (p->delim) set_string(&block, &post_block, ioparm_delim, ioparm_delim_len,
 			   p->delim);
 
+  if (p->err) set_flag(&block, ioparm_err);
+
   tmp = g95_build_function_call(iocall_inquire, NULL);
   g95_add_expr_to_block(&block, tmp);
 
@@ -716,15 +734,18 @@ tree tmp;
   }
 
   if (dt->format_expr == NULL &&
-      (dt->format_label == NULL || dt->format_label == &g95_format_asterisk)) {
-    unity = g95_int_expr(1);
-    set_parameter_value(&block, ioparm_list_format, unity);
-    g95_free_expr(unity);
-  }
+      (dt->format_label == NULL || dt->format_label == &g95_format_asterisk))
+    set_flag(&block, ioparm_list_format);
 
   if (dt->iostat) set_parameter_ref(&block, ioparm_iostat, dt->iostat);
 
   if (dt->size) set_parameter_ref(&block, ioparm_size, dt->size);
+
+  if (dt->err) set_flag(&block, ioparm_err);
+
+  if (dt->eor) set_flag(&block, ioparm_eor);
+
+  if (dt->end) set_flag(&block, ioparm_end);
 
   tmp = g95_build_function_call(*function, NULL_TREE);
   g95_add_expr_to_block(&block, tmp);
