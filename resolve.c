@@ -1844,14 +1844,14 @@ try t;
 	  continue;
 	}
 
-	if (attr.pointer) continue;
+	if (!attr.dimension) continue;
 
 	ref = a->expr->ref;
 	while(ref && ref->next)
 	  ref = ref->next;
 
 	if (ref == NULL || ref->type != REF_ARRAY ||
-	    ref->type == AR_FULL) {
+	    ref->u.ar.type == AR_FULL) {
 	  g95_error("Array specification required in ALLOCATE statement "
 		    "at %L", &a->expr->where);
 	  continue;
