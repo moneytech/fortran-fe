@@ -1097,10 +1097,23 @@ static void resolve_symbol(g95_symbol *sym) {
     }
   }
 
-  if (sym->ts.type == BT_UNKNOWN &&
-      (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER ||
-       (sym->attr.flavor == FL_PROCEDURE && sym->attr.function)))
-    g95_set_default_type(sym, 0, NULL);
+  /* Assign default type to symbols that need one and don't have one */
+
+  if (sym->ts.type == BT_UNKNOWN) {
+    if (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER)
+      g95_set_default_type(sym, 0, NULL);
+
+    if (sym->attr.flavor == FL_PROCEDURE && sym->attr.function) {
+      if (sym->result == sym || sym->result == NULL)
+	g95_set_default_type(sym, 0, NULL);
+      else {
+	resolve_symbol(sym->result);  /* Result may be in another namespace */
+
+	sym->ts = sym->result->ts;
+	sym->as = g95_copy_array_spec(sym->result->as);
+      }
+    }
+  }
 
   if (sym->as != NULL && sym->as->type == AS_ASSUMED_SIZE &&
       sym->attr.dummy == 0) {
@@ -1141,25 +1154,6 @@ static void resolve_symbol(g95_symbol *sym) {
 }
 
 
-/* copy_result_type()-- Looks at symbols that are function nodes of
- * unknown type with RESULT variables.  This has to happen before we
- * set default types of all symbols, because the function's default
- * type might get set before the result's. */
-
-void copy_result_type(g95_symbol *sym) {
-g95_symbol *result;
-
-  if (!sym->attr.function || sym->ts.type != BT_UNKNOWN ||
-      sym->result == NULL) return;
-
-  result = sym->result;
-
-  if (result->ts.type != BT_UNKNOWN ||
-      g95_set_default_type(result, 1, NULL) == SUCCESS)
-    sym->ts = result->ts;
-}
-
-
 /* g95_resolve()-- This function is called after a complete program
  * unit has been compiled.  Its purpose is to examine all of the
  * expressions associated with a program unit, assign types to all
@@ -1177,8 +1171,6 @@ g95_charlen *cl;
   g95_check_interfaces(ns);
 
   resolve_contained_functions(ns);
-
-  g95_traverse_ns(ns, copy_result_type);
 
   g95_traverse_ns(ns, resolve_symbol);
 
