@@ -882,9 +882,12 @@ try g95_check_pack(g95_expr *array, g95_expr *mask, g95_expr *vector) {
 
   if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (array_check(mask, 1) == FAILURE) return FAILURE;
-
   if (type_check(mask, 1, BT_LOGICAL) == FAILURE) return FAILURE;
+
+  if (mask->rank != 0 && mask->rank != array->rank) {
+    must_be(array, 0, "conformable with 'mask' argument");
+    return FAILURE;
+  }
 
   if (vector != NULL) {
     if (same_type_check(array, 0, vector, 2) == FAILURE) return FAILURE;
