@@ -1403,12 +1403,9 @@ int seen_else;
 /* parse_select_block()-- Parse a SELECT block */
 
 static void parse_select_block(void) {
-int seen_default;
 g95_statement st;
 g95_code *cp;
 g95_state_data s;
-
-  seen_default = 0;
 
   accept_statement(ST_SELECT_CASE);
 
@@ -1437,8 +1434,7 @@ g95_state_data s;
 
   cp = g95_new_level(cp);
   *cp = new_st;
-  if (cp->ext.case_list->low == NULL && cp->ext.case_list->high == NULL) 
-      seen_default = 1; /* CASE DEFAULT is the first case */
+
   accept_statement(st);
 
   do {
@@ -1452,12 +1448,6 @@ g95_state_data s;
       *cp = new_st;
       g95_clear_new_st();
       accept_statement(st);
-      if (cp->ext.case_list->low == NULL && cp->ext.case_list->high == NULL) {
-        if (seen_default) {
-          g95_error("Second occurrence of a default case at %C "
-                    "in SELECT CASE block");
-        } else seen_default = 1;
-      }
       break;
 
     case ST_END_SELECT:

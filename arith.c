@@ -1426,8 +1426,10 @@ int rc;
     break;
 
   case BT_LOGICAL:
-    rc = ((!op1->value.logical && op2->value.logical) ||
-	  (op1->value.logical && !op2->value.logical));
+    rc = (!!op1->value.logical) - (!!op2->value.logical);
+
+    if (rc < 0) rc = -1;
+    if (rc > 0) rc = 1;
     break;
 
   default: g95_internal_error("g95_compare_expr(): Bad basic type");

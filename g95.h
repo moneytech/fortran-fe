@@ -770,14 +770,11 @@ typedef struct g95_equiv {
 typedef struct g95_case {
   g95_expr *low, *high;
 
-  struct g95_case *link[2], *next;
-  struct g95_code *code; /* back link to g95_code block for this case */
+  locus where;
+  int n;
 
-  int balance;
-  char cache;		 /* used during insertion in AVL tree */
-
-  int label;             /* used during character select resolution */
-
+  struct g95_case *next, *cprev, *cnext;
+  struct g95_code *code; /* Code block for this case */
 } g95_case;
 
 #define g95_get_case() g95_getmem(sizeof(g95_case))

@@ -489,97 +489,401 @@ g95_trans_do_while (g95_code * code)
   return g95_finish_block (&block);
 }
 
-tree
-g95_trans_select (g95_code * code)
-{
-  g95_code *c;
-  g95_case *cp;
-  tree end_label;
-  tree tmp;
-  tree low;
-  tree high;
-  g95_se se;
-  stmtblock_t block;
-  stmtblock_t body;
-  g95_expr *expr;
-  int kind;
 
-  /* Normal select statements put the condition in expr, computed GOTO
-     statements put it in expr2.  */
-  if (code->expr)
-    expr = code->expr;
-  else
-    expr = code->expr2;
+/* logical_select()-- Build a logical selection statement. */
 
-  if (expr->ts.type != BT_INTEGER)
-    g95_todo_error ("non-integer switch statements");
+static tree logical_select(g95_code *code, g95_expr *selector) {
+g95_case *c, *true_case, *false_case, *default_case;
+stmtblock_t block, body;
+tree tmp, end_label;
+g95_se se;
 
-  g95_start_block (&block);
+  true_case = false_case = default_case = NULL;
 
-  g95_init_se (&se, NULL);
-  g95_conv_expr_val (&se, expr);
-  g95_add_block_to_block (&block, &se.pre);
+  c = code->block->ext.case_list;
 
-  kind = expr->ts.kind;
+  while(c->cprev != NULL)
+    c = c->cprev;
 
-  end_label = g95_build_label_decl (NULL_TREE);
+  /* Extract out the cases */
 
-  g95_init_block (&body);
-
-  for (c = code->block; c; c = c->block)
-    {
-      for (cp = c->ext.case_list; cp; cp = cp->next)
-        {
-          if (! (cp->low || cp->high))
-            {
-              /* Case DEFAULT.  */
-              low = high = NULL_TREE;
-            }
-          else
-            {
-              if (cp->low)
-                low = g95_conv_mpz_to_tree (cp->low->value.integer, kind);
-              else
-                g95_todo_error ("unbounded case ranges");
-
-              if (cp->high)
-                {
-                  if (mpz_cmp (cp->low->value.integer,
-                               cp->high->value.integer) != 0)
-                    {
-                      high = g95_conv_mpz_to_tree (cp->high->value.integer,
-                                                   kind);
-                    }
-                  else
-                    high = NULL_TREE;
-                }
-              else
-                g95_todo_error ("unbounded case ranges");
-            }
-
-          /* Add this case label.  */
-          tmp = build_v (CASE_LABEL_EXPR, low, high);
-          g95_add_expr_to_block (&body, tmp);
-        }
-
-      /* Add the statements for this case.  */
-      tmp = g95_trans_code (c->next);
-      g95_add_expr_to_block (&body, tmp);
-
-      /* Break to the end of the loop.  */
-      tmp = build_v (GOTO_EXPR, end_label);
-      g95_add_expr_to_block (&body, tmp);
+  for(; c; c=c->cnext) {
+    if (c->low == NULL && c->high == NULL) {
+      default_case = c;
+      continue;
     }
 
-  tmp = g95_finish_block (&body);
-  tmp = build_v (SWITCH_EXPR, se.expr, tmp, NULL_TREE);
-  g95_add_expr_to_block (&block, tmp);
+    if (c->low->value.logical)
+      true_case = c;
+    else
+      false_case = c;
+  }
 
-  tmp = build_v (LABEL_EXPR, end_label);
-  g95_add_expr_to_block (&block, tmp);
+  g95_start_block(&block);
+  g95_init_block(&body);
 
-  return g95_finish_block (&block);
+  g95_init_se(&se, NULL);
+  g95_conv_expr_val(&se, selector);
+
+  end_label = g95_build_label_decl(NULL_TREE);
+
+  if (false_case != NULL) {
+    tmp = build_v(CASE_LABEL_EXPR, integer_zero_node, NULL_TREE);
+    g95_add_expr_to_block(&body, tmp);
+
+    tmp = g95_trans_code(false_case->code);
+    g95_add_expr_to_block(&body, tmp);
+
+    tmp = build_v(GOTO_EXPR, end_label);
+    g95_add_expr_to_block(&body, tmp);
+  }
+
+  if (true_case != NULL) {
+    tmp = build_v(CASE_LABEL_EXPR, integer_one_node, NULL_TREE);
+    g95_add_expr_to_block(&body, tmp);
+
+    tmp = g95_trans_code(true_case->code);
+    g95_add_expr_to_block(&body, tmp);
+
+    tmp = build_v(GOTO_EXPR, end_label);
+    g95_add_expr_to_block(&body, tmp);
+  }
+
+  if (default_case != NULL) {
+    tmp = build_v(CASE_LABEL_EXPR, NULL_TREE, NULL_TREE);
+    g95_add_expr_to_block(&body, tmp);
+
+    tmp = g95_trans_code(default_case->code);
+    g95_add_expr_to_block(&body, tmp);
+
+    tmp = build_v(GOTO_EXPR, end_label);
+    g95_add_expr_to_block(&body, tmp);
+  }
+
+  tmp = g95_finish_block(&body);
+  tmp = build_v(SWITCH_EXPR, convert(g95_int4_type_node, se.expr),
+		tmp, NULL_TREE);
+
+  g95_add_expr_to_block(&block, tmp);
+
+  tmp = build_v(LABEL_EXPR, end_label);
+  g95_add_expr_to_block(&block, tmp);
+
+  return g95_finish_block(&block);
 }
+
+
+/* character_select()-- Implement a character SELECT statement.
+ * Instead of generating compares and jumps, it is far simpler to
+ * generate a data structure describing the cases in order and call a
+ * library subroutine that locates the right case.  This is
+ * particularly true because this is the only case where we might have
+ * to dispose of a temporary.  The library subroutine returns a
+ * pointer to jump to or NULL if no branches are to be taken. */
+
+static tree character_select(g95_code *code, g95_expr *selector) {
+
+tree init, node, end_label, tmp, args, *labels;
+stmtblock_t block, body;
+g95_case *cp, *d;
+g95_code *c;
+g95_se se;
+int i, n;
+
+static tree select_struct, ss_string1, ss_string1_len,
+            ss_string2, ss_string2_len, ss_target;
+
+  if (select_struct == NULL) {
+    select_struct = make_node(RECORD_TYPE);
+
+    TYPE_NAME(select_struct) = get_identifier("_jump_struct");
+  
+    ss_string1     = g95_add_field(select_struct, "string1", pchar_type_node);
+    ss_string1_len = g95_add_field(select_struct, "string1_len",
+				   g95_int4_type_node);
+
+    ss_string2     = g95_add_field(select_struct, "string2", pchar_type_node);
+    ss_string2_len = g95_add_field(select_struct, "string2_len",
+				   g95_int4_type_node);
+
+    ss_target      = g95_add_field(select_struct, "target", pvoid_type_node);
+
+    g95_finish_type(select_struct);
+  }
+
+  cp = code->block->ext.case_list;
+  while(cp->cprev != NULL)
+    cp = cp->cprev;
+
+  n = 0;
+  for(d=cp; d; d=d->cnext)
+    d->n = n++;
+
+  if (n != 0) labels = g95_getmem(n*sizeof(tree));
+
+  for(i=0; i<n; i++)
+    labels[i] = g95_build_label_decl(NULL_TREE);
+
+  end_label = g95_build_label_decl(NULL_TREE);
+
+/* Generate the body */
+
+  g95_start_block(&block);
+  g95_init_block(&body);
+
+  for(c=code->block; c; c=c->block) {
+    for(d=c->ext.case_list; d; d=d->next) {
+      tmp = build_v(LABEL_EXPR, labels[d->n]);
+      g95_add_expr_to_block(&body, tmp);
+    }
+
+    tmp = g95_trans_code(c->next);
+    g95_add_expr_to_block(&body, tmp);
+
+    tmp = build_v(GOTO_EXPR, end_label);
+    g95_add_expr_to_block(&body, tmp);
+  }
+
+/* Generate the structure describing the branches */
+
+  init = NULL_TREE;
+
+  i = 0;
+  for(d=cp; d; d=d->cnext, i++) {
+    node = NULL_TREE;
+
+    g95_init_se(&se, NULL);
+
+    if (d->low == NULL) {
+      node = tree_cons(ss_string1, null_pointer_node, node);
+      node = tree_cons(ss_string1_len, integer_zero_node, node);
+    } else {
+      g95_conv_expr_reference(&se, d->low);
+
+      node = tree_cons(ss_string1, se.expr, node);
+      node = tree_cons(ss_string1_len, se.string_length, node);
+    }
+
+    if (d->high == NULL) {
+      node = tree_cons(ss_string2, null_pointer_node, node);
+      node = tree_cons(ss_string2_len, integer_zero_node, node);
+    } else {
+      g95_init_se(&se, NULL);
+      g95_conv_expr_reference(&se, d->high);
+
+      node = tree_cons(ss_string2, se.expr, node);
+      node = tree_cons(ss_string2_len, se.string_length, node);
+    }
+
+    tmp = build1(ADDR_EXPR, pvoid_type_node, labels[i]);
+    node = tree_cons(ss_target, tmp, node);
+
+    tmp = build(CONSTRUCTOR, select_struct, NULL_TREE, nreverse(node));
+    init = tree_cons(NULL_TREE, tmp, init);
+  }
+
+  tmp = build_array_type(select_struct, build_index_type(build_int_2(n-1, 0)));
+
+  init = build(CONSTRUCTOR, tmp, NULL_TREE, nreverse(init));
+  TREE_CONSTANT(init) = 1;
+  TREE_STATIC(init) = 1;
+
+  /* Build an argument list for the library call */
+
+  init = build1(ADDR_EXPR, pvoid_type_node, init);
+  args = g95_chainon_list(NULL_TREE, init);
+
+  tmp = build_int_2(n, 0);
+  args = g95_chainon_list(args, tmp);
+
+  tmp = build1(ADDR_EXPR, pvoid_type_node, end_label);
+  args = g95_chainon_list(args, tmp);
+
+  g95_init_se(&se, NULL);
+  g95_conv_expr_reference(&se, selector);
+
+  args = g95_chainon_list(args, se.expr);
+  args = g95_chainon_list(args, se.string_length);
+
+  g95_add_block_to_block(&block, &se.pre);
+
+  tmp = g95_build_function_call(library_select_string, args);
+  tmp = build1(GOTO_EXPR, void_type_node, tmp);
+  g95_add_expr_to_block(&block, tmp);
+
+  tmp = g95_finish_block(&body);
+  g95_add_expr_to_block(&block, tmp);
+
+  tmp = build_v(LABEL_EXPR, end_label);
+  g95_add_expr_to_block(&block, tmp);
+
+  if (n != 0) g95_free(labels);
+
+  return g95_finish_block(&block);
+}
+
+
+/* integer_select()-- Build an integer selection statement */
+
+static tree integer_select(g95_code *code, g95_expr *selector) {
+tree end_label, ulow_label, uhigh_label, tmp, low, high, goto_expr;
+g95_case *cp, *unbounded_low, *unbounded_high;
+stmtblock_t block, body;
+g95_code *c;
+g95_se se;
+int kind;
+
+  g95_start_block(&block);
+
+  g95_init_se(&se, NULL);
+  g95_conv_expr_val(&se, selector);
+
+  kind = selector->ts.kind;
+
+  end_label = g95_build_label_decl(NULL_TREE);
+
+  g95_init_block(&body);
+
+  /* Look for the unbounded low and unbounded high cases. */
+
+  unbounded_low = NULL;
+  unbounded_high = NULL;
+
+  ulow_label = NULL_TREE;
+  uhigh_label = NULL_TREE;
+
+  cp = code->block->ext.case_list;
+
+  while(cp->cnext != NULL)
+    cp = cp->cnext;
+
+  if (cp->high == NULL) {
+    unbounded_low = cp;
+    ulow_label = g95_build_label_decl(NULL_TREE);
+  }
+
+  cp = code->block->ext.case_list;
+
+  while(cp->cprev != NULL)
+    cp = cp->cprev;
+
+  /* The unbounded high is the first or second element */
+
+  if (cp->low == NULL && cp->high != NULL)
+    unbounded_high = cp;
+  else {
+    cp = cp->cnext;
+    if (cp != NULL && cp->low == NULL && cp->high != NULL) unbounded_high = cp;
+  }
+
+  if (unbounded_high != NULL) uhigh_label = g95_build_label_decl(NULL_TREE);
+
+  if (unbounded_high != NULL || unbounded_low != NULL)
+    g95_make_safe_expr(&se);
+
+  g95_add_block_to_block(&block, &se.pre);
+
+/* Build branch statements to the unbounded cases */
+
+  if (unbounded_high != NULL) {
+    high = g95_conv_mpz_to_tree(unbounded_high->high->value.integer, kind);
+    tmp = build(LE_EXPR, boolean_type_node, se.expr, high);
+
+    goto_expr = build_v(GOTO_EXPR, uhigh_label);
+
+    tmp = build_v(COND_EXPR, tmp, goto_expr, empty_stmt_node);
+    g95_add_expr_to_block(&block, tmp);
+  }
+
+  if (unbounded_low != NULL) {
+    low = g95_conv_mpz_to_tree(unbounded_low->low->value.integer, kind);
+    tmp = build(GE_EXPR, boolean_type_node, se.expr, low);
+
+    goto_expr = build_v(GOTO_EXPR, ulow_label);
+
+    tmp = build_v(COND_EXPR, tmp, goto_expr, empty_stmt_node);
+    g95_add_expr_to_block(&block, tmp);
+  }
+
+  /* Build the body */
+
+  for(c=code->block; c; c=c->block) {
+    for(cp=c->ext.case_list; cp; cp=cp->next) {
+      if (cp == unbounded_low) {
+	tmp = build_v(LABEL_EXPR, ulow_label);
+	g95_add_expr_to_block(&body, tmp);
+	continue;
+      }
+
+      if (cp == unbounded_high) {
+	tmp = build_v(LABEL_EXPR, uhigh_label);
+	g95_add_expr_to_block(&body, tmp);
+	continue;
+      }
+
+      if (cp->low == NULL && cp->high == NULL)  /* Case DEFAULT.  */
+	low = high = NULL_TREE;
+      else {
+	low = g95_conv_mpz_to_tree(cp->low->value.integer, kind);
+
+	if (cp->low == cp->high)
+	  high = NULL_TREE;
+	else
+	  high = g95_conv_mpz_to_tree(cp->high->value.integer, kind);
+      }
+
+      /* Add this case label.  */
+
+      tmp = build_v(CASE_LABEL_EXPR, low, high);
+      g95_add_expr_to_block(&body, tmp);
+    }
+
+    /* Add the statements for this case.  */
+
+    tmp = g95_trans_code(c->next);
+    g95_add_expr_to_block(&body, tmp);
+
+    /* Break to the end of the loop. */
+
+    tmp = build_v(GOTO_EXPR, end_label);
+    g95_add_expr_to_block(&body, tmp);
+  }
+
+  tmp = g95_finish_block(&body);
+  tmp = build_v(SWITCH_EXPR, se.expr, tmp, NULL_TREE);
+  g95_add_expr_to_block(&block, tmp);
+
+  tmp = build_v(LABEL_EXPR, end_label);
+  g95_add_expr_to_block(&block, tmp);
+
+  return g95_finish_block(&block);
+}
+
+
+/* g95_trans_select()-- Translate a SELECT block */
+
+tree g95_trans_select(g95_code *code) {
+g95_expr *expr;
+tree tmp;
+
+  /* Normal select statements put the condition in expr, computed GOTO
+   * statements put it in expr2. */
+
+  expr = (code->expr == NULL) ? code->expr2 : code->expr;
+
+  switch(expr->ts.type) {
+  case BT_INTEGER:    tmp = integer_select(code, expr);    break;
+  case BT_LOGICAL:    tmp = logical_select(code, expr);    break;
+  case BT_CHARACTER:  tmp = character_select(code, expr);  break;
+  default:
+    g95_internal_error("g95_trans_select(): Bad type");
+    tmp = NULL_TREE;
+  }
+
+  return tmp;
+}
+
+
 
 static tree
 g95_trans_forall_loop (tree * var, tree * start, tree * end, tree * step,

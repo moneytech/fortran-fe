@@ -22,269 +22,19 @@ Boston, MA 02111-1307, USA.  */
 /* select.c-- Handle the SELECT CASE statement. */
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "g95.h"
 
-/* Structure which holds information about the AVL tree.
- * Node in this tree are of type "struct g95_case *". */
-typedef struct case_tree {
-  g95_case root;		/* Tree root node is in root->link[0]. */
-  g95_case *default_case;       /* Cannot store in AVL, so keep it here */
-  g95_case *unbounded[2];       /* Holds unbounded cases, 0 = low, 1 = high */
-}
-case_tree;
+static int overlap;
 
 
-/* compare_cases() -- helper function for overlap checker.
- * determines interval overlaps for CASEs. Return <0 if op1 < op2,
- * 0 for overlap, >0 for op1 > op2. 
- * Assumes we're not dealing with unbounded or default cases */
-
-static int compare_cases(g95_case *op1, g95_case *op2) {
-
-  if (g95_compare_expr(op1->high, op2->low) < 0) return -1;
-  if (g95_compare_expr(op1->low, op2->high) > 0) return 1;
-  return 0;
-}
-
-
-/* avl_create() -- Set up a new AVL tree. Free a tree with g95_free() */
-
-static case_tree *avl_create(void) {
-case_tree *tree;
-  tree = g95_getmem(sizeof(case_tree));
-  tree->root.link[0] = tree->root.link[1] = NULL; 
-  tree->default_case = NULL;
-  tree->unbounded[0] = tree->unbounded[1] = NULL; 
-  return tree;
-}
-
-
-/* check_case_overlap() -- Look for and repport overlapping CASEs.
- * Returns FAILURE if overlap is found, and adds the new case and 
- * returns SUCCESS otherwise. CASEs are put into an AVL tree instead 
- * of a linked list to minimize search time at runtime for SELECT CASE
- * blocks where the evaluation expression is of type CHARACTER. Code
- * for such SELECT blocks will be generated from the AVL tree because
- * the GCC backend doesn't support them.
- *
- * AVL insert routine is a modified version of that found in
- * Ben Pfaff's GNU libavl. Uses Knuth's Algorithm 6.2.3A but caches
- * results of comparisons */
-
-static try check_case_overlap(case_tree *tree, g95_case *cp)
-{
-g95_case *t, *s, *p, *q, *r;
-g95_expr *e1, *e2;
-int i;
-
-  t = &tree->root;
-  s = p = t->link[0];
-
-  /* intercept the default case and unbounded cases */
-  if (cp->low == NULL || cp->high == NULL) {
-
-    if (cp->low == NULL && cp->high == NULL) { /* default case */
-      tree->default_case = cp;
-      return SUCCESS;
-    }
-
-    i = (cp->low == NULL) ?  0 : 1;
-    s = tree->unbounded[i];
-    if (s != NULL) { /* already seen this unbounded case? */
-      p = s;
-      goto overlap;
-    }
-    tree->unbounded[i] = cp;
-
-    /* unbounded cases can only overlap with leftmost or rightmost node */
-    if (p != NULL) { /* could be an empty tree */
-      while(p->link[i] != NULL) 
-        p = p->link[i];
-      if (i == 0) {
-        if (g95_compare_expr(cp->high,p->low) >= 0) goto overlap;
-      } else {
-        if (g95_compare_expr(cp->low,p->high) <= 0) goto overlap;
-      }
-    }
-
-    return SUCCESS;
-  }
-
-  /* This is were we're going to build the tree */
-  if (s == NULL) { /* tree is empty */
-    q = t->link[0] = cp;
-    q->link[0] = q->link[1] = NULL;
-    q->balance = 0;
-    return SUCCESS;
-  }
-
-  for (;;) { /* search the tree */
-    int diff = compare_cases(cp, p);
-
-    if (diff < 0) { /* all values in range for *cp are smaller than  *p->low */
-      p->cache = 0;
-      q = p->link[0];
-      if (q == NULL) {
-        p->link[0] = q = cp;
-        break;
-      }
-    } else if (diff > 0) { /* value range for *cp is smaller than for *p */
-      p->cache = 1;
-      q = p->link[1];
-      if (q == NULL) {
-        p->link[1] = q = cp;
-        break;
-      }
-    } else goto overlap; /* overlaps with prior CASE */
-
-    if (q->balance != 0) t = p, s = q;
-    p = q;
-  }
-  
-  q->link[0] = q->link[1] = NULL;
-  q->balance = 0;
-
-  /* Update balance for affected subtree */
-  r = p = s->link[(int) s->cache];
-  while (p != q) {
-    p->balance = p->cache * 2 - 1;
-    p = p->link[(int) p->cache];
-  }
-
-  /* Check tree balance */
-  if (s->cache == 0) { /* node was inserted into left subtree */
-    if (s->balance == 0) { /* node balance was neutral */
-      s->balance = -1;
-      return SUCCESS;
-    } else if (s->balance == +1) { /* was right heavy */
-      s->balance = 0;
-      return SUCCESS;
-    }
-
-    /* node was left heavy, so we need rotations */      
-    if (r->balance == -1) {
-      p = r;
-      s->link[0] = r->link[1];
-      r->link[1] = s;
-      s->balance = r->balance = 0;
-    } else {
-      p = r->link[1];
-      r->link[1] = p->link[0];
-      p->link[0] = r;
-      s->link[0] = p->link[1];
-      p->link[1] = s;
-      if (p->balance == -1) 
-        s->balance = 1, r->balance = 0;
-      else if (p->balance == 0)
-        s->balance = r->balance = 0;
-      else {
-        s->balance = 0;
-        r->balance = -1;
-      }
-      p->balance = 0;
-    }
-  } 
-
-  else { /* node was inserted into right subtree */
-    if (s->balance == 0) {
-      s->balance = 1;
-      return SUCCESS;
-    }
-    else if (s->balance == -1) {
-      s->balance = 0;
-      return SUCCESS;
-    }
-
-    if (r->balance == +1) {
-      p = r;
-      s->link[1] = r->link[0];
-      r->link[0] = s;
-      s->balance = r->balance = 0;
-    } else {
-      p = r->link[0];
-      r->link[0] = p->link[1];
-      p->link[1] = r;
-      s->link[1] = p->link[0];
-      p->link[0] = s;
-      if (p->balance == +1)
-        s->balance = -1, r->balance = 0;
-      else if (p->balance == 0)
-        s->balance = r->balance = 0;
-      else {
-        s->balance = 0, r->balance = 1;
-      }
-      p->balance = 0;
-    }
-  }
-
-  /* reconnect subtree */
-  if (t != &tree->root && s == t->link[1])
-    t->link[1] = p;
-  else
-    t->link[0] = p;
-
-  return SUCCESS;
-
-overlap:
-  e1 = (cp->low == NULL) ? cp->high : cp->low; /* avoid SIGSEGV */
-  e2 = (p->low == NULL) ? p->high : p->low;
-  g95_error("CASE value range at %L overlaps with prior CASE statement at %L", 
-            &e1->where, &e2->where); 
-  return FAILURE;  
-}
-
-/* sane_logical_select() -- Make sure there are only two CASE labels for
- * a SELECT CASE construct if the selector expression is of type
- * LOGICAL. */
-
-static try sane_logical_select(case_tree *tree) {
-g95_case *t;
-int deflt, leaves;
-try result;
- 
-  result = SUCCESS;
-  t = tree->root.link[0];
-
-  /* deflt is nonzero if we have a default case. */
-  deflt = (tree->default_case != NULL);
-
-  /* See what other cases we have.  */
-  if (t)  /* could have been empty tree.  */
-    leaves = (t->link[0] == NULL && t->link[1] == NULL) ? 1 : 2;
-  else
-    leaves = 0;
-
-  if (leaves == 2 && deflt) result = FAILURE; /* 3 cases for logical... */
-
-  return result;
-}
-
-#if 0
-/* traverse_tree() -- visits root, then left, then right (RLN).
- * This is a first step towards generating code for CHARACTER cases. */
-
-static void traverse_tree(g95_case *tree, int depth) {
-  if (tree == NULL) return;
-#if 0 
-  generate_cmps_and_jmps();
-#endif
-  traverse_tree(tree->link[0], depth + 1);
-  traverse_tree(tree->link[1], depth + 1);
-}
-#endif
-
-/* free_case()-- Free a single case structure */
+/* free_case()-- Free a single case structure. */
 
 static void free_case(g95_case *p) {
 
-  if (p->low == NULL || p->high == NULL) {
-    if (p->low != NULL) g95_free_expr(p->low);
-    if (p->high != NULL) g95_free_expr(p->high);
-  } else {
-    g95_free_expr(p->low);
-    if (p->high != p->low) g95_free_expr(p->high);
-  }
+  g95_free_expr(p->low);
+  if (p->high != p->low) g95_free_expr(p->high);
 
   g95_free(p);
 }
@@ -328,6 +78,7 @@ g95_case *c;
 match m;
 
   c = g95_get_case();
+  c->where = *g95_current_locus();
 
   if (g95_match_char(':') == MATCH_YES) {
     m = g95_match_expr(&c->high);
@@ -419,12 +170,21 @@ match m;
   for(;;) {
     if (match_case_selector(&c) == MATCH_ERROR) goto cleanup;
 
-    if (head == NULL)
-      head = c;
-    else
-      tail->next = c;
+    /* Cases that can never be matched are legal to have but mess up
+     * code generation, so we discard them here. */
 
-    tail = c;
+    if (c->low != NULL && c->high != NULL && c->low != c->high &&
+	g95_compare_expr(c->low, c->high) > 0) {
+      g95_warning("Range specification at %C can never be matched");
+      free_case(c);
+    } else {
+      if (head == NULL)
+	head = c;
+      else
+	tail->next = c;
+
+      tail = c;
+    }
 
     if (g95_match_char(')') == MATCH_YES) break;
     if (g95_match_char(',') != MATCH_YES) goto syntax;
@@ -452,7 +212,9 @@ cleanup:
 /* check_case_expr()-- Check to see if an expression is suitable for
  * use in a CASE statement. */
 
-static try check_case_expr(g95_expr *e, bt type) {
+static try check_case_expr(g95_expr *e, g95_expr *selector) {
+
+  if (e == NULL) return SUCCESS;
 
   if (e->expr_type != EXPR_CONSTANT) {
     g95_error("Expression in CASE statement at %L must be a constant",
@@ -460,9 +222,15 @@ static try check_case_expr(g95_expr *e, bt type) {
     return FAILURE;
   }
 
-  if (e->ts.type != type) {
+  if (e->ts.type != selector->ts.type) {
     g95_error("Expression in CASE statement at %L must be of type %s",
-	      &e->where, g95_basic_typename(type));
+	      &e->where, g95_basic_typename(selector->ts.type));
+    return FAILURE;
+  }
+
+  if (e->ts.kind != selector->ts.kind) {
+    g95_error("Expression in CASE statement at %L must be kind %d",
+	      &e->where, selector->ts.kind);
     return FAILURE;
   }
 
@@ -473,6 +241,116 @@ static try check_case_expr(g95_expr *e, bt type) {
   }
 
   return SUCCESS;
+}
+
+
+/* compare_case()-- Compare two case nodes.  This is used to sort the
+ * nodes into order and also gives us the perfect opportunity to check
+ * for overlap.  The default case is sorted first in the list,
+ * followed by a unbounded upper, followed by the full ranges in
+ * order, followed by the unbounded lower.  We only report the first
+ * overlap. */
+
+static int compare_case(const void *v1, const void *v2) {
+const g95_case *c1, *c2;
+int p1, p2;
+char *msg;
+
+  c1 = *((g95_case **) v1);
+  c2 = *((g95_case **) v2);
+
+  /* Check for duplicate defaults */
+
+  if (c1->low == NULL && c1->high == NULL &&
+      c2->low == NULL && c2->high == NULL) {
+
+    msg = "Duplicate CASE DEFAULT at %L and %L";
+    goto error;
+  }
+
+  /* Arrange for the default case to be first of all if present. */
+
+  if (c1->low == NULL && c1->high == NULL) return -1;
+  if (c2->low == NULL && c2->high == NULL) return 1;
+
+  /* Detect duplicate X: and :X forms.  These conflict regardless of X. */
+
+  if ((c1->high == NULL && c2->high == NULL) ||
+      (c1->low  == NULL && c2->low  == NULL)) {
+    msg = "Unbounded CASEs conflict at %L and %L";
+    goto error;
+  }
+
+  /* Compare X: against :A */
+
+  if (c1->high == NULL && c2->low == NULL) {
+    if (g95_compare_expr(c1->low, c2->high) <= 0) goto got_overlap;
+    return 1;
+  }
+
+  /* Compare :X against B: */
+
+  if (c1->low == NULL && c2->high == NULL) {
+    if (g95_compare_expr(c1->high, c2->low) >= 0) goto got_overlap;
+    return -1;
+  }
+
+  /* Compare :X against A:B */
+
+  if (c1->low == NULL) {  
+    if (g95_compare_expr(c1->high, c2->low) >= 0) goto got_overlap;
+    return -1;
+  }
+
+  /* Compare X: against A:B */
+
+  if (c1->high == NULL) {
+    if (g95_compare_expr(c1->low, c2->high) <= 0) goto got_overlap;
+    return 1;
+  }
+
+  /* Compare X:Y against :A */
+
+  if (c2->low == NULL) {
+    if (g95_compare_expr(c1->low, c2->high) <= 0) goto got_overlap;
+    return 1;
+  }
+
+  /* Compare X:Y against A: */
+
+  if (c2->high == NULL) {
+    if (g95_compare_expr(c1->high, c2->low) >= 0) goto got_overlap;
+    return -1;
+  }
+
+  /* Having dispensed with almost a dozen special cases, we can now
+   * deal with the general case of X:Y against A:B */
+
+  p1 = g95_compare_expr(c1->high, c2->low);
+  if (p1 < 0) p1 = -1;
+  if (p1 > 0) p1 = 1;
+
+  p2 = g95_compare_expr(c1->low, c2->high);
+  if (p2 < 0) p2 = -1;
+  if (p2 > 0) p2 = 1;
+
+  if (p1 == 0 || p2 == 0 || p1 != p2) goto got_overlap;
+  return p1;
+
+got_overlap:
+  msg = "CASEs at %L and %L overlap";
+
+error:
+  if (!overlap) {
+    g95_error(msg, &c1->where, &c2->where);
+    overlap = 1;
+  }
+
+  /* Because we've generated an error, no code will be generated, and
+   * the order of the case array no longer matters.  Return something
+   * to keep qsort() happy. */
+
+  return 1;
 }
 
 
@@ -490,26 +368,23 @@ static try check_case_expr(g95_expr *e, bt type) {
  */
 
 void g95_resolve_select(g95_code *code) {
+g95_case *p, **array;
 g95_code *body;
 g95_expr *expr;
-g95_case *cp;
-case_tree *tree;
-int kind, overlap;
-bt type;
+int i, n, kind;
 try t;
 
-  if (code->expr == NULL) 
-  {
+  if (code->expr == NULL) {
     /* This was actually a computed GOTO statement.  */
     expr = code->expr2;
-    if ((expr->ts.type != BT_INTEGER)
-        || (expr->rank != 0))
+
+    if (expr->ts.type != BT_INTEGER || expr->rank != 0)
       g95_error("Selection expression in COMPUTED GOTO statement "
                 "at %L must be a scalar integer expression",
                 &expr->where);
-    return; /* Either way, we're done.  */
+    return;
   }
- 
+
   expr = code->expr;
     
   kind = -1;
@@ -526,79 +401,66 @@ try t;
     return;
   }
 
-  type = expr->ts.type;
-  if (type == BT_CHARACTER) kind = expr->ts.kind;
-
   t = SUCCESS;
-  tree = avl_create();
-  overlap = 0;
- 
+  n = 0;
+
   for(body=code->block; body; body=body->block) {
-    if (t == FAILURE) continue;
+    for(p=body->ext.case_list; p; p=p->next) {
+      p->code = body->next;
+      n++;
 
-    for(cp=body->ext.case_list; cp; cp=cp->next) {
-      if (cp->low != NULL) {
-	if (check_case_expr(cp->low, type) == FAILURE) {
-	  t = FAILURE;
-	  break;
-	}
-
-	if (type == BT_CHARACTER && cp->low->ts.kind != kind) {
-	  g95_error("Character expression in CASE statement at %L must be "
-		    "of kind %d", &cp->low->where, kind);
-	  t = FAILURE;
-	  break;
-	}
-      }
-
-      if (cp->high != NULL) {
-	if (check_case_expr(cp->high, type) == FAILURE) {
-	  t = FAILURE;
-	  break;
-	}
-
-	if (type == BT_CHARACTER && cp->high->ts.kind != kind) {
-	  g95_error("Character expression in CASE statement at %L must be "
-		    "of kind %d", &cp->high->where, kind);
-	  t = FAILURE;
-	  break;
-	}
-      }
-
-      if (type == BT_LOGICAL && cp->low != NULL && cp->high != NULL &&
-	  cp->low != cp->high) {
-	g95_error("Logical range in CASE statement at %L is not allowed",
-		  &cp->low->where);
+      if (check_case_expr(p->low, expr) == FAILURE) {
 	t = FAILURE;
-      }      
- 
-      if (cp->low != NULL && cp->high != NULL && cp->low != cp->high) {
-        if (g95_compare_expr(cp->low, cp->high) > 0) {
-          g95_warning("Range specification at %L can never be matched;\n\t "
-                      "first expression greater than second expression",
-                      &cp->high->where);
-	  continue; /* just ignore this case, but don't fail */;
-        }
+	break;
       }
 
-      if (check_case_overlap(tree, cp) != SUCCESS) overlap = 1;
+      if (check_case_expr(p->high, expr) == FAILURE) {
+	t = FAILURE;
+	break;
+      }
+
+      if (expr->ts.type == BT_LOGICAL &&
+	  (p->low != NULL || p->high != NULL) &&
+	  (p->low == NULL || p->high == NULL)) {
+
+	g95_error("Logical range in CASE statement at %L is not allowed",
+		  &p->low->where);
+	t = FAILURE;
+      }
     }
+
+    if (t == FAILURE) break;
   }
 
-  /* More than two cases is insane for logical selects.  */
-  if (g95_option.surprising && type == BT_LOGICAL &&
-      sane_logical_select (tree) != SUCCESS)
-    g95_warning("Logical SELECT CASE block at %L has more that two cases",
-		&code->loc);
-  
-  if ((t == FAILURE) || overlap) goto done;
+  if (t == FAILURE || n == 0) return;
 
-#if 0
-  if (type == BT_CHARACTER) {
-    setup_labels(); /* put label in front of code block and add a jump to END SELECT at end */
-    generate_case_code(code,tree); /* generate compares and jumps */
+  array = g95_getmem(n*sizeof(g95_case *));
+  n = 0;
+
+  for(body=code->block; body; body=body->block)
+    for(p=body->ext.case_list; p; p=p->next)
+      array[n++] = p;
+
+  overlap = 0;
+
+  qsort(array, n, sizeof(g95_case *), compare_case);
+
+  if (overlap) return;
+
+  /* String the case structures together in a doubly linked list */
+
+  array[0]->cprev = NULL;
+  array[0]->cnext = (n > 1) ? array[1] : NULL;
+
+  if (n > 1) {
+    for(i=1; i<n-1; i++) {
+      array[i]->cprev = array[i-1];
+      array[i]->cnext = array[i+1];
+    }
+
+    array[n-1]->cprev = array[n-2];
+    array[n-1]->cnext = NULL;
   }
-#endif
-done:
-  g95_free(tree);
+
+  g95_free(array);
 }

@@ -141,9 +141,9 @@ static GTY(()) tree iocall_endfile;
 static enum { READ, WRITE } last_dt;
 
 
-/* add_field()-- Add a field to the ioparm structure. */
+/* g95_add_field()-- Add a field to the ioparm structure. */
 
-static tree add_field(tree stype, char *name, tree type) {
+tree g95_add_field(tree stype, char *name, tree type) {
 tree decl;
 
   decl = build_decl(FIELD_DECL, get_identifier(name), type);
@@ -159,12 +159,13 @@ tree decl;
 
 
 #define ADD_FIELD(name, type) \
-  ioparm_ ## name = add_field(ioparm_type, stringize(name), type)
+  ioparm_ ## name = g95_add_field(ioparm_type, stringize(name), type)
 
 #define ADD_STRING(name) \
-  ioparm_ ## name = add_field(ioparm_type, stringize(name), pchar_type_node);\
+  ioparm_ ## name = g95_add_field(ioparm_type, stringize(name), \
+                                  pchar_type_node); \
   ioparm_ ## name ## _len = \
-        add_field(ioparm_type, stringize(name) "_len", g95_int4_type_node)
+        g95_add_field(ioparm_type, stringize(name) "_len", g95_int4_type_node)
 
 
 /* Create function decls for IO library functions.  */

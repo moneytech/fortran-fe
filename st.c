@@ -325,7 +325,7 @@ g95_dt *dt;
   case EXEC_SELECT:
     d = c->block;
     g95_status("SELECT CASE ");
-    g95_show_expr(c->expr);
+    g95_show_expr((c->expr != NULL) ? c->expr : c->expr2);
     g95_status_char('\n');
 
     for(;d ;d=d->block) {

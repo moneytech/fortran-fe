@@ -329,6 +329,8 @@ tree g95_build_library_function_decl VPARAMS((tree name, tree rettype,
                                               int nargs, ...));
 
 void g95_set_error_locus(stmtblock_t *, locus *);
+tree g95_add_field(tree stype, char *name, tree type);
+
 
 /* somewhere! */
 tree pushdecl (tree);
@@ -346,6 +348,7 @@ extern GTY(()) tree gfor_fndecl_internal_free;
 extern GTY(()) tree gfor_fndecl_allocate;
 extern GTY(()) tree library_stop_numeric;
 extern GTY(()) tree library_stop_string;
+extern GTY(()) tree library_select_string;
 extern GTY(()) tree gfor_fndecl_allocate64;
 extern GTY(()) tree gfor_fndecl_deallocate;
 extern GTY(()) tree gfor_fndecl_runtime_error;

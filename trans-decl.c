@@ -69,6 +69,7 @@ tree gfor_fndecl_internal_malloc64;
 tree gfor_fndecl_internal_free;
 tree library_stop_numeric;
 tree library_stop_string;
+tree library_select_string;
 tree gfor_fndecl_allocate;
 tree gfor_fndecl_allocate64;
 tree gfor_fndecl_deallocate;
@@ -1093,6 +1094,10 @@ g95_build_builtin_function_decls (void)
             2,
 	    pchar_type_node,
             g95_int4_type_node);
+
+  library_select_string = g95_build_library_function_decl(
+	    get_identifier(PREFIX "select_string"),
+	    pvoid_type_node, 0);
 
   gfor_fndecl_push_context = g95_build_library_function_decl (
             get_identifier ("_gfor_push_context"),
