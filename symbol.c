@@ -573,7 +573,26 @@ conflict:
 #undef conf
 
 
+/* check_used()-- Common subroutine called by attribute
+ * changing subroutine in order to prevent them from changing a symbol
+ * that has been use-associated.  Returns zero if it is OK to change
+ * the symbol, nonzero if not.  */
+
+static int check_used(symbol_attribute *attr, locus *loc) {
+
+  if (attr->use_assoc == 0) return 0;
+
+  if (loc == NULL) loc = g95_current_locus();
+
+  g95_error("Cannot change attributes of USE-associated symbol at %L", loc);
+
+  return 1;
+}
+
+
 try g95_add_allocatable(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->allocatable = 1;
   return check_conflict(attr, loc);
@@ -581,11 +600,15 @@ try g95_add_allocatable(symbol_attribute *attr, locus *loc) {
 
 try g95_add_dimension(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->dimension = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_external(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->external = 1;
 
@@ -601,6 +624,8 @@ try g95_add_external(symbol_attribute *attr, locus *loc) {
 
 try g95_add_intrinsic(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->intrinsic = 1;
 
   if (attr->dummy) {
@@ -615,11 +640,15 @@ try g95_add_intrinsic(symbol_attribute *attr, locus *loc) {
 
 try g95_add_optional(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->optional = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_pointer(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->pointer = 1;
   return check_conflict(attr, loc);
@@ -627,11 +656,15 @@ try g95_add_pointer(symbol_attribute *attr, locus *loc) {
 
 try g95_add_private(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->private = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_public(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->public = 1;
   return check_conflict(attr, loc);
@@ -639,11 +672,15 @@ try g95_add_public(symbol_attribute *attr, locus *loc) {
 
 try g95_add_result(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->result = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_save(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->save = 1;
   return check_conflict(attr, loc);
@@ -651,11 +688,15 @@ try g95_add_save(symbol_attribute *attr, locus *loc) {
 
 try g95_add_saved_common(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->saved_common = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_target(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->target = 1;
   return check_conflict(attr, loc);
@@ -663,11 +704,15 @@ try g95_add_target(symbol_attribute *attr, locus *loc) {
 
 try g95_add_dummy(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->dummy = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_data(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->data = 1;
   return check_conflict(attr, loc);
@@ -675,11 +720,15 @@ try g95_add_data(symbol_attribute *attr, locus *loc) {
 
 try g95_add_common(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->common = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_in_common(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->in_common = 1;
   if (check_conflict(attr, loc) == FAILURE) return FAILURE;
@@ -691,11 +740,15 @@ try g95_add_in_common(symbol_attribute *attr, locus *loc) {
 
 try g95_add_in_namelist(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->in_namelist = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_sequence(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->sequence = 1;
   return check_conflict(attr, loc);
@@ -703,11 +756,15 @@ try g95_add_sequence(symbol_attribute *attr, locus *loc) {
 
 try g95_add_elemental(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->elemental = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_pure(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   attr->pure = 1;
   return check_conflict(attr, loc);
@@ -715,17 +772,23 @@ try g95_add_pure(symbol_attribute *attr, locus *loc) {
 
 try g95_add_recursive(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->recursive = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_entry(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   attr->entry = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_function(symbol_attribute *attr, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_DUMMY_PROC &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
@@ -736,6 +799,8 @@ try g95_add_function(symbol_attribute *attr, locus *loc) {
 
 try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
 
+  if (check_used(attr, loc)) return FAILURE;
+
   if (attr->flavor != FL_PROCEDURE &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
@@ -744,6 +809,8 @@ try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
 }
 
 try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   if (attr->flavor != FL_UNKNOWN) {
     if (loc == NULL) loc = g95_current_locus();
@@ -764,6 +831,8 @@ try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 }
 
 try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *loc) {
+
+  if (check_used(attr, loc)) return FAILURE;
 
   if (attr->intent == INTENT_UNKNOWN) {
     attr->intent = intent;
@@ -1633,8 +1702,8 @@ g95_symbol *p;
   if (st == NULL) return 0;
 
   if (st->ambiguous)
-    g95_error("Name '%s' is an ambiguous reference to '%s' from module '%s'",
-	      name, st->sym->name, st->sym->module);
+    g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
+	      "from module '%s'", name, st->sym->name, st->sym->module);
 
   return st->ambiguous;
 }
