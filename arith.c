@@ -27,11 +27,9 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include <string.h>
 
+mpf_t mpf_pi, mpf_hpi, mpf_nhpi, mpf_tpi;
+
 static mpf_t e;
-static mpf_t pi;
-static mpf_t hpi;
-static mpf_t thpi;
-static mpf_t tpi;
 
 
 /* The g95_(integer|real)_kinds[] structures have everything the front
@@ -237,9 +235,9 @@ int i, sign;
     mpf_init(denom);
     mpf_init(term);
 
-    mpf_div(q,x,tpi);
+    mpf_div(q,x,mpf_tpi);
     mpf_floor(factor,q);
-    mpf_mul(q,factor,tpi);
+    mpf_mul(q,factor,mpf_tpi);
     mpf_sub(r,x,q);
 
     mpf_init_set_ui(xp, 0);
@@ -247,7 +245,7 @@ int i, sign;
     mpf_init_set_ui(denom, 1);
 
     sign = -1;
-    for(i=1; i<G95_REAL_BITS+10; i++) {
+    for(i=1; i<G95_REAL_BITS+10; i++) { 
       mpf_mul(num,num,r);
       mpf_mul_ui(denom,denom,i);
       if ( i%2 != 0 ) {
@@ -291,9 +289,9 @@ int i, sign;
     mpf_init(denom);
     mpf_init(term);
 
-    mpf_div(q,x,tpi);
+    mpf_div(q,x,mpf_tpi);
     mpf_floor(factor,q);
-    mpf_mul(q,factor,tpi);
+    mpf_mul(q,factor,mpf_tpi);
     mpf_sub(r,x,q);
 
     mpf_init_set_ui(xp, 1);
@@ -301,7 +299,7 @@ int i, sign;
     mpf_init_set_ui(denom, 1);
 
     sign = 1;
-    for(i=1; i<G95_REAL_BITS+10; i++) {
+    for(i=1; i<G95_REAL_BITS+10; i++) { 
       mpf_mul(num,num,r);
       mpf_mul_ui(denom,denom,i);
       if ( i%2 == 0 ) {
@@ -334,90 +332,90 @@ int i, sign;
   mpf_init_set(x, *arg);
 
 /* Special case */
-
-  if (mpf_cmp_ui(x, 0) == 0) {
-    mpf_set_ui(*result, 0);
-    return;
+  if ( mpf_cmp_ui(x,0) ==  0 ) {
+    mpf_set_ui(*result,0);
   }
 
-  mpf_init(absval);
-  mpf_init(num);
-  mpf_init(term);
+  else {
 
-  mpf_init_set_d(convgu, 1.5);
-  mpf_init_set_d(convgl, 0.5);
-  mpf_abs(absval, x);
+    mpf_init(absval);
 
-  mpf_init_set_ui(num, 1);
+    mpf_abs(absval,x);
 
-  if (mpf_cmp(absval, convgl) < 0) {
-    mpf_init_set_ui(xp, 0);
-    sign = -1;
-    for(i=1; i<G95_REAL_BITS+10; i++) {
-      mpf_mul(num, num, absval);
-      if (i%2 != 0) {
-	sign = -sign;
-	mpf_div_ui(term, num, i);
-	if (sign > 0)
-	  mpf_add(xp, xp, term);
-	else
-	  mpf_sub(xp, xp, term);
+    mpf_init_set_d(convgu,1.5);
+    mpf_init_set_d(convgl,0.5);
+    mpf_init_set_ui(num, 1);
+    mpf_init(term);
+
+    if (mpf_cmp(absval, convgl) < 0) {
+      mpf_init_set_ui(xp, 0);
+      sign = -1;
+      for(i=1; i<G95_REAL_BITS+10; i++) {
+        mpf_mul(num, num, absval);
+        if (i%2 != 0) {
+          sign = -sign;
+	  mpf_div_ui(term, num, i);
+	  if (sign > 0)
+	    mpf_add(xp, xp, term);
+	  else
+	    mpf_sub(xp, xp, term);
+        }
       }
-    }
-  } else if (mpf_cmp(absval, convgu) >= 0) {
-    mpf_init_set(xp, hpi);
-    sign = 1;
-    for(i=1; i<G95_REAL_BITS+10; i++) {
-      mpf_div(num, num, absval);
-      if (i%2 != 0) {
-	sign = -sign;
-	mpf_div_ui(term, num, i);
-	if (sign > 0)
-	  mpf_add(xp, xp, term);
-	else
-	  mpf_sub(xp, xp, term);
+    } else if (mpf_cmp(absval, convgu) >= 0) {
+      mpf_init_set(xp, mpf_hpi);
+      sign = 1;
+      for(i=1; i<G95_REAL_BITS+10; i++) {
+        mpf_div(num, num, absval);
+        if (i%2 != 0) {
+    	  sign = -sign;
+	  mpf_div_ui(term, num, i);
+	  if (sign > 0)
+	    mpf_add(xp, xp, term);
+	  else
+	    mpf_sub(xp, xp, term);
+        }
       }
-    }
-  } else {
-    mpf_init_set_ui(xp, 0);
+    } else {
+      mpf_init_set_ui(xp, 0);
 
-    mpf_sub_ui(num, absval, 1);
-    mpf_add_ui(term, absval, 1);
-    mpf_div(absval, num, term);
+      mpf_sub_ui(num, absval, 1);
+      mpf_add_ui(term, absval, 1);
+      mpf_div(absval, num, term);
 
-    mpf_set_ui(num, 1);
+      mpf_set_ui(num, 1);
 
-    sign = -1;
-    for(i=1; i<G95_REAL_BITS+10; i++) {
-      mpf_mul(num, num, absval);
-      if (i%2 != 0) {
-	sign = -sign;
-	mpf_div_ui(term, num, i);
-	if (sign > 0)
-	  mpf_add(xp, xp, term);
-	else
-	  mpf_sub(xp, xp, term);
+      sign = -1;
+      for(i=1; i<G95_REAL_BITS+10; i++) {
+        mpf_mul(num, num, absval);
+        if (i%2 != 0) {
+  	  sign = -sign;
+	  mpf_div_ui(term, num, i);
+	  if (sign > 0)
+	    mpf_add(xp, xp, term);
+	  else
+	    mpf_sub(xp, xp, term);
+        }
       }
+      mpf_div_ui(term, mpf_hpi, 2);
+      mpf_add(xp, term, xp);
     }
-    mpf_div_ui(term, hpi, 2);
-    mpf_add(xp, term, xp);
-  }
 
   /* This makes sure to preserve the identity arctan(-x) = -arctan(x) */
   /* and improves accuracy to boot                                    */
 
-  if (mpf_cmp_ui(x, 0) > 0)
-    mpf_set(*result, xp);
-  else
-    mpf_neg(*result, xp);
+    if (mpf_cmp_ui(x, 0) > 0)
+      mpf_set(*result, xp);
+    else
+      mpf_neg(*result, xp);
 
-  mpf_clear(absval);
-  mpf_clear(convgl);
-  mpf_clear(convgu);
-  mpf_clear(num);
-  mpf_clear(term);
+    mpf_clear(absval);
+    mpf_clear(convgl);
+    mpf_clear(convgu);
+    mpf_clear(num);
+    mpf_clear(term);
+    mpf_clear(xp);
+  }
   mpf_clear(x);
-  mpf_clear(xp);
 }
 
 
@@ -501,26 +499,34 @@ mpf_t a, b;
 mpz_t r;
 int i, n, limit;
 
+/* Set the default precision for GMP computations */  
+  mpf_set_default_prec(G95_REAL_BITS+30);
+
 /* Calculate e, needed by the natural_logarithm() subroutine. */
 
   mpf_init(b);
   mpf_init_set_ui(e, 0);
-  mpf_init_set_ui(a, 1);   /* 1/(i!) */
+  mpf_init_set_ui(a, 1);   
 
   for(i=1; i<100; i++) {
     mpf_add(e, e, a);
-    mpf_div_ui(a, a, i);
+    mpf_div_ui(a, a, i);   /* 1/(i!) */
   }
 
-/* Calculate pi, 2pi, pi/2, and 3pi/2, needed for trigonometric functions 
- * Using same method as in simplify.c */
+/* Calculate pi, 2pi, pi/2, and -pi/2, needed for trigonometric functions 
+ * We use the Bailey, Borwein and Plouffe formula:
+ *
+ * pi = \sum{n=0}^\infty (1/16)^n [4/(8n+1) - 2/(8n+4) - 1/(8n+5) - 1/(8n+6)]
+ * 
+ * which gives about four bits per iteration.
+ */
 
-  mpf_init_set_ui(pi,0);
-  mpf_set_ui(a,0);
 
-  mpf_init(tpi);
-  mpf_init(hpi);
-  mpf_init(thpi);
+  mpf_init_set_ui(mpf_pi,0);
+
+  mpf_init(mpf_tpi);
+  mpf_init(mpf_hpi);
+  mpf_init(mpf_nhpi);
 
   limit = (G95_REAL_BITS / 4) + 10;  /* (1/16)^n gives 4 bits per iteration */
 
@@ -545,12 +551,12 @@ int i, n, limit;
 
     mpf_div(b, b, a);
 
-    mpf_add(pi, pi, b);
+    mpf_add(mpf_pi, mpf_pi, b);
   }
 
-  mpf_div_ui(hpi,pi,2);
-  mpf_mul_ui(thpi,hpi,3);
-  mpf_mul_ui(tpi,pi,2);
+  mpf_mul_ui(mpf_tpi,mpf_pi,2);
+  mpf_div_ui(mpf_hpi,mpf_pi,2);
+  mpf_neg(mpf_nhpi, mpf_hpi);
 
 /* Convert the minimum/maximum values for each kind into their Gnu MP
  * representation. */
@@ -575,7 +581,7 @@ int i, n, limit;
     int_info->range = mpz_get_si(r);
   }
 
-  mpf_set_default_prec(G95_REAL_BITS);
+/*  mpf_set_default_prec(G95_REAL_BITS); */
 
   for(real_info=g95_real_kinds; real_info->kind != 0; real_info++) {
     /* Huge */

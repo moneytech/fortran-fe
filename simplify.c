@@ -28,11 +28,16 @@ Boston, MA 02111-1307, USA.  */
 
 extern g95_integer_info g95_integer_kinds[];
 extern g95_real_info g95_real_kinds[];
-
 extern g95_expr *g95_current_function;
 
+extern mpf_t mpf_pi, mpf_hpi, mpf_nhpi, mpf_tpi;
+
+#define FIRST_ARG(e) (e->value.function.actual->expr)
+#define SECOND_ARG(e) (e->value.function.actual->next->expr)
+#define THIRD_ARG(e) (e->value.function.actual->next->next->expr)
+
 static g95_expr *integer_zero, *real_zero;
-static mpf_t mpf_zero, mpf_half, mpf_one, mpf_pi, mpf_hpi, mpf_nhpi;
+static mpf_t mpf_zero, mpf_half, mpf_one;
 static mpz_t mpz_zero;
 
 g95_expr g95_bad_expr;
@@ -917,7 +922,12 @@ static char buffer[25];
  * a resolved call to the right subroutine. */
 
 g95_expr *g95_simplify_dot_product(g95_expr *a, g95_expr *b) {
-g95_expr temp;
+g95_expr temp, *result;
+
+  a = g95_copy_expr(a);
+  b = g95_copy_expr(b);
+
+  result = g95_build_funcall(NULL, a, b, NULL);
 
   if (a->ts.type == BT_LOGICAL && b->ts.type == BT_LOGICAL) {
     g95_current_function->ts.type = BT_LOGICAL;
@@ -3321,66 +3331,8 @@ int i;
 }
 
 
-/* init_pi()-- Calculate pi.  We use the Bailey, Borwein and Plouffe formula:
- *
- * pi = \sum{n=0}^\infty (1/16)^n [4/(8n+1) - 2/(8n+4) - 1/(8n+5) - 1/(8n+6)]
- *
- * which gives about four bits per iteration.
- */
-
-static void init_pi(void) {
-mpf_t s, t;
-int n, limit;
-
-  mpf_init(s);
-  mpf_init(t);
-
-  mpf_init(mpf_pi);
-  mpf_set_ui(mpf_pi, 0);
-
-  limit = (G95_REAL_BITS / 4) + 10;  /* (1/16)^n gives 4 bits per iteration */
-
-  for(n=0; n<limit; n++) {
-    mpf_set_ui(t, 4);
-    mpf_div_ui(t, t, 8*n+1);  /* 4/(8n+1) */
-
-    mpf_set_ui(s, 2);
-    mpf_div_ui(s, s, 8*n+4);  /* 2/(8n+4) */
-    mpf_sub(t, t, s);
-
-    mpf_set_ui(s, 1);
-    mpf_div_ui(s, s, 8*n+5);  /* 1/(8n+5) */
-    mpf_sub(t, t, s);
-
-    mpf_set_ui(s, 1);
-    mpf_div_ui(s, s, 8*n+6);  /* 1/(8n+6) */
-    mpf_sub(t, t, s);
-
-    mpf_set_ui(s, 16);
-    mpf_pow_ui(s, s, n);      /* 16^n */
-
-    mpf_div(t, t, s);
-
-    mpf_add(mpf_pi, mpf_pi, t);
-  }
-
-  mpf_clear(s);
-  mpf_clear(t);
-
-/* Compute multiples of pi */
-
-  mpf_init(mpf_hpi);
-  mpf_init(mpf_nhpi);
-
-  mpf_div_ui(mpf_hpi, mpf_pi, 2);
-  mpf_neg(mpf_nhpi, mpf_hpi);
-}
-
-
 void g95_simplify_init_1(void) {
 int i, j;
-
-  init_pi();
 
   integer_zero = g95_convert_integer("0", g95_default_integer_kind(), 10);
   real_zero = g95_convert_real("0.0", g95_default_real_kind());
