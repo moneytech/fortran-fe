@@ -291,11 +291,6 @@ g95_symbol *sym;
 
   sym = lvalue->symbol; 
 
-  if (sym->ts.type == BT_UNKNOWN) {
-    if (g95_set_default_type(sym, 0, NULL) == FAILURE) return FAILURE;
-    lvalue->ts = sym->ts;
-  }
-
   if (lvalue->ts.type == BT_DERIVED && rvalue->ts.type == BT_DERIVED &&
       lvalue->ts.derived != rvalue->ts.derived) {
     g95_error("Incompatible derived types in assignment at %L",
@@ -305,6 +300,11 @@ g95_symbol *sym;
 
   if (rvalue->rank != 0 && lvalue->rank != rvalue->rank) {
     g95_error("Incompatible ranks in assignment at %L", &lvalue->where);
+    return FAILURE;
+  }
+
+  if (lvalue->ts.type == BT_UNKNOWN) {
+    g95_error("Variable type is UNKNOWN in assignment at %L", &lvalue->where);
     return FAILURE;
   }
 
