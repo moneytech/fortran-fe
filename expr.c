@@ -1189,6 +1189,66 @@ match m;
 }
 
 
+/* is_constant_constructor()-- Recursively checks all elements of a
+ * constructor to see if everything is constant. */
+
+static int is_constant_expr(g95_expr *);
+
+static int is_constant_constructor(g95_constructor *c) {
+
+  if (c == NULL) return 1;
+
+  for(; c; c=c->next) {
+    if (!is_constant_expr(c->expr)) return 0;
+
+    if (!is_constant_constructor(c->child)) return 0;
+    
+    if (c->iter != NULL) {
+      if (!is_constant_expr(c->iter->start)) return 0;
+      if (!is_constant_expr(c->iter->end))   return 0;
+      if (!is_constant_expr(c->iter->step))  return 0;
+    }
+  }
+
+  return 1;
+}
+
+
+/* is_constant_expr()-- Function to determine if an expression is
+ * constant or not.  This function expects that the expression has
+ * already been simplified.  Mutually recursive with
+ * constant_constructor(). */
+
+static int is_constant_expr(g95_expr *e) {
+int rv;
+
+  if (e == NULL) return 1; 
+
+  switch(e->expr_type) {
+  case EXPR_OP:
+  case EXPR_FUNCTION:
+  case EXPR_VARIABLE:
+    rv = 0; 
+    break;
+
+  case EXPR_CONSTANT:
+    rv = 1;
+    break;
+
+  case EXPR_SUBSTRING:
+    rv = is_constant_expr(e->op1) && is_constant_expr(e->op2);
+    break;
+
+  case EXPR_STRUCTURE:
+  case EXPR_ARRAY:
+    rv = is_constant_constructor(e->value.constructor);
+    break;
+  }
+
+  return rv;
+}
+
+
 /* g95_match_init_expr()-- Match an initialization expression.  We work
  * by first matching an expression, then reducing it to a constant */
 
@@ -1203,7 +1263,7 @@ match m;
 
   if (simplify_expr(expr, 1) != ARITH_OK) return MATCH_ERROR;
 
-  if (expr->expr_type != EXPR_CONSTANT) {
+  if (!is_constant_expr(expr)) {
     g95_error("Expected an initialization expression at %C");
     return MATCH_ERROR;
   }
