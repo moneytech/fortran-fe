@@ -1442,8 +1442,13 @@ void g95_intrinsic_done_1(void) {
 }
 
 
-/******** Subroutines to check intrinsic interfaces ***********/
 
+
+
+
+
+
+/******** Subroutines to check intrinsic interfaces ***********/
 
 /* remove_nullargs()-- Given a formal argument list, remove any
  * NULL arguments that may have been left behind by a sort against
@@ -1767,8 +1772,7 @@ g95_actual_arglist *arg;
 /* check_specific()-- Given a pointer to an intrinsic symbol and an
  * expression consisting of a function call, see if the function call
  * is consistent with the intrinsic's formal argument list.  Return
- * SUCCESS if the expression and intrinsic match, FAILURE otherwise.
- */
+ * SUCCESS if the expression and intrinsic match, FAILURE otherwise.  */
 
 static try check_specific(intrinsic_sym *specific, g95_expr *expr,
 			  int error_flag) {
@@ -1820,6 +1824,10 @@ g95_actual_arglist *actual;
 const char *name;
 int flag;
 
+  if (expr->value.function.isym != NULL)
+    return (do_simplify(expr->value.function.isym, expr) == FAILURE)
+      ? MATCH_ERROR : MATCH_YES;
+
   g95_suppress_error = !error_flag;
   g95_intrinsic_extension = 1;
   flag = 0;
@@ -1829,10 +1837,9 @@ int flag;
       flag |= (actual->expr->ts.type != BT_INTEGER &&
 	       actual->expr->ts.type != BT_CHARACTER);
 
-  name = expr->value.function.name;
-  if (name == NULL) name = expr->symbol->name;
+  name = expr->symbol->name;
 
-  isym = find_function(name);
+  isym = specific = find_function(name);
   if (isym == NULL) {
     g95_suppress_error = 0;
     return MATCH_NO;
@@ -1844,10 +1851,8 @@ int flag;
 /* Bypass the generic list for min and max */
 
   if (isym->check == g95_check_min_max) {
-    if (g95_check_min_max(expr->value.function.actual) == SUCCESS) {
-      specific = isym;
+    if (g95_check_min_max(expr->value.function.actual) == SUCCESS)
       goto got_specific;
-    }
 
     g95_suppress_error = 0;
     return MATCH_NO;
@@ -1871,7 +1876,9 @@ int flag;
 
   specific = isym;
 
- got_specific:
+got_specific:
+  expr->value.function.isym = specific;
+
   if (do_simplify(specific, expr) == FAILURE) {
     g95_suppress_error = 0;
     return MATCH_ERROR;
@@ -1921,6 +1928,7 @@ char *name;
 
 try g95_convert_type(g95_expr *expr, g95_typespec *ts, int eflag) {
 intrinsic_sym *sym;
+locus old_where;
 g95_expr *new;
 
   if (ts->type == BT_UNKNOWN) goto bad;
@@ -1940,11 +1948,14 @@ g95_expr *new;
 
 /* Insert a pre-resolved function call to the right function */
 
+  old_where = expr->where;
   new = g95_get_expr();
   *new = *expr;
 
   new = g95_build_funcall(NULL, new, NULL);
   new->value.function.name = sym->lib_name;
+  new->value.function.isym = sym;
+  new->where = old_where;
 
   *expr = *new;
 

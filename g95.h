@@ -630,6 +630,7 @@ typedef struct g95_expr {
     struct {
       g95_actual_arglist *actual;
       char *name;   /* Points to the ultimate name of the function */
+      struct intrinsic_sym *isym;
     } function;
 
     struct {
