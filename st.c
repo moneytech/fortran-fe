@@ -437,7 +437,6 @@ static void resolve_symbol(g95_symbol *sym) {
     g95_error("Symbol at %L is not a DUMMY variable", &sym->declared_at);
     return;
   }
-
 }
 
 
@@ -449,7 +448,11 @@ static void resolve_symbol(g95_symbol *sym) {
  * or subroutines. */
 
 void g95_resolve(g95_namespace *ns) {
+g95_namespace *n;
 g95_charlen *cl;
+
+  for(n=ns->contained; n; n=n->sibling)
+    g95_resolve(n);
 
   if (ns->save_all) g95_save_all(ns);
 
@@ -469,6 +472,7 @@ g95_charlen *cl;
   g95_check_st_labels(ns);
 
   g95_traverse_ns(ns, resolve_symbol);
+
 }
 
 
