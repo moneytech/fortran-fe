@@ -497,11 +497,11 @@ int di, dr, dd, dl, dc, dz;
   dz = g95_default_complex_kind();
 
   add_sym("abs", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_abs, g95_resolve_abs,
+	  g95_check_abs, g95_simplify_abs, g95_resolve_abs,
 	  a, BT_REAL, dr, 0, NULL);
 
   add_sym("iabs", 1, 1, BT_INTEGER, di,
-	  NULL, g95_simplify_iabs, g95_resolve_abs,
+	  NULL, g95_simplify_abs, g95_resolve_abs,
 	  a, BT_INTEGER, di, 0, NULL);
 
   add_sym("dabs", 1, 1, BT_REAL, dd,
@@ -509,11 +509,11 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dd, 0, NULL);
 
   add_sym("cabs", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_cabs, g95_resolve_abs,
+	  NULL, g95_simplify_abs, g95_resolve_abs,
 	  a, BT_COMPLEX, dz, 0, NULL);
 
   add_sym("zabs", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_cabs, g95_resolve_abs,
+	  NULL, g95_simplify_abs, g95_resolve_abs,
 	  a, BT_COMPLEX, dd, 0, NULL);   /* Extension */
 
   make_alias("cdabs");

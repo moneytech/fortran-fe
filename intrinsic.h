@@ -29,6 +29,7 @@ extern g95_expr g95_bad_expr;
 try g95_check_a_kind(g95_expr *, g95_expr *);
 try g95_check_a_p(g95_expr *, g95_expr *);
 
+try g95_check_abs(g95_expr *);
 try g95_check_all_any(g95_expr *, g95_expr *);
 try g95_check_allocated(g95_expr *);
 try g95_check_associated(g95_expr *, g95_expr *);
@@ -106,8 +107,6 @@ try g95_check_random_seed(g95_expr *, g95_expr *, g95_expr *);
 /* Prototypes for the simplification functions */
 
 g95_expr *g95_simplify_abs(g95_expr *);
-g95_expr *g95_simplify_iabs(g95_expr *);
-g95_expr *g95_simplify_cabs(g95_expr *);
 g95_expr *g95_simplify_achar(g95_expr *);
 g95_expr *g95_simplify_acos(g95_expr *);
 g95_expr *g95_simplify_adjustl(g95_expr *);

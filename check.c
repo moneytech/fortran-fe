@@ -309,6 +309,14 @@ try g95_check_a_kind(g95_expr *a, g95_expr *kind) {
 }
 
 
+try g95_check_abs(g95_expr *a) {
+
+  if (numeric_check(a, 0) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 try g95_check_all_any(g95_expr *mask, g95_expr *dim) {
 
   if (logical_array_check(mask, 0) == FAILURE) return FAILURE;
