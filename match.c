@@ -1021,7 +1021,7 @@ match m;
   m = g95_match_label();
   if (m == MATCH_ERROR) return m;
 
-  if (g95_match(" do% ") != MATCH_YES) return MATCH_NO;
+  if (g95_match(" do") != MATCH_YES) return MATCH_NO;
 
 /* Match an infinite DO, make it like a DO WHILE(.TRUE.) */
 
@@ -1030,6 +1030,8 @@ match m;
     new_st.op = EXEC_DO_WHILE;
     goto done;
   }
+
+  if (g95_match("% ") != MATCH_YES) return MATCH_NO;
 
 /* See if we have a DO WHILE */
 

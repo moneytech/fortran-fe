@@ -1039,10 +1039,7 @@ g95_iterator *iter;
   mio_lparen();
 
   if (iomode == IO_OUTPUT) {
-    if (*ip != NULL) {
-      mio_rparen();
-      goto done;
-    }
+    if (*ip == NULL) goto done;
   } else {
     if (peek_atom() == ATOM_RPAREN) {
       *ip = NULL;
@@ -1246,7 +1243,6 @@ g95_expr *e;
     e->expr_type = find_enum(expr_types);
   }
 
-  e->expr_type = mio_name(e->expr_type, expr_types);
   mio_typespec(&e->ts);
   mio_integer(&e->rank);
 
@@ -1340,7 +1336,6 @@ g95_expr *e;
 static void mio_symbol(g95_symbol *sym) {
 
   mio_lparen();
-  mio_integer(&sym->serial);
 
   mio_symbol_attribute(&sym->attr);
   mio_typespec(&sym->ts);
@@ -1561,23 +1556,20 @@ static void write_symbol(g95_symbol *sym) {
 
   switch(sym->attr.flavor) {
   case FL_DERIVED:
-    if (phase == 1) {
-      mio_integer(&sym->serial);
-      mio_symbol(sym);
-    }
-    break;
+    if (phase == 1) break;
+    return;
 
   case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
   case FL_PROCEDURE:    case FL_NAMELIST:    case FL_GENERIC:
-    if (phase == 2) {
-      mio_integer(&sym->serial);
-      mio_symbol(sym);
-    }
-    break;
+    if (phase == 2) break;
+    return;
 
   default:
     g95_internal_error("write_symbol(): Bad symbol class");
   }
+
+  mio_integer(&sym->serial);
+  mio_symbol(sym);
 }
 
 
