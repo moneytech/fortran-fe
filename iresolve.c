@@ -158,7 +158,7 @@ void g95_resolve_all(g95_expr *f, g95_expr *mask, g95_expr *dim) {
   if (dim != NULL && mask->rank != 1) f->rank = mask->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__all%d_%c%d", f->rank, g95_type_letter(mask->ts.type),
+    g95_get_string("__all_%c%d", g95_type_letter(mask->ts.type),
                    mask->ts.kind);
 }
 
@@ -182,7 +182,7 @@ void g95_resolve_any(g95_expr *f, g95_expr *mask, g95_expr *dim) {
   if (dim != NULL && mask->rank != 1) f->rank = mask->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__any%d_%c%d", f->rank, g95_type_letter(mask->ts.type),
+    g95_get_string("__any_%c%d", g95_type_letter(mask->ts.type),
                    mask->ts.kind);
 }
 
@@ -287,17 +287,15 @@ void g95_resolve_cosh(g95_expr *f, g95_expr *x) {
 
 
 void g95_resolve_count(g95_expr *f, g95_expr *mask, g95_expr *dim) {
-static char count0[] = "__count0", count1[] = "__count1";
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
 
-  if (dim == NULL || mask->rank == 1)
-    f->value.function.name = count0;
-  else {
-    f->value.function.name = count1;
-    f->rank = mask->rank - 1;
-  }
+  if (dim != NULL) f->rank = mask->rank - 1;
+
+  f->value.function.name =
+    g95_get_string("__count_%d_%c%d", f->ts.kind,
+                   g95_type_letter(mask->ts.type), mask->ts.kind);
 }
 
 
@@ -579,17 +577,19 @@ void g95_resolve_max(g95_expr *f, g95_expr *a1) {
 
 void g95_resolve_maxloc(g95_expr *f, g95_expr *array, g95_expr *dim,
 			g95_expr *mask) {
-static char maxloc0[] = "__maxloc0", maxloc1[] = "__maxloc1";
+char *name;
 
   f->ts = array->ts;
 
-  if (dim == NULL) {
-    f->value.function.name = maxloc0;
+  if (dim == NULL)
     f->rank = 1;
-  } else {
-    f->value.function.name = maxloc1;
+  else
     f->rank = array->rank - 1;
-  }
+
+  name = mask ? "mmaxloc" : "maxloc";
+  f->value.function.name =
+    g95_get_string("__%s%d_%d_%c%d", name, dim != NULL, f->ts.kind,
+                   g95_type_letter(array->ts.type), array->ts.kind);
 }
 
 
@@ -602,7 +602,7 @@ void g95_resolve_maxval(g95_expr *f, g95_expr *array, g95_expr *dim,
     f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__%s%d_%c%d", mask ? "mmaxval" : "maxval", f->rank,
+    g95_get_string("__%s_%c%d", mask ? "mmaxval" : "maxval",
                    g95_type_letter(array->ts.type), array->ts.kind);
 }
 
@@ -627,21 +627,24 @@ void g95_resolve_min(g95_expr *f, g95_expr *a1) {
 
 void g95_resolve_minloc(g95_expr *f, g95_expr *array, g95_expr *dim,
 			g95_expr *mask) {
-static char minloc0[] = "__minloc0", minloc1[] = "__minloc1";
+char *name;
 
   f->ts = array->ts;
 
-  if (dim == NULL) {
-    f->value.function.name = minloc0;
+  if (dim == NULL)
     f->rank = 1;
-  } else {
-    f->value.function.name = minloc1;
+  else
     f->rank = array->rank - 1;
-  }
+
+  name = mask ? "mminloc" : "minloc";
+  f->value.function.name =
+    g95_get_string("__%s%d_%d_%c%d", name, dim != NULL, f->ts.kind,
+                   g95_type_letter(array->ts.type), array->ts.kind);
 }
 
 void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
 			     g95_expr *mask) {
+char *name;
 
   f->ts = array->ts;
 
@@ -649,7 +652,7 @@ void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
     f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__%s%d_%c%d", mask ? "mminval" : "minval", f->rank,
+    g95_get_string("__%s_%c%d", mask ? "mminval" : "minval",
                    g95_type_letter(array->ts.type), array->ts.kind);
 }
 
@@ -704,9 +707,12 @@ void g95_resolve_product(g95_expr *f, g95_expr *array, g95_expr *dim,
 			 g95_expr *mask) {
 
   f->ts = array->ts;
+
+  if (dim != NULL && array->rank != 1) f->rank = array->rank - 1;
+
   f->value.function.name =
-    g95_get_string("__product_%c%d", g95_type_letter(array->ts.type),
-		   array->ts.kind);
+    g95_get_string("__%s_%c%d", mask ? "mproduct" : "product",
+                   g95_type_letter(array->ts.type), array->ts.kind);
 }
 
 
@@ -840,8 +846,8 @@ void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
   if (dim != NULL && array->rank != 1) f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__%s%d_%c%d", mask ? "msum" : "sum", f->rank,
-		   g95_type_letter(array->ts.type), array->ts.kind);
+    g95_get_string("__%s_%c%d", mask ? "msum" : "sum",
+                   g95_type_letter(array->ts.type), array->ts.kind);
 }
 
 
