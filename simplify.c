@@ -19,7 +19,6 @@ along with GNU G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-
 #include "g95.h"
 #include "simplify.h"
 
@@ -33,6 +32,7 @@ extern g95_real_info g95_real_kinds[];
 
 static g95_expr *integer_zero, *real_zero;
 static mpf_t mpf_zero, mpf_half, mpf_one, mpf_pi, mpf_hpi, mpf_nhpi;
+static mpz_t mpz_zero;
 
 g95_expr g95_bad_expr;
 
@@ -70,22 +70,22 @@ g95_expr g95_bad_expr;
 /* FIXME -- a static table is a really stupid implementation of achar but
  * it should work for a start                                            */
 
-static char ascii_table[128] = {"\0", "\0", "\0", "\0", "\0", "\0", "\0", "\0",\
-                                "\b", "\t", "\n", "\v", "\0", "\r", "\0", "\0",\
-                                "\0", "\0", "\0", "\0", "\0", "\0", "\0", "\0",\
-                                "\0", "\0", "\0", "\0", "\0", "\0", "\0", "\0",\
-                                 " ",  "!", "\"",  "#",  "$",  "%",  "&", "\'",\
-                                 "(",  ")",  "*",  "+",  ",",  "-",  ".",  "/",\
-                                 "0",  "1",  "2",  "3",  "4",  "5",  "6", "7", \
-                                 "8",  "9",  ":",  ";",  "<",  "=",  ">",  "?",\
-                                 "@",  "A",  "B",  "C",  "D",  "E",  "F",  "G",\
-                                 "H",  "I",  "J",  "K",  "L",  "M",  "N",  "O",\
-                                 "P",  "Q",  "R",  "S",  "T",  "U",  "V",  "W",\
-                                 "X",  "Y",  "Z",  "[", "\\",  "]",  "^",  "_",\
-                                 "`",  "a",  "b",  "c",  "d",  "e",  "f",  "g",\
-                                 "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",\
-                                 "p",  "q",  "r",  "s",  "t",  "u",  "v",  "w",\
-                                 "x",  "y",  "z",  "{",  "|",  "}",  "~", "\?"};
+static char ascii_table[128] = {'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',\
+                                '\b', '\t', '\n', '\v', '\0', '\r', '\0', '\0',\
+                                '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',\
+                                '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',\
+                                 ' ',  '!', '\'',  '#',  '$',  '%',  '&', '\'',\
+                                 '(',  ')',  '*',  '+',  ',',  '-',  '.',  '/',\
+                                 '0',  '1',  '2',  '3',  '4',  '5',  '6', '7', \
+                                 '8',  '9',  ':',  ';',  '<',  '=',  '>',  '?',\
+                                 '@',  'A',  'B',  'C',  'D',  'E',  'F',  'G',\
+                                 'H',  'I',  'J',  'K',  'L',  'M',  'N',  'O',\
+                                 'P',  'Q',  'R',  'S',  'T',  'U',  'V',  'W',\
+                                 'X',  'Y',  'Z',  '[', '\\',  ']',  '^',  '_',\
+                                 '`',  'a',  'b',  'c',  'd',  'e',  'f',  'g',\
+                                 'h',  'i',  'j',  'k',  'l',  'm',  'n',  'o',\
+                                 'p',  'q',  'r',  's',  't',  'u',  'v',  'w',\
+                                 'x',  'y',  'z',  '{',  '|',  '}',  '~', '\?'};
 
 
 /* real_range_check()-- Range checks a real expression node.  If all
@@ -201,24 +201,25 @@ int index;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  result = g95_constant_result(BT_CHARACTER, e->ts.kind);
-  result->where = e->where;
-
-  result->value.character.string = g95_getmem(2);
-
 /* We cannot assume that the native character set is ASCII in this function */
 
-  if (mpz_cmp_si(e->value.integer, 1)<0 || mpz_cmp_si(e->value.integer,127)>0) {
-    g95_error("Argument of ACHAR at %L must be between 1 and 127", &e->where);
-    return &g95_bad_expr;
+  if (g95_extract_int(e, &index) != NULL  || index < 0 || index > 127  ) {
+      g95_error("Extended ASCII not implemented: argument of ACHAR at %L must be between 0 and 127", &e->where);
+      return &g95_bad_expr;
   }
 
 /* FIXME This is a limited and stupid implementation, but it's a start. */
-  index = mpz_get_si(e->value.integer);
-  result->value.character.string[0] = ascii_table[index];
-  result->value.character.string[1] = '\0';   /* For debugger */
 
-  return result;
+    result = g95_constant_result(BT_CHARACTER, e->ts.kind);
+    result->where = e->where;
+
+    result->value.character.string = g95_getmem(2);
+
+    result->value.character.length = 1;
+    result->value.character.string[0] = ascii_table[index];
+    result->value.character.string[1] = '\0';   /* For debugger */
+    return result;
+
 }
 
 
@@ -263,11 +264,11 @@ char ch;
   }
 
   for ( i=0; i<len-count; ++i) {
-    *(result->value.character.string + i) = *(e->value.character.string + count +i);
+    result->value.character.string[i] = e->value.character.string[count+i];
   }
 
   for ( i=len-count; i<len; ++i) {
-    *(result->value.character.string + i) = ' ';
+    result->value.character.string[i] = ' ';
   }
 
   result->value.character.string[len] = '\0';   /* For debugger */
@@ -296,17 +297,17 @@ char ch;
   result->value.character.string = g95_getmem(len+1);
 
   for ( count=0, i=len-1; i>=0; --i ) {
-    ch = *(e->value.character.string + i);
+    ch = e->value.character.string[i];
     if ( ch != ' ' ) break;
     ++count;
   }
 
   for ( i=0; i<count; ++i) {
-    *(result->value.character.string + i) = ' ';
+    result->value.character.string[i] = ' ';
   }
 
   for ( i=count; i<len; ++i) {
-    *(result->value.character.string + i) = *(e->value.character.string - count +i);
+    result->value.character.string[i] = e->value.character.string[i-count];
   }
 
   result->value.character.string[len] = '\0';   /* For debugger */
@@ -388,29 +389,32 @@ int kind;
 
 g95_expr *g95_simplify_asin(g95_expr *e) {
 
-  if (e->expr_type != EXPR_CONSTANT) return NULL; 
+  return NULL;
 
 /* Range checking--  Must have abs(x)<=1 */
  
+  /* Evaluation of transcendentals not implemented yet 
+  if (e->expr_type != EXPR_CONSTANT) return NULL; 
   if (mpf_cmp_si(e->value.real, 1) > 0 || mpf_cmp_si(e->value.real, -1) < 0) {
     g95_error("Argument of ASIN at %L must be between -1 and 1", &e->where);
     return &g95_bad_expr;
   }
-
-  return NULL;
+  */
 }
 
 
 g95_expr *g95_simplify_atan2(g95_expr *y, g95_expr *x) {
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL; 
+  return NULL;
 
+  /* Evaluation of transcendentals not implemented yet 
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL; 
   if (x->ts.kind != y->ts.kind) {
-    g95_warning("KIND of arguments of ATAN2 at %L must agree", &x->where);
+    g95_error("KIND of arguments of ATAN2 at %L must agree", &x->where);
     return &g95_bad_expr;
   }
+  */
 
-  return NULL;
 }
 
 
@@ -511,16 +515,13 @@ int kind;
   switch (x->ts.type) {
 	case BT_COMPLEX:
 	      result = g95_complex2complex(x,kind); 
-	      return result;
-	      break;
+              return real_range_check(result, "CMPLX");
 	case BT_INTEGER:
 	      result = g95_int2complex(x,kind);
-	      return result;
-	      break;
+              return real_range_check(result, "CMPLX");
 	case BT_REAL:
 	      result = g95_real2complex(x, kind);
-	      return result;
-	      break;
+              return real_range_check(result, "CMPLX");
 	default :
 	      g95_error("Argument of CMPLX at %L is not a valid type",
 			      &x->where);
@@ -530,10 +531,9 @@ int kind;
   else {
   switch (x->ts.type) {
 	case BT_COMPLEX:
-      		g95_error("CMPLX at %L cannot take two arguments if the first is complex",
+      	      g95_error("CMPLX at %L cannot take two arguments if the first is complex",
   	 	  &x->where);
               return &g95_bad_expr;
-	      break;
 	case BT_INTEGER:
 	      result = g95_constant_result(BT_REAL, kind);
   	      result->where = x->where;
@@ -542,8 +542,7 @@ int kind;
       	        mpf_set_z(result->value.complex.i, y->value.integer);
 	      if ( y->ts.type == BT_REAL )
       	        mpf_set(result->value.complex.i, y->value.real);
-	      return result;
-	      break;
+              return real_range_check(result, "CMPLX");
 	case BT_REAL:
 	      result = g95_constant_result(BT_REAL, kind);
   	      result->where = x->where;
@@ -551,8 +550,7 @@ int kind;
       	        mpf_set_z(result->value.complex.i, y->value.integer);
 	      if (y->ts.type == BT_REAL )
       	        mpf_set(result->value.complex.i, y->value.real);
-	      return result;
-	      break;
+              return real_range_check(result, "CMPLX");
 	default :
 	      g95_error("Argument of CMPLX at %L is not a valid type",
 			      &x->where);
@@ -584,6 +582,7 @@ g95_expr *g95_simplify_cos(g95_expr *e) {
 
 
 g95_expr *g95_simplify_cosh(g95_expr *e) {
+  /* Ditto */
 
   return NULL;
 }
@@ -594,129 +593,96 @@ g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  result = g95_copy_expr(e);
-
   switch (e->ts.type) {
 	  case BT_INTEGER:
 		  result = g95_int2real(e, g95_default_double_kind());
-		  return result;
 		  break;
 	  case BT_REAL:
 	          result = g95_real2real(e, g95_default_double_kind());
-		  return result;
 		  break;
 	  case BT_COMPLEX:
 		  result = g95_complex2real(e, g95_default_double_kind());
-		  return result;
 		  break;
 	  default:
 	          g95_error("Argument of DBLE at %L is not a valid type",
 			      &e->where);
 		  return &g95_bad_expr;
   }
+
+  return real_range_check(result, "DBLE");
 }
 
 
 g95_expr *g95_simplify_dim(g95_expr *x, g95_expr *y) {
 g95_expr *result;
-int knd1, knd2;
 
-  return NULL; 
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
 
-  if ( x->ts.type != BT_INTEGER || x->ts.type != BT_REAL ) {
-    g95_warning("Arguments of DIM at %L must be integer or real",
-		&FIRST_ARG(x)->where);
-    //    return FAILURE;
+  if ( x->ts.type != BT_INTEGER || x->ts.type != BT_REAL || y->ts.type !=BT_INTEGER || y->ts.type != BT_REAL ) {
+    g95_error("Arguments of DIM at %L must be integer or real",
+		&x->where);
+    return &g95_bad_expr;
   }
 
   if ( (x->ts.type == BT_INTEGER && y->ts.type != BT_INTEGER) ||
        (x->ts.type == BT_REAL && y->ts.type != BT_REAL ) ) {
-    g95_warning("Type of arguments of DIM at %L must agree",
+    g95_error("Type of arguments of DIM at %L must agree",
 		&FIRST_ARG(x)->where);
-    //    return FAILURE;
+    return &g95_bad_expr;
   }
 
-  if ( x->ts.type == BT_INTEGER ) {
-    knd1 = g95_validate_kind(BT_INTEGER, x->ts.type);
-    knd2 = g95_validate_kind(BT_INTEGER, y->ts.type);
-    if (knd1 != knd2 ) {
-      g95_warning("Kind of arguments of DIM at %L must agree",
-		&FIRST_ARG(x)->where);
-      //      return FAILURE;
-    }
+  if (x->ts.kind != y->ts.kind) {
+    g95_error("KIND of arguments of DIM at %L must agree", &x->where);
+    return &g95_bad_expr;
   }
 
-  //  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)     return FAILURE;
-
-  result = g95_get_expr();
-
-  if (g95_compare_expr(x, y) > 0) {
-    g95_arith_minus(x, y, &result);
+  switch (x->ts.type) {
+	case BT_INTEGER: 
+	        result = g95_constant_result(BT_INTEGER, x->ts.kind);
+                result->where = x->where;
+	        if (mpz_cmp(x->value.integer, y->value.integer) > 0 ) {
+	          mpz_sub(result->value.integer, x->value.integer, y->value.integer);
+		}
+	        else {
+	          mpz_set(result->value.integer,mpz_zero);
+	        }
+	        break;
+	case BT_REAL: 
+       	        result = g95_constant_result(BT_REAL, x->ts.kind);
+                result->where = x->where;
+	        if (mpf_cmp(x->value.real, y->value.real) > 0 ) {
+	          mpf_sub(result->value.real, x->value.real, y->value.real);
+		}
+	        else {
+	          mpf_set(result->value.real,mpf_zero);
+	        }
+	        break;
+        default:
+	        g95_error("Argument of DIM at %L is not integer or real", &x->where);
+                return &g95_bad_expr;
   }
-  else 
-    result = g95_copy_expr(0);
 
-  return NULL;
+  return real_range_check(result, "DIM");
 }
 
 
-g95_expr *g95_simplify_dprod(g95_expr *e) {
-g95_expr *arg1, *arg2, *dbl1, *dbl2, *result;
-arith r;
+g95_expr *g95_simplify_dprod(g95_expr *x, g95_expr *y) {
+g95_expr *mult1, *mult2, *result;
 
-  return NULL; 
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL;
 
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_REAL || arg2->ts.type != BT_REAL ) {
-     g95_warning("Arguments of DPROD at %L must be real",
-        	    &FIRST_ARG(e)->where);
-     //     return FAILURE;
+  if (x->ts.type != BT_REAL || y->ts.type != BT_REAL ) {
+     g95_error("Arguments of DPROD at %L must be real", &x->where);
+     return &g95_bad_expr;
   }
 
-  //  if (arg1->expr_type != EXPR_CONSTANT) return FAILURE;
+  mult1 = g95_real2real(x, g95_default_double_kind());
+  mult2 = g95_real2real(y, g95_default_double_kind());
 
-  dbl1 = g95_real2real(arg1, g95_default_double_kind());
-  dbl2 = g95_real2real(arg2, g95_default_double_kind());
+  mpf_mul(result->value.real, mult1->value.real, mult2->value.real);
 
-  if (dbl1 != NULL && dbl2 != NULL) {
-    r = g95_arith_times(dbl1, dbl2, &result);
-    if (r == ARITH_OK) {
-      result = g95_get_expr();
-      r = g95_arith_times(dbl1, dbl2, &result);
-      if (r == ARITH_OK) {
-	g95_replace_expr(e, result);
-	g95_free_expr(dbl1);
-	g95_free_expr(dbl2);
-	//        return SUCCESS;
-      }
-      else {
-        g95_warning("Invalid result in DPROD at %L",
-               	      &FIRST_ARG(e)->where);
-	g95_free_expr(dbl1);
-	g95_free_expr(dbl2);
-	g95_free_expr(result);
-	//	return FAILURE;
-      }
-    }
-    else {
-     g95_warning("Invalid result in DPROD at %L",
-        	    &FIRST_ARG(e)->where);
-     g95_free_expr(dbl1);
-     g95_free_expr(dbl2);
-     //     return FAILURE;
-    }
-  } 
-  else {
-     g95_warning("Conversion failed in DPROD at %L",
-        	    &FIRST_ARG(e)->where);
-     g95_free_expr(dbl1);
-     g95_free_expr(dbl2);
-     //     return FAILURE;
-  }
+  return real_range_check(result, "DPROD");
 
-  return NULL;
 }
 
 
@@ -738,109 +704,73 @@ int i;
 
 /* simplify_exp */
 g95_expr *g95_simplify_exp(g95_expr *e) {
-g95_expr *arg;
 
   return NULL; 
 
-  arg = FIRST_ARG(e);
-
-/* Type checking */
+/* We haven't implemented the extension of evaluation of transcendentals yet 
+  //  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of EXP at %L must be real",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
-  }
-
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  //  return SUCCESS;
+    g95_warning("Argument of EXP at %L must be real", &e->where);
+    return &g95_bad_expr;
+  } */
 }
 
 
 
 g95_expr *g95_simplify_exponent(g95_expr *e) {
-g95_expr *arg;
 
   return NULL; 
 
-  arg = FIRST_ARG(e);
+//  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-/* Type checking */
+/* Not done yet */
+/* Type checking 
 
   if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of EXPONENT at %L must be real",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+    g95_warning("Argument of EXPONENT at %L must be real", &e->where);
+    return &g95_bad_expr;
   }
+*/
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  //  return SUCCESS;
 }
 
 
 /* simplify_floor */
-g95_expr *g95_simplify_floor(g95_expr *e) {
-g95_expr *arg, *floor, *result;
-int knd;
-/* Result needs to have correct KIND */
-/* knd (optional) must be a valid integer kind */
+g95_expr *g95_simplify_floor(g95_expr *e, g95_expr *k) {
+g95_expr *result;
+int kind;
 
   return NULL; 
 
+  kind = get_kind(k, "FLOOR", g95_default_real_kind());
+  if (kind == -1) return &g95_bad_expr;
 
-  arg = FIRST_ARG(e);
+  if (e->ts.type != EXPR_CONSTANT) return NULL;
 
-  if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of FLOOR at %L must be real",
-		&SECOND_ARG(e)->where);
-    //    return FAILURE;
-  }
+  result = g95_constant_result(BT_REAL, kind);
+  result->where = e->where;
+  
+  mpf_floor(result->value.real, e->value.real);
 
-  knd = g95_validate_kind(BT_REAL, arg->ts.type);
+  return real_range_check(result, "FLOOR");
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  floor = g95_copy_expr(arg);
-
-  mpf_init(floor->value.real);
-  mpf_floor(floor->value.real, arg->value.real);
-
-  result = g95_real2int(floor, g95_default_integer_kind());
-
-  g95_free_expr(floor);
-
-  if (result != NULL) {
-    g95_replace_expr(e, result);
-    //    return SUCCESS;
-  }
-  else {
-    g95_warning("Conversion in ANINT at %L failed",
-		&SECOND_ARG(e)->where);
-    g95_free_expr(result);
-    // return FAILURE;
-  }
 }
 
 
 
 g95_expr *g95_simplify_fraction(g95_expr *e) {
-g95_expr *arg;
 
   return NULL; 
 
-  arg = FIRST_ARG(e);
+  //  if (arg->expr_type != EXPR_CONSTANT) return NULL;
 
+  /* Not done yet
   if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of FRACTION at %L must be real",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+    g95_warning("Argument of FRACTION at %L must be real", &e->where);
+    return &g95_bad_expr;
   }
-
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  //return SUCCESS;
+  */
 }
 
 
@@ -879,8 +809,6 @@ g95_expr *arg;
   return NULL; 
 
 /* Type checking */
-
-  arg = FIRST_ARG(e);
 
   /* Need to check character length */
   if (arg->ts.type != BT_CHARACTER ) {
@@ -1032,28 +960,36 @@ g95_expr *arg1, *arg2;
 
 
 g95_expr *g95_simplify_ichar(g95_expr *e) {
-g95_expr *arg;
+g95_expr *result;
+int index;
 
   return NULL; 
-
-/* Type checking */
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
 /* Argument must be of length 1; its value must be representable by the 
  * processor */
 
-  arg = FIRST_ARG(e);
-
-  /* Need to check character length */
-  if (arg->ts.type != BT_CHARACTER ) {
-    g95_warning("Argument of IACHAR at %L must be character and of length one",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (e->ts.type != BT_CHARACTER ) {
+    g95_error("Argument of ICHAR at %L must be character and of length one", &e->where);
+    return &g95_bad_expr;
   }
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+  if (e->value.character.length != 1 ) {
+    g95_error("Argument of ICHAR at %L must be of length one", &e->where);
+    return &g95_bad_expr;
+  }
 
-  //  return SUCCESS;
-} /* end simplify_ichar */
+  index = (int) e->value.character.string[0];
+
+  if ( index < CHAR_MIN || index > CHAR_MAX ) {
+    g95_error("Argument of ICHAR at %L out of range of this processor", &e->where);
+    return &g95_bad_expr;
+  }
+
+  mpz_set_si(result->value.integer, index);
+  return result;
+
+}
 
 
 
@@ -1835,53 +1771,31 @@ int i;
 
 
 
-g95_expr *g95_simplify_real(g95_expr *e) {
-g95_expr *arg, *result;
+g95_expr *g95_simplify_real(g95_expr *e, g95_expr *k) {
+g95_expr *result;
+int kind;
 
-  return NULL; 
+  kind = get_kind(k, "REAL", g95_default_real_kind()); 
+  if (kind == -1) return &g95_bad_expr;
 
-/* Needs KIND */
-/* knd (optional) must be a valid real kind */
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  arg = FIRST_ARG(e);
-
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  result = g95_copy_expr(arg);
-
-  switch (arg->ts.type) {
+  switch (e->ts.type) {
 	case BT_INTEGER:
-	    result = g95_int2real(arg, g95_default_real_kind());
-	    if (result != NULL) {
-		g95_replace_expr(e, result);
-		//	        return SUCCESS;
-	    }
-	    else {
-	        g95_free_expr(result);
-		//		return FAILURE;
-	    }
-	    break;
-
+	    result = g95_int2real(e, kind);
+            return real_range_check(result, "REAL");
 	case BT_REAL:
-	    g95_replace_expr(e, result);
-	    //	    return SUCCESS;
-	    break;
-
+	    result = g95_real2real(e, kind);
+            return real_range_check(result, "REAL");
 	case BT_COMPLEX:
-       	    mpf_init(result->value.real);
-	    mpf_set(result->value.real, arg->value.complex.r);
-            g95_replace_expr(e, result);
-	    //	    return SUCCESS;
+	    result = g95_complex2real(e, kind);
+            return real_range_check(result, "REAL");
 	    break;
 
         default:
-       	    g95_warning("Invalid argument type in REAL at %L",
- 	       	&FIRST_ARG(e)->where);
-	    g95_free(result);
-	    //	    return FAILURE;
+       	    g95_warning("Invalid argument type in REAL at %L", e->where);
+	    return &g95_bad_expr;
   }
-
-  //  return SUCCESS;
 
 }
 
@@ -2322,7 +2236,8 @@ void g95_simplify_init_1(void) {
 
   mpf_init_set_str(mpf_zero, "0.0", 10);
   mpf_init_set_str(mpf_half, "0.5", 10);
-  mpf_init_set_str(mpf_one, "0.5", 10);
+  mpf_init_set_str(mpf_one,  "1.0", 10);
+  mpz_init_set_str(mpz_zero,   "0", 10);
 }
 
 
@@ -2335,6 +2250,7 @@ void g95_simplify_done_1(void) {
   mpf_clear(mpf_zero);
   mpf_clear(mpf_half);
   mpf_clear(mpf_one);
+  mpz_clear(mpz_zero);
 
   g95_free_expr(integer_zero);
   g95_free_expr(real_zero);
