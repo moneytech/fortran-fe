@@ -997,6 +997,7 @@ arith g95_arith_power(g95_expr *, g95_expr *, g95_expr **);
 arith g95_arith_concat(g95_expr *, g95_expr *, g95_expr **);
 
 int g95_compare_expr(g95_expr *, g95_expr *);
+int g95_compare_string(g95_expr *, g95_expr *, int *);
 arith g95_arith_eq(g95_expr *, g95_expr *, g95_expr **);
 arith g95_arith_ne(g95_expr *, g95_expr *, g95_expr **);
 arith g95_arith_gt(g95_expr *, g95_expr *, g95_expr **);

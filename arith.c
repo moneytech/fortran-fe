@@ -1374,6 +1374,39 @@ static int compare_complex(g95_expr *op1, g95_expr *op2) {
 }
 
 
+/* g95_compare_string()-- Given two constant strings and the inverse
+ * collating sequence, compare the strings.  We return -1 for a<b,
+ * 0 for a==b and 1 for a>b.  If the xcoll_table is NULL, we use the
+ * processor's default collating sequence. */
+
+int g95_compare_string(g95_expr *a, g95_expr *b, int *xcoll_table) {
+int len, alen, blen, i, ac, bc;
+
+  alen = a->value.character.length;
+  blen = b->value.character.length;
+
+  len = (alen > blen) ? alen : blen;
+  
+  for(i=0; i<len; i++) {
+    ac = (i < alen) ? a->value.character.string[i] : ' ';
+    bc = (i < blen) ? b->value.character.string[i] : ' ';
+
+    if (xcoll_table != NULL) {
+      ac = xcoll_table[ac];
+      bc = xcoll_table[bc];
+    }
+
+    if (ac < bc) return -1;
+    if (ac > bc) return 1;
+  }
+
+  /* Strings are equal */
+
+  return 0;
+}
+
+
+
 /* Specific comparison subroutines */
 
 arith g95_arith_eq(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {

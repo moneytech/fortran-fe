@@ -69,10 +69,10 @@ g95_expr g95_bad_expr;
  * Array arguments are never passed to these subroutines.
  */
 
-/* FIXME -- a static table is a really stupid implementation of achar but
- * it should work for a start */
+/* Static table for converting non-ascii character sets to ascii.
+ * The xascii_table[] is the inverse table. */
 
-static char ascii_table[128] = {
+static int ascii_table[256] = {
    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
    '\b', '\t', '\n', '\v', '\0', '\r', '\0', '\0',
    '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
@@ -91,9 +91,11 @@ static char ascii_table[128] = {
    'x',  'y',  'z',  '{',  '|',  '}',  '~',  '\?'
 };
 
+static int xascii_table[256];
+
 
 /* range_check()-- Range checks an expression node.  If all goes well,
- * returns the node, otherwise returns &g95_bad_expr and frees the node.  */
+ * returns the node, otherwise returns &g95_bad_expr and frees the node. */
 
 static g95_expr *range_check(g95_expr *result, const char *name) {
 
@@ -225,18 +227,15 @@ int index;
       return &g95_bad_expr;
   }
 
-/* FIXME This is a limited and stupid implementation, but it's a start. */
+  result = g95_constant_result(BT_CHARACTER, g95_default_character_kind());
+  result->where = e->where;
 
-    result = g95_constant_result(BT_CHARACTER, g95_default_character_kind());
-    result->where = e->where;
+  result->value.character.string = g95_getmem(2);
 
-    result->value.character.string = g95_getmem(2);
-
-    result->value.character.length = 1;
-    result->value.character.string[0] = ascii_table[index];
-    result->value.character.string[1] = '\0';   /* For debugger */
-    return result;
-
+  result->value.character.length = 1;
+  result->value.character.string[0] = ascii_table[index];
+  result->value.character.string[1] = '\0';   /* For debugger */
+  return result;
 }
 
 
@@ -1128,8 +1127,7 @@ int i;
 
 g95_expr *g95_simplify_iachar(g95_expr *e) {
 g95_expr *result;
-int i, index=-1;
-char c;
+int index;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -1138,67 +1136,12 @@ char c;
     return &g95_bad_expr;
   }
 
-/* Table lookup -- can (should) be replaced with something smarter */
+  index = xascii_table[(int) e->value.character.string[0] & 0xFF];
 
-  c = e->value.character.string[0];
-
-  if (iscntrl(c)) {
-    if (c == '\?')
-      index = 127;
-    else {
-      for(i=0; i<=31; i++) {
-	if (c == ascii_table[i])
-	  index = i;
-	else {
-	  g95_error("Argument of IACHAR at %L cannot be represented by "
-		    "this processor or is not implemented", &e->where);
-	  return &g95_bad_expr;
-	}
-      }
-    }
-  } else if (isspace(c))
-    index = 32;
-  else if (ispunct(c)) {
-    for(i=33; i<=47; i++)
-      if (c == ascii_table[i]) index = i;
-
-    for(i=58; i<=64; i++)
-      if (c == ascii_table[i]) index = i;
-
-    for(i=91; i<=96; i++)
-      if (c == ascii_table[i]) index = i;
-
-    for (i=123; i<=126; i++)
-      if (c == ascii_table[i]) index = i;
-    
-  } else if (isdigit(c)) {
-    for(i=48; i<=57; i++)
-      if (c == ascii_table[i]) index = i;
-  } else if (isupper(c)) {
-    for(i=65; i<=90; i++)
-      if (c == ascii_table[i]) index = i;
-  } else if (islower(c)) {
-    for(i=97; i<=122; i++)
-      if (c == ascii_table[i]) index = i;
-
-  } else {
-    g95_error("Argument of IACHAR at %L cannot be represented by this "
-	      "processor", e->where);
-    return &g95_bad_expr;
-  }
-/* End of lookup */
-
-  if (index < CHAR_MIN || index > CHAR_MAX) {
-    g95_error("Argument of IACHAR at %L out of range of this processor",
-	      &e->where);
-    return &g95_bad_expr;
-  }
-
-  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+  result = g95_int_expr(index);
   result->where = e->where;
 
-  mpz_set_si(result->value.integer, index);
-  return range_check(result,"IACHAR");
+  return range_check(result, "IACHAR");
 }
 
 
@@ -1339,7 +1282,7 @@ int index;
     return &g95_bad_expr;
   }
 
-  index = (unsigned) e->value.character.string[0];
+  index = (int) e->value.character.string[0];
 
   if (index < CHAR_MIN || index > CHAR_MAX) {
     g95_error("Argument of ICHAR at %L out of range of this processor",
@@ -1742,79 +1685,44 @@ int count, len, lentrim, i;
   return range_check(result,"LEN_TRIM");
 }
 
-/* FIXME */
-/* Caveat: I have not accounted for possibility of non-ASCII character sets
- * in lge, lgt, lle, llt */
 
 g95_expr *g95_simplify_lge(g95_expr *a, g95_expr *b) {
-int tv;
 
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0)
-    return g95_logical_expr( 1, &a->where);
-
-  if (strcmp(a->value.character.string, b->value.character.string) >= 0) 
-    tv = 1;
-  else
-    tv = 0;
-
-  return g95_logical_expr(tv, &a->where);
+  return g95_logical_expr(g95_compare_string(a, b, xascii_table) >= 0,
+			  &a->where);
 }
 
 
 g95_expr *g95_simplify_lgt(g95_expr *a, g95_expr *b) {
-int tv;
 
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0)
-    return g95_logical_expr( 0, &a->where);
-
-  if (strcmp(a->value.character.string, b->value.character.string) > 0)
-    tv = 1;
-  else
-    tv = 0;
-
-  return g95_logical_expr( tv, &a->where);
+  return g95_logical_expr(g95_compare_string(a, b, xascii_table) > 0,
+			  &a->where);
 }
 
 
 g95_expr *g95_simplify_lle(g95_expr *a, g95_expr *b) {
-int tv;
 
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0)
-    return g95_logical_expr( 1, &a->where);
-
-  if (strcmp(a->value.character.string, b->value.character.string) <= 0)
-    tv = 1;
-  else
-    tv = 0;
-
-  return g95_logical_expr(tv, &a->where);
+  return g95_logical_expr(g95_compare_string(a, b, xascii_table) <= 0,
+			  &a->where);
 }
 
 
 g95_expr *g95_simplify_llt(g95_expr *a, g95_expr *b) {
-int tv;
 
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0)
-    return g95_logical_expr(0, &a->where);
-
-  if (strcmp(a->value.character.string, b->value.character.string) < 0)
-    tv = 1;
-  else
-    tv = 0;
-
-  return g95_logical_expr(tv, &a->where);
+  return g95_logical_expr(g95_compare_string(a, b, xascii_table) < 0,
+			  &a->where);
 }
 
 
@@ -3514,13 +3422,25 @@ size_t index=0, len, lenset;
  */
 
 
+/* invert_table()-- Given a collating table, create the inverse table */
+
+static void invert_table(int *table, int *xtable) {
+int i;
+
+  for(i=0; i<256; i++)
+    xtable[i] = 0;
+
+  for(i=0; i<256; i++) 
+    xtable[table[i]] = i;
+}
+
+
 /* init_pi()-- Calculate pi.  We use the Bailey, Borwein and Plouffe formula:
  *
  * pi = \sum{n=0}^\infty (1/16)^n [4/(8n+1) - 2/(8n+4) - 1/(8n+5) - 1/(8n+6)]
  * 
  * which gives about four bits per iteration.
  */
-
 
 static void init_pi(void) {
 mpf_t s, t;
@@ -3582,6 +3502,8 @@ void g95_simplify_init_1(void) {
   mpf_init_set_str(mpf_half, "0.5", 10);
   mpf_init_set_str(mpf_one,  "1.0", 10);
   mpz_init_set_str(mpz_zero,   "0", 10);
+
+  invert_table(ascii_table, xascii_table);
 }
 
 
