@@ -2779,11 +2779,11 @@ void g95_intrinsic_done_1(void) {
 /******** Subroutines to check intrinsic interfaces ***********/
 
 
-/* g95_remove_nullargs()-- Given a formal argument list, remove any
+/* remove_nullargs()-- Given a formal argument list, remove any
  * NULL arguments that may have been left behind by a sort against
  * some formal argument list. */
 
-static void g95_remove_nullargs(g95_actual_arglist **ap) {
+static void remove_nullargs(g95_actual_arglist **ap) {
 g95_actual_arglist *head, *tail, *next;
 
   tail = NULL;
@@ -2822,7 +2822,7 @@ static try sort_actual(const char *name, g95_actual_arglist **ap,
 g95_actual_arglist *actual, *a;
 intrinsic_arg *f;
 
-  g95_remove_nullargs(ap);
+  remove_nullargs(ap);
   actual = *ap;
 
   for(f=formal; f; f=f->next)
@@ -3095,6 +3095,8 @@ try t;
     if (t == SUCCESS) expr->ts = specific->ts;
   } else 
     t = do_check(specific, *ap);
+
+  if (t == FAILURE) remove_nullargs(ap);
 
   return t;
 }
