@@ -1734,7 +1734,7 @@ static arith reduce_binary(arith (*eval)(), g95_expr *op1, g95_expr *op2,
 
 
 /* High level arithmetic subroutines.  These subroutines go into
- * eval_intrinsic(), which can do one of several things to it's
+ * eval_intrinsic(), which can do one of several things to its
  * operands.  If the operands are incompatible with the intrinsic
  * operation, we return a node pointing to the operands and hope that
  * an operator interface is found during resolution.
@@ -1754,7 +1754,7 @@ arith rc;
 
   switch(operator) {
   case INTRINSIC_NOT:    /* Logical unary */
-    if (op1->ts.type != BT_LOGICAL) goto incompatible;
+    if (op1->ts.type != BT_LOGICAL) goto runtime;
 
     temp.ts.type = BT_LOGICAL;
     temp.ts.kind = g95_default_logical_kind();
@@ -1766,7 +1766,7 @@ arith rc;
   case INTRINSIC_OR:     case INTRINSIC_AND:
   case INTRINSIC_NEQV:   case INTRINSIC_EQV:
     if (op1->ts.type != BT_LOGICAL || op2->ts.type != BT_LOGICAL)
-      goto incompatible;
+      goto runtime;
 
     temp.ts.type = BT_LOGICAL;
     temp.ts.kind = g95_default_logical_kind();
@@ -1775,7 +1775,7 @@ arith rc;
     break;
 
   case INTRINSIC_UPLUS:   case INTRINSIC_UMINUS:  /* Numeric unary */
-    if (!g95_numeric_ts(&op1->ts)) goto incompatible;
+    if (!g95_numeric_ts(&op1->ts)) goto runtime;
 
     temp.ts = op1->ts;
 
@@ -1785,7 +1785,7 @@ arith rc;
   case INTRINSIC_GE:  case INTRINSIC_LT:  /* Additional restrictions */
   case INTRINSIC_LE:  case INTRINSIC_GT:  /* for ordering relations */
     if (op1->ts.type == BT_COMPLEX || op2->ts.type == BT_COMPLEX)
-      goto incompatible;
+      goto runtime;
 
     /* Fall through */
 
@@ -1800,7 +1800,7 @@ arith rc;
   case INTRINSIC_PLUS:    case INTRINSIC_MINUS:   case INTRINSIC_TIMES:
   case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:   /* Numeric binary */
     if (!g95_numeric_ts(&op1->ts) || !g95_numeric_ts(&op2->ts))
-      goto incompatible;
+      goto runtime;
 
     /* Insert any necessary type conversions to make the operands compatible */
 
@@ -1825,7 +1825,7 @@ arith rc;
 
   case INTRINSIC_CONCAT:   /* Character binary */
     if (op1->ts.type != BT_CHARACTER || op2->ts.type != BT_CHARACTER)
-      goto incompatible;
+      goto runtime;
 
     temp.ts.type = BT_CHARACTER;
     temp.ts.kind = g95_default_character_kind();
@@ -1834,7 +1834,7 @@ arith rc;
     break;
 
   case INTRINSIC_USER:
-    goto incompatible;
+    goto runtime;
 
   default:
     g95_internal_error("eval_intrinsic(): Bad operator");
@@ -1843,16 +1843,17 @@ arith rc;
   /* Try to combine the operators */
 
   if (operator == INTRINSIC_POWER && op2->ts.type != BT_INTEGER)
-    goto incompatible;
-
+    goto runtime;
 
   if (op1->expr_type != EXPR_CONSTANT &&
-      (op1->expr_type != EXPR_ARRAY || !g95_is_constant_expr(op1)))
-    goto incompatible;
+      (op1->expr_type != EXPR_ARRAY || !g95_is_constant_expr(op1) ||
+       !g95_expanded_ac(op1)))
+    goto runtime;
 
   if (op2 != NULL && op2->expr_type != EXPR_CONSTANT &&
-      (op2->expr_type != EXPR_ARRAY || !g95_is_constant_expr(op2)))
-    goto incompatible;
+      (op2->expr_type != EXPR_ARRAY || !g95_is_constant_expr(op2) ||
+       !g95_expanded_ac(op2)))
+    goto runtime;
 
   if (unary)
     rc = reduce_unary(eval, op1, &result);
@@ -1870,7 +1871,7 @@ arith rc;
 
   /* Create a run-time expression */
 
-incompatible:
+runtime:
   result = g95_get_expr();
   result->ts = temp.ts;
 

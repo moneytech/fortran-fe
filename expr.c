@@ -662,6 +662,11 @@ int rv;
 
   switch(e->expr_type) {
   case EXPR_OP:
+    rv = g95_is_constant_expr(e->op1) &&
+      (e->op2 == NULL || g95_is_constant_expr(e->op2));
+
+    break;
+
   case EXPR_VARIABLE:
     rv = 0; 
     break;
@@ -827,7 +832,7 @@ g95_expr *op1, *op2, *result;
 
 static try simplify_constructor(g95_constructor *c, int type) {
 
-  for( ;c; c=c->next) {
+  for(;c; c=c->next) {
     if (c->iterator &&
 	(g95_simplify_expr(c->iterator->start, type) == FAILURE ||
 	 g95_simplify_expr(c->iterator->end, type) == FAILURE ||
@@ -907,8 +912,7 @@ g95_actual_arglist *ap;
     if (simplify_constructor(p->value.constructor.head, type) == FAILURE)
       return FAILURE;
 
-    if (type == 1 && p->expr_type == EXPR_ARRAY &&
-	g95_expand_constructor(p) == FAILURE)
+    if (p->expr_type == EXPR_ARRAY && g95_expand_constructor(p) == FAILURE)
       return FAILURE;
 
     break;

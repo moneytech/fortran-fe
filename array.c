@@ -1219,6 +1219,21 @@ int g95_constant_ac(g95_expr *e) {
 }
 
 
+/* g95_expanded_ac()-- Returns nonzero if an array constructor has
+ * been completely expanded (no iterators) and zero if iterators are
+ * present. */
+
+int g95_expanded_ac(g95_expr *e) {
+g95_constructor *p;
+
+  if (e->expr_type == EXPR_ARRAY)
+    for(p=e->value.constructor.head; p; p=p->next)
+      if (p->iterator != NULL || !g95_expanded_ac(p->expr)) return 0;
+
+  return 1;
+}
+
+
 /*************** Type resolution of array constructors ***************/
 
 /* resolve_array_list()-- Recursive array list resolution function.
