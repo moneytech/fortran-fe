@@ -112,7 +112,7 @@ int global_bindings_p (void);
 void insert_block (tree);
 void set_block (tree);
 tree g95_truthvalue_conversion (tree);
-void g95_be_parse_file (void *);
+static void g95_be_parse_file (void *);
 
 #undef LANG_HOOKS_NAME
 #undef LANG_HOOKS_INIT
@@ -137,7 +137,6 @@ void g95_be_parse_file (void *);
 #define LANG_HOOKS_DECODE_OPTION        g95_parse_arg
 #define LANG_HOOKS_PRINT_IDENTIFIER     g95_print_identifier
 #define LANG_HOOKS_PARSE_FILE           g95_be_parse_file
-
 #define LANG_HOOKS_TRUTHVALUE_CONVERSION   g95_truthvalue_conversion
 #define LANG_HOOKS_MARK_ADDRESSABLE        g95_mark_addressable
 #define LANG_HOOKS_TYPE_FOR_MODE           g95_type_for_mode
@@ -330,8 +329,8 @@ is_simple_stmt (tree t)
       {
 	tree type = TREE_TYPE (TREE_TYPE (current_function_decl));
 	if (TREE_CODE (type) != VOID_TYPE
-	    && RETURN_EXPR (t))
-	  return is_simple_rhs (TREE_OPERAND (RETURN_EXPR (t), 1));
+	    && RETURN_STMT_EXPR (t))
+	  return is_simple_rhs (TREE_OPERAND (RETURN_STMT_EXPR (t), 1));
 	else
 	  return 1;
       }
@@ -375,6 +374,8 @@ expand_function_body (tree fndecl, int nested)
     {
       if (flag_tree_ssa)
         optimize_function_tree (fndecl);
+      if (! is_simple_stmt (DECL_SAVED_TREE (fndecl)))
+        warning ("Function tree not simple after optimization");
     }
   else
     warning ("Internal failure: Function is not SIMPLE. Optimization inhibited.");
@@ -458,7 +459,7 @@ current_scope_stmt_stack (void)
   return &g95_scope_stmt_stack;
 }
 
-void
+static void
 g95_be_parse_file (void *set_yydebug ATTRIBUTE_UNUSED)
 {
   g95_parse_file ();
@@ -521,7 +522,7 @@ g95_finish (void)
   return;
 }
 
-void
+static void
 g95_print_identifier (FILE * file ATTRIBUTE_UNUSED,
 		      tree t ATTRIBUTE_UNUSED, int i ATTRIBUTE_UNUSED)
 {

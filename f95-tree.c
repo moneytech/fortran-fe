@@ -165,7 +165,7 @@ deep_copy_node (node)
       break;
 
     case RETURN_STMT:
-      res = build_stmt (RETURN_STMT, deep_copy_node (RETURN_EXPR (node)));
+      res = build_stmt (RETURN_STMT, deep_copy_node (RETURN_STMT_EXPR (node)));
       break;
 
     case TREE_LIST:
