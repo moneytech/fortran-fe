@@ -614,9 +614,9 @@ static try check_reshape(g95_expr *source, g95_expr *shape,
 
 static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
 
-  if (p == NULL && r == NULL) return FAILURE;
-
-  if (p->ts.type != BT_INTEGER || r->ts.type != BT_INTEGER) return FAILURE;
+  if ((p == NULL && r == NULL) ||
+      (p != NULL && p->ts.type != BT_INTEGER) ||
+      (r != NULL && r->ts.type != BT_INTEGER)) return FAILURE;
 
   is_inittype = 1;
 
