@@ -874,8 +874,17 @@ order:
  * show-stopper... */
 
 static void unexpected_eof(void) {
+g95_state_data *p;
 
   g95_error("Unexpected end of file in '%s'", g95_current_file->filename);
+
+  /* Memory cleanup.  Move to "second to last" */
+
+  for(p=g95_state_stack; p && p->previous && p->previous->previous;
+      p=p->previous);
+
+  g95_current_ns->code = (p && p->previous) ? p->head : NULL;
+  g95_done_2();
 
   longjmp(eof, 1);
 }
