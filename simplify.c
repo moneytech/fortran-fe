@@ -2257,6 +2257,7 @@ long j;
     break;
 
   case BT_REAL:
+  case BT_COMPLEX:
     j = g95_real_kinds[i].range;
     break;
 
