@@ -906,9 +906,14 @@ g95_expr temp, *result;
 int unary;
 arith rc;
 
+  g95_clear_ts(&temp.ts); 
+
   switch(operator) {
   case INTRINSIC_NOT:    /* Logical unary */
     if (op1->ts.type != BT_LOGICAL) goto incompatible;
+
+    temp.ts.type = BT_LOGICAL;
+    temp.ts.kind = g95_default_logical_kind();
 
     unary = 1;
     break;
@@ -919,11 +924,16 @@ arith rc;
     if (op1->ts.type != BT_LOGICAL || op2->ts.type != BT_LOGICAL)
       goto incompatible;
 
+    temp.ts.type = BT_LOGICAL;
+    temp.ts.kind = g95_default_logical_kind();
+
     unary = 0;
     break;
 
   case INTRINSIC_UPLUS:   case INTRINSIC_UMINUS:  /* Numeric unary */
     if (!g95_numeric_ts(&op1->ts)) goto incompatible;
+
+    temp.ts = op1->ts;
 
     unary = 1;
     break;
@@ -952,12 +962,22 @@ arith rc;
 
     g95_type_convert_binary(&temp);
 
+    if (operator == INTRINSIC_EQ || operator == INTRINSIC_NE ||
+	operator == INTRINSIC_GE || operator == INTRINSIC_GT ||
+	operator == INTRINSIC_LE || operator == INTRINSIC_LT) {
+      temp.ts.type = BT_LOGICAL;
+      temp.ts.kind = g95_default_integer_kind();
+    }
+
     unary = 0;
     break;
 
   case INTRINSIC_CONCAT:   /* Character binary */
     if (op1->ts.type != BT_CHARACTER || op2->ts.type != BT_CHARACTER)
       goto incompatible;
+
+    temp.ts.type = BT_CHARACTER;
+    temp.ts.kind = g95_default_character_kind();
 
     unary = 0;
     break;
@@ -991,7 +1011,7 @@ arith rc;
 
 incompatible:
   result = g95_get_expr();
-  result->ts.type = BT_UNKNOWN;
+  result->ts = temp.ts;
 
   result->expr_type = EXPR_OP;
   result->operator = operator;
