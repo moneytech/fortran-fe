@@ -1234,8 +1234,8 @@ not_numeric:
  * tree is reduced to a single constant node if all goes well.  This
  * would normally happen when the expression is constructed but
  * function references are assumed to be intrinsics in the context of
- * initialization expressions.  If FAILURE is return an error message
- * has been generated. */
+ * initialization expressions.  If FAILURE is returned an error
+ * message has been generated. */
 
 try g95_check_init_expr(g95_expr *e) {
 g95_actual_arglist *ap;

@@ -944,11 +944,10 @@ static cons_stack *base;
  * function for each expression in the constructor, giving variables
  * with the names of iterators a pass.  */
 
-static match check_constructor(g95_constructor *cons,
-			       match (*check_function)(g95_expr *)) {
+static try check_constructor(g95_constructor *cons,
+			     match (*check_function)(g95_expr *)) {
 cons_stack *c, element;
 g95_symbol *sym;
-match m;
 
   for(; cons; cons=cons->next) {
     if (cons->expr != NULL) {
@@ -961,11 +960,10 @@ match m;
 	g95_error("Variable '%s' at %L isn't an implied DO-iterator.  "
 		  "Constructor is not constant", sym->name, &cons->where);
 
-	return MATCH_ERROR;
+	return FAILURE;
       }
 
-      m = (*check_function)(cons->expr);
-      if (m != MATCH_YES) return m;
+      if ((*check_function)(cons->expr) == FAILURE) return FAILURE;
     }
 
   ok:
@@ -981,7 +979,7 @@ match m;
 
 /* Nothing went wrong, so all OK */
 
-  return MATCH_YES;
+  return SUCCESS;
 }
 
 
@@ -989,18 +987,18 @@ match m;
  * particular kind of expression-- specification, restricted,
  * or initialization as determined by the check_function.  */
 
-match g95_check_constructor(g95_expr *expr,
+try g95_check_constructor(g95_expr *expr,
 			    match (*check_function)(g95_expr *)) {
 cons_stack *base_save;
-match m;
+try t;
 
   base_save = base; 
   base = NULL;
 
-  m = check_constructor(expr->value.constructor, check_function);
+  t = check_constructor(expr->value.constructor, check_function);
 
   base = base_save;
-  return m;
+  return t;
 }
 
 
