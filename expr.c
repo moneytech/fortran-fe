@@ -618,9 +618,14 @@ int rv;
 
   switch(e->expr_type) {
   case EXPR_OP:
-  case EXPR_FUNCTION:
   case EXPR_VARIABLE:
     rv = 0; 
+    break;
+
+  case EXPR_FUNCTION:
+    rv = 0;
+    if (e->value.function.actual->expr)
+      rv = g95_is_constant_expr(e->value.function.actual->expr);
     break;
 
   case EXPR_CONSTANT:
