@@ -69,7 +69,8 @@ G95_PARSER_OBJS = f95/arith.o f95/array.o f95/bbt.o f95/check.o f95/decl.o\
 G95_OBJS = $(G95_PARSER_OBJS) \
     f95/f95-lang.o f95/support.o f95/convert.o f95/trans.o \
     f95/trans-decl.o f95/trans-types.o f95/trans-const.o f95/trans-expr.o \
-    f95/trans-stmt.o f95/trans-io.o f95/trans-array.o f95/trans-intrinsic.o
+    f95/trans-stmt.o f95/trans-io.o f95/trans-array.o f95/trans-intrinsic.o \
+    f95/f95-tree.o
 
 G95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o \
 	tree-cfg.o tree-dfa.o tree-optimize.o tree-simple.o \

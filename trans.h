@@ -169,9 +169,8 @@ void g95_init_se(g95_se *, g95_se *);
    Used by g95_add_stmt_to_(pre|post).  */
 void g95_add_stmt_to_list(tree *, tree *, tree, tree);
 
-/* Create a temporary variable in the current scope.  Depreciated, use
-   create_tmp_var.  */
-tree g95_create_tmp_var(tree);
+/* Depreciated, use create_tmp_var.  */
+#define g95_create_tmp_var(tree) create_tmp_var(tree, NULL)
 
 /* store the result of an expression on a temp variable so it can be used
    repeatedly even if the original changes */
@@ -335,6 +334,15 @@ extern GTY(()) tree g95_fndecl_deallocate;
 extern GTY(()) tree g95_fndecl_stop;
 extern GTY(()) tree g95_fndecl_runtime_error;
 extern GTY(()) tree g95_fndecl_repack[G95_MAX_DIMENSIONS];
+
+/* Math functions.  Many other math functions are handled in
+   trans-intrinsic.c.  */
+extern GTY(()) tree g95_fndecl_math_powf;
+extern GTY(()) tree g95_fndecl_math_pow;
+extern GTY(()) tree g95_fndecl_math_cpowf;
+extern GTY(()) tree g95_fndecl_math_cpow;
+extern GTY(()) tree g95_fndecl_math_cabsf;
+extern GTY(()) tree g95_fndecl_math_cabs;
 
 /* String functions.  */
 extern GTY(()) tree g95_fndecl_copy_string;

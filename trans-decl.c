@@ -69,6 +69,15 @@ tree g95_fndecl_stop;
 tree g95_fndecl_runtime_error;
 tree g95_fndecl_repack[G95_MAX_DIMENSIONS];
 
+/* Math functions.  Many other math functions are handled in
+   trans-intrinsic.c.  */
+tree g95_fndecl_math_powf;
+tree g95_fndecl_math_pow;
+tree g95_fndecl_math_cpowf;
+tree g95_fndecl_math_cpow;
+tree g95_fndecl_math_cabsf;
+tree g95_fndecl_math_cabs;
+
 /* String functions.  */
 tree g95_fndecl_copy_string;
 tree g95_fndecl_compare_string;
@@ -871,6 +880,31 @@ g95_build_intrinsic_function_decls (void)
     g95_build_library_function_decl (get_identifier ("_gforio_write_character"),
                                     void_type_node,
                                     2, g95_strlen_type_node, pchar_type_node);
+  /* Power functions.  */
+  g95_fndecl_math_powf =
+    g95_build_library_function_decl (get_identifier ("powf"),
+                                     g95_real4_type_node,
+                                     1, g95_real4_type_node);
+  g95_fndecl_math_pow =
+    g95_build_library_function_decl (get_identifier ("pow"),
+                                     g95_real8_type_node,
+                                     1, g95_real8_type_node);
+  g95_fndecl_math_cpowf =
+    g95_build_library_function_decl (get_identifier ("cpowf"),
+                                     g95_complex4_type_node,
+                                     1, g95_complex4_type_node);
+  g95_fndecl_math_cpow =
+    g95_build_library_function_decl (get_identifier ("cpow"),
+                                     g95_complex8_type_node,
+                                     1, g95_complex8_type_node);
+  g95_fndecl_math_cabsf =
+    g95_build_library_function_decl (get_identifier ("cabsf"),
+                                     g95_real4_type_node,
+                                     1, g95_complex4_type_node);
+  g95_fndecl_math_cabs =
+    g95_build_library_function_decl (get_identifier ("cabs"),
+                                     g95_real8_type_node,
+                                     1, g95_complex8_type_node);
 }
 
 /* Make prototypes for runtime library functions.  */

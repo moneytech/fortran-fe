@@ -47,6 +47,35 @@ tree g95_strconst_fault;
 tree g95_strconst_wrong_return;
 tree g95_strconst_current_filename;
 
+/* Build a constant with given type from an int_cst.  */
+tree
+g95_build_const (tree type, tree intval)
+{
+  tree val;
+  tree zero;
+
+  switch (TREE_CODE (type))
+    {
+    case INTEGER_TYPE:
+      val = convert (type, intval);
+      break;
+
+    case REAL_TYPE:
+      val = build_real_from_int_cst (type, intval);
+      break;
+
+    case COMPLEX_TYPE:
+      val = build_real_from_int_cst (TREE_TYPE (type), intval);
+      zero = build_real_from_int_cst (TREE_TYPE (type), integer_zero_node);
+      val = build_complex (type, val, zero);
+      break;
+
+    default:
+      abort();
+    }
+  return val;
+}
+
 static tree
 g95_build_string_const(int length, char *s)
 {

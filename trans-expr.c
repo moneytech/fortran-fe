@@ -499,10 +499,248 @@ g95_conv_unary_op (enum tree_code code, g95_se * se, g95_expr * expr)
   g95_add_stmt_to_post (se, operand.post, operand.post_tail);
 }
 
+/* For power op (lhs ** rhs) We generate:
+    m = lhs
+    if (rhs > 0)
+      count = rhs
+    else if (rhs == 0)
+      {
+        count = 0
+        m = 1
+      }
+    else // (rhs < 0)
+      {
+        count = -rhs
+        m = 1 / m;
+      }
+    // for constant rhs we do the above at compile time
+    val = m;
+    for (n = 1; n < count; n++)
+      val = val * m;
+ */
 static void
-g95_conv_power_op (g95_se * se ATTRIBUTE_UNUSED, g95_expr * expr ATTRIBUTE_UNUSED)
+g95_conv_integer_power (g95_se *se, tree lhs, tree rhs)
 {
-  g95_todo_error ("power op");
+  tree tmpvar;
+  tree count;
+  tree countvar;
+  tree result;
+  tree loopvar;
+  tree init;
+  tree cond;
+  tree inc;
+  tree stmt;
+  tree neg_stmt;
+  tree pos_stmt;
+  tree head;
+  tree tail;
+  tree tmp;
+  tree type;
+
+  type = TREE_TYPE (lhs);
+
+  if (INTEGER_CST_P (rhs))
+    {
+      tmpvar = NULL_TREE;
+      if (integer_zerop (rhs))
+        {
+          se->expr = g95_build_const (type, integer_one_node);
+          return;
+        }
+      /* Special cases for constant values.  */
+      if (TREE_INT_CST_HIGH (rhs) == -1)
+        {
+          /* x ** (-y) == 1 / (x ** y).  */
+          if (TREE_CODE (type) == INTEGER_TYPE)
+            {
+              se->expr = integer_zero_node;
+              return;
+            }
+
+          tmp = g95_build_const (type, integer_one_node);
+          tmp = build (RDIV_EXPR, type, tmp, lhs);
+          lhs = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+
+          rhs = fold (build1 (NEGATE_EXPR, TREE_TYPE (rhs), rhs));
+          assert (INTEGER_CST_P (rhs));
+        }
+      else
+        {
+          /* TODO: really big integer powers.  */
+          assert (TREE_INT_CST_HIGH (rhs) == 0);
+        }
+
+      if (integer_onep (rhs))
+        {
+          se->expr = lhs;
+          return;
+        }
+      if (TREE_INT_CST_LOW (rhs) == 2)
+        {
+          se->expr = build (MULT_EXPR, type, lhs, lhs);
+          return;
+        }
+      if (TREE_INT_CST_LOW (rhs) == 3)
+        {
+          tmp = build (MULT_EXPR, type, lhs, lhs);
+          tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+          se->expr = build (MULT_EXPR, type, tmp, lhs);
+          return;
+        }
+      count = rhs;
+      countvar = NULL_TREE;
+    }
+  else
+    {
+      /* Put the lhs into a temporary variable.  */
+      tmpvar = create_tmp_var (type, "val");
+      count = create_tmp_var (TREE_TYPE (rhs), "count");
+      countvar = count;
+      tmp = build (MODIFY_EXPR, TREE_TYPE (tmpvar), tmpvar, lhs);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_pre (se, stmt, stmt);
+      lhs = tmpvar;
+
+      /* Generate code for negative rhs.  */
+      g95_start_stmt ();
+      head = tail = NULL_TREE;
+
+      if (TREE_CODE (TREE_TYPE (lhs)) == INTEGER_TYPE)
+        {
+          /* An integer raised to a negative power is zero.  */
+          tmp = build (MODIFY_EXPR, type, lhs, integer_zero_node);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+
+          tmp = build (MODIFY_EXPR, TREE_TYPE (count), count,
+                       integer_zero_node);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+        }
+      else
+        {
+          tmp = g95_build_const (type, integer_one_node);
+          tmp = build (RDIV_EXPR, type, tmp, lhs);
+          lhs = g95_simple_fold (tmp, &head, &tail, &tmpvar);
+
+          tmp = build1 (NEGATE_EXPR, TREE_TYPE (rhs), rhs);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (count), count, tmp);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+        }
+      neg_stmt = g95_finish_stmt (head, tail);
+
+      tmp = build (MODIFY_EXPR, TREE_TYPE (count), count, rhs);
+      pos_stmt = build_stmt (EXPR_STMT, tmp);
+
+      /* Code for rhs == 0.  */
+      g95_start_stmt ();
+      head = tail = NULL_TREE;
+
+      tmp = build (MODIFY_EXPR, TREE_TYPE (count), count,
+                   integer_zero_node);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+      tmp = g95_build_const (type, integer_one_node);
+      tmp = build (MODIFY_EXPR, type, lhs, tmp);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+
+      stmt = g95_finish_stmt (head, tail);
+
+      /* Code for rhs <= 0.  */
+      tmp = build (EQ_EXPR, TREE_TYPE (rhs), rhs, integer_zero_node);
+      stmt = build_stmt (IF_STMT, tmp, stmt, neg_stmt);
+
+      /* Code for positive rhs.  */
+      tmp = build (GT_EXPR, TREE_TYPE (rhs), rhs, integer_zero_node);
+      stmt = build_stmt (IF_STMT, tmp, pos_stmt, stmt);
+      g95_add_stmt_to_pre (se, stmt, stmt);
+    }
+
+  /* Create a variable for the result.  */
+  result = create_tmp_var (type, "pow");
+  tmp = build (MODIFY_EXPR, type, result, lhs);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_pre (se, stmt, stmt);
+
+  /* Create the loop.  */
+  loopvar = create_tmp_var (TREE_TYPE (count), "loop");
+  init = build (MODIFY_EXPR, TREE_TYPE (count), loopvar, integer_one_node);
+  init = build_stmt (EXPR_STMT, init);
+  cond = build (LT_EXPR, TREE_TYPE (count), loopvar, count);
+  inc = build (PLUS_EXPR, TREE_TYPE (count), loopvar, integer_one_node);
+  inc = build (MODIFY_EXPR, TREE_TYPE (count), loopvar, inc);
+
+  tmp = build (MULT_EXPR, type, result, lhs);
+  tmp = build (MODIFY_EXPR, type, result, tmp);
+  stmt = build_stmt (EXPR_STMT, tmp);
+
+  stmt = build_stmt (FOR_STMT, init, cond, inc, stmt);
+  g95_add_stmt_to_pre (se, stmt, stmt);
+  se->expr = result;
+}
+
+/* Power op (**).  Integer rhs has special handling.  */
+static void
+g95_conv_power_op (g95_se * se, g95_expr * expr)
+{
+  int kind;
+  g95_se lse;
+  g95_se rse;
+  tree fndecl;
+  tree tmp;
+  tree type;
+
+  g95_init_se (&lse, se);
+  g95_conv_simple_val (&lse, expr->op1);
+  g95_add_stmt_to_pre (se, lse.pre, lse.pre_tail);
+  g95_add_stmt_to_post (se, lse.post, lse.post_tail);
+
+  g95_init_se (&rse, se);
+  g95_conv_simple_val (&rse, expr->op2);
+  g95_add_stmt_to_pre (se, rse.pre, rse.pre_tail);
+  g95_add_stmt_to_post (se, rse.post, rse.post_tail);
+
+  type = TREE_TYPE (lse.expr);
+
+  kind = expr->op1->ts.kind;
+  switch (expr->op2->ts.type)
+    {
+    case BT_INTEGER:
+      /* Integer powers are expanded inline as multiplications.  */
+      g95_conv_integer_power (se, lse.expr, rse.expr);
+      return;
+
+    case BT_REAL:
+      switch (kind)
+        {
+        case 4: fndecl = g95_fndecl_math_powf; break;
+        case 8: fndecl = g95_fndecl_math_pow; break;
+        default: abort();
+        }
+      break;
+
+    case BT_COMPLEX:
+      switch (kind)
+        {
+        case 4: fndecl = g95_fndecl_math_cpowf; break;
+        case 8: fndecl = g95_fndecl_math_cpow; break;
+        default: abort();
+        }
+      break;
+
+    default:
+      abort();
+      break;
+    }
+
+  if (fndecl != NULL_TREE)
+    {
+      tmp = g95_chainon_list (NULL_TREE, lse.expr);
+      tmp = g95_chainon_list (tmp, rse.expr);
+      se->expr = g95_build_function_call (fndecl, tmp);
+    }
 }
 
 /* Handle a string concatenation operation.  A temporary will be allocated to
@@ -958,40 +1196,18 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
 static void
 g95_conv_function_expr (g95_se * se, g95_expr * expr)
 {
-  /*g95_symbol sym;*/
   g95_symbol *psym;
+  g95_intrinsic_sym *isym;
 
-  if (expr->value.function.isym)
+  isym = expr->value.function.isym;
+  psym = expr->value.function.esym;
+  assert ((isym || psym) && ! (isym && psym));
+
+  if (isym)
     {
       g95_conv_intrinsic_function (se, expr);
       return;
     }
-
-  psym = expr->value.function.esym;
-#if 0
-  /* TODO: functions without symbols. Hopefully this will be fixed in
-     the frontend.  Scalarized references currently throw an error before
-     this point is reached.  */
-  if (psym == NULL)
-    {
-      /* The frontend does not always create a symbol for implicitly declared
-         functions, so we create one now.  */
-      memset (&sym, 0, sizeof (g95_symbol));
-
-      sym.ts = expr->ts;
-      strcpy (sym.name, expr->value.function.name);
-      sym.attr.external = 1;
-      sym.attr.function = 1;
-      sym.attr.proc = PROC_EXTERNAL;
-      sym.attr.flavor = FL_PROCEDURE;
-
-      psym = &sym;
-
-      warning ("No symbol created for function %s", expr->value.function.name);
-    }
-#else
-  assert (psym);
-#endif
 
   g95_conv_function_call (se, psym, expr->value.function.actual);
 }

@@ -55,8 +55,6 @@ void g95_cleanup_loop (g95_loopinfo *);
 void g95_add_ss_to_loop (g95_loopinfo *, g95_ss *);
 /* Mark a SS chain as used in this loop.  */
 void g95_mark_ss_chain_used (g95_ss * ss);
-/* Add the pre and post chains from an SS chain to a loopinfo.  */
-void g95_add_ss_stmts (g95_loopinfo *, g95_ss *);
 /* Reverse a SS chain.  */
 g95_ss * g95_reverse_ss (g95_ss *);
 

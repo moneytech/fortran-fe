@@ -33,7 +33,7 @@ Boston, MA 02111-1307, USA.  */
 
    The scalarization parameters are stored in a g95_loopinfo structure.
    First the start and stride of each term is calculated by
-   g95_trans_startstride.  During this process the expressions for the array
+   g95_conv_ss_startstride.  During this process the expressions for the array
    descriptors and data pointers are also translated.
 
    If the expression is an assignment, we must then resolve and dependancies.
@@ -55,7 +55,9 @@ Boston, MA 02111-1307, USA.  */
    term is calculated.
 
    A call to g95_start_scalarized_body marks the start of the scalarized
-   expression.  This creates a scope and declares the loop variables.
+   expression.  This creates a scope and declares the loop variables.  Before
+   calling this g95_make_ss_chain_used must be used to indicate which terms
+   will be used inside this loop.
 
    The scalar g95_conv_* functions are then used to build the main body of the
    scalarization loop.  Scalarization loop variables and precalculated scalar
@@ -63,7 +65,9 @@ Boston, MA 02111-1307, USA.  */
    must be used, rather than changing the se->ss directly.
 
    Finally g95_trans_scalarizing_loops is called to generate the impicit do
-   loops.  For assignment expressions requiring a temporary two loops are
+   loops. The loops are added to the pre chain of the loopinfo.
+
+   For assignment expressions requiring a temporary two loops are
    generated.  The first stores the result of the expression in the temporary,
    the second copies it to the result.  */
 
@@ -1188,7 +1192,6 @@ g95_start_scalarized_body (g95_loopinfo * loop)
 
           info = &ss->data.info;
 
-          /* TODO: For temporaries info->ref == NULL.  */
           if (dim == info->dimen - 1)
             {
               /* For the outermost loop calculate the offset due to any
@@ -3126,6 +3129,9 @@ g95_walk_elemental_function_args (g95_ss * ss, g95_expr * expr,
   scalar = 1;
   for (arg = expr->value.function.actual; arg; arg = arg->next)
     {
+      if (! arg->expr)
+        continue;
+
       newss = g95_walk_expr (ss, arg->expr);
       if (newss == ss)
         {
@@ -3168,10 +3174,7 @@ g95_walk_function_expr (g95_ss * ss, g95_expr * expr)
   sym = expr->value.function.esym;
   isym = expr->value.function.isym;
 
-  if (! (sym || isym))
-    internal_error ("Possible frontend bug: function without symbol");
-  assert (! (sym && isym));
-
+  assert ((sym || isym) && ! (sym && isym));
   if (isym)
     return g95_walk_intrinsic_function (ss, expr, isym);
 

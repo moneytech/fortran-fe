@@ -79,133 +79,6 @@ g95_chainon_list (tree list, tree add)
   return chainon (list, l);
 }
 
-/* Change the flags for the type of the node T to make it writable.  */
-static void
-g95_make_type_writable (tree t)
-{
-  if (t == NULL_TREE)
-    abort ();
-
-  if (TYPE_READONLY (TREE_TYPE (t))
-      || ((TREE_CODE (TREE_TYPE (t)) == RECORD_TYPE
-	   || TREE_CODE (TREE_TYPE (t)) == UNION_TYPE)
-	  /* && C_TYPE_FIELDS_READONLY (TREE_TYPE (t))*/))
-    {
-      /* Make a copy of the type declaration.  */
-      TREE_TYPE (t) = build_type_copy (TREE_TYPE (t));
-      TYPE_READONLY (TREE_TYPE (t)) = 0;
-
-      /* If the type is a structure that contains a field readonly.  */
-      if ((TREE_CODE (TREE_TYPE (t)) == RECORD_TYPE
-	   || TREE_CODE (TREE_TYPE (t)) == UNION_TYPE)
-	  /*&& C_TYPE_FIELDS_READONLY (TREE_TYPE (t))*/)
-	{
-	  /*C_TYPE_FIELDS_READONLY (TREE_TYPE (t)) = 0;*/
-
-	  /* Make the fields of the structure writable.  */
-	  {
-	    tree it;
-	    it = TYPE_FIELDS (TREE_TYPE (t));
-	    while (it)
-	      {
-		/* Make the field writable.  */
-		TREE_READONLY (it) = 0;
-		
-		/* Make the type of the field writable.  */
-		g95_make_type_writable (it);
-		it = TREE_CHAIN (it);
-	      }
-	  }
-	}
-    }
-}
-
-/* Strip off a legitimate source ending from the input string NAME of
-   length LEN.  Rather than having to know the names used by all of
-   our front ends, we strip off an ending of a period followed by
-   up to five characters.  (Java uses ".class".)  */
-
-static inline void
-remove_suffix (char * name, int len)
-{
-  int i;
-
-  for (i = 2;  i < 8 && len > i;  i++)
-    {
-      if (name[len - i] == '.')
-	{
-	  name[len - i] = '\0';
-	  break;
-	}
-    }
-}
-
-/** Create a new temporary variable declaration of type TYPE.  Returns the
-    newly created decl and pushes it into the current binding.  */
-tree
-create_tmp_var (tree type, const char * prefix)
-{
-  tree tmp_var;
-
-  /* Get a temporary.  */
-  tmp_var = create_tmp_alias_var (type, prefix);
-
-  /* Add it to the current scope.  */
-  pushdecl (tmp_var);
-
-  return tmp_var;
-}
-
-/*  Create a new temporary alias variable declaration of type TYPE.  Returns the
-    newly created decl. Does NOT push it into the current binding.  */
-tree
-create_tmp_alias_var (tree type, const char * prefix)
-{
-  static unsigned int id_num = 1;
-  char *tmp_name;
-  char *preftmp = NULL;
-  tree tmp_var;
-
-  if (prefix)
-    {
-      preftmp = ASTRDUP (prefix);
-      remove_suffix (preftmp, strlen (preftmp));
-      prefix = preftmp;
-    }
-
-  ASM_FORMAT_PRIVATE_NAME (tmp_name, (prefix ? prefix : "T"), id_num++);
-
-  tmp_var = build_decl (VAR_DECL, get_identifier (tmp_name), type);
-
-  /* The variable was declared by the compiler.  */
-  DECL_ARTIFICIAL (tmp_var) = 1;
-
-  /* Make the variable writable.  */
-  TREE_READONLY (tmp_var) = 0;
-
-  /* Make the type of the variable writable.  */
-  g95_make_type_writable (tmp_var);
-
-  DECL_EXTERNAL (tmp_var) = 0;
-  TREE_STATIC (tmp_var) = 0;
-  TREE_USED (tmp_var) = 1;
-
-
-  return tmp_var;
-}
-
-/* Create a temporary variable.  Note that it may be used for small array
-   temporaries.  Also used for array descriptors.  Be careful when you call
-   this as the temporary is added to the current scope.  It is only valid
-   inside the g95_start/finish_stmt pair in which it is created.
-   Use of this function is depreciated, use create_tmp_var or
-   create_tmp_alias_var.  */
-tree
-g95_create_tmp_var (tree type)
-{
-  return create_tmp_var (type, NULL);
-}
-
 /* Identical to convert() in effect.  Generates an error if the conversion
    causes the expression to violate SIMPLE grammar.  The initial expression
    should be a simple_val, the result will be a simple_rhs.  */
@@ -217,7 +90,7 @@ g95_simple_convert (tree type, tree expr)
   assert (is_simple_val (expr));
   result = convert (type, expr);
   if (! is_simple_rhs (result))
-    internal_error ("convert broke SIMPLE");
+    warning ("Internal: convert broke SIMPLE");
 
   return result;
 }

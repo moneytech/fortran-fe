@@ -17,8 +17,11 @@ Create $gcc_src/gcc/f95/ and copy all the g95 files into it.
 Configure GCC as normal with --enable-languages=f95
 Don't use the G95 configure system.
 You'll probably need GMP installed on your system.
+
+
 To make useful programs you'll also need the runtime and IO libraries
- (libgfor.c and libgforio.a).
+ (libgfor.c and libgforio.a).  These are not required to build a fortran 95
+ enabled GCC, list to link fortran programs.
 
 Note that the backend interface is still at an early stage. Many features are
 either missing or only partially complete.
