@@ -351,7 +351,7 @@ match m;
 
   if (g95_match_eos() == MATCH_YES) return MATCH_YES;
 
-  if (g95_match_space() != MATCH_YES) return MATCH_NO;
+  g95_gobble_whitespace();
 
   m = g95_match_name(name);
   if (m != MATCH_YES) return m;
