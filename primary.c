@@ -22,9 +22,7 @@ Boston, MA 02111-1307, USA.  */
 /* primary.c-- Match primary expressions */
 
 #include <ctype.h>
-
 #include "g95.h"
-
 
 /* match_kind_param()-- Matches a kind-parameter expression, which is
  * either a named symbolic constant or a nonnegative integer constant.
@@ -294,7 +292,7 @@ g95_expr *e;
       temp_loc = *g95_current_locus();
       c = g95_next_char();
 
-      if (c == 'e' || c == 'd') {
+      if (c == 'e' || c == 'd' || c == 'q') {
 	c = g95_next_char();
 	if (c == '.') goto done;   /* Operator named .e. or .d. */
       }
@@ -314,7 +312,7 @@ g95_expr *e;
     break;
   }
 
-  if (!seen_digits || (c != 'e' && c != 'd')) goto done;
+  if (!seen_digits || (c != 'e' && c != 'd' && c != 'q')) goto done;
   exp_char = c;
 
 /* scan exponent */
@@ -360,7 +358,7 @@ done:
   p = buffer;
   while(count>0) {
     *p = g95_next_char();
-    if (*p == 'd') *p = 'e';   /* Hack for mpf_init_set_str() */
+    if (*p == 'd' || *p == 'q') *p = 'e';   /* Hack for mpf_init_set_str() */
     p++;
     count--;
   }
@@ -368,14 +366,24 @@ done:
   kind = get_kind();
   if (kind == -1) goto cleanup;
 
-  if (exp_char == 'd') {
+  switch(exp_char) {
+  case 'd':
     if (kind != -2) {
       g95_error("Real number at %C has a 'd' exponent and an explicit kind");
       goto cleanup;
     }
     kind = g95_default_double_kind();
+    break;
 
-  } else {
+  case 'q':
+    if (kind != -2) {
+      g95_error("Real number at %C has a 'q' exponent and an explicit kind");
+      goto cleanup;
+    }
+    kind = g95_option.q_kind;
+    break;
+
+  default:
     if (kind == -2) kind = g95_default_real_kind();
 
     if (g95_validate_kind(BT_REAL, kind) == -1) {

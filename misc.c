@@ -249,6 +249,7 @@ static void display_help(void) {
     "  -fdollar-ok             Allow dollar signs in entity names\n"
     "  -ffree-form             Assume that the source file is free form\n"
     "  -ffixed-form            Assume that the source file is fixed form\n"
+    "  -fqkind=<n>             Set the kind for a real with the 'q' exponent\n"
     "  -pedantic               Warn about use of non-standard features\n"
     "  -r                      Run the resolution phase\n"
     "  -I[directory]           Append directory to the include/module\n"
@@ -267,6 +268,7 @@ static void display_help(void) {
 
 static int parse_arg(int argc, char *argv[]) {
 char *option;
+int i;
 
   option = argv[0]; 
 
@@ -315,6 +317,15 @@ char *option;
 
   if (strcmp(option, "-fdollar-ok") == 0) {
     g95_option.dollar = 1;
+    return 1;
+  }
+
+  if (strncmp(option, "-fqkind=", 8) == 0) {
+    i = atoi(option+8);
+    if (g95_validate_kind(BT_REAL, i) < 0)
+      g95_fatal_error("Argument to -fqkind isn't a valid real kind");
+
+    g95_option.q_kind = i;
     return 1;
   }
 
@@ -383,6 +394,7 @@ static void init_options(void) {
   g95_option.fixed_80 = 0;
   g95_option.fmode = 0;
   g95_option.form = FORM_UNKNOWN;
+  g95_option.q_kind = g95_default_double_kind();
 }
 
 
@@ -392,6 +404,8 @@ int main(int argc, char *argv[]) {
 int errors, warnings, i;
 
   if (argc == 1) display_help();
+
+  g95_init_1();
 
   init_options();
 
@@ -405,8 +419,6 @@ int errors, warnings, i;
   }
 
   if (g95_option.source == NULL) g95_fatal_error("Need a file to compile");
-
-  g95_init_1();
 
   if (g95_new_file(g95_option.source, g95_option.form) == SUCCESS)
     g95_parse_file();
