@@ -186,6 +186,8 @@ try compare_spec_to_ref(g95_array_ref *ar, g95_array_spec *as) {
 try t;
 int i;
 
+  if (ar->type == AR_FULL) return SUCCESS;
+
   if (as->rank != ar->rank) {
     g95_error("Array reference at %L is of rank %d but specified as rank %d",
               &ar->where, ar->rank, as->rank);
@@ -312,12 +314,23 @@ matched:
 /* resolve_index()-- Resolve a single array index */
 
 static try resolve_index(g95_expr *index) {
+g95_typespec ts;
 
   if (g95_resolve_expr(index) == FAILURE) return FAILURE;
 
-  if (index != NULL && index->ts.type != BT_INTEGER) {
-    g95_error("Array index at %C must of type INTEGER", &index->where);
+  if (index == NULL) return SUCCESS;
+
+  if (!g95_numeric_ts(&index->ts)) {
+    g95_error("Array index at %L must be of numeric type", &index->where);
     return FAILURE;
+  }
+
+  if (index->ts.type != BT_INTEGER ||
+      index->ts.kind != g95_default_integer_kind()) {
+    ts.type = BT_INTEGER;
+    ts.kind = g95_default_integer_kind();
+
+    g95_convert_type(index, &ts, 2);
   }
 
   return SUCCESS;
