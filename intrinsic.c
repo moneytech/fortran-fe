@@ -631,7 +631,6 @@ int di, dr, dd, dl, dc, dz;
 	  y, BT_REAL, dd, 0, x, BT_REAL, dd, 0, NULL);
   make_generic("atan2");
 
-/* KAH Takes integer scalar or array */
   add_sym("bit_size", 1, BT_INTEGER, di, g95_simplify_bit_size, check_bit_size,
 	  i, BT_INTEGER, di, 0, NULL);
 
@@ -673,7 +672,6 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dble", 0, BT_REAL, dd, g95_simplify_dble, not_ready,
 	  a, BT_REAL, dr, 0, NULL);
 
-/* KAH Input can be integer or real, scalar or array */
   add_sym("digits", 1, BT_INTEGER, di, g95_simplify_digits, check_digits,
 	  x, BT_UNKNOWN, dr, 0, NULL);
 
@@ -697,8 +695,6 @@ int di, dr, dd, dl, dc, dz;
   add_sym("eoshift", 1, BT_REAL, dr, NULL, not_ready,
 	  ar, BT_REAL, dr, 0, sh, BT_INTEGER, di, 0,
 	  bd, BT_REAL, dr, 1, dm, BT_INTEGER, di, 1, NULL);
-
-/* KAH Takes and returns real scalar or array */
 
   add_sym("epsilon", 1, BT_REAL, dr, g95_simplify_epsilon, check_epsilon,
 	  x, BT_UNKNOWN, dr, 0, NULL);
@@ -768,8 +764,6 @@ int di, dr, dd, dl, dc, dz;
 	  i, BT_INTEGER, di, 0,  sh, BT_INTEGER, di, 0,
 	  sz, BT_INTEGER, di, 1, NULL);
 
-/* KAH Input can be any type, or an array of any type */
-
   add_sym("kind", 1, BT_INTEGER, di, g95_simplify_kind, check_kind,
 	  x, BT_REAL, dr, 0, NULL);
 
@@ -813,7 +807,6 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dd, 0, NULL);
   make_generic("log10");
 
-/* KAH knd (optional) must be a valid logical kind */
   add_sym("logical", 0, BT_LOGICAL, dl, g95_simplify_logical, NULL,
 	  l, BT_LOGICAL, dl, 0,	  knd, BT_INTEGER, di, 1, NULL);
 
@@ -838,7 +831,6 @@ int di, dr, dd, dl, dc, dz;
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
   make_generic("max");
 
-/* KAH Takes scalar or array input */
   add_sym("maxexponent", 1, BT_INTEGER, di, g95_simplify_maxexponent,
 	  check_min_max_exponent, x, BT_UNKNOWN, dr, 0, NULL);
 
@@ -928,10 +920,6 @@ int di, dr, dd, dl, dc, dz;
   add_sym("present", 1, BT_LOGICAL, dl, NULL, not_ready,
 	  a, BT_REAL, dr, 0, NULL);
 
-/* KAH Takes array argument of type integer, real, or complex.  The type
- * of the second argument must be checked to decide if it's dm or msk if
- * called with two arguments. */
-
   add_sym("product", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
@@ -1011,7 +999,6 @@ int di, dr, dd, dl, dc, dz;
   add_sym("spread", 1, BT_REAL, dr, NULL, not_ready, src, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 0, n, BT_INTEGER, di, 0, NULL);
 
-/* KAH Unless the arg is complex it must be >=0 */
   add_sym("sqrt",  1, BT_REAL,    dr, g95_simplify_sqrt, NULL,
 	  x, BT_REAL,    dr, 0, NULL);
   add_sym("dsqrt", 1, BT_REAL,    dd, g95_simplify_sqrt, NULL,
@@ -1036,7 +1023,6 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dtanh", 1, BT_REAL, dd, NULL, NULL,  x, BT_REAL, dd, 0, NULL);
   make_generic("tanh");
 
-/* KAH Input may be scalar or array */
   add_sym("tiny", 0, BT_REAL, dr, g95_simplify_tiny, check_tiny,
 	  x, BT_UNKNOWN, dr, 0, NULL);
 
