@@ -176,7 +176,7 @@ g95_constructor *head, *c, *tail=NULL;
 
       if (tail->expr == NULL) {
 	g95_free_constructor(head);
-	return &g95_bad_expr;
+	return NULL;
       }
     }
 
