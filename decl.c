@@ -582,7 +582,7 @@ char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 match m;
 
-  g95_clear_ts(ts); 
+  g95_clear_ts(ts);
 
   if (g95_match(" integer") == MATCH_YES) {
     ts->type = BT_INTEGER;
@@ -890,16 +890,15 @@ match m;
 
   for(;;) {
     m = variable_decl();
-    if (m != MATCH_YES) break;
+    if (m == MATCH_ERROR) goto cleanup;
+    if (m == MATCH_NO) break;
 
-    if (g95_match_eos() == MATCH_YES) break;
-
-    if (g95_match(" ,") != MATCH_YES) {
-      g95_error("Unexpected characters in declaration at %C");
-      m = MATCH_ERROR;
-      break;
-    }
+    if (g95_match_eos() == MATCH_YES) goto cleanup;
+    if (g95_match(" ,") != MATCH_YES) break;
   }
+  
+  g95_error("Syntax error in data declaration at %C");
+  m = MATCH_ERROR;
 
 cleanup:
   g95_free_array_spec(current_as);
