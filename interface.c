@@ -318,9 +318,12 @@ g95_component *dt1, *dt2;
  * same rank and type, zero otherwise. */
 
 static int compare_type_rank(g95_symbol *s1, g95_symbol *s2) {
+int r1, r2;
 
-  if (s1->as != NULL && s2->as != NULL && s1->as->rank != s2->as->rank)
-    return 0;  /* Ranks differ */
+  r1 = (s1->as != NULL) ? s1->as->rank : 0;
+  r2 = (s2->as != NULL) ? s2->as->rank : 0;
+
+  if (r1 != r2) return 0;   /* Ranks differ */
 
   return g95_compare_types(&s1->ts, &s2->ts);
 }
