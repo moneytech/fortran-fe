@@ -1169,7 +1169,7 @@ match g95_match_target(void);
 
 /* primary.c */
 
-match g95_match_substring(g95_ref **);
+match g95_match_substring(g95_ref **, int);
 match g95_match_rvalue(g95_expr **);
 match g95_match_variable(g95_expr **, int);
 match g95_match_expr_type(bt, g95_expr **);

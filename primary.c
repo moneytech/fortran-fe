@@ -588,7 +588,7 @@ got_delim:
   if (g95_next_string_char(delimiter) != -1)
     g95_internal_error("match_string_constant(): Delimiter not found");
 
-  if (g95_match_substring(&e->ref) != MATCH_NO)
+  if (g95_match_substring(&e->ref, 0) != MATCH_NO)
     e->expr_type = EXPR_SUBSTRING;
 
   *result = e;
@@ -1090,7 +1090,7 @@ static g95_ref *extend_ref(g95_expr *primary, g95_ref *tail) {
 
 /* g95_match_substring()-- Match a substring reference */
 
-match g95_match_substring(g95_ref **result) {
+match g95_match_substring(g95_ref **result, int init) {
 g95_expr *start, *end;
 locus old_loc;
 g95_ref *ref;
@@ -1105,7 +1105,11 @@ match m;
   if (m != MATCH_YES) return MATCH_NO;
 
   if (g95_match(" :") != MATCH_YES) {
-    m = g95_match_expr(&start);
+    if (init)
+      m = g95_match_init_expr(&start);
+    else
+      m = g95_match_expr(&start);
+
     if (m != MATCH_YES) {
       m = MATCH_NO;
       goto cleanup;
@@ -1116,7 +1120,11 @@ match m;
   }
 
   if (g95_match(" )") != MATCH_YES) {
-    m = g95_match_expr(&end);
+    if (init)
+      m = g95_match_init_expr(&end);
+    else
+      m = g95_match_expr(&end);
+
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
 
@@ -1214,7 +1222,7 @@ match m;
 
 check_substring:
   if (primary->ts.type == BT_CHARACTER) {
-    switch(g95_match_substring(&substring)) {
+    switch(g95_match_substring(&substring, equiv_flag)) {
     case MATCH_YES:
       if (tail == NULL) 
 	primary->ref = substring;
@@ -1523,7 +1531,7 @@ match m;
     e->symbol = sym;
 
     if ((sym->ts.type == BT_UNKNOWN || sym->ts.type == BT_CHARACTER) &&
-	g95_match_substring(&e->ref) == MATCH_YES) {
+	g95_match_substring(&e->ref, 0) == MATCH_YES) {
 
       e->expr_type = EXPR_VARIABLE;
 

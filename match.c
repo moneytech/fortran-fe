@@ -1854,9 +1854,9 @@ match m;
       if (m == MATCH_NO) goto syntax;
 
       for(ref=set->expr->ref; ref; ref=ref->next)
-	if (ref->type == REF_ARRAY && ref->ar.type != AR_ELEMENT) {
-	  g95_error("Array reference in EQUIVALENCE at %C must be to a "
-		    "single element");
+	if (ref->type == REF_ARRAY && ref->ar.type == AR_SECTION) {
+	  g95_error("Array reference in EQUIVALENCE at %C cannot be an "
+		    "array section");
 	  goto cleanup;
 	}
 
