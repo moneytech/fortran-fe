@@ -1584,6 +1584,7 @@ arith rc;
     r->value.constructor = head;
     r->ts = head->expr->ts;
     r->where = op->where;
+    r->rank = op->rank;
 
     *result = r;
   }
@@ -1620,6 +1621,7 @@ arith rc;
     r->value.constructor = head;
     r->ts = head->expr->ts;
     r->where = op1->where;
+    r->rank = op1->rank;
 
     *result = r;
   }
@@ -1640,7 +1642,7 @@ arith rc;
   rc = ARITH_OK;
 
   for(c=head; c; c=c->next) {
-    rc = eval(c->expr, op1, &r);
+    rc = eval(op1, c->expr, &r);
     if (rc != ARITH_OK) break;
 
     g95_replace_expr(c->expr, r);
@@ -1654,6 +1656,7 @@ arith rc;
     r->value.constructor = head;
     r->ts = head->expr->ts;
     r->where = op2->where;
+    r->rank = op2->rank;
 
     *result = r;
   }
@@ -1697,6 +1700,7 @@ arith rc;
     r->value.constructor = head;
     r->ts = head->expr->ts;
     r->where = op1->where;
+    r->rank = op1->rank;
 
     *result = r;
   }

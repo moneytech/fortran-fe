@@ -191,6 +191,7 @@ g95_constructor *head, *c, *tail=NULL;
     result->expr_type = EXPR_ARRAY;
     result->value.constructor = head;
     result->where = e->where;
+    result->rank = e->rank;
     break;
 
   default:
