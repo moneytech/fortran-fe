@@ -199,6 +199,23 @@ static try check_bit_size(g95_expr *x) {
 }
 
 
+static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
+
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  if (y != NULL) {
+    if (!g95_numeric_ts(&y->ts)) return FAILURE;
+    if (x->ts.type == BT_COMPLEX) return FAILURE;
+  }
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_digits(g95_expr *x) {
 
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
@@ -246,9 +263,90 @@ static try check_huge(g95_expr *x) {
 }
 
 
+static try check_int(g95_expr *x, g95_expr *kind) {
+
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_kind(g95_expr *x) {
 
   if (x->ts.type == BT_DERIVED) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_min_max(g95_actual_arglist *arg) {
+g95_expr *x, *y;
+
+  x=arg->expr;
+  arg = arg->next;
+
+  if ( arg == NULL ) {
+    g95_error("Too few arguments to intrinsic at %L",x->where);
+    return FAILURE;
+  }
+
+  while ( arg != NULL ) {
+    y=arg->expr;
+    if ((x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) ||
+         x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
+    x=y;
+    arg=arg->next;
+  }
+
+  return SUCCESS;
+}
+
+
+static try check_min0_max0(g95_actual_arglist *arg) {
+g95_expr *x, *y;
+
+  x=arg->expr;
+  arg = arg->next;
+
+  if ( arg == NULL ) {
+    g95_error("Too few arguments to intrinsic at %L",x->where);
+    return FAILURE;
+  }
+
+  while ( arg != NULL ) {
+    y=arg->expr;
+    if (x->ts.type != BT_INTEGER  ||
+        x->ts.type != y->ts.type  || x->ts.kind != y->ts.kind) return FAILURE;
+    x=y;
+    arg=arg->next;
+  }
+
+  return SUCCESS;
+}
+
+
+static try check_min1_max1(g95_actual_arglist *arg) {
+g95_expr *x, *y;
+
+  x=arg->expr;
+  arg = arg->next;
+
+  if ( arg == NULL ) {
+    g95_error("Too few arguments to intrinsic at %L",x->where);
+    return FAILURE;
+  }
+
+  while ( arg != NULL ) {
+    y=arg->expr;
+    if (x->ts.type != BT_REAL ||
+        x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
+    x=y;
+    arg=arg->next;
+  }
 
   return SUCCESS;
 }
@@ -342,11 +440,19 @@ static try check_tiny(g95_expr *x) {
 static try do_check(intrinsic_sym *specific, g95_actual_arglist *arg) {
 g95_expr *a1, *a2, *a3, *a4;
 try t;
- 
+
+/* Max and min require special handling due to the variable number of args */
+  if ( specific->check_function == check_min_max    ||
+       specific->check_function == check_min0_max0  ||
+       specific->check_function == check_min1_max1 ) {
+    t = (*specific->check_function)(arg);
+    return t;
+  }
+
   a1 = arg->expr;
   arg = arg->next;
 
-  if (arg == NULL)
+  if (arg == NULL) 
     t = (*specific->check_function)(a1);
   else {
     a2 = arg->expr;
@@ -643,8 +749,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("char", 0, BT_CHARACTER, dc, g95_simplify_char, NULL,
 	  i, BT_INTEGER, di, 0,   knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("cmplx", 0, BT_COMPLEX, dz, g95_simplify_cmplx, not_ready,
-	  x, BT_REAL, dr, 0, y, BT_REAL, dr, 1, knd, BT_INTEGER, di, 1, NULL);
+  add_sym("cmplx", 0, BT_COMPLEX, dz, g95_simplify_cmplx, check_cmplx,
+	  x, BT_UNKNOWN, dr, 0, y, BT_UNKNOWN, dr, 1, knd, BT_INTEGER, 
+          di, 1, NULL);
 
   add_sym("conjg", 0, BT_COMPLEX, dz, g95_simplify_conjg, NULL,
 	  z, BT_COMPLEX, dz, 0, NULL);
@@ -676,7 +783,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_UNKNOWN, dr, 0, NULL);
 
   add_sym("dim",  0, BT_REAL,    dr, g95_simplify_dim, check_dim,
-	  x, BT_REAL,    dr, 0, y, BT_REAL,    dr, 0, NULL);
+	  x, BT_UNKNOWN,    dr, 0, y, BT_UNKNOWN,    dr, 0, NULL);
   add_sym("idim", 0, BT_INTEGER, di, g95_simplify_dim, NULL,
 	  x, BT_INTEGER, di, 0, y, BT_INTEGER, di, 0, NULL);
   add_sym("ddim", 0, BT_REAL,    dd, g95_simplify_dim, NULL,
@@ -746,7 +853,7 @@ int di, dr, dd, dl, dc, dz;
 	  stg, BT_CHARACTER, dc, 0,   ssg, BT_CHARACTER, dc, 0,
 	  bck, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("int",   0, BT_INTEGER, di, g95_simplify_int, not_ready,
+  add_sym("int",   0, BT_INTEGER, di, g95_simplify_int, check_int,
 	  a, BT_REAL, dr, 0, knd, BT_INTEGER, di, 1, NULL);
   add_sym("ifix",  0, BT_INTEGER, di, g95_simplify_int, NULL,
 	  a, BT_REAL, dr, 0, NULL);
@@ -814,20 +921,19 @@ int di, dr, dd, dl, dc, dz;
   add_sym("matmul", 1, BT_REAL, dr, NULL, not_ready,
 	  ma, BT_REAL, dr, 0, mb, BT_REAL, dr, 0, NULL);
 
-/* KAH Takes an indefinite number of arguments (but at least two), the
- * argument names are a1,a2[,a3,...]
- * Note: amax0 is equivalent to real(max), max1 is equivalent to int(max) */
-  add_sym("max",   0, BT_REAL,    dr, g95_simplify_max, not_ready,
-	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  add_sym("max0",  0, BT_INTEGER, di, NULL, not_ready,
+/* Note: amax0 is equivalent to real(max), max1 is equivalent to int(max) 
+ * Max function must take at least two arguments                        */
+  add_sym("max",   0, BT_REAL,    dr, g95_simplify_max, check_min_max,
+	  a1, BT_UNKNOWN,    dr, 0, a2, BT_UNKNOWN,    dr, 0, NULL);
+  add_sym("max0",  0, BT_INTEGER, di, g95_simplify_max, check_min0_max0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
-  add_sym("amax1", 0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("amax1", 0, BT_REAL,    dr, g95_simplify_max, check_min1_max1,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  add_sym("dmax1", 0, BT_REAL,    dd, NULL, not_ready,
+  add_sym("dmax1", 0, BT_REAL,    dd, g95_simplify_max, check_min1_max1,
 	  a1, BT_REAL,    dd, 0, a2, BT_REAL,    dd, 0, NULL);
-  add_sym("amax0", 0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("amax0", 0, BT_REAL,    dr, g95_simplify_amax0, check_min0_max0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
-  add_sym("max1",  0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("max1",  0, BT_INTEGER, di, g95_simplify_max1, check_min1_max1,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
   make_generic("max");
 
@@ -850,20 +956,18 @@ int di, dr, dd, dl, dc, dz;
   add_sym("merge", 0, BT_REAL, dr, NULL, not_ready, ts, BT_REAL, dr, 0,
 	  fs, BT_REAL, dr, 0, msk, BT_LOGICAL, dl, 0, NULL);
 
-/* KAH Takes an indefinite number of arguments (but at least two).  The
- * argument names are a1,a2[,a3,...]
- * Note: amin0 is equivalent to real(min), min1 is equivalent to int(min) */
-  add_sym("min",   0, BT_REAL,    dr, g95_simplify_min, not_ready,
+/* Note: amin0 is equivalent to real(min), min1 is equivalent to int(min) */
+  add_sym("min",   0, BT_REAL,    dr, g95_simplify_min, check_min_max,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  add_sym("min0",  0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("min0",  0, BT_INTEGER, di, g95_simplify_min, check_min0_max0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
-  add_sym("amin1", 0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("amin1", 0, BT_REAL,    dr, g95_simplify_min, check_min1_max1,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  add_sym("dmin1", 0, BT_REAL,    dd, NULL, not_ready,
+  add_sym("dmin1", 0, BT_REAL,    dd, g95_simplify_min, check_min1_max1,
 	  a1, BT_REAL,    dd, 0, a2, BT_REAL,    dd, 0, NULL);
-  add_sym("amin0", 0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("amin0", 0, BT_REAL,    dr, g95_simplify_amin0, check_min0_max0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
-  add_sym("min1",  0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("min1",  0, BT_INTEGER, di, g95_simplify_min1, check_min1_max1,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
   make_generic("min");
 
@@ -1397,6 +1501,17 @@ g95_actual_arglist *arg;
 
   arg = e->value.function.actual;
 
+/* Max and min require special handling due to the variable number of args */
+  if ( (specific->simplify == g95_simplify_max)   || 
+       (specific->simplify == g95_simplify_amax0) || 
+       (specific->simplify == g95_simplify_max1)  || 
+       (specific->simplify == g95_simplify_min)   || 
+       (specific->simplify == g95_simplify_amin0) || 
+       (specific->simplify == g95_simplify_min1) ) {
+    result = (*specific->simplify)(arg);
+    goto finish;
+  }
+
   a1 = arg->expr;
   arg = arg->next;
 
@@ -1466,6 +1581,14 @@ try t;
   ap = &expr->value.function.actual;
   lib_name = NULL;
 
+/* Don't attempt to sort the argument list for min or max */
+  if ( specific->check_function == check_min_max    ||
+       specific->check_function == check_min0_max0  ||
+       specific->check_function == check_min1_max1 ) {
+    t=do_check(specific, *ap);
+    return t;
+  } 
+
   if (sort_actual(specific->name, ap, specific->arg) == FAILURE)
     return FAILURE;
 
@@ -1517,7 +1640,7 @@ intrinsic_sym *isym, *specific;
 
 
 /* g95_intrinsic_sub_interface()-- see if a CALL statement corresponds
- * to an intrinic subroutine */
+ * to an intrinsic subroutine */
 
 try g95_intrinsic_sub_interface(g95_code *c) {
 g95_actual_arglist **argp;
