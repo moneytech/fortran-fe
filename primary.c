@@ -110,7 +110,7 @@ int r;
  * If the buffer is NULL, we just count characters for the second
  * pass.  Returns the number of characters matched, -1 for no match. */
 
-static match match_digits(int signflag, int radix, char *buffer) {
+static int match_digits(int signflag, int radix, char *buffer) {
 locus old_loc;
 int length, c;
 
@@ -1072,7 +1072,7 @@ locus old_loc, name_loc;
 int arg_number, label;
 match m;
 
-  *argp = NULL;
+  *argp = arg_tail = NULL;
   old_loc = *g95_current_locus();
   label_head = label_tail = NULL;
 

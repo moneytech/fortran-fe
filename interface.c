@@ -530,6 +530,8 @@ g95_symbol *ip, *sym;
 g95_namespace *ns;
 int i;
 
+  ip = sym = NULL;
+
   actual = g95_get_actual_arglist();
   actual->expr = e->op1;
 

@@ -159,6 +159,7 @@ int offset, flag, i, m, c1, c2;
   }
 
   c1 = l1->nextc - l1->lp->line[l1->line];
+  c2 = 0;
   if (l2 == NULL) goto separate;
 
   c2 = l2->nextc - l2->lp->line[l2->line];
@@ -247,8 +248,7 @@ int i, n, have_l1, have_l2, i_arg[MAX_ARGS];
 locus *l1, *l2, *loc;
 const char *format;
 
-  l1 = NULL;
-  l2 = NULL;
+  l1 = l2 = loc = NULL;
 
   have_l1 = have_l2 = 0;
 

@@ -143,7 +143,7 @@ match g95_match_case(void) {
 g95_case *c, *head, *tail;
 match m;
 
-  head = NULL;
+  head = tail = NULL;
 
   if (g95_current_state() != COMP_SELECT) {
     g95_error("Unexpected CASE statement at %C");
@@ -233,6 +233,7 @@ bt type;
 try t;
 
   expr = code->expr; 
+  kind = -1;
 
   if (expr->ts.type == BT_DERIVED || expr->ts.type == BT_REAL ||
       expr->ts.type == BT_COMPLEX)

@@ -369,7 +369,7 @@ match m;
 /* match_filepos()-- Match the second half of the file-positioning
  * statements, REWIND, BACKSPACE or ENDFILE. */
 
-static match match_filepos(g95_statement st, int op) {
+static match match_filepos(g95_statement st, g95_exec_op op) {
 g95_filepos *fp;
 match m;
 

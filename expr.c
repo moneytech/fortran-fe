@@ -79,7 +79,7 @@ g95_actual_arglist *a2;
 g95_actual_arglist *g95_copy_actual_arglist(g95_actual_arglist *p) {
 g95_actual_arglist *head, *tail, *new;
 
-  head = NULL;
+  head = tail = NULL;
 
   for(; p; p=p->next) {
     new = g95_get_actual_arglist();
@@ -1269,7 +1269,7 @@ static try check_init_expr(g95_expr *);
 static try check_spec_expr(g95_expr *);
 
 static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
-const char *expr_type;
+const char *expr_type = NULL;
  
   if ((*check_function)(e->op1) == FAILURE) return FAILURE;
 
@@ -1520,7 +1520,7 @@ match m;
  * specification expression.  Like its cousin check_init_expr(),
  * an error message is generated if we return FAILURE. */
 
-try check_spec_expr(g95_expr *e) {
+static try check_spec_expr(g95_expr *e) {
 g95_actual_arglist *ap;
 g95_symbol *sym;
 match m;

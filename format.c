@@ -28,10 +28,10 @@ Boston, MA 02111-1307, USA.  */
 /* format tokens returned by format_lex() */
 
 typedef enum {
-  FMT_UNKNOWN=1, FMT_NEGINT, FMT_ZERO, FMT_POSINT, FMT_PERIOD, FMT_COMMA,
-  FMT_COLON, FMT_SLASH, FMT_DOLLAR, FMT_POS, FMT_LPAREN, FMT_RPAREN, FMT_X,
-  FMT_SIGN, FMT_BLANK, FMT_CHAR, FMT_P, FMT_IBOZ, FMT_F, FMT_E, FMT_EXT,
-  FMT_G, FMT_L, FMT_A, FMT_D, FMT_H, FMT_END
+  FMT_NONE, FMT_UNKNOWN, FMT_NEGINT, FMT_ZERO, FMT_POSINT, FMT_PERIOD,
+  FMT_COMMA, FMT_COLON, FMT_SLASH, FMT_DOLLAR, FMT_POS, FMT_LPAREN,
+  FMT_RPAREN, FMT_X, FMT_SIGN, FMT_BLANK, FMT_CHAR, FMT_P, FMT_IBOZ, FMT_F,
+  FMT_E, FMT_EXT, FMT_G, FMT_L, FMT_A, FMT_D, FMT_H, FMT_END
 } format_token;
 
 
@@ -93,9 +93,9 @@ format_token token;
 char c, delim;
 int zflag;
 
-  if (saved_token != 0) {
+  if (saved_token != FMT_NONE) {
     token = saved_token;
-    saved_token = 0;
+    saved_token = FMT_NONE;
     return token;
   }
 
@@ -293,7 +293,7 @@ int level;
 try rv;
 
   use_last_char = 0; 
-  saved_token = 0;
+  saved_token = FMT_NONE;
   level = 0;
   rv = SUCCESS;
 

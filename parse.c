@@ -966,11 +966,12 @@ g95_state_data s;
 static g95_statement parse_spec(g95_statement);
 
 static void parse_interface(void) {
-int seen_body, new_state, current_state;
+g95_compile_state new_state, current_state;
 g95_symbol *prog_unit, *sym;
 g95_interface_info save;
 g95_state_data s1, s2;
 g95_statement st;
+int seen_body;
 
   accept_statement(ST_INTERFACE);
 

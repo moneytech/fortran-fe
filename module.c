@@ -73,7 +73,7 @@ g95_use_rename *next;
 
 match g95_match_use(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_use_rename *tail, *new;
+g95_use_rename *tail=NULL, *new;
 interface_type type;
 int operator;
 match m;
@@ -286,8 +286,8 @@ typedef struct {
 /* The name buffer must be at least as long as a symbol name.  Right
  * now it's not clear how we're going to store numeric constants--
  * probably as a hexadecimal string, since this will allow the exact
- * numeric representation to be preserved (this can't be done by
- * a decimal representation).  Worry about that later. */
+ * number to be preserved (this can't be done by a decimal
+ * representation).  Worry about that later. */
 
 #define MAX_ATOM_SIZE 100
 
@@ -531,21 +531,22 @@ char msg[100];
 int i;
 
   i = g95_string2code(m, atom_name);
-  if (i < 0) {
-    strcat(msg, "Expected one of ");
-    for(i=0; i<3; i++) {
-      strcat(msg, m->string);
+  if (i >= 0) return i;
 
-      m++;
-      if (m->string == NULL) break;
-      strcat(msg, ", ");
-    }
+  strcat(msg, "Expected one of ");
 
-    if (m->string != NULL) strcat(msg, ", ...");
-    bad_module(msg);
+  for(i=0; i<3; i++) {
+    strcat(msg, m->string);
+
+    m++;
+    if (m->string == NULL) break;
+    strcat(msg, ", ");
   }
 
-  return i;
+  if (m->string != NULL) strcat(msg, ", ...");
+  bad_module(msg);
+
+  return 0;  /* Not reached */
 }
 
 

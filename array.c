@@ -903,7 +903,7 @@ match m;
   if (g95_match(" (/") == MATCH_NO) return MATCH_NO;
 
   where = *g95_current_locus();
-  head = NULL;
+  head = tail = NULL;
 
   if (g95_match(" /)") == MATCH_YES) goto empty;   /* Special case */
 
@@ -1053,8 +1053,7 @@ typedef struct cons_stack {
 
 static cons_stack *base;
 
-static try check_constructor(g95_constructor *, match (*)(g95_expr *));
-
+static try check_constructor(g95_constructor *, try (*)(g95_expr *));
 
 /* g95_check_iter_variable()-- Check an EXPR_VARIABLE expression in a
  * constructor to make sure that that variable is an iteration
@@ -1082,7 +1081,7 @@ cons_stack *c;
  * with the names of iterators a pass.  */
 
 static try check_constructor(g95_constructor *c,
-			     match (*check_function)(g95_expr *)) {
+			     try (*check_function)(g95_expr *)) {
 cons_stack element;
 g95_expr *e;
 try t;

@@ -118,7 +118,7 @@ typedef enum { INTRINSIC_UPLUS=0, INTRINSIC_UMINUS, INTRINSIC_PLUS,
    INTRINSIC_CONCAT, INTRINSIC_AND, INTRINSIC_OR, INTRINSIC_EQV,
    INTRINSIC_NEQV, INTRINSIC_EQ, INTRINSIC_NE, INTRINSIC_GT, INTRINSIC_GE,
    INTRINSIC_LT, INTRINSIC_LE, INTRINSIC_NOT, INTRINSIC_USER, INTRINSIC_ASSIGN
-} intrinsic_op;
+} g95_intrinsic_op;
 
 /* This macro is the number of intrinsic operators that exist.
  * Assumptions are made about the numbering of the interface_op enums. */
@@ -245,6 +245,11 @@ typedef struct linebuf {
 
 
 #include <limits.h>
+#ifndef PATH_MAX
+# include <sys/param.h>
+# define PATH_MAX MAXPATHLEN
+#endif
+
 
 typedef struct g95_file {
   char filename[PATH_MAX+1];
@@ -594,7 +599,7 @@ typedef struct g95_expr {
   g95_typespec ts;         /* These two refer to the overall expression */
   g95_array_shape *shape;  /* Nonnull if the expression is array-valued */
 
-  intrinsic_op operator;
+  g95_intrinsic_op operator;
   g95_symbol *symbol;   /* Nonnull for functions and structure constructors */
   g95_ref *ref;
 
@@ -659,16 +664,18 @@ typedef struct g95_equiv {
 
 /* Executable statements that fill g95_code structures */
 
+typedef enum {
+  EXEC_NOP=1, EXEC_ASSIGN, EXEC_POINTER_ASSIGN, EXEC_GOTO, EXEC_CALL,
+  EXEC_RETURN, EXEC_STOP,
+  EXEC_IF, EXEC_ARITHMETIC_IF, EXEC_DO, EXEC_DO_WHILE, EXEC_SELECT,
+  EXEC_FORALL, EXEC_WHERE, EXEC_CYCLE, EXEC_EXIT,
+  EXEC_ALLOCATE, EXEC_DEALLOCATE, EXEC_NULLIFY,
+  EXEC_OPEN, EXEC_CLOSE, EXEC_READ, EXEC_WRITE, EXEC_IOLENGTH,
+  EXEC_BACKSPACE, EXEC_ENDFILE, EXEC_INQUIRE, EXEC_REWIND
+} g95_exec_op;
+
 typedef struct g95_code {
-  enum {
-    EXEC_NOP=1, EXEC_ASSIGN, EXEC_POINTER_ASSIGN, EXEC_GOTO, EXEC_CALL,
-    EXEC_RETURN, EXEC_STOP,
-    EXEC_IF, EXEC_ARITHMETIC_IF, EXEC_DO, EXEC_DO_WHILE, EXEC_SELECT,
-    EXEC_FORALL, EXEC_WHERE, EXEC_CYCLE, EXEC_EXIT,
-    EXEC_ALLOCATE, EXEC_DEALLOCATE, EXEC_NULLIFY,
-    EXEC_OPEN, EXEC_CLOSE, EXEC_READ, EXEC_WRITE, EXEC_IOLENGTH,
-    EXEC_BACKSPACE, EXEC_ENDFILE, EXEC_INQUIRE, EXEC_REWIND
-  } op;
+  g95_exec_op op;
 
   struct g95_code *block, *next;
   locus loc;
@@ -1124,7 +1131,7 @@ match g95_match_small_int(int *);
 int g95_match_strings(mstring *);
 match g95_match_name(char *);
 match g95_match_symbol(g95_symbol **);
-match g95_match_intrinsic_op(int *);
+match g95_match_intrinsic_op(g95_intrinsic_op *);
 const char *g95_op2string(int);
 match g95_match(const char *, ...);
 match g95_match_iterator(g95_iterator *);

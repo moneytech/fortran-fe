@@ -100,9 +100,9 @@ match m;
  * the input.  If this is not the case, the parse pointer remains
  * where it was. */
 
-static int next_operator(intrinsic_op t) {
+static int next_operator(g95_intrinsic_op t) {
+g95_intrinsic_op u;
 locus old_loc;
-int u;
 
   old_loc = *g95_current_locus();
   if (g95_match_intrinsic_op(&u) == MATCH_YES && t == u) return 1;
@@ -153,7 +153,7 @@ syntax:
 
 /* build_node()-- Build an operator expression node. */
 
-static g95_expr *build_node(intrinsic_op operator, locus *where,
+static g95_expr *build_node(g95_intrinsic_op operator, locus *where,
 			    g95_expr *op1, g95_expr *op2) {
 g95_expr *new;
 
@@ -402,10 +402,10 @@ match m;
 
 static match match_level_4(g95_expr **result) {
 g95_expr *left, *right, *r;
+g95_intrinsic_op i;
 locus old_loc;
 locus where;
 match m;
-int i;
 
   m = match_level_3(&left);
   if (m != MATCH_YES) return m;

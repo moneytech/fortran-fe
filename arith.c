@@ -1458,7 +1458,7 @@ typedef union {
  * the arithmetic.  We also handle the cases where either or both
  * operands are array constructors. */
 
-static g95_expr *eval_intrinsic(intrinsic_op operator,
+static g95_expr *eval_intrinsic(g95_intrinsic_op operator,
 				eval_f eval,
 				g95_expr *op1, g95_expr *op2) {
 g95_expr temp, *result;
@@ -1583,7 +1583,7 @@ incompatible:
   return result;
 }
 
-static g95_expr *eval_intrinsic_f2(intrinsic_op operator,
+static g95_expr *eval_intrinsic_f2(g95_intrinsic_op operator,
 				arith (*eval)(g95_expr *, g95_expr **),
 				g95_expr *op1, g95_expr *op2) {
 eval_f f;
@@ -1591,7 +1591,7 @@ eval_f f;
   return eval_intrinsic(operator, f, op1, op2);
 }
 
-static g95_expr *eval_intrinsic_f3(intrinsic_op operator,
+static g95_expr *eval_intrinsic_f3(g95_intrinsic_op operator,
 				arith (*eval)(g95_expr *, g95_expr *,
                                               g95_expr **),
 				g95_expr *op1, g95_expr *op2) {

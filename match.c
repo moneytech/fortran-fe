@@ -357,22 +357,20 @@ static mstring operators[] = {
   minit(".le.", INTRINSIC_LE),     minit("<=", INTRINSIC_LE),
   minit(".lt.", INTRINSIC_LT),     minit("<", INTRINSIC_LT),
   minit(".gt.", INTRINSIC_GT),     minit(">", INTRINSIC_GT),
-  minit(".not.", INTRINSIC_NOT),   minit(NULL, 0) };
+  minit(".not.", INTRINSIC_NOT),   minit(NULL, -1) };
 
 /* g95_match_intrinsic_op()-- Match an intrinsic operator.  Returns an
  * INTRINSIC enum. */
 
-match g95_match_intrinsic_op(int *token) {
-int t;
+match g95_match_intrinsic_op(g95_intrinsic_op *result) {
+g95_intrinsic_op op;
 
-  t = g95_match_strings(operators);
+  op = g95_match_strings(operators);
 
-  if (t != 0) {
-    *token = t;
-    return MATCH_YES;
-  }
+  if (op == -1) return MATCH_NO;
 
-  return MATCH_NO;
+  *result = op;
+  return MATCH_YES;
 }
 
 
@@ -547,7 +545,7 @@ loop:
 
     case 'o':
       ip = va_arg(argp, int *);
-      n = g95_match_intrinsic_op(ip);
+      n = g95_match_intrinsic_op((g95_intrinsic_op *) ip);
       if (n != MATCH_YES) { m = n; goto not_yes; }
 
       matches++;
@@ -1022,7 +1020,7 @@ cleanup:
 
 /* match_exit_cycle()-- Match an EXIT or CYCLE statement */
 
-static match match_exit_cycle(g95_statement st, int op) {
+static match match_exit_cycle(g95_statement st, g95_exec_op op) {
 g95_state_data *p;
 g95_symbol *sym;
 match m;
