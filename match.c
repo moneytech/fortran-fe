@@ -408,19 +408,23 @@ static mstring operators_out[] = {
  * the equals sign is seen. */
 
 match g95_match_iterator(g95_iterator *iter) {
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_expr *var, *e1, *e2, *e3;
 locus start;
 match m;
 
-  start = *g95_current_locus();
+  /* Match the start of an iterator without affecting the symbol table */
+
+  start = *g95_current_locus();    
+  m = g95_match(" %n =", name);
+  g95_set_locus(&start);
+
+  if (m != MATCH_YES) return MATCH_NO;
 
   m = g95_match_variable(&var, 0);
   if (m != MATCH_YES) return MATCH_NO;
 
-  if (g95_match_char('=') != MATCH_YES) {
-    g95_set_locus(&start);
-    return MATCH_NO;
-  }
+  g95_match_char('=');
 
   e1 = e2 = e3 = NULL;
 

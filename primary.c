@@ -710,12 +710,15 @@ int i, kind;
  * constant that is a symbolic constant. */
 
 static match match_sym_complex_part(g95_expr **result) {
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 g95_expr *e;
 match m;
 
-  m = g95_match_symbol(&sym);
+  m = g95_match_name(name);
   if (m != MATCH_YES) return m;
+
+  if (g95_find_symbol(name, NULL, 1, &sym) || sym == NULL) return MATCH_NO;
 
   if (sym->attr.flavor != FL_PARAMETER) {
     g95_error("Expected PARAMETER symbol in complex constant at %C");
