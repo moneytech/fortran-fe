@@ -987,8 +987,9 @@ match m;
 static match match_actual_arg(g95_expr **result) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
+locus where, w;
 g95_expr *e;
-locus where;
+int c;
 
   where = *g95_current_locus();
 
@@ -1001,11 +1002,36 @@ locus where;
 
   case MATCH_YES:
     g95_find_symbol(name, NULL, 1, &sym);
-    if (sym == NULL || (sym->attr.flavor != FL_PROCEDURE &&
-			sym->attr.flavor != FL_MODULE_PROC)) break;
+    if (sym == NULL ||
+	(!sym->attr.intrinsic && !sym->attr.external &&
+	 sym->attr.flavor != FL_PROCEDURE &&
+	 sym->attr.flavor != FL_MODULE_PROC)) {
 
-/* Peek ahead yet again to see if the next character is a left
- * parenthesis.  If not, the actual argument is the procedure. */
+      /* No clue about what we've got.  If we're compiling a module,
+       * it still might be a procedure reference if the name is the
+       * only argument */
+
+      if (g95_find_state(COMP_MODULE) == FAILURE) break;
+
+      w = *g95_current_locus();
+      g95_gobble_whitespace();
+      c = g95_next_char();
+      g95_set_locus(&w);
+
+      if (c != ',' && c != ')') break;
+
+      e = g95_get_expr();      /* Leave it unknown for now */
+      e->symbol = sym;
+      e->expr_type = EXPR_VARIABLE;
+      e->ts.type = BT_UNKNOWN;
+
+      *result = e;
+      return MATCH_YES;
+    }
+
+/* Symbol is a procedure.  Peek ahead yet again to see if the next
+ * character is a left parenthesis.  If not, the actual argument is
+ * the procedure. */
 
     if (g95_match(" (") == MATCH_YES) break;
 
@@ -1441,7 +1467,8 @@ match m;
   e = NULL;
   where = *g95_current_locus();
 
-  if (sym->attr.function) goto function0;
+  if (sym->attr.function || sym->attr.external || sym->attr.intrinsic)
+    goto function0;
 
   switch(sym->attr.flavor) {
   case FL_VARIABLE:
