@@ -725,7 +725,6 @@ match m;
 /* resolve_specific_s0()-- Resolve a subroutine call known to be specific */
 
 static match resolve_specific_s0(g95_code *c, g95_symbol *sym) {
-match m;
 
   if (sym->attr.external || sym->attr.if_source == IFSRC_IFBODY) {
     if (sym->attr.dummy) {
@@ -741,12 +740,11 @@ match m;
     goto found;
 
   if (sym->attr.intrinsic) {
-    m = g95_intrinsic_sub_interface(c);
-    if (m == MATCH_YES) return MATCH_YES;
-    if (m == MATCH_NO)
-      g95_error("Symbol '%s' at %L is INTRINSIC but is not compatible with "
-		"an intrinsic", sym->name, &c->loc);
-      
+    if (g95_intrinsic_sub_interface(c) == SUCCESS) return MATCH_YES;
+
+    g95_error("Symbol '%s' at %L is INTRINSIC but is not compatible with "
+	      "an intrinsic", sym->name, &c->loc);
+
     return MATCH_ERROR;
   }
 
@@ -803,10 +801,7 @@ g95_symbol *sym;
 
   /* See if we have an intrinsic function reference */
 
-  if (g95_intrinsic_name(sym->name, 1)) {
-    if (g95_intrinsic_sub_interface(c) == MATCH_YES) return SUCCESS;
-    return FAILURE;
-  }
+  if (g95_intrinsic_name(sym->name, 1)) return g95_intrinsic_sub_interface(c);
 
   /* The reference is to an external name */
 
