@@ -46,6 +46,8 @@ g95_option_t g95_option;
 void *g95_getmem(size_t n) {
 void *p;
 
+  if (n == 0) return NULL; 
+
   p = calloc(n, 1);
   if (p == NULL) g95_fatal_error("Out of memory-- malloc() failed");
   return p;
@@ -57,7 +59,7 @@ void *p;
 
 void g95_free(void *p) {
 
-  free(p);
+  if (p != NULL) free(p);
 }
 
 #define free temp
