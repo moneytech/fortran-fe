@@ -1952,6 +1952,8 @@ g95_symbol *sym;
     mio_interface(&ns->operator[i]);
   }
 
+  mio_rparen();
+
 /* Load generic and user operator interfaces.  These must follow the
  * loading of symtree because otherwise symbols can be marked as
  * ambiguous */
@@ -2142,9 +2144,12 @@ int i;
 
   mio_lparen();
 
-  for(i=0; i<G95_INTRINSIC_OPS; i++)
+  for(i=0; i<G95_INTRINSIC_OPS; i++) {
+    if (i == INTRINSIC_USER) continue;
+
     mio_interface(check_access(ns->operator_access[i], ns->default_access)
 		  ? &ns->operator[i] : NULL);
+  }
 
   mio_rparen();
   write_char('\n');  write_char('\n');

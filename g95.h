@@ -947,7 +947,8 @@ void g95_free(void *);
 void g95_clear_ts(g95_typespec *);
 FILE *g95_open_included_file(const char *);
 const char *g95_article(const char *);
-const char *g95_typename(bt);
+const char *g95_basic_typename(bt);
+char *g95_typename(g95_typespec *);
 void g95_show_typespec(g95_typespec *);
 
 const char *g95_code2string(mstring *, int);
@@ -1288,7 +1289,6 @@ match g95_match_target(void);
 match g95_match_substring(g95_ref **, int);
 match g95_match_rvalue(g95_expr **);
 match g95_match_variable(g95_expr **, int);
-match g95_match_expr_type(bt, g95_expr **);
 match g95_match_scalar_expr(g95_expr **);
 match g95_match_actual_arglist(int, g95_actual_arglist **);
 void g95_free_actual_arglist(g95_actual_arglist *);

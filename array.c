@@ -976,37 +976,14 @@ static int check_element_type(g95_expr *expr) {
     return 0;
   }
 
-  if (constructor_ts.type != expr->ts.type) {
-    g95_error("Element in %s array constructor at %L is %s",
-	      g95_typename(constructor_ts.type), &expr->where,
-	      g95_typename(expr->ts.type));
+  if (g95_compare_types(&constructor_ts, &expr->ts)) return 0;
 
-    cons_state = CONS_BAD;
-    return 1;
-  }
+  g95_error("Element in %s array constructor at %L is %s",
+	    g95_typename(&constructor_ts), &expr->where,
+	    g95_typename(&expr->ts));
 
-  if (constructor_ts.type == BT_DERIVED) {
-    if (constructor_ts.derived == expr->ts.derived) return 0;
-
-    g95_error("Element in DERIVED %s array constructor at %L is "
-	      "DERIVED %s", constructor_ts.derived->name, &expr->where,
-	      expr->ts.derived->name);
-
-    cons_state = CONS_BAD;
-    return 1;
-  }
-
-  if (constructor_ts.kind != expr->ts.kind) {
-    g95_error("Element in %s kind %d array constructor at %L is "
-	      "%s kind %d", g95_typename(constructor_ts.type),
-	      constructor_ts.kind, &expr->where,
-	      g95_typename(expr->ts.type), expr->ts.kind);
-
-    cons_state = CONS_BAD;
-    return 1;
-  }
-
-  return 0;
+  cons_state = CONS_BAD;
+  return 1;
 }
 
 

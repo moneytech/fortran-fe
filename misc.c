@@ -149,7 +149,7 @@ const char *p;
 
 /* g95_typename()-- Return a string for each type */
 
-const char *g95_typename(bt type) {
+const char *g95_basic_typename(bt type) {
 const char *p;
 
   switch(type) {
@@ -162,16 +162,46 @@ const char *p;
   case BT_PROCEDURE:  p = "PROCEDURE";  break;
   case BT_UNKNOWN:    p = "UNKNOWN";    break;
   default:
-    g95_internal_error("g95_typename(): Undefined type");
+    g95_internal_error("g95_basic_typename(): Undefined type");
   }
 
   return p;
 }
 
 
+/* g95_typename()-- Return a string descibing the type and kind of a
+ * typespec.  Because we return alternating buffers, this subroutine
+ * can appear twice in the argument list of a single statement. */
+
+char *g95_typename(g95_typespec *ts) {
+static char buffer1[60], buffer2[60];
+static int flag = 0;
+char *buffer;
+
+  buffer = flag ? buffer1 : buffer2;
+  flag = !flag;
+
+  switch(ts->type) {
+  case BT_INTEGER:    sprintf(buffer, "INTEGER(%d)", ts->kind);    break;
+  case BT_REAL:       sprintf(buffer, "REAL(%d)", ts->kind);       break;
+  case BT_COMPLEX:    sprintf(buffer, "COMPLEX(%d)", ts->kind);    break;
+  case BT_LOGICAL:    sprintf(buffer, "LOGICAL(%d)", ts->kind);    break;
+  case BT_CHARACTER:  sprintf(buffer, "CHARACTER(%d)", ts->kind);  break;
+  case BT_DERIVED:    sprintf(buffer, "TYPE(%s)", ts->derived->name); break;
+  case BT_PROCEDURE:  strcpy(buffer, "PROCEDURE");  break;
+  case BT_UNKNOWN:    strcpy(buffer, "UNKNOWN");    break;
+  default:
+    g95_internal_error("g95_typespec(): Undefined type");
+  }
+
+  return buffer;
+}
+
+
+
 void g95_show_typespec(g95_typespec *ts) {
 
-  g95_status("(%s ", g95_typename(ts->type));
+  g95_status("(%s ", g95_basic_typename(ts->type));
 
   switch(ts->type) {
   case BT_DERIVED:

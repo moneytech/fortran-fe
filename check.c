@@ -54,7 +54,7 @@ static try type_check(g95_expr *e, int n, bt type) {
 
   if (e->ts.type == type) return SUCCESS;
 
-  must_be(e, n, g95_typename(type));
+  must_be(e, n, g95_basic_typename(type));
 
   return FAILURE;
 }
@@ -85,9 +85,11 @@ static try int_or_real_check(g95_expr *e, int n) {
 }
 
 
-/* kind_check()-- that the expression is an optional constant integer. */
+/* kind_check()-- that the expression is an optional constant integer
+ * and that it specifies a valid kind for that type. */
 
-static try kind_check(g95_expr *k, int n) {
+static try kind_check(g95_expr *k, int n, bt type) {
+int kind;
 
   if (k == NULL) return SUCCESS;
 
@@ -95,6 +97,13 @@ static try kind_check(g95_expr *k, int n) {
 
   if (k->expr_type != EXPR_CONSTANT) {
     must_be(k, n, "a constant");
+    return FAILURE;
+  }
+
+  if (g95_extract_int(k, &kind) != NULL ||
+      g95_validate_kind(type, kind) == -1) {
+    g95_error("Invalid kind for %s at %L", g95_basic_typename(type),
+	      &k->where);
     return FAILURE;
   }
 
@@ -272,7 +281,7 @@ try g95_check_abs(g95_expr *a) {
 try g95_check_a_kind(g95_expr *a, g95_expr *kind) {
 
   if (type_check(a, 0, BT_REAL) == FAILURE) return FAILURE;
-  if (kind_check(kind, 1) == FAILURE) return FAILURE;
+  if (kind_check(kind, 1, BT_REAL) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -367,7 +376,7 @@ try g95_check_btest(g95_expr *i, g95_expr *pos) {
 try g95_check_char(g95_expr *i, g95_expr *kind) {
 
   if (type_check(i, 0, BT_INTEGER) == FAILURE) return FAILURE;
-  if (kind_check(kind, 1) == FAILURE) return FAILURE;
+  if (kind_check(kind, 1, BT_CHARACTER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -386,7 +395,7 @@ try g95_check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
     }
   }
 
-  if (kind_check(kind, 2) == FAILURE) return FAILURE;
+  if (kind_check(kind, 2, BT_COMPLEX) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -570,7 +579,7 @@ try g95_check_idnint(g95_expr *a, g95_expr *kind) {
 
   if (double_check(a, 0) == FAILURE) return FAILURE;
 
-  if (kind_check(kind, 1) == FAILURE) return FAILURE;
+  if (kind_check(kind, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -606,7 +615,7 @@ try g95_check_index(g95_expr *string, g95_expr *substring, g95_expr *back) {
 try g95_check_int(g95_expr *x, g95_expr *kind) {
 
   if (numeric_check(x, 0) == FAILURE ||
-      kind_check(kind, 1) == FAILURE) return FAILURE;
+      kind_check(kind, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -672,7 +681,7 @@ try g95_check_lbound(g95_expr *array, g95_expr *dim) {
 try g95_check_logical(g95_expr *a, g95_expr *kind) {
 
   if (type_check(a, 0, BT_LOGICAL) == FAILURE) return FAILURE;
-  if (kind_check(kind, 1) == FAILURE) return FAILURE;
+  if (kind_check(kind, 1, BT_LOGICAL) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -704,7 +713,8 @@ int n;
     x = arg->expr;
     if (x->ts.type != type || x->ts.kind != kind) {
       g95_error("'a%d' argument of '%s' intrinsic at %L must be %s(%d)",
-		n, g95_current_intrinsic, &x->where, g95_typename(type), kind);
+		n, g95_current_intrinsic, &x->where,
+		g95_basic_typename(type), kind);
       return FAILURE;
     }
   }
@@ -972,7 +982,7 @@ try g95_check_real(g95_expr *a, g95_expr *kind) {
 
   if (numeric_check(a, 0) == FAILURE) return FAILURE;
 
-  if (kind_check(kind, 1) == FAILURE) return FAILURE;
+  if (kind_check(kind, 1, BT_REAL) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }

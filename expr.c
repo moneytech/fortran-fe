@@ -837,8 +837,9 @@ g95_actual_arglist *ap;
     for(ap=p->value.function.actual; ap; ap=ap->next) 
       if (g95_simplify_expr(ap->expr, type) == FAILURE) return FAILURE;
 
-    if (g95_intrinsic_func_interface(p, 1) == MATCH_ERROR) 
-        return FAILURE;
+    if (p->value.function.isym != NULL &&
+	g95_intrinsic_func_interface(p, 1) == MATCH_ERROR) return FAILURE;
+
     break;
 
   case EXPR_SUBSTRING:
@@ -878,30 +879,6 @@ g95_actual_arglist *ap;
   return SUCCESS;
 }
 
-
-
-/* g95_match_expr_type()-- Match an expression and require it to be of
- * a particular type. */
-
-match g95_match_expr_type(bt type, g95_expr **result) {
-g95_expr *e;
-match m;
-
-  m = g95_match_expr(&e);
-  if (m != MATCH_YES) return m;
-
-  if (type == e->ts.type) {
-    *result = e;
-    return MATCH_YES;
-  }
-
-  g95_error("Expression at %C is %s where %s is required",
-	    g95_typename(e->ts.type), g95_typename(type));
-
-  g95_free_expr(e);
-
-  return MATCH_ERROR;
-}
 
 
 /* g95_match_scalar_expr()-- Match an expression and require it to be

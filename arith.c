@@ -1828,9 +1828,8 @@ g95_expr *e;
 
 static void overflow(g95_typespec *from, g95_typespec *to, locus *where) {
 
-  g95_error("Arithmetic overflow converting %s(%d) to %s(%d) at %L",
-	    g95_typename(from->type), from->kind,
-	    g95_typename(to->type), to->kind, where);
+  g95_error("Arithmetic overflow converting %s to %s at %L",
+	    g95_typename(from), g95_typename(to), where);
 }
 
 

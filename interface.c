@@ -93,6 +93,21 @@ g95_interface *next;
 }
 
 
+/* fold_unary()-- Change the operators unary plus and minus into
+ * binary plus and minus respectively, leaving the rest unchanged.  */
+
+static int fold_unary(int operator) {
+
+  switch(operator) {
+  case INTRINSIC_UPLUS:   operator = INTRINSIC_PLUS;   break;
+  case INTRINSIC_UMINUS:  operator = INTRINSIC_MINUS;  break;
+  default: break;
+  }
+
+  return operator;
+}
+
+
 /* g95_match_generic_spec()-- Match a generic specification.
  * Depending on which type of interface is found, the 'name' or
  * 'operator' pointers may be set.  This subroutine doesn't return
@@ -112,7 +127,7 @@ int i;
 
   if (g95_match("% operator ( %o )", &i) == MATCH_YES) { /* Operator i/f */
     *type = INTERFACE_INTRINSIC_OP;
-    *operator = i;
+    *operator = fold_unary(i);
     return MATCH_YES;
   }
 
@@ -905,40 +920,19 @@ int i;
     actual->next->expr = e->op2;
   }
 
-  i = e->operator;
+  i = fold_unary(e->operator);
 
-  switch(i) {
-  case INTRINSIC_UPLUS:   i = INTRINSIC_PLUS;     break;
-  case INTRINSIC_UMINUS:  i = INTRINSIC_MINUS;    break;
-
-  case INTRINSIC_PLUS:    case INTRINSIC_MINUS:   case INTRINSIC_TIMES: 
-  case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:   case INTRINSIC_CONCAT:
-  case INTRINSIC_AND:     case INTRINSIC_OR:      case INTRINSIC_EQV:   
-  case INTRINSIC_NEQV:    case INTRINSIC_EQ:      case INTRINSIC_NE:    
-  case INTRINSIC_GT:      case INTRINSIC_GE:      case INTRINSIC_LT:    
-  case INTRINSIC_LE:      case INTRINSIC_NOT:
-    break;
-    
-  case INTRINSIC_USER:
-    i = -1;
-    ip = e->symbol;
-    break;
-
-  default:
-    g95_internal_error("g95_extend_expr(): Bad operator");
-  }
-    
-  if (i == -1)
-    sym = g95_search_interface(ip->operator, 0, actual);
+  if (i == INTRINSIC_USER)
+    sym = g95_search_interface(e->symbol->operator, 0, actual);
   else {
     for(ns=g95_current_ns; ns; ns=ns->parent) {
       sym = g95_search_interface(ns->operator[i], 0, actual);
       if (sym != NULL) break;
     }
   }
-    
-  if (sym == NULL) {
-    g95_free(actual->next);  /* Don't use g95_free_actual_arglist() */
+
+  if (sym == NULL) {  /* Don't use g95_free_actual_arglist() */
+    if (actual->next != NULL) g95_free(actual->next);
     g95_free(actual);
 
     return FAILURE;

@@ -436,7 +436,7 @@ static try check_case_expr(g95_expr *e, bt type) {
 
   if (e->ts.type != type) {
     g95_error("Expression in CASE statement at %L must be of type %s",
-	      &e->where, g95_typename(type));
+	      &e->where, g95_basic_typename(type));
     return FAILURE;
   }
 
@@ -466,7 +466,7 @@ try t;
   if (expr->ts.type == BT_DERIVED || expr->ts.type == BT_REAL ||
       expr->ts.type == BT_COMPLEX)
     g95_error("Argument of SELECT statement at %L cannot be %s",
-	      &code->expr->where, g95_typename(expr->ts.type));
+	      &code->expr->where, g95_typename(&expr->ts));
 
   type = expr->ts.type;
   if (type == BT_CHARACTER) kind = expr->ts.kind;

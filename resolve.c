@@ -585,10 +585,12 @@ try t;
 
 static try resolve_operator(g95_expr *e) {
 g95_expr *op1, *op2;
-const char *msg;
+char *operator_name, msg[250];
 try t;
 
 /* Resolve all subnodes-- give them types. */
+
+  operator_name = (char *) g95_op2string(e->operator); 
 
   switch(e->operator) {
   default:
@@ -617,7 +619,8 @@ try t;
       break;
     }
 
-    msg = "Unary numeric operator at %L needs a numeric operand";
+    sprintf(msg, "Operand of unary numeric operator '%s' at %%L is %s",
+	    operator_name, g95_typename(&e->ts));
     goto bad_op;
 
   case INTRINSIC_PLUS:
@@ -630,7 +633,8 @@ try t;
       break;
     }
 
-    msg = "Binary numeric operator at %L needs numeric operands";
+    sprintf(msg, "Operands of binary numeric operator '%s' at %%L are %s/%s",
+	    operator_name, g95_typename(&op1->ts), g95_typename(&op2->ts));
     goto bad_op;
 
   case INTRINSIC_CONCAT:
@@ -640,7 +644,8 @@ try t;
       break;
     }
 
-    msg = "String concatenation operator at %L needs two string operands";
+    sprintf(msg, "Operands of string concatenation operator at %%L are %s/%s",
+	    g95_typename(&op1->ts), g95_typename(&op2->ts));
     goto bad_op;
 
   case INTRINSIC_AND:
@@ -653,7 +658,9 @@ try t;
       break;
     }
 
-    msg = "Logical operator at %L needs logical operands";
+    sprintf(msg, "Operands of logical operator '%s' at %%L are %s/%s",
+	    operator_name, g95_typename(&op1->ts), g95_typename(&op1->ts));
+
     goto bad_op;
       
   case INTRINSIC_NOT:
@@ -663,13 +670,14 @@ try t;
       break;
     }
 
-    msg = ".NOT. operator at %L needs logical operand";
+    sprintf(msg, "Operand of .NOT. operator at %%L is %s",
+	    g95_typename(&op1->ts));
     goto bad_op;
 
   case INTRINSIC_GT: case INTRINSIC_GE:
   case INTRINSIC_LT: case INTRINSIC_LE:
     if (op1->ts.type == BT_COMPLEX || op2->ts.type == BT_COMPLEX) {
-      msg = "COMPLEX quantities cannot be compared at %L";
+      strcpy(msg, "COMPLEX quantities cannot be compared at %L");
       goto bad_op;
     }
 
@@ -690,11 +698,19 @@ try t;
       break;
     }
 
-    msg = "Comparison operator at %L requires similar operands";
+    sprintf(msg, "Operands of comparison operator '%s' at %%L are %s/%s",
+	    operator_name, g95_typename(&op1->ts), g95_typename(&op2->ts));
+
     goto bad_op;
 
   case INTRINSIC_USER:
-    msg = "Can't find compatible interface for user operator at %L";
+    if (op2 == NULL)
+      sprintf(msg, "Operand of user operator '%s' at %%L is %s",
+	      e->symbol->name, g95_typename(&op1->ts));
+    else
+      sprintf(msg, "Operands of user operator '%s' at %%L are %s/%s",
+	      e->symbol->name, g95_typename(&op1->ts), g95_typename(&op2->ts));
+
     goto bad_op;
 
   default:
@@ -1156,6 +1172,7 @@ g95_namespace *old_ns, *n;
 g95_charlen *cl;
 
   old_ns = g95_current_ns;
+  g95_current_ns = ns;
 
   g95_check_interfaces(ns);
 
@@ -1165,12 +1182,8 @@ g95_charlen *cl;
 
   g95_traverse_ns(ns, resolve_symbol);
 
-  for(n=ns->contained; n; n=n->sibling) {
-    g95_current_ns = n;
+  for(n=ns->contained; n; n=n->sibling)
     g95_resolve(n);
-  }
-
-  g95_current_ns = ns;
 
   if (ns->save_all) g95_save_all(ns);
 

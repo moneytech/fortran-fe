@@ -201,7 +201,7 @@ g95_expr *init;
       sym->ts = current_ts;
     else {
       g95_error("Symbol at %L already has basic type of %s", var_locus,
-		g95_typename(sym->ts.type));
+		g95_basic_typename(sym->ts.type));
       return FAILURE;
     }
   }
@@ -451,7 +451,7 @@ match m;
 
   if (g95_validate_kind(ts->type, ts->kind) == -1) {
     g95_error("Old-style kind %d not supported for type %s at %C", ts->kind,
-	      g95_typename(ts->type));
+	      g95_basic_typename(ts->type));
 
     return MATCH_ERROR;
   }
@@ -503,7 +503,7 @@ match m, n;
 
   if (g95_validate_kind(ts->type, ts->kind) == -1) {
     g95_error("Kind %d not supported for type %s at %C", ts->kind,
-	      g95_typename(ts->type));
+	      g95_basic_typename(ts->type));
 
     m = MATCH_ERROR;
     goto no_match;
@@ -1208,6 +1208,10 @@ g95_symbol *sym, *result;
 locus old_loc;
 match m;
 
+  if (g95_current_state() != COMP_NONE &&
+      g95_current_state() != COMP_INTERFACE &&
+      g95_current_state() != COMP_CONTAINS) return MATCH_NO;
+
   g95_clear_attr(&current_attr);
   g95_clear_ts(&current_ts);
 
@@ -1262,7 +1266,7 @@ match m;
 
   if (current_ts.type != BT_UNKNOWN && sym->ts.type != BT_UNKNOWN) {
     g95_error("Function '%s' at %C already has a type of %s", name,
-	      g95_typename(sym->ts.type));
+	      g95_basic_typename(sym->ts.type));
     m = MATCH_ERROR;
     goto cleanup;
   }
@@ -1366,6 +1370,10 @@ char name[G95_MAX_SYMBOL_LEN+1];
 symbol_attribute attr;
 g95_symbol *sym;
 match m;
+
+  if (g95_current_state() != COMP_NONE &&
+      g95_current_state() != COMP_INTERFACE &&
+      g95_current_state() != COMP_CONTAINS) return MATCH_NO;
 
   g95_clear_attr(&attr);
 
