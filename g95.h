@@ -994,6 +994,10 @@ void g95_init_2(void);
 void g95_done_1(void);
 void g95_done_2(void);
 
+/* options.c */
+
+void g95_display_help(void);
+
 /* iresolve.c */
 
 char *g95_get_string(char *, ...)
