@@ -2343,10 +2343,10 @@ g95_expr *arg;
 static try simplify_selected_real_kind(g95_expr *e) {
 g95_expr *arg;
 
-/* This isnt even a skeleton */
-  return SUCCESS;
+  g95_replace_expr(e, g95_int_expr(g95_default_real_kind()));
 
-} /* end simplify_selected_real_kind */
+  return SUCCESS;
+}
 
 
 /* simplify_set_exponent */
