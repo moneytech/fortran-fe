@@ -1047,6 +1047,8 @@ int comma_flag;
 locus where;
 g95_dt *dt;
 match m;
+
+  m = MATCH_NO;
  
   comma_flag = 0;
   current_dt = dt = g95_getmem(sizeof(g95_dt));
