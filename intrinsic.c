@@ -2999,7 +2999,7 @@ g95_actual_arglist *arg;
     e->value.function.name =
       (lib_name != NULL) ? lib_name : specific->lib_name;
 
-    e->ts = specific->ts;
+    if (e->ts.type == BT_UNKNOWN) e->ts = specific->ts;
   } else
     g95_replace_expr(e, result);
 
