@@ -169,6 +169,7 @@ static void g95_free_expr0(g95_expr *e) {
       break;
     }
 
+    g95_free_ref_list(e->ref);
     break;
 
   case EXPR_OP:
