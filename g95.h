@@ -962,6 +962,7 @@ arith g95_real2double(g95_expr **, g95_expr *src);
 
 try g95_simplify_selected_int_kind(g95_expr *);
 try g95_simplify_selected_real_kind(g95_expr *);
+g95_expr *g95_simplify_huge(bt, int);
 
 /* symbol.c */
 

@@ -1223,6 +1223,17 @@ g95_expr *arg;
 } /* end simplify_fraction */
 
 
+static try simplify_huge(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+  g95_replace_expr(e, g95_simplify_huge(arg->ts.type, arg->ts.kind));
+
+  return SUCCESS;
+}
+
+
 /* simplify_iachar() */
 static try simplify_iachar(g95_expr *e) {
 g95_expr *arg;
@@ -2859,13 +2870,12 @@ static intrinsic_sym *find_subroutine(char *name) {
 
 /* make_generic()-- Collect a set of intrinsic functions into a
  * generic collection.  The first argument is the name of the generic
- * function (which is probably also the name of a specific function)
- * and the rest of the arguments are the names of the specific
- * functions. */
+ * function, which is also the name of a specific function.  The rest
+ * of the specifics currently in the table are placed into the list of
+ * specific functions associated with that generic.  */
 
-void make_generic(char *name, ...) {
-intrinsic_sym *generic, *new;
-va_list argp;
+static void make_generic(char *name) {
+intrinsic_sym *generic;
 
   if (sizing) return; 
 
@@ -2873,23 +2883,16 @@ va_list argp;
   if (generic == NULL)
     g95_internal_error("make_generic(): Can't find generic symbol '%s'", name);
 
-  va_start(argp, name);
-
-  for(;;) {
-    name = va_arg(argp, char *);
-    if (name == NULL) break;
-
-    new = find_function(name);
-
-    if (new == NULL) 
-      g95_internal_error("make_generic(): Can't find symbol '%s',", name);
-
-    new->next = generic->specific;
-    generic->specific = new;
-
+  generic->specific = generic + 1;
+  generic++;
+  
+  while(generic->name[0] != '\0') {
+    generic->next = generic + 1;
+    generic++;
   }
 
-  va_end(argp);
+  generic--;
+  generic->next = NULL;
 }
 
 
@@ -2938,14 +2941,14 @@ int di, dr, dd, dl, dc, dz;
   add_sym("iabs", 0, BT_INTEGER, di, simplify_iabs, NULL, a, BT_INTEGER, di, 0, NULL);
   add_sym("dabs", 0, BT_REAL,    dd, simplify_rabs, NULL, a, BT_REAL,    dd, 0, NULL);
   add_sym("cabs", 0, BT_REAL,    dr, NULL, NULL, a, BT_COMPLEX, dz, 0, NULL);
-  make_generic("abs", "abs", "iabs", "dabs", "cabs", NULL);
-  
+  make_generic("abs");
+
   add_sym("achar", 0, BT_CHARACTER, dc, simplify_achar, NULL,
 	  i, BT_INTEGER, di, 0, NULL);
   
   add_sym("acos",  0, BT_REAL, dr, simplify_acos, not_ready, x, BT_REAL, dr, 0, NULL);
   add_sym("dacos", 0, BT_REAL, dd, simplify_acos, not_ready, x, BT_REAL, dd, 0, NULL);
-  make_generic("acos", "acos", "dacos", NULL);
+  make_generic("acos");
 
   add_sym("adjustl", 0, BT_CHARACTER, dc, simplify_adjustl, NULL,
 	  stg, BT_CHARACTER, dc, 0, NULL);
@@ -2958,7 +2961,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("aint", 0, BT_REAL, dr, simplify_aint, not_ready, a, BT_REAL, dr, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
   add_sym("dint", 0, BT_REAL, dd, NULL, NULL, a, BT_REAL, dd, 0, NULL);
-  make_generic("aint", "aint", "dint", NULL);
+  make_generic("aint");
 
 /* KAH Takes logical array input */
   add_sym("all", 1, BT_LOGICAL, dl, NULL, not_ready,
@@ -2971,7 +2974,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("anint", 0, BT_REAL, dr, simplify_anint, not_ready, a, BT_REAL, dr, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
   add_sym("dnint", 0, BT_REAL, dd, simplify_anint, NULL, a, BT_REAL, dd, 0, NULL);
-  make_generic("anint", "anint", "dnint", NULL);
+  make_generic("anint");
 
 /* KAH Takes logical array input */
   add_sym("any", 1, BT_LOGICAL, dl, NULL, not_ready,
@@ -2979,7 +2982,7 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("asin",  0, BT_REAL, dr, simplify_asin, not_ready, x, BT_REAL, dr, 0, NULL);
   add_sym("dasin", 0, BT_REAL, dd, simplify_asin, not_ready, x, BT_REAL, dd, 0, NULL);
-  make_generic("asin", "asin", "dasin", NULL);
+  make_generic("asin");
 
 /* KAH Takes pointer and target types-- BT_INTEGER used as a placeholder */
   add_sym("associated", 1, BT_LOGICAL, dl, NULL, not_ready,
@@ -2987,13 +2990,13 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("atan",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
   add_sym("datan", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
-  make_generic("atan", "atan", "datan", NULL);
+  make_generic("atan");
 
   add_sym("atan2",  0, BT_REAL, dr, simplify_atan2, not_ready,
 	  y, BT_REAL, dr, 0, x, BT_REAL, dr, 0, NULL);
   add_sym("datan2", 0, BT_REAL, dd, simplify_atan2, not_ready,
 	  y, BT_REAL, dd, 0, x, BT_REAL, dd, 0, NULL);
-  make_generic("atan2", "atan2", "datan2", NULL);
+  make_generic("atan2");
 
 /* KAH Takes integer scalar or array */
   add_sym("bit_size", 1, BT_INTEGER, di, NULL, not_ready,
@@ -3016,11 +3019,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("cos",  0, BT_REAL,    dr, simplify_cos, NULL, x, BT_REAL,    dr, 0, NULL);
   add_sym("dcos", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,    dd, 0, NULL);
   add_sym("ccos", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX, dz, 0, NULL);
-  make_generic("cos", "cos", "dcos", "ccos", NULL);
+  make_generic("cos");
 
   add_sym("cosh",  0, BT_REAL, dr, simplify_cosh, NULL, x, BT_REAL, dr, 0, NULL);
   add_sym("dcosh", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
-  make_generic("cosh", "cosh", "dcosh", NULL);
+  make_generic("cosh");
 
 /* KAH Takes logical array input */
   add_sym("count", 1, BT_INTEGER, di, NULL, not_ready,
@@ -3042,7 +3045,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_INTEGER, di, 0, y, BT_INTEGER, di, 0, NULL);
   add_sym("ddim", 0, BT_REAL,    dd, simplify_dim, NULL,
 	  x, BT_REAL,    dd, 0, y, BT_REAL,    dd, 0, NULL);
-  make_generic("dim", "dim", "idim", "ddim", NULL);
+  make_generic("dim");
 
 /* KAH Takes vector input, returns scalar.  Vectors can be integer,
  * real, complex, or logical */
@@ -3063,7 +3066,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("exp",  0, BT_REAL,    dr, simplify_exp, NULL, x, BT_REAL,    dr, 0, NULL);
   add_sym("dexp", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,    dd, 0, NULL);
   add_sym("cexp", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX, dz, 0, NULL);
-  make_generic("exp", "exp", "dexp", "cexp", NULL);
+  make_generic("exp");
 
   add_sym("exponent", 0, BT_INTEGER, di, simplify_exponent, NULL, x, BT_REAL, dr, 0, NULL);
 
@@ -3072,8 +3075,20 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("fraction", 0, BT_REAL, dr, simplify_fraction, NULL, x, BT_REAL, dr, 0, NULL);
 
-/* KAH May be integer or real, input may be scalar or array */
-  add_sym("huge", 1, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);
+  /* the HUGE intrinsic really isn't generic, but we create versions
+   * for each type and kind that it can take. */
+
+  add_sym("huge", 1, BT_REAL, dr, simplify_huge, NULL, x, BT_REAL, dr, 0,
+	  NULL);
+
+  add_sym("huge", 1, BT_REAL, dd, simplify_huge, NULL, x, BT_REAL, dd, 0,
+	  NULL);
+
+  add_sym("huge", 1, BT_INTEGER, di, simplify_huge, NULL, x, BT_INTEGER, di, 0,
+	  NULL);
+
+  make_generic("huge");
+
 
   add_sym("iachar", 0, BT_INTEGER, di, simplify_iachar, NULL,
 	  c, BT_CHARACTER, dc, 0, NULL);
@@ -3103,7 +3118,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0, knd, BT_INTEGER, di, 1, NULL);
   add_sym("ifix",  0, BT_INTEGER, di, simplify_int, NULL, a, BT_REAL, dr, 0, NULL);
   add_sym("idint", 0, BT_INTEGER, di, simplify_int, NULL, a, BT_REAL, dd, 0, NULL);
-  make_generic("int", "int", "ifix", "idint", NULL);
+  make_generic("int");
 
   add_sym("ior", 0, BT_INTEGER, di, simplify_ior, NULL,
 	  i, BT_INTEGER, di, 0, j, BT_INTEGER, di, 0, NULL);
@@ -3148,12 +3163,12 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL,    dd, 0, NULL);
   add_sym("clog", 0, BT_COMPLEX, dz, simplify_log, not_ready,
 	  x, BT_COMPLEX, dz, 0, NULL);
-  make_generic("log", "log", "alog", "dlog", "clog", NULL);
+  make_generic("log");
 
   add_sym("log10",  0, BT_REAL, dr, simplify_log10, not_ready, x, BT_REAL, dr, 0, NULL);
   add_sym("alog10", 0, BT_REAL, dr, simplify_log10, not_ready, x, BT_REAL, dr, 0, NULL);
   add_sym("dlog10", 0, BT_REAL, dd, simplify_log10, not_ready, x, BT_REAL, dd, 0, NULL);
-  make_generic("log10", "log10", "alog10", "dlog10", NULL);
+  make_generic("log10");
 
 /* KAH knd (optional) must be a valid logical kind */
   add_sym("logical", 0, BT_LOGICAL, dl, simplify_logical, not_ready, l, BT_LOGICAL, dl, 0,
@@ -3178,7 +3193,7 @@ int di, dr, dd, dl, dc, dz;
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
   add_sym("max1",  0, BT_INTEGER, di, NULL, not_ready,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  make_generic("max", "max", "max0", "amax1", "dmax1", "amax0", "max1", NULL);
+  make_generic("max");
 
 /* KAH Takes scalar or array input */
   add_sym("maxexponent", 1, BT_INTEGER, di, simplify_maxexponent, not_ready,
@@ -3215,7 +3230,7 @@ int di, dr, dd, dl, dc, dz;
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
   add_sym("min1",  0, BT_INTEGER, di, NULL, not_ready,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  make_generic("min", "min", "min0", "amin1", "dmin1", "amin0", "min1", NULL);
+  make_generic("min");
 
   add_sym("minexponent", 1, BT_INTEGER, di, simplify_minexponent, not_ready,
 	  x, BT_REAL, dr, 0, NULL);
@@ -3238,7 +3253,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL,    dr, 0, p, BT_REAL,    dr, 0, NULL);
   add_sym("dmod", 0, BT_REAL,    dd, simplify_mod, NULL,
 	  a, BT_REAL,    dd, 0, p, BT_REAL,    dd, 0, NULL);
-  make_generic("mod", "mod", "amod", "dmod", NULL);
+  make_generic("mod");
 
   add_sym("modulo", 0, BT_INTEGER, di, simplify_modulo, not_ready,
 	  a, BT_INTEGER, di, 0, p, BT_INTEGER, di, 0, NULL);
@@ -3249,7 +3264,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("nint",   0, BT_INTEGER, di, simplify_nint, not_ready, a, BT_REAL, dr, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
   add_sym("idnint", 0, BT_INTEGER, di, simplify_nint, NULL, a, BT_REAL, dd, 0, NULL);
-  make_generic("nint", "nint", "idnint", NULL);
+  make_generic("nint");
 
   add_sym("not", 0, BT_INTEGER, di, simplify_not, NULL, i, BT_INTEGER, di, 0, NULL);
 
@@ -3284,7 +3299,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_INTEGER, di, 0, knd, BT_INTEGER, di, 1, NULL);
   add_sym("float", 0, BT_REAL, dr, simplify_real, NULL, a, BT_INTEGER, di, 0, NULL);
   add_sym("sngl",  0, BT_REAL, dr, NULL, NULL, a, BT_REAL,    dd, 0, NULL);
-  make_generic("real", "real", "float", "sngl", NULL);
+  make_generic("real");
 
   add_sym("repeat", 1, BT_CHARACTER, dc, NULL, NULL,
 	  stg, BT_CHARACTER, dc, 0, n, BT_INTEGER, di, 0, NULL);
@@ -3323,16 +3338,16 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_INTEGER, di, 0, b, BT_INTEGER, di, 0, NULL);
   add_sym("dsign", 0, BT_REAL,    dd, simplify_sign, NULL,
 	  a, BT_REAL,    dd, 0, b, BT_REAL,    dd, 0, NULL);
-  make_generic("sign", "sign", "isign", "dsign", NULL);
+  make_generic("sign");
 
   add_sym("sin",  0, BT_REAL,    dr, simplify_sin, NULL, x, BT_REAL,    dr, 0, NULL);
   add_sym("dsin", 0, BT_REAL,    dd, simplify_sin, NULL, x, BT_REAL,    dd, 0, NULL);
   add_sym("csin", 0, BT_COMPLEX, dz, simplify_sin, NULL, x, BT_COMPLEX, dz, 0, NULL);
-  make_generic("sin", "sin", "dsin", "csin", NULL);
+  make_generic("sin");
 
   add_sym("sinh",  0, BT_REAL, dr, simplify_sinh, NULL, x, BT_REAL, dr, 0, NULL);
   add_sym("dsinh", 0, BT_REAL, dd, simplify_sinh, NULL, x, BT_REAL, dd, 0, NULL);
-  make_generic("sinh", "sinh", "dsinh", NULL);
+  make_generic("sinh");
 
 /* KAH Takes array of any type */
   add_sym("size", 1, BT_INTEGER, di, NULL, not_ready,
@@ -3351,7 +3366,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL,    dd, 0, NULL);
   add_sym("csqrt", 0, BT_COMPLEX, dz, NULL, NULL,
 	  x, BT_COMPLEX, dz, 0, NULL);
-  make_generic("sqrt", "sqrt", "dsqrt", "csqrt", NULL);
+  make_generic("sqrt");
 
 /* KAH Takes array argument of type integer or real, returns array of
  * same type.  The type of the second argument must be checked to decide
@@ -3361,11 +3376,11 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("tan",  0, BT_REAL, dr, simplify_tan, NULL, x, BT_REAL, dr, 0, NULL);
   add_sym("dtan", 0, BT_REAL, dd, simplify_tan, NULL, x, BT_REAL, dd, 0, NULL);
-  make_generic("tan", "tan", "dtan", NULL);
+  make_generic("tan");
 
   add_sym("tanh",  0, BT_REAL, dr, simplify_tanh, NULL, x, BT_REAL, dr, 0, NULL);
   add_sym("dtanh", 0, BT_REAL, dd, simplify_tanh, NULL, x, BT_REAL, dd, 0, NULL);
-  make_generic("tanh", "tanh", "dtanh", NULL);
+  make_generic("tanh");
 
 /* KAH Input may be scalar or array */
   add_sym("tiny", 1, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);

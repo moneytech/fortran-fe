@@ -1466,3 +1466,35 @@ g95_expr *arg1, *arg2;
   g95_replace_expr(e, g95_constant_expr(BT_INTEGER, kind, NULL));
   return SUCCESS;
 }
+
+
+/* g95_simplify_huge()-- Simplify the HUGE intrinsic. */
+
+g95_expr *g95_simplify_huge(bt type, int kind) {
+g95_expr *result;
+int i;
+
+  switch(type) {
+  case BT_INTEGER:
+    i = validate_integer(kind);
+    if (i == -1) goto bad_type;
+
+    result = constant_result(type, kind);
+    mpz_init_set(result->value.integer, g95_integer_kinds[i].maxval);
+    break;
+
+  case BT_REAL:
+    i = validate_real(kind);
+    if (i == -1) goto bad_type;
+
+    result = constant_result(type, kind);
+    mpf_init_set(result->value.real, g95_real_kinds[i].maxval);
+    break;
+
+  bad_type:
+  default:
+    g95_internal_error("g95_simplify_huge(): Bad type");
+  }
+
+  return result;
+}
