@@ -1,4 +1,3 @@
-
 /* Command line option related things
    Copyright (C) 2000-2002 Free Software Foundation, Inc.
    Contributed by Andy Vaught
@@ -28,28 +27,17 @@ Boston, MA 02111-1307, USA.  */
 #include <string.h>
 #include <stdlib.h>
 
-
-static struct {
-  char *option;
-  char *description;
-}
-
-#ifndef BACKEND_CODE
+#ifdef IN_GCC
+#include "intl.h"
+#else
 #define N_(msg) (msg)
 #endif
 
-
-#ifdef IN_GCC
-#include "config.h"
-#include "system.h"
-#include "tree.h"
-#include "intl.h"
-#define BACKEND_CODE
-#endif
-
-
 #define DEFINE_LANG_NAME(x)
-lang_options[] = {
+static struct {
+  char *option;
+  char *description;
+} lang_options[] = {
 #include "lang-options.h"
     { " ", " " } /* Ugly hack to avoid compile error. Will be moved
                     to driver executable anyway */
