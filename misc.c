@@ -523,6 +523,7 @@ void g95_init_options(void) {
   g95_option.implicit_none = 0;
   g95_option.fixed_line_length = 72;
   g95_option.fmode = 0;
+  g95_option.dollar = 0;
   g95_option.form = FORM_UNKNOWN;
   g95_option.i8 = 0;
   g95_option.q_kind = g95_default_double_kind();
