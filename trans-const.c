@@ -179,7 +179,7 @@ g95_conv_mpz_to_tree (mpz_t i, int kind)
     res = fold (build1 (NEGATE_EXPR, TREE_TYPE (res), res));
 
   if (q != buff)
-    g95_free (buff);
+    g95_free (q);
 
   return res;
 }
