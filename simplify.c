@@ -2224,6 +2224,7 @@ g95_expr *result;
   result = g95_get_expr();
 
   result->expr_type = EXPR_NULL;
+  result->where = g95_current_function->where;
 
   if (mold == NULL)
     result->ts.type = BT_UNKNOWN;

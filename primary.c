@@ -1617,9 +1617,11 @@ match m;
 
     e = g95_get_expr();
     e->symbol = sym;
-    if (sym->as != NULL) e->rank = sym->as->rank;
     e->expr_type = EXPR_FUNCTION;
     e->value.function.actual = actual_arglist;
+    e->where = *g95_current_locus();
+
+    if (sym->as != NULL) e->rank = sym->as->rank;
 
     if (!sym->attr.function && g95_add_function(&sym->attr, NULL) == FAILURE) {
       m = MATCH_ERROR;

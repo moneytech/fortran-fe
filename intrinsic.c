@@ -3197,7 +3197,14 @@ try g95_convert_type(g95_expr *expr, g95_typespec *ts, int eflag) {
 intrinsic_sym *sym;
 g95_expr *new;
 
-  if (expr->ts.type == BT_UNKNOWN || ts->type == BT_UNKNOWN) goto bad;
+  if (ts->type == BT_UNKNOWN) goto bad;
+
+  if (expr->expr_type == EXPR_NULL) { /* NULL pointers aquire types easily */
+    expr->ts = *ts;
+    return SUCCESS;
+  }
+
+  if (expr->ts.type == BT_UNKNOWN) goto bad;
 
   if (expr->ts.type == BT_DERIVED && ts->type == BT_DERIVED &&
       expr->ts.derived == ts->derived) return SUCCESS;
