@@ -238,9 +238,9 @@ static void display_help(void) {
     "  -I[directory]           Append directory to the include/module\n"
     "                          file search path\n"
     "  -M[directory]           put generated module files in directory,\n"
-    "                          search there for modules"
+    "                          search there for modules\n"
     "\n"
-    "See http://g95.sourceforge.net for more information.\n\n");
+    "See http://g95.sourceforge.net for more information.\n");
 
   exit(0);
 }

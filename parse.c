@@ -216,6 +216,7 @@ int c;
     case 'p':
       match("print", g95_match_print, ST_WRITE);
       match("parameter", g95_match_parameter, ST_PARAMETER);
+      match("pause", g95_match_pause, ST_NONE);
       match("pointer", g95_match_pointer, ST_ATTR_DECL);
       if (g95_match_private(&st) == MATCH_YES) return st;
       match("program", g95_match_program, ST_PROGRAM);

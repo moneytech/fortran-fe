@@ -1053,6 +1053,7 @@ match g95_match_elseif(void);
 match g95_match_do(void);
 match g95_match_cycle(void);
 match g95_match_exit(void);
+match g95_match_pause(void);
 match g95_match_stop(void);
 match g95_match_continue(void);
 match g95_match_goto(void);

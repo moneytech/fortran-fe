@@ -889,6 +889,7 @@ match m, n;
   match("inquire",    g95_match_inquire,     ST_INQUIRE)
   match("nullify",    g95_match_nullify,     ST_NULLIFY)
   match("open",       g95_match_open,        ST_OPEN)
+  match("pause",      g95_match_pause,       ST_NONE)
   match("print",      g95_match_print,       ST_WRITE)
   match("read",       g95_match_read,        ST_READ)
   match("return",     g95_match_return,      ST_RETURN)
@@ -1137,6 +1138,19 @@ match g95_match_exit(void) {
 match g95_match_cycle(void) {
 
   return match_exit_cycle(ST_CYCLE, EXEC_CYCLE);
+}
+
+
+/* g95_match_pause()-- Match the (deprecated) PAUSE statement */
+
+match g95_match_pause(void) {
+
+  if (g95_match_eos() == MATCH_YES) {
+    g95_error("The PAUSE statement at %C is not allowed in Fortran 95.");
+    return MATCH_ERROR;
+  }
+
+  return MATCH_NO;
 }
 
 
