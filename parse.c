@@ -287,7 +287,7 @@ int c;
         c = g95_next_char();
       } while(isdigit(c));
     } else {
-      label_locus = g95_statement_label->where = *g95_current_locus();
+      label_locus = *g95_current_locus();
 
       if (g95_statement_label->value == 0) {
         g95_warning_now("Ignoring statement label of zero at %C");

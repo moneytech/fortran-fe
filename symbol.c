@@ -1497,9 +1497,9 @@ static int next_label = 100000; /* only initialized at startup! */
   return g95_get_st_label (next_label++);
 }
 
-/* TODO : redo comment */
+
 /* g95_define_st_label()-- Called when a statement with a statement
- * label is about to be accepted. We add the label to the list of the
+ * label is about to be accepted.  We add the label to the list of the
  * current namespace, making sure it hasn't been defined previously
  * and referenced correctly. */
 
@@ -1510,14 +1510,16 @@ int labelno;
   labelno = lp->value;
 
   if (lp->defined != ST_LABEL_UNKNOWN)
-    g95_error("Duplicate statement label %d at %L and %C", labelno, &lp->where);
+    g95_error("Duplicate statement label %d at %L and %L", labelno,
+	      &lp->where, label_locus);
   else {
     lp->where = *label_locus;
 
     switch(type) {
     case ST_LABEL_FORMAT:
       if (lp->referenced == ST_LABEL_TARGET) 
-        g95_error("Label %d at %C already referenced as branch target", labelno);
+        g95_error("Label %d at %C already referenced as branch target",
+		  labelno);
       else
         lp->defined = ST_LABEL_FORMAT;
 
@@ -1525,7 +1527,8 @@ int labelno;
 
     case ST_LABEL_TARGET:
       if (lp->referenced == ST_LABEL_FORMAT)
-        g95_error("Label %d at %C already referenced as a format label", labelno);
+        g95_error("Label %d at %C already referenced as a format label",
+		  labelno);
       else
         lp->defined = ST_LABEL_TARGET;
 
