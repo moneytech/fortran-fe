@@ -601,12 +601,13 @@ void g95_resolve_maxval(g95_expr *f, g95_expr *array, g95_expr *dim,
 			g95_expr *mask) {
 
   f->ts = array->ts;
+
   if (dim != NULL && array->rank != 1)
     f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__maxval_%c%d", g95_type_letter(array->ts.type),
-		   array->ts.kind);
+    g95_get_string("__%s%d_%c%d", mask ? "mmaxval" : "maxval", f->rank,
+                   g95_type_letter(array->ts.type), array->ts.kind);
 }
 
 
@@ -645,14 +646,15 @@ static char minloc0[] = "__minloc0", minloc1[] = "__minloc1";
 
 void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
 			     g95_expr *mask) {
+
   f->ts = array->ts;
 
   if (dim != NULL && array->rank != 1)
     f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__minval_%c%d", g95_type_letter(array->ts.type),
-		   array->ts.kind);
+    g95_get_string("__%s%d_%c%d", mask ? "mminval" : "minval", f->rank,
+                   g95_type_letter(array->ts.type), array->ts.kind);
 }
 
 
