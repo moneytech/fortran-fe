@@ -381,59 +381,37 @@ g95_expr *g95_simplify_aint(g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *result;
 int kind;
 
-/* Because the kind parameter has to be known at compile-time, we make
- * sure this is so before seeing if e is non-constant. */
-
   kind = get_kind(k, "AINT", e->ts.kind);
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  rtrunc = g95_constant_result(BT_REAL, kind);
-  rtrunc->where = e->where;
+  rtrunc = g95_copy_expr(e);
 
   mpf_trunc(rtrunc->value.real, e->value.real);
 
   result=g95_real2real(rtrunc,kind);
-  if ( result == NULL ) {
-    g95_error("Result of AINT() overflows its kind at %L", &e->where);
-    g95_free_expr(rtrunc);
-    return &g95_bad_expr;
-  }
-  else {
-    g95_free_expr(rtrunc);
-    return range_check(result,"AINT");
-  }
+  g95_free_expr(rtrunc);
+
+  return range_check(result,"AINT");
+
 }
 
 
 g95_expr *g95_simplify_dint(g95_expr *e) {
 g95_expr *rtrunc, *result;
-int kind;
-
-  kind = e->ts.kind;
-  if (kind != g95_default_double_kind()) {
-    g95_error("Kind of DINT() at %L must be double", &e->where);
-    return &g95_bad_expr;
-  }
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  rtrunc = g95_constant_result(BT_REAL, kind);
-  rtrunc->where = e->where;
+  rtrunc = g95_copy_expr(e);
 
   mpf_trunc(rtrunc->value.real, e->value.real);
 
-  result=g95_real2real(rtrunc,kind);
-  if ( result == NULL ) {
-    g95_error("Result of DINT() overflows its kind at %L", &e->where);
-    g95_free_expr(rtrunc);
-    return &g95_bad_expr;
-  }
-  else {
-    g95_free_expr(rtrunc);
-    return range_check(result,"DINT");
-  }
+  result=g95_real2real(rtrunc,g95_default_double_kind());
+  g95_free_expr(rtrunc);
+
+  return range_check(result,"DINT");
+
 }
 
 
@@ -448,21 +426,16 @@ int kind, cmp;
 
   rtrunc = g95_copy_expr(e);
 
-  cmp = mpf_cmp_si(e->value.real, 0);
+  cmp = mpf_cmp_ui(e->value.real, 0);
 
   if (cmp > 0) {
     mpf_ceil(rtrunc->value.real,e->value.real);
   } else if (cmp < 0) {
     mpf_floor(rtrunc->value.real,e->value.real);
   } else 
-    mpf_set_si(rtrunc->value.real,0);
+    mpf_set_ui(rtrunc->value.real,0);
 
   result = g95_real2real(rtrunc,kind);
-  if (result == NULL) {
-    g95_error("Result of ANINT() overflows its kind at %L", &e->where);
-    g95_free_expr(rtrunc);
-    return &g95_bad_expr;
-  }
 
   g95_free_expr(rtrunc);
   return range_check(result,"ANINT");
@@ -471,33 +444,22 @@ int kind, cmp;
 
 g95_expr *g95_simplify_dnint(g95_expr *e) {
 g95_expr *rtrunc, *result;
-int kind, cmp;
-
-  kind = e->ts.kind;
-  if (kind != g95_default_double_kind()) {
-    g95_error("Kind of DINT() at %L must be double", &e->where);
-    return &g95_bad_expr;
-  }
+int cmp;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   rtrunc = g95_copy_expr(e);
 
-  cmp = mpf_cmp_si(e->value.real, 0);
+  cmp = mpf_cmp_ui(e->value.real, 0);
 
   if (cmp > 0) {
     mpf_ceil(rtrunc->value.real,e->value.real);
   } else if (cmp < 0 ) {
     mpf_floor(rtrunc->value.real,e->value.real);
   } else 
-    mpf_set_si(rtrunc->value.real,0);
+    mpf_set_ui(rtrunc->value.real,0);
 
-  result = g95_real2real(rtrunc,kind);
-  if (result == NULL) {
-    g95_error("Result of DNINT() overflows its kind at %L", &e->where);
-    g95_free_expr(rtrunc);
-    return &g95_bad_expr;
-  }
+  result = g95_real2real(rtrunc,g95_default_double_kind());
 
   g95_free_expr(rtrunc);
   return range_check(result, "DNINT");
@@ -1266,9 +1228,6 @@ g95_expr *g95_simplify_ibclr(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 int k, pos;
 
-  k = g95_validate_kind(x->ts.type, x->ts.kind);
-  if ( k == -1 ) g95_internal_error("In g95_simplify_ibclr: bad kind");
-
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
     return NULL;
 
@@ -1281,6 +1240,9 @@ int k, pos;
     g95_error("Second argument of IBCLR exceeds bit size at %L", &y->where);
     return &g95_bad_expr;
   }
+
+  k = g95_validate_kind(x->ts.type, x->ts.kind);
+  if ( k == -1 ) g95_internal_error("In g95_simplify_ibclr: bad kind");
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where;
@@ -1296,9 +1258,6 @@ int pos, len;
 int i, k, bitsize;
 int *bits;
 
-  k = g95_validate_kind(BT_INTEGER, x->ts.kind);
-  if ( k == -1 ) g95_internal_error("In g95_simplify_ibits: bad kind");
-
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT ||  
       z->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -1311,6 +1270,9 @@ int *bits;
     g95_error("Invalid third argument of IBITS at %L", &z->where);
     return &g95_bad_expr;
   }
+
+  k = g95_validate_kind(BT_INTEGER, x->ts.kind);
+  if ( k == -1 ) g95_internal_error("In g95_simplify_ibits: bad kind");
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where;
@@ -1351,9 +1313,6 @@ g95_expr *g95_simplify_ibset(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 int k, pos;
 
-  k = g95_validate_kind(x->ts.type, x->ts.kind);
-  if ( k == -1 ) g95_internal_error("In g95_simplify_ibset: bad kind");
-
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
     return NULL;
 
@@ -1366,6 +1325,9 @@ int k, pos;
     g95_error("Second argument of IBSET exceeds bit size at %L", &y->where);
     return &g95_bad_expr;
   }
+
+  k = g95_validate_kind(x->ts.type, x->ts.kind);
+  if ( k == -1 ) g95_internal_error("In g95_simplify_ibset: bad kind");
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where;
@@ -1525,8 +1487,8 @@ g95_expr *g95_simplify_int(g95_expr *e, g95_expr *k) {
 g95_expr *rpart, *rtrunc, *result;
 int kind;
 
-  kind = g95_validate_kind(e->ts.type, e->ts.kind);
-  if ( kind == -1 ) g95_internal_error("In g95_simplify_int: bad kind");
+  kind = get_kind(k, "INT", g95_default_integer_kind());
+  if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -1561,13 +1523,12 @@ int kind;
 
 g95_expr *g95_simplify_ifix(g95_expr *e) {
 g95_expr *rtrunc, *result;
-int kind;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   rtrunc = g95_copy_expr(e);
   mpf_trunc(rtrunc->value.real, e->value.real);
-  result = g95_real2int(rtrunc, kind);
+  result = g95_real2int(rtrunc, g95_default_integer_kind());
 
   g95_free_expr(rtrunc);
   return range_check(result,"IFIX");
@@ -1578,10 +1539,10 @@ g95_expr *g95_simplify_idint(g95_expr *e) {
 g95_expr *rtrunc, *result;
 int kind;
 
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
   kind = g95_validate_kind(e->ts.type, e->ts.kind);
   if ( kind == -1 ) g95_internal_error("In g95_simplify_int: bad kind");
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   rtrunc = g95_copy_expr(e);
   mpf_trunc(rtrunc->value.real, e->value.real);
@@ -1611,9 +1572,6 @@ g95_expr *result;
 int shift, isize, k;
 long e_int;
 
-  k = g95_validate_kind(BT_INTEGER, e->ts.kind);
-  if ( k == -1 ) g95_internal_error("In g95_simplify_ishft: bad kind");
-
   if (e->expr_type != EXPR_CONSTANT || s->expr_type != EXPR_CONSTANT)  
     return NULL;
 
@@ -1621,6 +1579,9 @@ long e_int;
     g95_error("Invalid second argument of ISHFT at %L", &s->where);
     return &g95_bad_expr;
   }
+
+  k = g95_validate_kind(BT_INTEGER, e->ts.kind);
+  if ( k == -1 ) g95_internal_error("In g95_simplify_ishft: bad kind");
 
   isize = g95_integer_kinds[k].bit_size;
 
@@ -1657,9 +1618,6 @@ g95_expr *result;
 int shift, isize, delta, k;
 int i, *bits;
 
-  k = g95_validate_kind(e->ts.type, e->ts.kind);
-  if ( k == -1 ) g95_internal_error("In g95_simplify_ishftc: bad kind");
-
   if (e->expr_type != EXPR_CONSTANT || s->expr_type != EXPR_CONSTANT)  
     return NULL;
 
@@ -1680,6 +1638,9 @@ int i, *bits;
     g95_error("Second argument of ISHFTC exceeds bit size at %L", &s->where);
     return &g95_bad_expr;
   }
+
+  k = g95_validate_kind(e->ts.type, e->ts.kind);
+  if ( k == -1 ) g95_internal_error("In g95_simplify_ishftc: bad kind");
 
   result = g95_constant_result(e->ts.type, e->ts.kind);
   result->where = e->where;
@@ -2421,13 +2382,13 @@ int kind, cmp;
 
 g95_expr *g95_simplify_idnint(g95_expr *e) {
 g95_expr *rtrunc, *result;
-int kind, cmp;
+int cmp;
 
   if (e->expr_type != EXPR_CONSTANT ) return NULL;
 
   rtrunc = g95_copy_expr(e);
 
-  cmp = mpf_cmp_si(e->value.real, 0);
+  cmp = mpf_cmp_ui(e->value.real, 0);
 
   if (cmp > 0) {
     mpf_ceil(rtrunc->value.real, e->value.real);
@@ -2437,7 +2398,7 @@ int kind, cmp;
     mpf_set_si(rtrunc->value.real, 0);
   }
 
-  result = g95_real2int(rtrunc, kind);
+  result = g95_real2int(rtrunc, g95_default_double_kind());
 
   g95_free_expr(rtrunc);
 
@@ -2450,10 +2411,10 @@ g95_expr *result;
 int k, isize;
 int i;
 
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
   k = g95_validate_kind(e->ts.kind, e->ts.kind);
   if (k == -1) g95_internal_error("g95_simplify_not(): Bad kind");
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   isize = g95_integer_kinds[k].bit_size;
 
@@ -3171,10 +3132,10 @@ long diff;
 unsigned long exp2;
 int i, p;
 
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
   i = g95_validate_kind(x->ts.type, x->ts.kind);
   if (i < 0) g95_internal_error("g95_simplify_spacing(): bad kind");
-
-  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   p = g95_real_kinds[i].digits;
 
@@ -3332,10 +3293,10 @@ g95_expr *result;
 mpf_t mpf_sin, mpf_cos, mag_cos;
 int i;
 
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
   i = g95_validate_kind(BT_REAL, x->ts.kind);
   if (i == -1) g95_internal_error("g95_simplify_tan(): bad kind");
-
-  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
