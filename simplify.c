@@ -2384,8 +2384,8 @@ int i, j, len, ncopies, nlen;
 }
 
 
-/* simplify_reshape()-- This one is a bear, but mainly has to do with
- * shuffling elements. */
+/* g95_simplify_reshape()-- This one is a bear, but mainly has to do
+ * with shuffling elements. */
 
 g95_expr *g95_simplify_reshape(g95_expr *source, g95_expr *shape_exp,
 			       g95_expr *pad, g95_expr *order_exp) {
@@ -2400,6 +2400,11 @@ mpz_t index;
 g95_expr *e;
 
 /* Unpack the shape array */
+
+  if (source->expr_type != EXPR_ARRAY || shape_exp->expr_type != EXPR_ARRAY ||
+      (pad != NULL && pad->expr_type != EXPR_ARRAY) ||
+      (order_exp != NULL && order_exp->expr_type != EXPR_ARRAY))
+      return NULL;
 
   mpz_init(index);
   rank = 0;
@@ -2430,7 +2435,8 @@ g95_expr *e;
   }
 
   if (rank == 0) {
-    g95_error("Shape specification at %L cannot be the null array", &e->where);
+    g95_error("Shape specification at %L cannot be the null array",
+	      &shape_exp->where);
     goto done;
   }
 
