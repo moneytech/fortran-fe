@@ -6,7 +6,7 @@ WARNING:
 
 G95 is in a larval state. Perusing the g77 source, we estimate that
 about 200,000 lines of code will be necessary to implement g95.  G95
-is currently about 37,000 lines long, making it about version 0.185.
+is currently about 46,500 lines long, making it about version 0.235.
 The current g95 does nothing except print the contents of internal
 data structures.
 

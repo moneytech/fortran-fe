@@ -53,7 +53,7 @@ char *alloca ();
 
 /* Major control parameters */
 
-#define G95_VERSION "0.18"
+#define G95_VERSION "0.23"
 
 #define G95_MAX_SYMBOL_LEN 31
 
