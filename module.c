@@ -37,6 +37,8 @@ Boston, MA 02111-1307, USA.  */
 typedef struct g95_use_rename {
   char local_name[G95_MAX_SYMBOL_LEN+1], use_name[G95_MAX_SYMBOL_LEN+1];
   struct g95_use_rename *next;
+  int found;
+  locus where;
 } g95_use_rename;
 
 #define g95_get_use_rename() g95_getmem(sizeof(g95_use_rename))
@@ -87,6 +89,7 @@ match m;
 
   for(;;) {
     new = g95_get_use_rename();
+    new->found = 0;
 
     if (g95_rename_list == NULL)
       g95_rename_list = new;
@@ -98,6 +101,8 @@ match m;
     m = g95_match(" %n", name);
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
+
+    new->where = *g95_current_locus();
 
     m = g95_match(" =>");
 
@@ -1665,6 +1670,14 @@ g95_symtree *st;
   }
 
   mio_rparen();
+
+/* Find out if all elements of the rename-list were found in the module */
+  for(u=g95_rename_list; u; u=g95_rename_list->next) {
+    if(!u->found) {
+      g95_error("Symbol %s referenced at %L not found in module %s",
+		u->use_name, &u->where, module_name);
+    }
+  }
 
 /* Clean up symbol nodes that were never loaded */
 
