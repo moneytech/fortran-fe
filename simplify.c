@@ -594,6 +594,8 @@ g95_expr *g95_simplify_cmplx(g95_expr *x, g95_expr *y, g95_expr *k) {
 g95_expr *result;
 int kind;
 
+    printf("In simplify_cmplx\n");
+
   kind = get_kind(k, "CMPLX", g95_default_real_kind()); 
   if (kind == -1) return &g95_bad_expr;
 
@@ -902,11 +904,10 @@ int kind;
 
   if (e->ts.type != EXPR_CONSTANT) return NULL;
 
-  result = g95_constant_result(BT_INTEGER, kind);
-  result->where = e->where;
+  floor = g95_constant_result(BT_REAL, kind);
+  floor->where = e->where;
   
-  floor = g95_copy_expr(e);
-  mpf_floor(result->value.real, e->value.real);
+  mpf_floor(floor->value.real, e->value.real);
   result=g95_real2int(floor, kind);
 
   g95_free_expr(floor);
