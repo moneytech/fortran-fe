@@ -328,8 +328,7 @@ tree tmp;
   g95_add_block_to_block(block, &se.pre);
 
   tmp = build(COMPONENT_REF, TREE_TYPE(var), ioparm_var, var);
-  tmp = build(MODIFY_EXPR, TREE_TYPE(var), tmp, se.expr);
-  g95_add_expr_to_block(block, tmp);
+  g95_add_modify_expr(block, tmp, se.expr);
 }
 
 
@@ -347,8 +346,7 @@ tree tmp;
   g95_add_block_to_block(block, &se.pre);
 
   tmp = build(COMPONENT_REF, TREE_TYPE(var), ioparm_var, var);
-  tmp = build(MODIFY_EXPR, TREE_TYPE(var), tmp, se.expr);
-  g95_add_expr_to_block(block, tmp);
+  g95_add_modify_expr(block, tmp, se.expr);
 }
 
 
@@ -368,12 +366,10 @@ tree tmp;
   g95_add_block_to_block(postblock, &se.post);
 
   tmp = build(COMPONENT_REF, TREE_TYPE(var), ioparm_var, var);
-  tmp = build(MODIFY_EXPR, TREE_TYPE(tmp), tmp, se.expr);
-  g95_add_expr_to_block(block, tmp);
+  g95_add_modify_expr(block, tmp, se.expr);
 
   tmp = build(COMPONENT_REF, TREE_TYPE(var_len), ioparm_var, var_len);
-  tmp = build(MODIFY_EXPR, TREE_TYPE(tmp), tmp, se.string_length);
-  g95_add_expr_to_block(block, tmp);
+  g95_add_modify_expr(block, tmp, se.string_length);
 }
 
 
@@ -445,14 +441,10 @@ int line;
   tmp = g95_build_string_const(strlen(f->filename)+1, f->filename);
 
   tmp = build1(ADDR_EXPR, pchar_type_node, tmp);
-  tmp = build(MODIFY_EXPR, pchar_type_node, locus_file, tmp);
-  g95_add_expr_to_block(block, tmp);
+  g95_add_modify_expr(block, locus_file, tmp);
 
   line = where->lp->start_line + where->line;
-  tmp = build(MODIFY_EXPR, g95_int4_type_node, locus_line,
-	      build_int_2(line, 0));
-
-  g95_add_expr_to_block(block, tmp);
+  g95_add_modify_expr(block, locus_line, build_int_2(line, 0));
 }
 
 
