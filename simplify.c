@@ -3143,118 +3143,115 @@ g95_expr *g95_simplify_sqrt(g95_expr *e) {
 g95_expr *sroot, *result;
 mpf_t ac, ad, s, t, w;
 
+  if (e->expr_type != EXPR_CONSTANT) return NULL; 
+
   switch (e->ts.type) {
-      case BT_INTEGER:
-          if (g95_option.pedantic == 1) 
-          g95_warning("Integer initialization constant to SQRT at %L is nonstandard", &e->where);
-	  if (mpz_cmp_si(e->value.integer,0) < 0) {
-	    g95_error("Argument of SQRT at %L has a negative value", &e->where);
-	    return &g95_bad_expr;
-	  }
-	  else {
-	    sroot = g95_copy_expr(e);
-            mpz_sqrt(sroot->value.integer, e->value.integer);
-	    result = g95_int2real(sroot, g95_default_real_kind());
-	    g95_free_expr(sroot);
-	    return result;
-	  }
-  	case BT_REAL:
-	  if (mpf_cmp_si(e->value.real,0) < 0) {
-	    g95_error("Argument of SQRT at %L has a negative value", &e->where);
-	    return &g95_bad_expr;
-	  }
-	  else {
-            result = g95_constant_result(BT_REAL, e->ts.kind);
-	    result->where = e->where;
-            mpf_sqrt(result->value.real, e->value.real);
-	    return result;
-	  }
-	case BT_COMPLEX:
-	  /*Formula taken from Numerical Recipes to avoid over- and underflow*/
+  case BT_INTEGER:
+    if (mpz_cmp_si(e->value.integer, 0) < 0) goto negative_arg;
 
-          result = g95_constant_result(BT_COMPLEX, e->ts.kind);
-	  result->where = e->where;
+    sroot = g95_copy_expr(e);
+    mpz_sqrt(sroot->value.integer, e->value.integer);
+    result = g95_int2real(sroot, g95_default_real_kind());
+    g95_free_expr(sroot);
 
-	  mpf_init(ac);
-	  mpf_init(ad);
-	  mpf_init(s);
-	  mpf_init(t);
-	  mpf_init(w);
+    break;
 
-	  if (mpf_cmp_ui(e->value.complex.r,0)==0 && 
-			  mpf_cmp_ui(e->value.complex.i,0)==0) {
-	    mpf_set_ui(result->value.complex.r,0);
-	    mpf_set_ui(result->value.complex.i,0);
-	    return result;
-	  }
+  case BT_REAL:
+    if (mpf_cmp_si(e->value.real, 0) < 0) goto negative_arg;
 
-	  mpf_abs(ac,e->value.complex.r);
-	  mpf_abs(ad,e->value.complex.i);
+    result = g95_constant_result(BT_REAL, e->ts.kind);
+    result->where = e->where;
+    mpf_sqrt(result->value.real, e->value.real);
 
-	  if (mpf_cmp(ac,ad) >= 0) {
-	    mpf_div(t,e->value.complex.i,e->value.complex.r);
-	    mpf_mul(t,t,t);
-	    mpf_add_ui(t,t,1);
-	    mpf_sqrt(t,t);
-	    mpf_add_ui(t,t,1);
-	    mpf_div_ui(t,t,2);
-	    mpf_sqrt(t,t);
-	    mpf_sqrt(s,ac);
-	    mpf_mul(w,s,t);
-	  }
-	  else {
-	    mpf_div(s,e->value.complex.r,e->value.complex.i);
-	    mpf_mul(t,s,s);
-	    mpf_add_ui(t,t,1);
-	    mpf_sqrt(t,t);
-	    mpf_abs(s,s);
-	    mpf_add(t,t,s);
-	    mpf_div_ui(t,t,2);
-	    mpf_sqrt(t,t);
-	    mpf_sqrt(s,ad);
-	    mpf_mul(w,s,t);
-	  }
+    break;
 
-	  if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0) >=0){
-	    mpf_mul_ui(t,w,2);
-	    mpf_div(result->value.complex.i,e->value.complex.i,t);
-	    mpf_set(result->value.complex.r,w);
-	  }
-	  else if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0)<0 &&
-			  mpf_cmp_ui(e->value.complex.i,0)>=0) {
-	    mpf_mul_ui(t,w,2);
-	    mpf_div(result->value.complex.r,e->value.complex.i,t);
-	    mpf_set(result->value.complex.i,w);
-	  }
-	  else if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0)<0 &&
-			  mpf_cmp_ui(e->value.complex.i,0)<0) {
-	    mpf_mul_ui(t,w,2);
-	    mpf_div(result->value.complex.r,ad,t);
-	    mpf_neg(w,w);
-	    mpf_set(result->value.complex.i,w);
-	  }
-	  else {
-	    g95_internal_error("invalid complex argument of SQRT at %L", 
-			    &e->where);
-    	    mpf_clear(s);  mpf_clear(t); mpf_clear(ac); 
- 	    mpf_clear(ad); mpf_clear(w);
-	    return &g95_bad_expr;
-	  }
+  case BT_COMPLEX:
+    /*Formula taken from Numerical Recipes to avoid over- and underflow*/
 
-	  mpf_clear(s);
-	  mpf_clear(t);
-	  mpf_clear(ac);
-	  mpf_clear(ad);
-	  mpf_clear(w);
+    result = g95_constant_result(BT_COMPLEX, e->ts.kind);
+    result->where = e->where;
 
-	  return result;
+    mpf_init(ac);
+    mpf_init(ad);
+    mpf_init(s);
+    mpf_init(t);
+    mpf_init(w);
 
-	  break;
+    if (mpf_cmp_ui(e->value.complex.r, 0) == 0 && 
+	mpf_cmp_ui(e->value.complex.i, 0) == 0) {
 
-        default:
-	    g95_internal_error("invalid argument of SQRT at %L", &e->where);
-	    return &g95_bad_expr;
+      mpf_set_ui(result->value.complex.r, 0);
+      mpf_set_ui(result->value.complex.i, 0);
+      break;
+    }
+
+    mpf_abs(ac,e->value.complex.r);
+    mpf_abs(ad,e->value.complex.i);
+
+    if (mpf_cmp(ac, ad) >= 0) {
+      mpf_div(t,e->value.complex.i,e->value.complex.r);
+      mpf_mul(t,t,t);
+      mpf_add_ui(t,t,1);
+      mpf_sqrt(t,t);
+      mpf_add_ui(t,t,1);
+      mpf_div_ui(t,t,2);
+      mpf_sqrt(t,t);
+      mpf_sqrt(s,ac);
+      mpf_mul(w,s,t);
+    } else {
+      mpf_div(s,e->value.complex.r,e->value.complex.i);
+      mpf_mul(t,s,s);
+      mpf_add_ui(t,t,1);
+      mpf_sqrt(t,t);
+      mpf_abs(s,s);
+      mpf_add(t,t,s);
+      mpf_div_ui(t,t,2);
+      mpf_sqrt(t,t);
+      mpf_sqrt(s,ad);
+      mpf_mul(w,s,t);
+    }
+
+    if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0) >=0){
+      mpf_mul_ui(t,w,2);
+      mpf_div(result->value.complex.i,e->value.complex.i,t);
+      mpf_set(result->value.complex.r,w);
+    } else if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0)<0 &&
+	     mpf_cmp_ui(e->value.complex.i,0)>=0) {
+      mpf_mul_ui(t,w,2);
+      mpf_div(result->value.complex.r,e->value.complex.i,t);
+      mpf_set(result->value.complex.i,w);
+    } else if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0)<0 &&
+	     mpf_cmp_ui(e->value.complex.i,0)<0) {
+      mpf_mul_ui(t,w,2);
+      mpf_div(result->value.complex.r,ad,t);
+      mpf_neg(w,w);
+      mpf_set(result->value.complex.i,w);
+    } else {
+      g95_internal_error("invalid complex argument of SQRT at %L", 
+			 &e->where);
+      mpf_clear(s);  mpf_clear(t); mpf_clear(ac); 
+      mpf_clear(ad); mpf_clear(w);
+      return &g95_bad_expr;
+    }
+
+    mpf_clear(s);
+    mpf_clear(t);
+    mpf_clear(ac);
+    mpf_clear(ad);
+    mpf_clear(w);
+
+    break;
+
+  default:
+    g95_internal_error("invalid argument of SQRT at %L", &e->where);
+    return &g95_bad_expr;
   }
+
+  return result;
+
+ negative_arg:
+  g95_error("Argument of SQRT at %L has a negative value", &e->where);
+  return &g95_bad_expr;
 }
 
 
