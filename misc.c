@@ -23,6 +23,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+
 #include "g95.h"
 
 static struct 
@@ -105,6 +107,19 @@ const char *p;
 }
 
 
+/* g95_open_file()-- Open a file for reading */
+
+FILE *g95_open_file(const char *name) {
+struct stat statbuf;
+
+  if (stat(name, &statbuf) < 0) return NULL;
+
+  if (!S_ISREG(statbuf.st_mode)) return NULL;
+
+  return fopen(name, "r");
+}
+
+
 /* g95_open_included_file()-- opens file for reading, searching
  * through the include directories given if necessary */
 
@@ -113,7 +128,7 @@ char fullname[PATH_MAX];
 g95_directorylist *p;
 FILE *f;
 
-  f = fopen(name, "r"); 
+  f = g95_open_file(name);
   if (f != NULL) return f;
 
   for(p=g95_option.include_dirs; p; p=p->next) {
@@ -122,7 +137,7 @@ FILE *f;
     strcpy(fullname, p->path);
     strcat(fullname, name);
 
-    f = fopen(fullname, "r");
+    f = g95_open_file(fullname);
     if (f != NULL) return f;
   }
 

@@ -998,6 +998,7 @@ extern g95_file *g95_current_file;
 void *g95_getmem(size_t);
 void g95_free(void *);
 void g95_clear_ts(g95_typespec *);
+FILE *g95_open_file(const char *);
 FILE *g95_open_included_file(const char *);
 const char *g95_article(const char *);
 const char *g95_basic_typename(bt);

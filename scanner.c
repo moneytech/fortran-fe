@@ -774,7 +774,7 @@ int len;
   strcpy(fp->filename, filename);
 
   if (g95_current_file == NULL)
-    input = fopen(filename, "r");
+    input = g95_open_file(filename);
   else
     input = g95_open_included_file(filename);
 
