@@ -650,6 +650,11 @@ typedef struct {
 } g95_integer_info;
 
 typedef struct {
+  int kind, radix, digits, bit_size;
+
+} g95_logical_info;
+
+typedef struct {
   int kind, radix, digits, min_exponent, max_exponent;
 
   int range, precision;
