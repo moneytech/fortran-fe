@@ -403,6 +403,9 @@ typedef struct g95_namelist {
 
 #define g95_get_namelist() g95_getmem(sizeof(g95_namelist))
 
+#ifndef IN_GCC
+typedef void * tree; /* Just a dummy place holder. */
+#endif
 
 /* The g95_st_label structure is a singly linked list attached to a
  * namespace that records the usage of statement labels within that space */
@@ -433,10 +436,6 @@ typedef struct g95_interface {
 } g95_interface;
 
 #define g95_get_interface() g95_getmem(sizeof(g95_interface))
-
-#ifndef IN_GCC
-typedef void * tree; /* Just a dummy place holder. */
-#endif
 
 /* User operator nodes.  These are like stripped down symbols */
 
