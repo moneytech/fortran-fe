@@ -29,6 +29,9 @@ Boston, MA 02111-1307, USA.  */
 
 #ifdef IN_GCC
 #include "intl.h"
+#include "system.h"
+#include "tree.h"
+#include "flags.h"
 #else
 #define N_(msg) (msg)
 #endif
@@ -186,6 +189,25 @@ char *p;
   strcat(dir->path, "/");     /* make '/' last character */
 }
 
+/* Set the options for -Wall.  */
+static void g95_set_Wall (int on) {
+
+  g95_option.surprising = on;
+  g95_option.line_truncation = on;
+  g95_option.aliasing = on;
+
+#ifdef IN_GCC
+  set_Wunused (on);
+  warn_return_type = on;
+  warn_switch = on;
+
+  /* We save the value of warn_uninitialized, since if they put
+     -Wuninitialized on the command line, we need to generate a
+     warning about not using it without also specifying -O.  */
+
+  if (warn_uninitialized != 1) warn_uninitialized = (on ? 2 : 0);
+#endif
+}
 
 /* g95_parse_arg()-- Parse an argument on the command line. */
 
@@ -227,6 +249,8 @@ int i;
     g95_option.aliasing = 1;
     return 1;
   }
+
+  if (strcmp(option, "-Wall") == 0) g95_set_Wall(1);
 
   if (strcmp(option, "-fimplicit-none") == 0 ||
       strcmp(option, "-Wimplicit") == 0) {
