@@ -1,0 +1,77 @@
+How to compile G95 with GCC
+---------------------------
+
+G95 now includes code to interface with GCC for code generation.
+
+First you need to get a copy of the GCC source tree.  G95 uses SIMPLE
+trees, so you'll need tree-ssa-20020619-branch from GCC CVS.
+
+$ cvs -d :pserver:anoncvs@subversions.gnu.org:/cvsroot/gcc login
+(no password)
+$ cvs -z9 -d :pserver:anoncvs@subversions.gnu.org:/cvsroot/gcc co -r tree-ssa-20020619-branch gcc
+
+Should get you started.  See htpp://gcc.gnu.org/ for full details.
+
+Next apply the patch at the end of this file to gcc/gengtype.c. It teaches
+the GCC Garbage Collection system about G95.
+
+Create %gcc_src//gcc/f95/ and copy all the g95 files into it.
+
+Configure GCC as normal with --enable-lannguages=f95
+Don't use the G95 configure system.
+You'll probably need GMP installed on your system.
+
+Note that the backend interface is still at an early stage. Many features are
+either missing or only partialy complete.
+
+Any problems/comments/suggestions please let me know.
+
+Paul Brook <paul@nowt.org>
+
+===================================================================
+RCS file: /cvsroot/gcc/gcc/gcc/gengtype.c,v
+retrieving revision 1.7.4.1
+diff -u -r1.7.4.1 gengtype.c
+--- gengtype.c	24 Jun 2002 21:37:59 -0000	1.7.4.1
++++ gengtype.c	28 Jun 2002 23:58:45 -0000
+@@ -519,11 +519,15 @@
+   BASE_FILE_OBJC,
+   BASE_FILE_CPLUSPLUS,
+   BASE_FILE_TREELANG,
+-  BASE_FILE_COBOL
++  BASE_FILE_COBOL,
++  BASE_FILE_F77,
++  BASE_FILE_F95,
++  BASE_FILE_ADA,
++  BASE_FILE_JAVA
+ };
+ 
+-static const char *const lang_names[] = {
+-  "c", "objc", "cp", "treelang", "cobol", "f", "ada", "java"
++static const char *lang_names[] = {
++  "c", "objc", "cp", "treelang", "cobol", "f", "f95", "ada", "java"
+ };
+ #define NUM_BASE_FILES ARRAY_SIZE (lang_names)
+ outf_p base_files[NUM_BASE_FILES];
+@@ -658,6 +662,8 @@
+     basename++;
+   if (startswith (basename - f, basename-2, "f/"))
+     basename -= 2;
++  else if (startswith (basename - f, basename-4, "f95/"))
++    basename -= 4;
+   else if (startswith (basename - f, basename-3, "cp/"))
+     basename -= 3;
+   else if (startswith (basename - f, basename-4, "ada/"))
+@@ -705,6 +711,12 @@
+ 	   || strcmp (basename, "c-decl.c") == 0
+ 	   || strcmp (basename, "c-objc-common.c") == 0)
+     return 1 << BASE_FILE_C | 1 << BASE_FILE_OBJC;
++  else if (startswith (len, basename, "c-semantics.c"))
++    return 1 << BASE_FILE_C | 1 << BASE_FILE_OBJC | 1 << BASE_FILE_CPLUSPLUS
++      | 1 << BASE_FILE_F95;
++  else if (startswith (len, basename, "c-pretty-print.c"))
++    return 1 << BASE_FILE_C | 1 << BASE_FILE_OBJC | 1 << BASE_FILE_CPLUSPLUS
++      | 1 << BASE_FILE_F95;
+   else if (startswith (len, basename, "c-common.c"))
+     return 1 << BASE_FILE_C | 1 << BASE_FILE_OBJC| 1 << BASE_FILE_CPLUSPLUS
+       |  1 << BASE_FILE_TREELANG | 1 << BASE_FILE_COBOL;
