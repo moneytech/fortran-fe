@@ -1081,6 +1081,11 @@ static void resolve_symbol(g95_symbol *sym) {
     }
   }
 
+  if (sym->ts.type == BT_UNKNOWN &&
+      (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER ||
+       (sym->attr.flavor == FL_PROCEDURE && sym->attr.function)))
+    g95_set_default_type(sym, 0, NULL);
+
   if (sym->as != NULL && sym->as->type == AS_ASSUMED_SIZE &&
       sym->attr.dummy == 0) {
     g95_error("Assumed size array at %L must be a dummy argument",
@@ -1157,8 +1162,6 @@ g95_charlen *cl;
   resolve_contained_functions(ns);
 
   g95_traverse_ns(ns, copy_result_type);
-
-  g95_set_sym_defaults(ns);
 
   g95_traverse_ns(ns, resolve_symbol);
 

@@ -2297,31 +2297,6 @@ void g95_save_all(g95_namespace *ns) {
 }
 
 
-/* set_sym_defaults()-- Sets the default type for a particular symbol
- * if it doesn't have one already.  Meant to be called from
- * g95_set_sym_defaults() via traverse_ns(). */
-
-static void set_sym_defaults(g95_symbol *sym) {
-
-  if (sym->ts.type != BT_UNKNOWN) return;
-
-  if (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER ||
-      (sym->attr.flavor == FL_PROCEDURE && sym->attr.function))
-    g95_set_default_type(sym, 0, NULL);
-}
-
-
-/* g95_set_sym_defaults()-- Set all symbols that don't have a type to
- * their name-dependent default type. */
-
-void g95_set_sym_defaults(g95_namespace *ns) {
-
-  g95_traverse_ns(ns, set_sym_defaults);
-
-  if (ns->proc_name != NULL) set_sym_defaults(ns->proc_name);
-}
-
-
 /* g95_show_namespace()-- Show a namespace */
 
 void g95_show_namespace(g95_namespace *ns) {

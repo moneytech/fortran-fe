@@ -1172,7 +1172,6 @@ void g95_traverse_symtree(g95_namespace *, void (*)(g95_symtree *));
 void g95_traverse_ns(g95_namespace *, void (*)(g95_symbol *));
 void g95_save_all(g95_namespace *);
 
-void g95_set_sym_defaults(g95_namespace *);
 void g95_show_namespace(g95_namespace *);
 void g95_symbol_state(void);
 
