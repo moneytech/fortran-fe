@@ -1438,6 +1438,7 @@ int d;
 try g95_array_size(g95_expr *array, mpz_t *result) {
 g95_ref *ref;
 int flag;
+try t;
 
   switch(array->expr_type) {
   case EXPR_ARRAY:
@@ -1448,11 +1449,11 @@ int flag;
     expand_work_function = count_elements;
     iter_stack = NULL;
 
-    if (expand_constructor(array->value.constructor) == FAILURE) count = -1;
-    mpz_init_set_ui(*result, count);
-
+    t = expand_constructor(array->value.constructor);
     g95_suppress_error = flag;
-    break;
+
+    if (t == SUCCESS) mpz_init_set_ui(*result, count);
+    return t;
 
   case EXPR_VARIABLE:
     for(ref=array->ref; ref; ref=ref->next) {
