@@ -844,8 +844,8 @@ void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
   if (dim != NULL && array->rank != 1) f->rank = array->rank - 1;
 
   f->value.function.name =
-    g95_get_string("__sum_%c%d", g95_type_letter(array->ts.type),
-		   array->ts.kind);
+    g95_get_string("__%s%d_%c%d", mask ? "msum" : "sum", f->rank,
+		   g95_type_letter(array->ts.type), array->ts.kind);
 }
 
 
