@@ -467,6 +467,26 @@ int i;
     return 1;
   }
 
+  if (strncmp(option, "-fno-repack-arrays", 18) == 0) {
+    g95_option.no_repack_arrays = 1;
+    return 1;
+  }
+
+  if (strncmp(option, "-finline-repack-arrays", 22) == 0) {
+    g95_option.inline_repack_arrays = 1;
+    return 1;
+  }
+
+  if (strncmp(option, "-fno-inline-repack-arrays", 25) == 0) {
+    g95_option.inline_repack_arrays = 0;
+    return 1;
+  }
+
+  if (strncmp(option, "-fcheck-array-bounds", 20) == 0) {
+    g95_option.check_array_bounds = 1;
+    return 1;
+  }
+
   if (strcmp(option, "-i8") == 0) {
     g95_option.i8 = 1;
     return 1;
@@ -569,6 +589,9 @@ void g95_init_options(void) {
   g95_option.d8 = 0;
   g95_option.l1 = g95_default_logical_kind();
   g95_option.max_stack_var_size = -1;
+  g95_option.no_repack_arrays = 0;
+  g95_option.inline_repack_arrays = 1;
+  g95_option.check_array_bounds = 0;
 }
 
 
