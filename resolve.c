@@ -1912,6 +1912,14 @@ static void resolve_symbol(g95_symbol *sym) {
     return;
   }
 
+  /* Make sure that character string variables with assumed length are
+   * dummy argument. */
+
+  if (sym->attr.flavor == FL_VARIABLE && sym->ts.type == BT_CHARACTER
+      && sym->ts.cl->length == NULL && sym->attr.dummy == 0)
+    g95_error("Entity with assumed character length at %L must be a "
+	      "dummy argument or a PARAMETER", &sym->declared_at);
+
   /* Make sure the types of derived parameters are consistent.  This
    * type checking is deferred until resolution because the type may
    * refer to a derived type from the host. */
