@@ -39,7 +39,7 @@ extern g95_real_info g95_real_kinds[];
 extern g95_expr g95_bad_expr;
 
 static int is_intrinsic;
-static int is_inittype;
+static int type_match;
 
 
 /* If a validation of an intrinsic symbol/interface fails for some
@@ -204,7 +204,7 @@ static try check_aint(g95_expr *a, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
-  is_inittype=0;
+  type_match=0;
 
   return SUCCESS;
 }
@@ -218,7 +218,7 @@ static try check_anint(g95_expr *a, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
-  is_inittype=0;
+  type_match=0;
 
   return SUCCESS;
 }
@@ -232,7 +232,7 @@ static try check_ceiling(g95_expr *a, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
-  is_inittype=0;
+  type_match=0;
 
   return SUCCESS;
 }
@@ -246,7 +246,7 @@ static try check_char(g95_expr *a, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
-  is_inittype=1;
+  type_match=1;
 
   return SUCCESS;
 }
@@ -265,7 +265,7 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
-  is_inittype=0;
+  type_match=0;
 
   return SUCCESS;
 }
@@ -276,9 +276,9 @@ static try check_dble(g95_expr *x) {
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
 
   if (x->ts.type == BT_INTEGER)
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -289,9 +289,9 @@ static try check_digits(g95_expr *x) {
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
 
   if (x->ts.type == BT_INTEGER)
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -304,9 +304,9 @@ static try check_dim(g95_expr *x, g95_expr *y) {
     x->ts.type != y->ts.type || x->ts.kind != y->ts.kind) return FAILURE;
 
   if ((x->ts.type == BT_INTEGER) && y->ts.type == BT_INTEGER) 
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -317,9 +317,9 @@ static try check_exp(g95_expr *x) {
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
 
   if (x->ts.type == BT_INTEGER)
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -333,7 +333,7 @@ static try check_floor(g95_expr *a, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
-  is_inittype=0;
+  type_match=0;
 
   return SUCCESS;
 }
@@ -344,9 +344,9 @@ static try check_huge(g95_expr *x) {
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
 
   if (x->ts.type == BT_INTEGER)
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -361,9 +361,9 @@ static try check_int(g95_expr *x, g95_expr *kind) {
     return FAILURE;
 
   if (x->ts.type == BT_INTEGER)
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -374,9 +374,9 @@ static try check_kind(g95_expr *x) {
   if (x->ts.type == BT_DERIVED) return FAILURE;
 
   if (x->ts.type == BT_INTEGER) 
-    is_inittype = 1;
+    type_match = 1;
   else 
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -387,9 +387,9 @@ static try check_log(g95_expr *x) {
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
 
   if (x->ts.type == BT_INTEGER)
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -400,9 +400,9 @@ static try check_log10(g95_expr *x) {
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
 
   if (x->ts.type == BT_INTEGER)
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -411,24 +411,25 @@ static try check_log10(g95_expr *x) {
 
 static try check_min_max(g95_actual_arglist *arg) {
 g95_expr *x, *y;
+g95_actual_arglist *argument;
 
   x = arg->expr;
-  arg = arg->next;
+  argument = arg->next;
 
-  if (arg == NULL) {
+  if (argument->expr == NULL) {
     g95_error("Too few arguments to intrinsic at %L",&x->where);
     return FAILURE;
   }
 
-  is_inittype = 1;
+  type_match = 1;
 
-  while(arg != NULL) {
-    y = arg->expr;
+  while(argument != NULL) {
+    y = argument->expr;
     if ((x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) ||
         (x->ts.type != y->ts.type)||(x->ts.kind != y->ts.kind)) return FAILURE;
-    if (x->ts.type != BT_INTEGER) is_inittype=0;
+    if (x->ts.type != BT_INTEGER) type_match=0;
     x = y;
-    arg = arg->next;
+    argument = argument->next;
   }
 
   return SUCCESS;
@@ -454,7 +455,7 @@ g95_expr *x, *y;
     arg=arg->next;
   }
 
-  is_inittype=1;
+  type_match=1;
 
   return SUCCESS;
 }
@@ -479,7 +480,7 @@ g95_expr *x, *y;
     arg = arg->next;
   }
 
-  is_inittype=0;
+  type_match=0;
 
   return SUCCESS;
 }
@@ -499,9 +500,9 @@ static try check_mod(g95_expr *a, g95_expr *p) {
       a->ts.type != p->ts.type || a->ts.kind != p->ts.kind) return FAILURE;
 
   if ((a->ts.type == BT_INTEGER) && p->ts.type == BT_INTEGER) 
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -513,9 +514,9 @@ static try check_modulo(g95_expr *a, g95_expr *p) {
       a->ts.type != p->ts.type || a->ts.kind != p->ts.kind) return FAILURE;
 
   if ((a->ts.type == BT_INTEGER) && p->ts.type == BT_INTEGER) 
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -529,7 +530,7 @@ static try check_nint(g95_expr *x, g95_expr *kind) {
       (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
-  is_inittype = 0;
+  type_match = 0;
 
   return SUCCESS;
 }
@@ -539,7 +540,7 @@ static try check_precision(g95_expr *x) {
 
   if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) return FAILURE;
 
-  is_inittype = 0;
+  type_match = 0;
 
   return SUCCESS;
 }
@@ -550,9 +551,9 @@ static try check_radix(g95_expr *x) {
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) return FAILURE;
 
   if (x->ts.type == BT_INTEGER) 
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -563,9 +564,9 @@ static try check_range(g95_expr *x) {
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
 
   if (x->ts.type == BT_INTEGER) 
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -580,9 +581,9 @@ static try check_real(g95_expr *a, g95_expr *kind) {
     return FAILURE;
 
   if (a->ts.type == BT_INTEGER) 
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -611,14 +612,13 @@ static try check_reshape(g95_expr *source, g95_expr *shape,
   return SUCCESS;
 }
 
-
 static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
 
   if ((p == NULL && r == NULL) ||
       (p != NULL && p->ts.type != BT_INTEGER) ||
       (r != NULL && r->ts.type != BT_INTEGER)) return FAILURE;
 
-  is_inittype = 1;
+  type_match = 1;
 
   return SUCCESS;
 }
@@ -631,9 +631,9 @@ static try check_sign(g95_expr *a, g95_expr *b) {
     a->ts.type != b->ts.type || a->ts.kind != b->ts.kind) return FAILURE;
 
   if (a->ts.type == BT_INTEGER) 
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -644,9 +644,9 @@ static try check_sqrt(g95_expr *x) {
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
 
   if (x->ts.type == BT_INTEGER)
-    is_inittype = 1;
+    type_match = 1;
   else
-    is_inittype = 0;
+    type_match = 0;
 
   return SUCCESS;
 }
@@ -685,7 +685,7 @@ try t;
     a2 = arg->expr;
     arg = arg->next;
 
-    if (arg == NULL)
+    if (arg == NULL) 
       t = (*specific->check_function)(a1, a2);
     else {
       a3 = arg->expr;
@@ -1080,10 +1080,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym("int",   0, BT_INTEGER, di, g95_simplify_int, check_int,
 	  a, BT_REAL, dr, 0, knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("ifix",  0, BT_INTEGER, di, g95_simplify_int, NULL,
+  add_sym("ifix",  0, BT_INTEGER, di, g95_simplify_ifix, NULL,
 	  a, BT_REAL, dr, 0, NULL);
 
-  add_sym("idint", 0, BT_INTEGER, di, g95_simplify_int, NULL,
+  add_sym("idint", 0, BT_INTEGER, di, g95_simplify_idint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
 
   add_sym("ior", 0, BT_INTEGER, di, g95_simplify_ior, NULL,
@@ -1228,7 +1228,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("nint",   0, BT_INTEGER, di, g95_simplify_nint, check_nint,
 	  a, BT_REAL, dr, 0,   knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("idnint", 0, BT_INTEGER, di, g95_simplify_nint, NULL,
+  add_sym("idnint", 0, BT_INTEGER, di, g95_simplify_idnint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
 
   add_sym("not", 0, BT_INTEGER, di, g95_simplify_not, NULL,
@@ -1685,7 +1685,7 @@ intrinsic_arg *formal;
   formal = sym->arg;
   actual = *ap;
 
-  is_inittype = 1;
+  type_match = 1;
 
   for(; formal; formal=formal->next, actual=actual->next) {
     if (actual->expr == NULL) continue;
@@ -1706,8 +1706,6 @@ intrinsic_arg *formal;
       return FAILURE;
     }
 
-    if (formal->ts.type != BT_INTEGER || formal->ts.type != BT_CHARACTER) 
-      is_inittype = 0;
   }
 
   return SUCCESS;
@@ -1847,9 +1845,10 @@ try t;
  * generated even if a MATCH_NO is returned.
  */
 
-match g95_intrinsic_func_interface(g95_expr *expr, int *type_flag, int intrinsic_flag ) {
+match g95_intrinsic_func_interface(g95_expr *expr, int intrinsic_flag ) {
 intrinsic_sym *isym, *specific;
 char *name;
+int is_inittype;
 
   is_intrinsic = intrinsic_flag;
 
@@ -1859,11 +1858,12 @@ char *name;
   isym = find_function(name);
   if (isym == NULL) return MATCH_NO;
 
+
 /* If the function is generic, check all of its specific incarnations.
  * If the generic name is also a specific, we check that name last, so
  * that any error message will correspond to the specific */
 
-  if (isym->specific) {
+  if (isym->specific != NULL) {
     for(specific=isym->specific; specific; specific=specific->next) {
       if (specific == isym) continue;
       if (check_specific(specific, expr) == SUCCESS) goto got_specific;
@@ -1876,14 +1876,18 @@ char *name;
  got_specific:
   if (do_simplify(specific, expr) == FAILURE) return MATCH_ERROR;
 
-  if (expr->ts.type != BT_INTEGER || expr->ts.type != BT_CHARACTER) {
-    is_inittype = 0;
-  }
-  else if ( is_inittype ) {
-    is_inittype = 1;
+  while ( isym->arg != NULL) {
+    if (isym->arg->ts.type == BT_INTEGER || isym->arg->ts.type == BT_CHARACTER)
+      is_inittype = 1;
+    else
+      is_inittype = 0;
+    isym->arg = isym->arg->next;
   }
 
-  type_flag = &is_inittype;
+  if (g95_option.pedantic == 1) {
+    if ( !is_inittype ) 
+      intrinsic_error("Evaluation of initialization for '%s' at %%L is nonstandard");
+  }
 
   return MATCH_YES;
 }
