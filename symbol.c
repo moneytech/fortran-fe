@@ -733,8 +733,6 @@ try g95_add_in_common(symbol_attribute *attr, locus *loc) {
 
 try g95_add_in_namelist(symbol_attribute *attr, locus *loc) {
 
-  if (check_used(attr, loc)) return FAILURE;
-
   attr->in_namelist = 1;
   return check_conflict(attr, loc);
 }
