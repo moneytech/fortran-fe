@@ -1254,8 +1254,6 @@ g95_trans_scalar_assign (g95_se * lse, g95_se * rse, bt type)
 
   g95_init_block (&block);
 
-  g95_add_block_to_block (&block, &lse->pre);
-  g95_add_block_to_block (&block, &rse->pre);
 
   if (type == BT_CHARACTER)
     {
@@ -1267,6 +1265,9 @@ g95_trans_scalar_assign (g95_se * lse, g95_se * rse, bt type)
       g95_conv_string_parameter (lse);
       g95_conv_string_parameter (rse);
 
+      g95_add_block_to_block (&block, &lse->pre);
+      g95_add_block_to_block (&block, &rse->pre);
+
       args = g95_chainon_list (args, lse->string_length);
       args = g95_chainon_list (args, lse->expr);
       args = g95_chainon_list (args, rse->string_length);
@@ -1276,10 +1277,15 @@ g95_trans_scalar_assign (g95_se * lse, g95_se * rse, bt type)
       g95_add_expr_to_block (&block, tmp);
     }
   else
-    g95_add_modify_expr (&block, lse->expr, rse->expr);
+    {
+      g95_add_block_to_block (&block, &lse->pre);
+      g95_add_block_to_block (&block, &rse->pre);
 
-  g95_add_block_to_block (&block, &lse->pre);
-  g95_add_block_to_block (&block, &rse->pre);
+      g95_add_modify_expr (&block, lse->expr, rse->expr);
+    }
+
+  g95_add_block_to_block (&block, &lse->post);
+  g95_add_block_to_block (&block, &rse->post);
 
   return g95_finish_block (&block);
 }

@@ -463,6 +463,8 @@ g95_build_array_type (tree type, g95_array_spec * as)
   tree lbound[G95_MAX_DIMENSIONS];
   tree ubound[G95_MAX_DIMENSIONS];
   int n;
+  /* TODO: get assumed size arrays working.  */
+  static int warn_assumed=1;
 
   for (n = 0 ; n < as->rank; n++)
     {
@@ -475,6 +477,14 @@ g95_build_array_type (tree type, g95_array_spec * as)
           break;
 
         case AS_ASSUMED_SIZE:
+          if (warn_assumed)
+            {
+              /* Assumed size arrays only work if the actual parameter is the
+                 same rank and shape as the assumed size parameter.  */
+              warning ("Assumed size arrays probably don't work");
+              /* Only warn once.  */
+              warn_assumed=0;
+            }
 	  if (n < as->rank-1)
 	    {
               lbound[n] = g95_conv_array_bound (as->lower[n]);

@@ -1,3 +1,19 @@
+2002-11-18  Paul Brook  <paul@nowt.org>
+
+	* trans-stmt.c (g95_trans_if): Fix IF statements when the condition
+	requires a temporary.
+	(g95_trans_select): Handle computed gotos.
+	* trans-types.c (g95_build_array_type): Warn about non-functional
+	assumed shape arrays.
+	* trans-expr.c (g95_trans_scalar_assign): Correctly handle post
+	blocks.
+	* trans-intrinsic.c (g95_conv_intrinsic_round): New function.
+	(g95_conv_intrinsic_int): New function.
+	(g95_conv_intrinsic_mod): New function.
+	(g95_conv_intrinsic_ichar): New function.
+	(g95_conv_intrinsic_function): Use them.
+	(g95_conv_intrinsic_dim): Use g95_evaluate_now.
+
 2002-11-17  Toon Moene  <toon@moene.indiv.nluug.nl>
 
 	* trans-types.c (g95_build_array_type): Assumed

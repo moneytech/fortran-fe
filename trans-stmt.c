@@ -146,7 +146,7 @@ g95_trans_stop (g95_code *code)
         IF (cond) THEN
            then_clause
         ELSEIF (cond2)
-           ...
+           elseif_clause
         ELSE
            else_clause
         ENDIF
@@ -162,9 +162,9 @@ g95_trans_stop (g95_code *code)
           {
             pre_cond_s
             if (cond_s)
-            {
-              ...
-            }
+              {
+                elseif_clause
+              }
             else
               {
                 else_clause;
@@ -177,8 +177,8 @@ g95_trans_stop (g95_code *code)
 tree
 g95_trans_if (g95_code * code)
 {
-  g95_se if_stmt;
-  tree top, stmt, tail, then_clause;
+  g95_se if_se;
+  tree top, stmt, tail, ifstmt;
 
   top = tail = NULL_TREE;
 
@@ -194,27 +194,27 @@ g95_trans_if (g95_code * code)
   while (code && code->expr)
     {
       /* Initialize the statement builder. Puts in NULL_TREEs.  */
-      g95_init_se (&if_stmt, NULL);
-      g95_start_block (&if_stmt.pre);
+      g95_init_se (&if_se, NULL);
+      g95_start_block (&if_se.pre);
 
       /* SIMPLEfy the IF condition expression.  */
-      g95_conv_expr_val (&if_stmt, code->expr);
+      g95_conv_expr_val (&if_se, code->expr);
 
       /* Translate the THEN clause.  */
-      then_clause = g95_trans_code (code->next);
+      stmt = g95_trans_code (code->next);
 
       /* Build the condition expression and add it to the condition block.  */
-      stmt = build_v (COND_EXPR, if_stmt.expr, then_clause, empty_stmt_node);
-      g95_add_expr_to_block (&if_stmt.pre, stmt);
+      ifstmt = build_v (COND_EXPR, if_se.expr, stmt, empty_stmt_node);
+      g95_add_expr_to_block (&if_se.pre, ifstmt);
 
       /* Finish off this statement.  */
-      stmt = g95_finish_block (&if_stmt.pre);
+      stmt = g95_finish_block (&if_se.pre);
 
       /* If this is an elseif, insert it into the else of the previous
          condition.  */
       if (tail)
 	TREE_OPERAND (tail, 2) = stmt;
-      tail = stmt;
+      tail = ifstmt;
 
       /* Store in TOP if this is the first translated IF block of this
          construct.  */
@@ -508,18 +508,26 @@ g95_trans_select (g95_code * code)
   g95_se se;
   stmtblock_t block;
   stmtblock_t body;
+  g95_expr *expr;
   int kind;
 
-  if (code->expr->ts.type != BT_INTEGER)
+  /* Normal select statements put the condition in expr, computed GOTO
+     statements put it in expr2.  */
+  if (code->expr)
+    expr = code->expr;
+  else
+    expr = code->expr2;
+
+  if (expr->ts.type != BT_INTEGER)
     g95_todo_error ("non-integer switch statements");
 
   g95_start_block (&block);
 
   g95_init_se (&se, NULL);
-  g95_conv_expr_val (&se, code->expr);
+  g95_conv_expr_val (&se, expr);
   g95_add_block_to_block (&block, &se.pre);
 
-  kind = code->expr->ts.kind;
+  kind = expr->ts.kind;
 
   end_label = g95_build_label_decl (NULL_TREE);
 

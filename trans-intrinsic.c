@@ -123,14 +123,14 @@ g95_conv_intrinsic_function_args (g95_se * se, g95_expr * expr)
         g95_conv_expr (&argse, actual->expr);
       else
         g95_conv_expr_val (&argse, actual->expr);
-      g95_add_block_to_block (&se->pre, &argse.pre);
-      g95_add_block_to_block (&se->post, &argse.post);
 
       if (actual->expr->ts.type == BT_CHARACTER)
         {
           g95_conv_string_parameter (&argse);
           args = g95_chainon_list (args, argse.string_length);
         }
+      g95_add_block_to_block (&se->pre, &argse.pre);
+      g95_add_block_to_block (&se->post, &argse.post);
       args = g95_chainon_list (args, argse.expr);
     }
   return args;
@@ -162,6 +162,80 @@ g95_conv_intrinsic_conversion (g95_se * se, g95_expr * expr)
     }
 
   se->expr = convert (type, arg);
+}
+
+/* This is needed because the gcc backend only implements FIX_TRUNC_EXPR
+   NINT(x) = INT(x + ((x > 0) ? 0.5 : -0.5)).  */
+static void g95_conv_intrinsic_round(g95_se * se, tree arg, tree type)
+{
+  tree tmp;
+  tree cond;
+  tree neg;
+  tree pos;
+  tree argtype;
+  REAL_VALUE_TYPE r;
+
+  argtype = TREE_TYPE (arg);
+  arg = g95_evaluate_now(arg, &se->pre);
+
+  real_from_string(&r, "0.5");
+  pos = build_real(argtype, r);
+
+  real_from_string(&r, "-0.5");
+  neg = build_real(argtype, r);
+
+  tmp = g95_build_const (argtype, integer_zero_node);
+  cond = fold (build (GT_EXPR, boolean_type_node, arg, tmp));
+
+  tmp = fold (build (COND_EXPR, argtype, cond, pos, neg));
+  tmp = fold (build (PLUS_EXPR, argtype, arg, tmp));
+  se->expr = fold (build1 (FIX_TRUNC_EXPR, type, tmp));
+}
+
+/* Convert to an integer using the specified rounding mode.  */
+static void
+g95_conv_intrinsic_int (g95_se * se, g95_expr * expr, int op)
+{
+  tree type;
+  tree arg;
+
+  /* Evaluate the argument.  */
+  type = g95_typenode_for_spec (&expr->ts);
+  assert (expr->value.function.actual->expr);
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg = TREE_VALUE (arg);
+
+  if (TREE_CODE (TREE_TYPE (arg)) == INTEGER_TYPE)
+    {
+      /* Conversion to a different integer kind.  */
+      se->expr = convert(type, arg);
+    }
+  else
+    {
+      /* Conversion from complex to non-complex involves taking the real
+         component of the value.  */
+      if (TREE_CODE (TREE_TYPE (arg)) == COMPLEX_TYPE
+          && expr->ts.type != BT_COMPLEX)
+        {
+          tree artype;
+
+          artype = TREE_TYPE (TREE_TYPE (arg));
+          arg = build1 (REALPART_EXPR, artype, arg);
+        }
+
+      /* FIX_ROUND_EXPR isn't implemented in the gcc backend, so we
+         must do it ourselves.  */
+      switch (op)
+        {
+        case FIX_ROUND_EXPR:
+          g95_conv_intrinsic_round (se, arg, type);
+          break;
+
+        default:
+          se->expr = build1 (op, type, arg);
+          break;
+        }
+    }
 }
 
 /* Get the imaginary component of a value.  */
@@ -455,6 +529,47 @@ g95_conv_intrinsic_cmplx (g95_se * se, g95_expr * expr, int both)
   se->expr = fold (build (COMPLEX_EXPR, type, real, imag));
 }
 
+/* Remainder function MOD(A, P) = A - INT(A / P) * P.  */
+/* TODO: MOD(x, 0)  */
+static void
+g95_conv_intrinsic_mod (g95_se * se, g95_expr * expr)
+{
+  tree arg;
+  tree arg2;
+  tree type;
+  tree itype;
+  tree tmp;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg2 = TREE_VALUE (TREE_CHAIN (arg));
+  arg = TREE_VALUE (arg);
+  type = TREE_TYPE (arg);
+
+  switch (expr->ts.type)
+    {
+    case BT_INTEGER:
+      /* Integer case is easy, we've got a builtin op.  */
+      se->expr = build (TRUNC_MOD_EXPR, type, arg, arg2);
+      break;
+
+    case BT_REAL:
+      /* Real values we have to do the hard way.  */
+      arg = g95_evaluate_now(arg, &se->pre);
+      arg2 = g95_evaluate_now(arg2, &se->pre);
+
+      itype = g95_get_int_type (expr->ts.kind);
+      tmp = fold(build (RDIV_EXPR, type, arg, arg2));
+      tmp = fold(build1 (FIX_TRUNC_EXPR, itype, tmp));
+      tmp = convert (type, tmp);
+      tmp = fold(build (MULT_EXPR, type, tmp, arg2));
+      se->expr = fold(build (MINUS_EXPR, type, arg, tmp));
+      break;
+
+    default:
+      abort();
+    }
+}
+
 /* Positive difference DIM (x, y) = ((x - y) < 0) ? 0 : x - y.  */
 static void
 g95_conv_intrinsic_dim (g95_se * se, g95_expr * expr)
@@ -471,9 +586,8 @@ g95_conv_intrinsic_dim (g95_se * se, g95_expr * expr)
   arg = TREE_VALUE (arg);
   type = TREE_TYPE (arg);
 
-  val = g95_create_var (type, "dim");
-  tmp = build (MINUS_EXPR, type, arg, arg2);
-  g95_add_modify_expr (&se->pre, val, tmp);
+  val = build (MINUS_EXPR, type, arg, arg2);
+  val = g95_evaluate_now (val, &se->pre);
 
   zero = g95_build_const (type, integer_zero_node);
   tmp = build (LE_EXPR, boolean_type_node, val, zero);
@@ -1442,6 +1556,23 @@ g95_conv_intrinsic_len_trim (g95_se * se, g95_expr * expr)
   se->expr = convert (type, se->expr);
 }
 
+/* The ascii value for a single character.  */
+static void
+g95_conv_intrinsic_ichar (g95_se * se, g95_expr * expr)
+{
+  tree arg;
+  tree type;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg = TREE_VALUE (TREE_CHAIN(arg));
+  assert (POINTER_TYPE_P (TREE_TYPE(arg)));
+  arg = build1 (NOP_EXPR, pchar_type_node, arg);
+  type = g95_typenode_for_spec (&expr->ts);
+
+  se->expr = build1 (INDIRECT_REF, TREE_TYPE(TREE_TYPE (arg)), arg);
+  se->expr = convert(type, se->expr);
+}
+
 static void
 g95_conv_intrinsic_size (g95_se * se, g95_expr * expr)
 {
@@ -1518,8 +1649,6 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_ACHAR:
     case G95_ISYM_ADJUSTL:
     case G95_ISYM_ADJUSTR:
-    case G95_ISYM_AINT:
-    case G95_ISYM_ANINT:
     case G95_ISYM_ALLOCATED:
     case G95_ISYM_ANINIT:
     case G95_ISYM_ASSOCIATED:
@@ -1532,19 +1661,15 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_EXPONENT:
     case G95_ISYM_FLOOR:
     case G95_ISYM_FRACTION:
-    case G95_ISYM_IACHAR:
-    case G95_ISYM_ICHAR:
     case G95_ISYM_INDEX:
     case G95_ISYM_LGE:
     case G95_ISYM_LGT:
     case G95_ISYM_LLE:
     case G95_ISYM_LLT:
     case G95_ISYM_MERGE:
-    case G95_ISYM_MOD:
     case G95_ISYM_MODULO:
     case G95_ISYM_MVBITS:
     case G95_ISYM_NEAREST:
-    case G95_ISYM_NINT:
     case G95_ISYM_PACK:
     case G95_ISYM_PRESENT:
     case G95_ISYM_RANDOM_NUMBER:
@@ -1584,10 +1709,25 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 
     case G95_ISYM_CONVERSION:
     case G95_ISYM_REAL:
-    case G95_ISYM_INT:
     case G95_ISYM_LOGICAL:
     case G95_ISYM_DBLE:
       g95_conv_intrinsic_conversion (se, expr);
+      break;
+
+    /* Integer conversions are handled seperately to make sure we get the
+       correct rounding mode.  */
+    case G95_ISYM_AINT:
+    case G95_ISYM_INT:
+      g95_conv_intrinsic_int (se, expr, FIX_TRUNC_EXPR);
+      break;
+
+    case G95_ISYM_ANINT:
+    case G95_ISYM_NINT:
+      g95_conv_intrinsic_int (se, expr, FIX_ROUND_EXPR);
+      break;
+
+    case G95_ISYM_MOD:
+      g95_conv_intrinsic_mod (se, expr);
       break;
 
     case G95_ISYM_CMPLX:
@@ -1624,6 +1764,12 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 
     case G95_ISYM_IBSET:
       g95_conv_intrinsic_singlebitop (se, expr, 1);
+      break;
+
+    case G95_ISYM_IACHAR:
+    case G95_ISYM_ICHAR:
+      /* We assume ASCII character sequence.  */
+      g95_conv_intrinsic_ichar (se, expr);
       break;
 
     case G95_ISYM_IEOR:
