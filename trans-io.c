@@ -731,21 +731,12 @@ char *p;
 	       dt->format_expr);
 
   if (dt->format_label) {
-    tmp = build(COMPONENT_REF, TREE_TYPE(ioparm_format), ioparm_var,
-		ioparm_format);
-
-    p = dt->format_label->format;
-    g95_add_modify_expr(&block, tmp, build_string(strlen(p), p));
-
-    tmp = build(COMPONENT_REF, TREE_TYPE(ioparm_format_len), ioparm_var,
-					 ioparm_format_len);
-
-    g95_add_modify_expr(&block, tmp, build_int_2(strlen(p), 0));
+    if (dt->format_label == &g95_format_asterisk)
+      set_flag(&block, ioparm_list_format);
+    else
+      set_string(&block, &post_block, ioparm_format, ioparm_format_len,
+		 dt->format_label->format);
   }
-
-  if (dt->format_expr == NULL &&
-      (dt->format_label == NULL || dt->format_label == &g95_format_asterisk))
-    set_flag(&block, ioparm_list_format);
 
   if (dt->iostat) set_parameter_ref(&block, ioparm_iostat, dt->iostat);
 

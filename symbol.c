@@ -1442,8 +1442,9 @@ void g95_get_component_attr(symbol_attribute *attr, g95_component *c) {
 /******************** Statement label management ********************/
 
 /* Free a single g95_st_label structure, making sure the list is not
-   messed up.  This function is called only when some parse error
-   occurs.  */
+ * messed up.  This function is called only when some parse error
+ * occurs. */
+
 void g95_free_st_label(g95_st_label *l) {
 
   if (l == NULL) return;
@@ -1454,7 +1455,7 @@ void g95_free_st_label(g95_st_label *l) {
   if (l->next)
     (l->next->prev = l->prev);
 
-  if (l->format != NULL) g95_free(l->format);
+  if (l->format != NULL) g95_free_expr(l->format);
   g95_free(l);
 }
 
@@ -1494,15 +1495,6 @@ g95_st_label *lp;
   g95_current_ns->st_labels = lp;
 
   return lp;
-}
-
-
-/* g95_new_internal_label() -- create a branch label for g95 internal use */
-
-g95_st_label *g95_new_internal_label(void) {
-static int next_label = 100000; /* only initialized at startup! */
-
-  return g95_get_st_label (next_label++);
 }
 
 
@@ -1555,7 +1547,7 @@ int labelno;
  * known about that label, updating the unknown state.  Returns
  * FAILURE if something goes wrong. */
 
-try g95_reference_st_label(g95_st_label * lp, g95_sl_type type) {
+try g95_reference_st_label(g95_st_label *lp, g95_sl_type type) {
 g95_sl_type label_type;
 int labelno;
 try rc;

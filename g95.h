@@ -417,7 +417,7 @@ typedef struct g95_st_label {
 
   g95_sl_type defined, referenced;
 
-  char *format;
+  struct g95_expr *format;
   int length;
   locus where;
 

@@ -27,7 +27,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-/* Current statement label.  Zero means no statement label.  Because
+/* Current statement label.  NULL means no statement label.  Because
  * new_st can get wiped during statement matching, we have to keep it
  * separate. */
 
@@ -37,7 +37,35 @@ static jmp_buf eof;
 
 g95_state_data *g95_state_stack;
 
-static void check_statement_label(g95_statement);
+/* Macros that expand to case-labels for various classes of
+ * statements.  Start with executable statements that directly do
+ * things. */
+
+#define case_executable case ST_ALLOCATE: case ST_BACKSPACE: case ST_CALL: \
+  case ST_CLOSE: case ST_CONTINUE: case ST_DEALLOCATE: case ST_END_FILE: \
+  case ST_GOTO: case ST_INQUIRE: case ST_NULLIFY: case ST_OPEN: \
+  case ST_READ: case ST_RETURN: case ST_REWIND: case ST_SIMPLE_IF: \
+  case ST_STOP: case ST_WRITE: case ST_ASSIGNMENT: \
+  case ST_POINTER_ASSIGNMENT: case ST_EXIT: case ST_CYCLE: \
+  case ST_ARITHMETIC_IF: case ST_WHERE: case ST_FORALL
+
+/* Statements that mark other executable statements */
+
+#define case_exec_markers case ST_DO: case ST_FORALL_BLOCK: case ST_IF_BLOCK: \
+  case ST_WHERE_BLOCK: case ST_SELECT_CASE
+
+/* Declaration statements */
+
+#define case_decl case ST_ATTR_DECL: case ST_COMMON: case ST_DATA_DECL: \
+  case ST_EQUIVALENCE: case ST_NAMELIST: case ST_STATEMENT_FUNCTION: \
+  case ST_TYPE: case ST_INTERFACE
+
+/* Block end statements.  Errors associated with interchanging these
+ * are detected in g95_match_end(). */
+
+#define case_end case ST_END_BLOCK_DATA: case ST_END_FUNCTION: \
+                 case ST_END_PROGRAM: case ST_END_SUBROUTINE
+
 
 /* match_word()-- A sort of half-matching function.  We try to match
  * the word on the input with the passed string.  If this succeeds, we
@@ -391,6 +419,40 @@ blank_line:
 }
 
 
+/* check_statement_label()-- If the current statement has a statement
+ * label, make sure that it is allowed to have one. */
+
+static void check_statement_label(g95_statement st) {
+g95_sl_type type;
+
+  if (g95_statement_label == NULL) return;
+
+  switch(st) {
+  case ST_END_PROGRAM:    case ST_END_FUNCTION:  case ST_END_SUBROUTINE:
+  case ST_ENDDO:          case ST_ENDIF:         case ST_END_SELECT:
+  case_executable:
+  case_exec_markers:
+    type = ST_LABEL_TARGET;
+    break;
+
+  case ST_FORMAT:
+    type = ST_LABEL_FORMAT;
+    break;
+
+/* Statement labels are not restricted from appearing on a particular
+ * line.  However, there are plenty of situations where the resulting
+ * label can't be referenced. */
+
+  default:
+    type = ST_LABEL_BAD_TARGET;
+    break;
+  }
+
+  g95_define_st_label(g95_statement_label, type, &label_locus);
+  new_st.here = g95_statement_label;
+}
+
+
 /* next_statement()-- Return the next non-ST_NONE statement to the
  * caller.  We also worry about including files and the ends of
  * include files at this stage */
@@ -438,36 +500,6 @@ g95_statement st;
 /* The parser subroutines are of type 'try' that fail if the file ends
  * unexpectedly. */
 
-/* Macros that expand to case-labels for various classes of
- * statements.  Start with executable statements that directly do
- * things. */
-
-#define case_executable case ST_ALLOCATE: case ST_BACKSPACE: case ST_CALL: \
-  case ST_CLOSE: case ST_CONTINUE: case ST_DEALLOCATE: case ST_END_FILE: \
-  case ST_GOTO: case ST_INQUIRE: case ST_NULLIFY: case ST_OPEN: \
-  case ST_READ: case ST_RETURN: case ST_REWIND: case ST_SIMPLE_IF: \
-  case ST_STOP: case ST_WRITE: case ST_ASSIGNMENT: \
-  case ST_POINTER_ASSIGNMENT: case ST_EXIT: case ST_CYCLE: \
-  case ST_ARITHMETIC_IF: case ST_WHERE: case ST_FORALL
-
-/* Statements that mark other executable statements */
-
-#define case_exec_markers case ST_DO: case ST_FORALL_BLOCK: case ST_IF_BLOCK: \
-  case ST_WHERE_BLOCK: case ST_SELECT_CASE
-
-/* Declaration statements */
-
-#define case_decl case ST_ATTR_DECL: case ST_COMMON: case ST_DATA_DECL: \
-  case ST_EQUIVALENCE: case ST_NAMELIST: case ST_STATEMENT_FUNCTION: \
-  case ST_TYPE: case ST_INTERFACE
-
-/* Block end statements.  Errors associated with interchanging these
- * are detected in g95_match_end(). */
-
-#define case_end case ST_END_BLOCK_DATA: case ST_END_FUNCTION: \
-                 case ST_END_PROGRAM: case ST_END_SUBROUTINE
-
-
 /* push_state()-- Push a new state onto the stack */
 
 static void push_state(g95_state_data *p, g95_compile_state new_state,
@@ -499,40 +531,6 @@ g95_state_data *p;
     if (p->state == state) break;
 
   return (p == NULL) ? FAILURE : SUCCESS;
-}
-
-
-/* check_statement_label()-- If the current statement has a statement
- * label, make sure that it is allowed to have one. */
-
-static void check_statement_label(g95_statement st) {
-g95_sl_type type;
-
-  if (g95_statement_label == NULL) return;
-
-  switch(st) {
-  case ST_END_PROGRAM:    case ST_END_FUNCTION:  case ST_END_SUBROUTINE:
-  case ST_ENDDO:          case ST_ENDIF:         case ST_END_SELECT:
-  case_executable:
-  case_exec_markers:
-    type = ST_LABEL_TARGET;
-    break;
-
-  case ST_FORMAT:
-    type = ST_LABEL_FORMAT;
-    break;
-
-/* Statement labels are not restricted from appearing on a particular
- * line.  However, there are plenty of situations where the resulting
- * label can't be referenced. */
-
-  default:
-    type = ST_LABEL_BAD_TARGET;
-    break;
-  }
-
-  g95_define_st_label(g95_statement_label, type, &label_locus);
-  new_st.here = g95_statement_label;
 }
 
 

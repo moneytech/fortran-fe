@@ -585,10 +585,10 @@ void g95_check_format_string(g95_expr *e) {
  * locate the end of the format string.  */
 
 match g95_match_format(void) {
-char *p;
 locus start;
+g95_expr *e;
 
-  if (g95_statement_label == 0) {
+  if (g95_statement_label == NULL) {
     g95_error("FORMAT statement at %C does not have a statement label");
     return MATCH_ERROR;
   }
@@ -607,20 +607,27 @@ locus start;
     return MATCH_ERROR;
   }
 
+  /* The label doesn't get created until after the statement is done
+   * being matched, so we have to leave the string for later. */
+
   g95_set_locus(&start);      /* Back to the beginning */
 
-  p = format_string = g95_getmem(format_length+1);
+  e = g95_get_expr();
+  e->expr_type = EXPR_CONSTANT;
+  e->ts.type = BT_CHARACTER;
+  e->ts.kind = g95_default_character_kind();
+
+  e->where = start;
+  e->value.character.string = format_string = g95_getmem(format_length+1);
+  e->value.character.length = format_length;
+
+  g95_statement_label->format = e;
 
   mode = MODE_COPY;
   check_format();       /* Guaranteed to succeed */
 
   g95_match_eos();      /* Guaranteed to succeed */
-
-/* More here later */
-
   new_st.op = EXEC_NOP;
-  g95_free(p);
 
   return MATCH_YES;
 }
-
