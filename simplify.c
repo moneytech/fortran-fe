@@ -32,10 +32,6 @@ extern g95_expr *g95_current_function;
 
 extern mpf_t mpf_pi, mpf_hpi, mpf_nhpi, mpf_tpi;
 
-#define FIRST_ARG(e) (e->value.function.actual->expr)
-#define SECOND_ARG(e) (e->value.function.actual->next->expr)
-#define THIRD_ARG(e) (e->value.function.actual->next->next->expr)
-
 static g95_expr *integer_zero, *real_zero;
 static mpf_t mpf_zero, mpf_half, mpf_one;
 static mpz_t mpz_zero;
@@ -922,12 +918,7 @@ static char buffer[25];
  * a resolved call to the right subroutine. */
 
 g95_expr *g95_simplify_dot_product(g95_expr *a, g95_expr *b) {
-g95_expr temp, *result;
-
-  a = g95_copy_expr(a);
-  b = g95_copy_expr(b);
-
-  result = g95_build_funcall(NULL, a, b, NULL);
+g95_expr temp;
 
   if (a->ts.type == BT_LOGICAL && b->ts.type == BT_LOGICAL) {
     g95_current_function->ts.type = BT_LOGICAL;
