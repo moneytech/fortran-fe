@@ -761,11 +761,9 @@ done:
  * have seen, otherwise validate the kind against real kinds. */
 
   if (seen_dp == 0 && exp_char == ' ') {
-    g95_expr *temp;
-
     if (kind == -2) kind = g95_default_integer_kind();
-    temp = g95_convert_integer(buffer, kind, 10);
-    g95_int2real(result, temp);
+    *result = g95_convert_real(buffer, kind);
+
   } else {
     if (exp_char == 'd') {
       if (kind != -2) {

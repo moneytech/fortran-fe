@@ -147,119 +147,160 @@ int i;
 
 /* conv_null()-- Null conversion, does nothing */
 
-static g95_expr *conv_null(g95_expr *e) { return e; }
+static g95_expr *conv_null(g95_expr *e) { return g95_copy_expr(e); }
 
 static g95_expr *conv_r_i(g95_expr *e) {
-g95_expr *new;
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_real2int(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
-}
-
-
-static g95_expr *conv_d_i(g95_expr *e) {
-g95_expr *new;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  return (g95_real2int(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
+  result = g95_real2int(e, g95_default_integer_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
 static g95_expr *conv_z_i(g95_expr *e) {
-g95_expr *new;
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_complex2int(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
+  result = g95_complex2int(e, g95_default_integer_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
 static g95_expr *conv_i_r(g95_expr *e) {
-g95_expr *new;
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_int2real(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
-}
-
-
-static g95_expr *conv_d_r(g95_expr *e) {
-g95_expr *new;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  new = g95_copy_expr(e);
-  new->ts.kind = g95_default_real_kind();
-
-  return new;
+  result = g95_int2real(e, g95_default_real_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
 static g95_expr *conv_z_r(g95_expr *e) {
-g95_expr *new;
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_complex2real(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
+  result = g95_complex2real(e, g95_default_real_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
+}
+
+
+
+static g95_expr *conv_d_r(g95_expr *e) {
+g95_expr *result;
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  result = g95_real2real(e, g95_default_integer_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
 static g95_expr *conv_i_d(g95_expr *e) {
-g95_expr *new;
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_int2real(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
+  result = g95_int2real(e, g95_default_double_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
 static g95_expr *conv_r_d(g95_expr *e) {
-g95_expr *new;
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  new = g95_copy_expr(e);
-  new->ts.kind = g95_default_double_kind();
-
-  return new;
+  result = g95_real2real(e, g95_default_double_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
-static g95_expr *conv_z_d(g95_expr *e) { 
-g95_expr *new;
+static g95_expr *conv_z_d(g95_expr *e) {
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
- 
-  return (g95_complex2real(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
+
+  result = g95_complex2real(e, g95_default_double_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
 static g95_expr *conv_i_z(g95_expr *e) {
-g95_expr *new;
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_int2complex(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
+  result = g95_int2complex(e, g95_default_complex_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
 static g95_expr *conv_r_z(g95_expr *e) {
-g95_expr *new;
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
+  result = g95_real2complex(e, g95_default_complex_kind());
+  if (result == NULL) return &g95_bad_expr;
 
-  return (g95_real2complex(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
+  return result;
 }
 
 
-static g95_expr *conv_d_z(g95_expr *e) {
-g95_expr *new;
+static g95_expr *conv_dz_z(g95_expr *e) {
+g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_real2complex(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
+  result = g95_complex2complex(e, g95_default_complex_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
+}
+
+
+static g95_expr *conv_i_dz(g95_expr *e) {
+g95_expr *result;
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  result = g95_int2complex(e, g95_default_double_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
+}
+
+
+static g95_expr *conv_r_dz(g95_expr *e) {
+g95_expr *result;
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+  result = g95_real2complex(e, g95_default_double_kind());
+  if (result == NULL) return &g95_bad_expr;
+
+  return result;
+}
+
+
+static g95_expr *conv_z_dz(g95_expr *e) {
+g95_expr *result;
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  result = g95_complex2complex(e, g95_default_double_kind());
+  if (result == NULL) return &g95_bad_expr;
+  return result;
 }
 
 
@@ -1197,25 +1238,34 @@ int dr, di, dz, dd;
 
   add_conv(BT_INTEGER, di,  BT_INTEGER, di,  conv_null);
   add_conv(BT_REAL,    dr,  BT_INTEGER, di,  conv_r_i);
-  add_conv(BT_REAL,    dd,  BT_INTEGER, di,  conv_d_i);
+  add_conv(BT_REAL,    dd,  BT_INTEGER, di,  conv_r_i);
   add_conv(BT_COMPLEX, dz,  BT_INTEGER, di,  conv_z_i);
+  add_conv(BT_COMPLEX, dd,  BT_INTEGER, di,  conv_z_i);
 
   add_conv(BT_INTEGER, di,  BT_REAL,    dr,  conv_i_r);
   add_conv(BT_REAL,    dr,  BT_REAL,    dr,  conv_null);
   add_conv(BT_REAL,    dd,  BT_REAL,    dr,  conv_d_r);
   add_conv(BT_COMPLEX, dz,  BT_REAL,    dr,  conv_z_r);
+  add_conv(BT_COMPLEX, dd,  BT_REAL,    dr,  conv_z_r);
 
   add_conv(BT_INTEGER, di,  BT_REAL,    dd,  conv_i_d);
   add_conv(BT_REAL,    dr,  BT_REAL,    dd,  conv_r_d);
   add_conv(BT_REAL,    dd,  BT_REAL,    dd,  conv_null);
   add_conv(BT_COMPLEX, dz,  BT_REAL,    dd,  conv_z_d);
+  add_conv(BT_COMPLEX, dz,  BT_REAL,    dd,  conv_z_d);
 
   add_conv(BT_INTEGER, di,  BT_COMPLEX, dz,  conv_i_z);
   add_conv(BT_REAL,    dr,  BT_COMPLEX, dz,  conv_r_z);
-  add_conv(BT_REAL,    dd,  BT_COMPLEX, dz,  conv_d_z);
+  add_conv(BT_REAL,    dd,  BT_COMPLEX, dz,  conv_r_z);
   add_conv(BT_COMPLEX, dz,  BT_COMPLEX, dz,  conv_null);
-}
+  add_conv(BT_COMPLEX, dz,  BT_COMPLEX, dz,  conv_dz_z);
 
+  add_conv(BT_INTEGER, di,  BT_COMPLEX, dd,  conv_i_dz);
+  add_conv(BT_REAL,    dr,  BT_COMPLEX, dd,  conv_r_dz);
+  add_conv(BT_REAL,    dd,  BT_COMPLEX, dd,  conv_r_dz);
+  add_conv(BT_COMPLEX, dz,  BT_COMPLEX, dd,  conv_z_dz);
+  add_conv(BT_COMPLEX, dz,  BT_COMPLEX, dd,  conv_null);
+}
 
 
 /* g95_intrinsic_init_1()-- Initialize the table of intrinsics */

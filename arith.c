@@ -974,11 +974,13 @@ arith rc;
       (op2 != NULL && op2->expr_type != EXPR_CONSTANT)) goto incompatible;
 
   rc = (unary) ? (*eval)(op1, &result) : (*eval)(op1, op2, &result);
-  if (rc != ARITH_OK) goto incompatible;  /* Something went wrong */
+  if (rc != ARITH_OK) {     /* Something went wrong */
+    g95_error("%s at %C", g95_arith_error(rc));
+    return NULL;
+  }
 
   g95_free_expr(op1);
   g95_free_expr(op2);
-
   return result;
 
   /* Create a run-time expression */
@@ -997,7 +999,6 @@ incompatible:
 
   return result;
 }
-
 
 
 
@@ -1092,14 +1093,8 @@ g95_expr *g95_user(g95_expr *op1, g95_expr *op2) {
 g95_expr *g95_convert_integer(char *buffer, int kind, int radix) {
 g95_expr *e;
 
-  e = g95_get_expr();
-
-  e->expr_type = EXPR_CONSTANT;
-  e->rank = 0;
-  e->ts.type = BT_INTEGER;
-  e->ts.kind = kind;
-
-  mpz_init_set_str(e->value.integer, buffer, radix);
+  e = g95_constant_result(BT_INTEGER, kind);
+  mpz_set_str(e->value.integer, buffer, radix);
 
   return e;
 }
@@ -1110,14 +1105,8 @@ g95_expr *e;
 g95_expr *g95_convert_real(char *buffer, int kind) {
 g95_expr *e;
 
-  e = g95_get_expr();
-
-  e->expr_type = EXPR_CONSTANT;
-  e->rank = 0;
-  e->ts.type = BT_REAL;
-  e->ts.kind = kind;
-
-  mpf_init_set_str(e->value.real, buffer, 10);
+  e = g95_constant_result(BT_REAL, kind);
+  mpf_set_str(e->value.real, buffer, 10);
 
   return e;
 }
@@ -1129,15 +1118,9 @@ g95_expr *e;
 g95_expr *g95_convert_complex(g95_expr *real, g95_expr *imag, int kind) {
 g95_expr *e;
 
-  e = g95_get_expr();
-
-  e->expr_type = EXPR_CONSTANT;
-  e->rank = 0;
-  e->ts.type = BT_COMPLEX;
-  e->ts.kind = kind;
-
-  mpf_init_set(e->value.complex.r, real->value.real);
-  mpf_init_set(e->value.complex.i, imag->value.real);
+  e = g95_constant_result(BT_COMPLEX, kind);
+  mpf_set(e->value.complex.r, real->value.real);
+  mpf_set(e->value.complex.i, imag->value.real);
 
   return e;
 }
@@ -1145,214 +1128,195 @@ g95_expr *e;
 
 /******* Simplification of intrinsic functions with constant arguments *****/
 
-/* g95_int2real()-- Convert default integer to default real */
+static void overflow(g95_typespec *from, g95_typespec *to, locus *where) {
 
-arith g95_int2real(g95_expr **dest, g95_expr *src) {
-g95_expr *e;
-arith rv;
+  g95_error("Arithmetic overflow converting %s(%d) to %s(%d) at %L",
+	    g95_typename(from->type), from->kind,
+	    g95_typename(to->type), to->kind, where);
+}
 
-  e = g95_get_expr();
 
-  e->expr_type = EXPR_CONSTANT;
-  e->where = src->where;
+/* g95_int2int()-- Convert integers to integers */
 
-  e->ts.type = BT_REAL;
-  e->ts.kind = g95_default_real_kind();
+g95_expr *g95_int2int(g95_expr *src, int kind) {
+g95_expr *result;
 
-  mpf_init(e->value.real);
-  mpf_set_z(e->value.real, src->value.integer);
+  result = g95_constant_result(BT_INTEGER, kind);
+  result->where = src->where;
 
-  rv = g95_check_real_range(e->value.real, e->ts.kind);
+  mpz_set(result->value.integer, src->value.integer);
 
-  if (rv == ARITH_OK)
-    *dest = e;
-  else {
-    g95_error("Overflow converting INTEGER to REAL at %L", e->where);
-    g95_free_expr(e);
+  if (g95_check_integer_range(result->value.integer, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
   }
 
-  return rv;
+  return result;
+}
+
+
+/* g95_int2real()-- Convert integers to reals */
+
+g95_expr *g95_int2real(g95_expr *src, int kind) {
+g95_expr *result;
+
+  result = g95_constant_result(BT_REAL, kind);
+  result->where = src->where;
+
+  mpf_set_z(result->value.real, src->value.integer);
+
+  if (g95_check_real_range(result->value.real, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
+  }
+
+  return result;
 }
 
 
 /* g95_int2complex()-- Convert default integer to default complex */
 
-arith g95_int2complex(g95_expr **dest, g95_expr *src) {
-g95_expr *e;
-arith rv;
+g95_expr *g95_int2complex(g95_expr *src, int kind) {
+g95_expr *result;
 
-  e = g95_get_expr(); 
+  result = g95_constant_result(BT_COMPLEX, kind);
+  result->where = src->where;
 
-  e->expr_type = EXPR_CONSTANT;
-  e->where = src->where;
+  mpf_set_z(result->value.complex.r, src->value.integer);
+  mpf_set_ui(result->value.complex.i, 0);
 
-  e->ts.type = BT_COMPLEX;
-  e->ts.kind = g95_default_complex_kind();
-
-  mpf_init(e->value.complex.r);
-  mpf_set_z(e->value.complex.r, src->value.integer);
-  mpf_init_set_ui(e->value.complex.i, 0L);
-
-  rv = g95_check_real_range(e->value.complex.i, e->ts.kind);
-
-  if (rv == ARITH_OK)
-    *dest = e;
-  else {
-    g95_error("Overflow converting INTEGER to COMPLEX at %L", e->where);
-    g95_free_expr(e);
+  if (g95_check_real_range(result->value.complex.i, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
   }
 
-  return rv;
+  return result;
 }
 
 
 /* g95_real2int()-- Convert default real to default integer */
 
-arith g95_real2int(g95_expr **dest, g95_expr *src) {
-g95_expr *e;
-arith rv;
+g95_expr *g95_real2int(g95_expr *src, int kind) {
+g95_expr *result;
 
-  e = g95_get_expr(); 
+  result = g95_constant_result(BT_INTEGER, kind);
+  result->where = src->where;
 
-  e->expr_type = EXPR_CONSTANT;
-  e->where = src->where;
+  mpz_set_f(result->value.integer, src->value.real);
 
-  e->ts.type = BT_INTEGER;
-  e->ts.kind = g95_default_integer_kind();
-
-  mpz_init(e->value.integer);
-  mpz_set_f(e->value.integer, src->value.real);
-
-  rv = g95_check_integer_range(e->value.integer, e->ts.kind);
-
-  if (rv == ARITH_OK)
-    *dest = e;
-  else {
-    g95_error("Overflow converting REAL to INTEGER at %L", e->where);
-    g95_free_expr(e);
+  if (g95_check_integer_range(result->value.integer, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
   }
 
-  return rv;
+  return result;
 }
 
 
-/* g95_real2complex()-- Convert default real to default complex.
- * Because complex components are real numbers, this can't fail.  */
+/* g95_real2real()-- Convert real to real */
 
-arith g95_real2complex(g95_expr **dest, g95_expr *src) {
-g95_expr *e;
+g95_expr *g95_real2real(g95_expr *src, int kind) {
+g95_expr *result;
 
-  e = g95_get_expr(); 
+  result = g95_constant_result(BT_REAL, kind);
+  result->where = src->where;
 
-  e->expr_type = EXPR_CONSTANT;
-  e->where = src->where;
+  mpf_set(result->value.real, src->value.real);
 
-  e->ts.type = BT_COMPLEX;
-  e->ts.kind = g95_default_complex_kind();
-
-  mpf_init_set(e->value.complex.r, src->value.real);
-  mpf_init_set_ui(e->value.complex.i, 0);
-
-  *dest = e;
-  return ARITH_OK;
-}
-
-
-/* g95_complex2int()-- Convert default complex to default integer */
-
-arith g95_complex2int(g95_expr **dest, g95_expr *src) {
-g95_expr *e;
-arith rv;
-
-  e = g95_get_expr(); 
-
-  e->expr_type = EXPR_CONSTANT;
-  e->where = src->where;
-
-  e->ts.type = BT_INTEGER;
-  e->ts.kind = g95_default_integer_kind();
-
-  mpz_init(e->value.integer);
-  mpz_set_f(e->value.integer, src->value.complex.r);
-
-  rv = g95_check_integer_range(e->value.integer, e->ts.kind);
-
-  if (rv == ARITH_OK)
-    *dest = e;
-  else {
-    g95_error("Overflow converting COMPLEX to INTEGER at %L", e->where);
-    g95_free_expr(e);
+  if (g95_check_real_range(result->value.real, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
   }
 
-  return rv;
+  return result;
 }
 
 
-/* g95_complex2real()-- Convert default complex to default real.
- * Because complex components are real numbers, this can't fail. */
+/* g95_real2complex()-- Convert real to complex. */
 
-arith g95_complex2real(g95_expr **dest, g95_expr *src) {
-g95_expr *e;
+g95_expr *g95_real2complex(g95_expr *src, int kind) {
+g95_expr *result;
 
-  e = g95_get_expr(); 
+  result = g95_constant_result(BT_COMPLEX, kind); 
+  result->where = src->where;
 
-  e->expr_type = EXPR_CONSTANT;
-  e->where = src->where;
+  mpf_set(result->value.complex.r, src->value.real);
+  mpf_set_ui(result->value.complex.i, 0);
 
-  e->ts.type = BT_REAL;
-  e->ts.kind = g95_default_real_kind();
-
-  mpf_init_set(e->value.real, src->value.complex.r);
-
-  *dest = e;
-  return ARITH_OK;
-}
-
-
-/* g95_double2real()-- Convert the double kind to default real kind */
-
-arith g95_double2real(g95_expr **dest, g95_expr *src) {
-g95_expr *e;
-arith rv;
-
-  e = g95_get_expr();
-
-  e->expr_type = EXPR_CONSTANT;
-  e->where = src->where;
-
-  e->ts.type = BT_REAL;
-  e->ts.kind = g95_default_real_kind();
-
-  mpf_init_set(e->value.real, src->value.real);
-
-  rv = g95_check_real_range(e->value.real, e->ts.kind);
-
-  if (rv == ARITH_OK)
-    *dest = e;
-  else {
-    g95_error("Overflow converting DOUBLE to REAL at %L", e->where);
-    g95_free_expr(e);
+  if (g95_check_real_range(result->value.complex.i, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
   }
 
-  return rv;
+  return result;
 }
 
 
-/* g95_real2double()-- Convert the double kind to default real kind */
+/* g95_complex2int()-- Convert complex to integer */
 
-arith g95_real2double(g95_expr **dest, g95_expr *src) {
-g95_expr *e;
+g95_expr *g95_complex2int(g95_expr *src, int kind) {
+g95_expr *result;
 
-  e = g95_get_expr();
+  result = g95_constant_result(BT_INTEGER, kind);
+  result->where = src->where;
 
-  e->expr_type = EXPR_CONSTANT;
-  e->where = src->where;
+  mpz_set_f(result->value.integer, src->value.complex.r);
 
-  e->ts.type = BT_REAL;
-  e->ts.kind = g95_default_real_kind();
+  if (g95_check_integer_range(result->value.integer, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
+  }
 
-  mpf_init_set(e->value.real, src->value.real);
-
-  return ARITH_OK;
+  return result;
 }
+
+
+/* g95_complex2real()-- Convert complex to real */
+
+g95_expr *g95_complex2real(g95_expr *src, int kind) {
+g95_expr *result;
+
+  result = g95_constant_result(BT_REAL, kind);
+  result->where = src->where;
+
+  mpf_set(result->value.real, src->value.complex.r);
+
+  if (g95_check_real_range(result->value.real, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
+  }
+
+  return result;
+}
+
+
+/* g95_complex2complex()-- Convert complex to complex */
+
+g95_expr *g95_complex2complex(g95_expr *src, int kind) {
+g95_expr *result;
+
+  result = g95_constant_result(BT_COMPLEX, kind);
+  result->where = src->where;
+
+  mpf_set(result->value.complex.r, src->value.complex.r);
+  mpf_set(result->value.complex.i, src->value.complex.i);
+
+  if (g95_check_real_range(result->value.complex.r, kind) != ARITH_OK ||
+      g95_check_real_range(result->value.complex.i, kind) != ARITH_OK) {
+    overflow(&src->ts, &result->ts, &src->where);
+    g95_free_expr(result);
+    return NULL;
+  }
+
+  return result;
+}
+
 

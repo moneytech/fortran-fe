@@ -972,14 +972,17 @@ g95_expr *g95_convert_integer(char *, int, int);
 g95_expr *g95_convert_real(char *, int);
 g95_expr *g95_convert_complex(g95_expr *, g95_expr *, int);
 
-arith g95_int2real(g95_expr **, g95_expr *);
-arith g95_int2complex(g95_expr **, g95_expr *);
-arith g95_real2int(g95_expr **, g95_expr *);
-arith g95_real2complex(g95_expr **, g95_expr *);
-arith g95_complex2int(g95_expr **, g95_expr *);
-arith g95_complex2real(g95_expr **, g95_expr *);
-arith g95_double2real(g95_expr **, g95_expr *src);
-arith g95_real2double(g95_expr **, g95_expr *src);
+g95_expr *g95_int2int(g95_expr *, int);
+g95_expr *g95_int2real(g95_expr *, int);
+g95_expr *g95_int2complex(g95_expr *, int);
+g95_expr *g95_real2int(g95_expr *, int);
+g95_expr *g95_real2real(g95_expr *, int);
+g95_expr *g95_real2complex(g95_expr *, int);
+g95_expr *g95_complex2int(g95_expr *, int);
+g95_expr *g95_complex2real(g95_expr *, int);
+g95_expr *g95_complex2complex(g95_expr *, int);
+
+
 
 /* symbol.c */
 

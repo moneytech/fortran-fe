@@ -414,13 +414,12 @@ int kind;
 	      g95_replace_expr(e, arg1);
 	      break;
 	case BT_INTEGER:
-              result = g95_copy_expr(arg1);
-	      g95_int2complex(&result, arg1);
+	      result = g95_int2complex(arg1, arg1->ts.kind);
               g95_replace_expr(e, result);
 	      break;
 	case BT_REAL:
               result = g95_copy_expr(arg1);
-	      g95_real2complex(&result, arg1);
+	      result = g95_real2complex(arg1, arg1->ts.kind);
 	      g95_replace_expr(e, result);
 	      break;
 	default :
@@ -493,15 +492,13 @@ g95_expr *arg, *rmid, *result;
 
   switch (arg->ts.type) {
 	  case BT_INTEGER:
-		  g95_int2real(&rmid, arg);
-		  g95_real2double(&result, rmid);
+		  result = g95_int2real(rmid, g95_default_double_kind());
 		  break;
 	  case BT_REAL:
-		  g95_real2double(&result, arg);
+	          result = g95_real2real(result, g95_default_double_kind());
 		  break;
 	  case BT_COMPLEX:
-		  g95_complex2real(&rmid, arg);
-		  g95_real2double(&result, rmid);
+		  rmid = g95_complex2real(arg, g95_default_double_kind());
 		  break;
 	  default:
 	          g95_warning("Argument of DBLE at %L is not a valid type",
@@ -566,7 +563,7 @@ int knd1, knd2;
 
 g95_expr *g95_simplify_dprod(g95_expr *e) {
 g95_expr *arg1, *arg2, *dbl1, *dbl2, *result;
-arith r1, r2, r;
+arith r;
 
   return NULL; 
 
@@ -581,10 +578,10 @@ arith r1, r2, r;
 
   //  if (arg1->expr_type != EXPR_CONSTANT) return FAILURE;
 
-  r1 = g95_real2double(&dbl1, arg1);
-  r2 = g95_real2double(&dbl2, arg2);
+  dbl1 = g95_real2real(arg1, g95_default_double_kind());
+  dbl2 = g95_real2real(arg2, g95_default_double_kind());
 
-  if (r1 == ARITH_OK && r2 == ARITH_OK) {
+  if (dbl1 != NULL && dbl2 != NULL) {
     r = g95_arith_times(dbl1, dbl2, &result);
     if (r == ARITH_OK) {
       result = g95_get_expr();
@@ -686,7 +683,6 @@ g95_expr *arg;
 g95_expr *g95_simplify_floor(g95_expr *e) {
 g95_expr *arg, *floor, *result;
 int knd;
-arith r;
 /* Result needs to have correct KIND */
 /* knd (optional) must be a valid integer kind */
 
@@ -710,13 +706,11 @@ arith r;
   mpf_init(floor->value.real);
   mpf_floor(floor->value.real, arg->value.real);
 
-  result = g95_get_expr();
-
-  r = g95_real2int(&result, floor);
+  result = g95_real2int(floor, g95_default_integer_kind());
 
   g95_free_expr(floor);
 
-  if ( r == ARITH_OK ) {
+  if (result != NULL) {
     g95_replace_expr(e, result);
     //    return SUCCESS;
   }
@@ -1025,7 +1019,6 @@ g95_expr *arg1, *arg2, *arg3;
 g95_expr *g95_simplify_int(g95_expr *e) {
 g95_expr *arg, *rmid, *rtrunc, *result;
 int knd;
-arith r;
 
   return NULL; 
 
@@ -1047,9 +1040,9 @@ arith r;
 		  rmid = g95_get_expr();
                   mpf_init(rmid->value.real);
                   mpf_trunc(rmid->value.real, arg->value.real);
-                  r = g95_real2int(&result, rmid);
+                  result = g95_real2int(rmid, g95_default_integer_kind());
 		  g95_free(rmid);
-                  if ( r == ARITH_OK ) {
+                  if (result != NULL) {
 		    g95_replace_expr(e, result);
 		    //		    return SUCCESS;
 		  }
@@ -1063,13 +1056,13 @@ arith r;
           case BT_COMPLEX:
 	          rmid   = g95_get_expr();
 	          rtrunc = g95_get_expr();
-		  g95_complex2real(&rmid,arg);
+		  rmid = g95_complex2real(arg, g95_default_real_kind());
 		  mpf_init(rtrunc->value.real);
 	          mpf_trunc(rtrunc->value.real, rmid->value.real);
-                  r = g95_real2int(&result, rtrunc);
+                  result = g95_real2int(rtrunc, g95_default_integer_kind());
 		  g95_free_expr(rmid);
 		  g95_free_expr(rtrunc);
-                  if ( r == ARITH_OK ) {
+                  if (result != NULL) {
 		    g95_replace_expr(e, result);
 		    //		    return SUCCESS;
 		  }
@@ -1507,8 +1500,8 @@ g95_expr *arg1, *arg2, *rmid1, *rmid2, *result;
 			rmid1 = g95_get_expr();
 			rmid2 = g95_get_expr();
 			result =g95_copy_expr(e);
-			g95_real2int( &rmid1, arg1 );
-			g95_real2int( &rmid2, arg2 );
+			rmid1 = g95_real2int(arg1, g95_default_integer_kind());
+			rmid2 = g95_real2int(arg2, g95_default_integer_kind());
  			mpz_init(result->value.integer);
                     	mpz_mod (result->value.integer, arg1->value.integer,
 			                                arg2->value.integer);
@@ -1625,7 +1618,6 @@ g95_expr *arg1, *arg2;
 g95_expr *g95_simplify_nint(g95_expr *e) {
 g95_expr *arg, *rmid, *rtrunc, *result;
 int knd;
-arith r;
 
   return NULL; 
 
@@ -1658,12 +1650,12 @@ arith r;
   rtrunc = g95_copy_expr(rmid);
   mpf_trunc(rtrunc->value.real,rmid->value.real);
 
-  r = g95_real2int(&result, rtrunc);
+  result = g95_real2int(rtrunc, g95_default_integer_kind());
 
   g95_free_expr(rmid);
   g95_free_expr(rtrunc);
 
-  if ( r == ARITH_OK ) {
+  if (result != NULL) {
     g95_replace_expr(e, result);
     //    return SUCCESS;
   }
@@ -1743,7 +1735,6 @@ int i;
 
 g95_expr *g95_simplify_real(g95_expr *e) {
 g95_expr *arg, *result;
-arith r;
 
   return NULL; 
 
@@ -1758,8 +1749,8 @@ arith r;
 
   switch (arg->ts.type) {
 	case BT_INTEGER:
-            r = g95_int2real(&result, arg);
-	    if ( r == ARITH_OK ) {
+	    result = g95_int2real(arg, g95_default_real_kind());
+	    if (result != NULL) {
 		g95_replace_expr(e, result);
 		//	        return SUCCESS;
 	    }

@@ -192,7 +192,7 @@ match m;
 
 
 static match match_mult_operand(g95_expr **result) {
-g95_expr *e, *exp ,*r;
+g95_expr *e, *exp, *r;
 locus where;
 match m;
 
@@ -214,6 +214,12 @@ match m;
   }
 
   r = g95_power(e, exp);
+  if (r == NULL) {
+    g95_free_expr(e);
+    g95_free_expr(exp);
+    return MATCH_ERROR;
+  }
+
   r->where = where;
   *result = r;
 
@@ -222,8 +228,8 @@ match m;
 
 
 static match match_add_operand(g95_expr **result) {
+g95_expr *all, *e, *total;
 locus where, old_loc;
-g95_expr *all, *e;
 match m;
 int i;
 
@@ -258,10 +264,17 @@ int i;
     }
 
     if (i == INTRINSIC_TIMES)
-      all = g95_multiply(all, e);
+      total = g95_multiply(all, e);
     else
-      all = g95_divide(all, e);
+      total = g95_divide(all, e);
 
+    if (total == NULL) {
+      g95_free_expr(all);
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
+
+    all = total;
     all->where = where;
   }
 
@@ -281,7 +294,7 @@ static int match_add_op(void) {
 /* match_level_2()-- Match a level 2 expression.  */
 
 static match match_level_2(g95_expr **result) {
-g95_expr *all, *e;
+g95_expr *all, *e, *total;
 locus where;
 match m;
 int i;
@@ -304,6 +317,11 @@ int i;
       all = g95_uminus(e);
     else
       all = g95_uplus(e);
+
+    if (all == NULL) {
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
   }
 
   all->where = where;
@@ -323,10 +341,17 @@ int i;
     }
 
     if (i == -1)
-      all = g95_subtract(all, e);
+      total = g95_subtract(all, e);
     else
-      all = g95_add(all, e);
+      total = g95_add(all, e);
 
+    if (total == NULL) {
+      g95_free_expr(all);
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
+
+    all = total;
     all->where = where;
   }
 
@@ -338,7 +363,7 @@ int i;
 /* match_level_3()-- Match a level three expression */
 
 static match match_level_3(g95_expr **result) {
-g95_expr *all, *e;
+g95_expr *all, *e, *total;
 locus where;
 match m;
 
@@ -357,7 +382,14 @@ match m;
     }
     if (m != MATCH_YES) return MATCH_ERROR;
 
-    all = g95_concat(all, e);
+    total = g95_concat(all, e);
+    if (total == NULL) {
+      g95_free_expr(all);
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
+
+    all = total;
     all->where = where;
   }
 
@@ -427,7 +459,13 @@ int i;
     break;
 
   default:
-    r = NULL;
+    g95_internal_error("match_level_4(): Bad operator");
+  }
+
+  if (r == NULL) {
+    g95_free_expr(left);
+    g95_free_expr(right);
+    return MATCH_ERROR;
   }
 
   r->where = where;
@@ -450,7 +488,13 @@ int i;
   if (m != MATCH_YES) return m;
 
   r = e;
-  if (i) r = g95_not(e);
+  if (i) {
+    r = g95_not(e);
+    if (r == NULL) {
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
+  }
 
   r->where = where;
   *result = r;
@@ -460,7 +504,7 @@ int i;
 
 
 static match match_or_operand(g95_expr **result) {
-g95_expr *all, *e;
+g95_expr *all, *e, *total;
 locus where;
 match m;
 
@@ -478,7 +522,14 @@ match m;
       return MATCH_ERROR;
     }
 
-    all = g95_and(all, e);
+    total = g95_and(all, e);
+    if (total == NULL) {
+      g95_free_expr(all);
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
+
+    all = total;
     all->where = where;
 
     where = *g95_current_locus();
@@ -490,7 +541,7 @@ match m;
 
 
 static match match_equiv_operand(g95_expr **result) {
-g95_expr *all, *e;
+g95_expr *all, *e, *total;
 locus where;
 match m;
 
@@ -508,7 +559,14 @@ match m;
       return MATCH_ERROR;
     }
 
-    all = g95_or(all, e);
+    total = g95_or(all, e);
+    if (total == NULL) {
+      g95_free_expr(all);
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
+
+    all = total;
     all->where = where;
 
     where = *g95_current_locus();
@@ -522,7 +580,7 @@ match m;
 /* match_level_5()-- Match a level 5 expression */
 
 static match match_level_5(g95_expr **result) {
-g95_expr *all, *e;
+g95_expr *all, *e, *total;
 locus where;
 match m;
 int i;
@@ -550,10 +608,17 @@ int i;
     }
 
     if (i == INTRINSIC_EQV)
-      all = g95_eqv(all, e);
+      total = g95_eqv(all, e);
     else
-      all = g95_neqv(all, e);
+      total = g95_neqv(all, e);
 
+    if (total == NULL) {
+      g95_free_expr(all);
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
+
+    all = total;
     all->where = where;
     where = *g95_current_locus();
   }
