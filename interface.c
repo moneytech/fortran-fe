@@ -887,9 +887,11 @@ int g95_symbol_rank(g95_symbol *sym) {
 
 /* compare_parameter()-- Given a symbol of a formal argument list and
  * an expression, see if the two are compatible as arguments.  Returns
- * nonzero if the same, zero if different.  */
+ * nonzero if compatible, zero if not compatible. */
 
-static int compare_parameter(g95_symbol *formal, g95_expr *actual) {
+static int compare_parameter(g95_symbol *formal, g95_expr *actual,
+			     int ranks_must_agree) {
+g95_ref *ref;
 
   if (actual->ts.type == BT_PROCEDURE) {
     if (formal->attr.flavor != FL_PROCEDURE) return 0;
@@ -904,32 +906,27 @@ static int compare_parameter(g95_symbol *formal, g95_expr *actual) {
 
   if (!g95_compare_types(&formal->ts, &actual->ts)) return 0;
 
-#if 0
-  if (formal->attr.pointer) {
-    if (formal->rank != actual->rank) return 0;
-    return 1;
-  }
-#endif
+  if (g95_symbol_rank(formal) == actual->rank) return 1;
 
+  /* At this point the ranks didn't agree. */
 
-#if 0
-  /* Ranks can disagree if we are passing an array element into an
-   * array that is not assumed shape nor a pointer array. */
+  if (ranks_must_agree || formal->attr.pointer) return 0;
 
-  if (g95_symbol_rank(formal) != actual->rank) {
-    if (!formal->attr.dimension) return 0;
+  if (actual->rank != 0)
+    return formal->attr.dimension ? 1 : 0;   /* Passing an array */
 
-    if (formal->as->type == AS_ASSUMED_SHAPE || formal->attr.pointer) return 0;
+  /* At this point, we are considering a scalar passed to an array.
+   * This is legal if the scalar is an array element of the right sort. */
 
-    for(ref=actual->ref; ref; ref=ref->next)
-      if (ref->type == REF_SUBSTRING) return 0;
+  if (formal->as->type == AS_ASSUMED_SHAPE) return 0;
 
-    for(ref=actual->ref; ref; ref=ref->next)
-      if (ref->type == REF_ARRAY && ref->u.ar.type == AR_ELEMENT) break;
+  for(ref=actual->ref; ref; ref=ref->next)
+    if (ref->type == REF_SUBSTRING) return 0;
 
-    if (ref == NULL) return 0;
-  }
-#endif
+  for(ref=actual->ref; ref; ref=ref->next)
+    if (ref->type == REF_ARRAY && ref->u.ar.type == AR_ELEMENT) break;
+
+  if (ref == NULL) return 0;   /* Not an array element */
 
   return 1;
 }
@@ -944,7 +941,8 @@ static int compare_parameter(g95_symbol *formal, g95_expr *actual) {
  * don't match instead of just returning the status code. */
 
 static int compare_actual_formal(g95_actual_arglist **ap,
-				 g95_formal_arglist *formal, locus *where) {
+				 g95_formal_arglist *formal,
+				 int ranks_must_agree, locus *where) {
 g95_actual_arglist **new, *a, *actual, temp;
 g95_formal_arglist *f;
 int i, n, na;
@@ -1013,7 +1011,7 @@ int i, n, na;
       return 0;
     }
 
-    if (compare_parameter(f->sym, a->expr) == 0) {
+    if (compare_parameter(f->sym, a->expr, ranks_must_agree) == 0) {
       if (where) g95_error("Type/rank mismatch in argument '%s' at %L",
 			   f->sym->name, &a->expr->where);
       return 0;
@@ -1114,7 +1112,7 @@ sym_intent a_intent, f_intent;
 void g95_procedure_use(g95_symbol *sym, g95_actual_arglist **ap, locus *where){
 
   if (sym->attr.if_source == IFSRC_UNKNOWN ||
-      !compare_actual_formal(ap, sym->formal, where)) return;
+      !compare_actual_formal(ap, sym->formal, 0, where)) return;
 
   check_intents(sym->formal, *ap);
 }
@@ -1127,12 +1125,15 @@ void g95_procedure_use(g95_symbol *sym, g95_actual_arglist **ap, locus *where){
 
 g95_symbol *g95_search_interface(g95_interface *intr, int sub_flag,
 				 g95_actual_arglist **ap) {
+int r;
 
   for(; intr; intr=intr->next) {
     if (sub_flag && intr->sym->attr.function) continue;
     if (!sub_flag && intr->sym->attr.subroutine) continue;
 
-    if (compare_actual_formal(ap, intr->sym->formal, NULL)) {
+    r = !intr->sym->attr.elemental;
+
+    if (compare_actual_formal(ap, intr->sym->formal, r, NULL)) {
       check_intents(intr->sym->formal, *ap);
       return intr->sym;
     }
