@@ -283,5 +283,6 @@ void g95_resolve_verify(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 #define MAX_INTRINSIC_ARGS 5
 
 extern int g95_intrinsic_extension;
-extern char *g95_current_intrinsic, *g95_current_intrinsic_arg[5];
+extern char *g95_current_intrinsic,
+  *g95_current_intrinsic_arg[MAX_INTRINSIC_ARGS];
 extern locus *g95_current_intrinsic_where;
