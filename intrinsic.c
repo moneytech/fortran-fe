@@ -2460,6 +2460,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym("scale", 0, 1, BT_REAL, dr, g95_simplify_scale, check_scale,
 	  x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
+  make_generic("scale");
+
   add_sym("scan", 0, 1, BT_INTEGER, di, g95_simplify_scan, check_scan,
 	  stg, BT_CHARACTER, dc, 0,  set, BT_CHARACTER, dc, 0,
 	  bck, BT_LOGICAL, dl, 1, NULL);
