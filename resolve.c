@@ -256,7 +256,7 @@ g95_symbol *s;
       expr->value.function.name = s->name;
       expr->value.function.esym = s;
       expr->ts = s->ts;
-      if (sym->as != NULL) expr->rank = sym->as->rank;
+      if (s->as != NULL) expr->rank = s->as->rank;
       return MATCH_YES;
     }
 
