@@ -1005,8 +1005,8 @@ static try check_dimension(int i, g95_array_ref *ar, g95_array_spec *as) {
   return SUCCESS;
 
 bound:
-  g95_error("Array reference at %L is out of bounds", &ar->c_where[i]);
-  return FAILURE;
+  g95_warning("Array reference at %L is out of bounds", &ar->c_where[i]);
+  return SUCCESS;
 }
 
 
