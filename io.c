@@ -21,7 +21,6 @@ Boston, MA 02111-1307, USA.  */
 
 /* io.c-- Deal with input/output statements */
 
-#include <string.h>
 #include "g95.h"
 
 static g95_st_label format_asterisk_ =
