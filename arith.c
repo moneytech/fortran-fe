@@ -342,7 +342,7 @@ arith rc;
 
 arith g95_arith_uplus(g95_expr *op1, g95_expr **resultp) {
 
-  *resultp = op1;
+  *resultp = g95_copy_expr(op1);
   return ARITH_OK;
 }
 
@@ -988,6 +988,9 @@ arith rc;
 
   if (operator == INTRINSIC_POWER && op2->ts.type != BT_INTEGER)
     goto incompatible;
+
+  if (op1->expr_type != EXPR_CONSTANT ||
+      (op2 != NULL && op2->expr_type != EXPR_CONSTANT)) goto incompatible;
 
   rc = (unary) ? (*eval)(op1, &result) : (*eval)(op1, op2, &result);
   if (rc != ARITH_OK) goto incompatible;  /* Something went wrong */
