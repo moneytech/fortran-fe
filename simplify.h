@@ -36,6 +36,7 @@ g95_expr *g95_simplify_dint(g95_expr *);
 g95_expr *g95_simplify_anint(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_dnint(g95_expr *);
 g95_expr *g95_simplify_asin(g95_expr *);
+g95_expr *g95_simplify_atan(g95_expr *);
 g95_expr *g95_simplify_atan2(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_bit_size(g95_expr *);
 g95_expr *g95_simplify_btest(g95_expr *, g95_expr *);

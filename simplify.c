@@ -483,6 +483,38 @@ g95_expr *g95_simplify_asin(g95_expr *e) {
 }
 
 
+g95_expr *g95_simplify_atan(g95_expr *x) {
+g95_expr *re, *result;
+int i;
+
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  switch (x->ts.type) {
+  case BT_INTEGER: 
+    if (g95_option.pedantic == 1) 
+        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
+    re = g95_int2real(x,x->ts.kind);
+    arctangent(&re->value.real,&result->value.real);
+    break;
+  case BT_REAL: 
+    arctangent(&x->value.real,&result->value.real);
+    break;
+  default:
+    g95_internal_error("in g95_simplify_exp(): Bad type");
+  }
+
+  return range_check(result, "ATAN");
+
+}
+
+
+
 g95_expr *g95_simplify_atan2(g95_expr *y, g95_expr *x) {
 
   return NULL;
@@ -693,13 +725,13 @@ int i;
     cosine(&x->value.real,&result->value.real);
     break;
   case BT_COMPLEX: 
-    g95_error("Complex sin at %L has not yet been implemented",&x->where);
+    g95_error("Complex cos at %L has not yet been implemented",&x->where);
     return &g95_bad_expr;
   default:
     g95_internal_error("in g95_simplify_exp(): Bad type");
   }
 
-  return range_check(result, "SIN");
+  return range_check(result, "COS");
 
 }
 
@@ -3301,11 +3333,78 @@ mpf_t ac, ad, s, t, w;
 }
 
 
-g95_expr *g95_simplify_tan(g95_expr *e) {
-/* We don't have an extension to return transcendental functions for constant
- * arguments yet */
+g95_expr *g95_simplify_tan(g95_expr *x) {
+g95_expr *re, *result;
+mpf_t mpf_sin, mpf_cos, mag_cos;
+int i;
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  switch (x->ts.type) {
+  case BT_INTEGER: 
+    if (g95_option.pedantic == 1) 
+        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
+    re = g95_int2real(x,x->ts.kind);
+    mpf_init(mpf_sin);
+    mpf_init(mpf_cos);
+    mpf_init(mag_cos);
+    sine(&re->value.real,&mpf_sin);
+    cosine(&re->value.real,&mpf_cos);
+    mpf_abs(mag_cos, mpf_cos);
+    if ( mpf_cmp_ui(mag_cos,0) == 0 ) {
+      g95_error("Tangent undefined at %L",x->where);
+      mpf_clear(mpf_sin);
+      mpf_clear(mpf_cos);
+      mpf_clear(mag_cos);
+      return &g95_bad_expr;
+    }
+    else if ( mpf_cmp(mag_cos,g95_real_kinds[i].tiny) < 0 ) {
+      g95_error("Tangent cannot be accurately evaluated at %L",x->where);
+      mpf_clear(mpf_sin);
+      mpf_clear(mpf_cos);
+      mpf_clear(mag_cos);
+      return &g95_bad_expr;
+    }
+    else {
+      mpf_div(result->value.real,mpf_sin,mpf_cos);
+      mpf_clear(mpf_sin);
+      mpf_clear(mpf_cos);
+      mpf_clear(mag_cos);
+    }
+    break;
+  case BT_REAL: 
+    mpf_init(mpf_sin);
+    mpf_init(mpf_cos);
+    mpf_init(mag_cos);
+    sine(&x->value.real,&mpf_sin);
+    cosine(&x->value.real,&mpf_cos);
+    mpf_abs(mag_cos, mpf_cos);
+    if ( mpf_cmp(mag_cos,g95_real_kinds[i].tiny) < 0 ) {
+      g95_error("Tangent undefined at %L",&x->where);
+      mpf_clear(mpf_sin);
+      mpf_clear(mpf_cos);
+      mpf_clear(mag_cos);
+      return &g95_bad_expr;
+    }
+    else {
+      mpf_div(result->value.real,mpf_sin,mpf_cos);
+      mpf_clear(mpf_sin);
+      mpf_clear(mpf_cos);
+      mpf_clear(mag_cos);
+    }
+    break;
+  default:
+    g95_internal_error("in g95_simplify_exp(): Bad type");
+  }
+
+  return range_check(result, "TAN");
+
 }
 
 

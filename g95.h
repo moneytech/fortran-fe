@@ -950,9 +950,7 @@ void common_logarithm(mpf_t *, mpf_t *);
 void exponential(mpf_t *, mpf_t *);
 void sine(mpf_t *, mpf_t *);
 void cosine(mpf_t *, mpf_t *);
-/*
 void arctangent(mpf_t *, mpf_t *);
-*/
 
 int g95_default_integer_kind(void);
 int g95_default_real_kind(void);

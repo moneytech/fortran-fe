@@ -333,6 +333,98 @@ int i, sign;
   }
 }
 
+void arctangent(mpf_t *arg, mpf_t *result) {
+mpf_t absval, convgu, convgl, num, term, x, xp;
+int i, sign;
+
+/* Similar to sine routine but requires special handling for x near 1 */
+
+  mpf_init_set(x, *arg);
+
+/* Special case */
+  if ( mpf_cmp_ui(x,0) ==  0 ) {
+    mpf_set_ui(*result,0);
+  }
+
+  else {
+
+    mpf_init(absval);
+    mpf_init(num);
+    mpf_init(term);
+
+    mpf_init_set_d(convgu,1.5);
+    mpf_init_set_d(convgl,0.5);
+    mpf_abs(absval,x);
+
+    mpf_init_set_ui(num, 1);
+
+    if ( mpf_cmp(absval,convgl) < 0 ) {
+      mpf_init_set_ui(xp, 0);
+      sign = -1;
+      for(i=1; i<100; i++) {
+        mpf_mul(num,num,absval);
+        if ( i%2 != 0 ) {
+          sign = sign*(-1);
+          mpf_div_ui(term,num,i);
+          if ( sign > 0) mpf_add(xp,xp,term);
+          else mpf_sub(xp,xp,term);
+        }
+      }
+    }
+    else if ( mpf_cmp(absval,convgu) >=0 ) {
+      mpf_init_set(xp, hpi);
+      sign = 1;
+      for(i=1; i<100; i++) {
+        mpf_div(num,num,absval);
+        if ( i%2 != 0 ) {
+          sign = sign*(-1);
+          mpf_div_ui(term,num,i);
+          if ( sign > 0) mpf_add(xp,xp,term);
+          else mpf_sub(xp,xp,term);
+        }
+      }
+    }
+    else {
+      mpf_init_set_ui(xp,0);
+      mpf_sub_ui(num,absval,1);
+      mpf_add_ui(term,absval,1);
+      mpf_div(absval,num,term);
+
+      mpf_set_ui(num,1);
+
+      sign = -1;
+      for(i=1; i<100; i++) {
+        mpf_mul(num,num,absval);
+        if ( i%2 != 0 ) {
+          sign = sign*(-1);
+          mpf_div_ui(term,num,i);
+          if ( sign > 0) mpf_add(xp,xp,term);
+          else mpf_sub(xp,xp,term);
+        }
+      }
+      mpf_div_ui(term,hpi,2);
+      mpf_add(xp,term,xp);
+    }
+
+    /* This makes sure to preserve the identity arctan(-x) = -arctan(x) */
+    /* and improves accuracy to boot                                    */
+
+    if ( mpf_cmp_ui(x,0) > 0 ) 
+      mpf_set(*result,xp);
+    else
+      mpf_neg(*result,xp); 
+
+    mpf_clear(absval);
+    mpf_clear(convgl);
+    mpf_clear(convgu);
+    mpf_clear(num);
+    mpf_clear(term);
+    mpf_clear(x);
+    mpf_clear(xp);
+  }
+}
+
+
 /* g95_arith_error()-- Given an arithmetic error code, return a
  * pointer to a string that explains the error. */
 

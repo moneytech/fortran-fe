@@ -1653,8 +1653,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f2("associated", 1, BT_LOGICAL, dl, NULL, check_associated,
 	     pt, BT_UNKNOWN, 0, 0, tg, BT_INTEGER, di, 1, NULL);
 
-  add_sym_f1("atan",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("datan", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("atan",  0, BT_REAL, dr, g95_simplify_atan, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym_f1("datan", 0, BT_REAL, dd, g95_simplify_atan, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("atan");
 
   add_sym_f2("atan2",  0, BT_REAL, dr, g95_simplify_atan2, NULL,
@@ -2023,8 +2023,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f3("sum", 1, BT_REAL, dr, NULL, check_sum, ar, BT_REAL, dr, 0,
 	     dm, BT_INTEGER, di, 1,   msk, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym_f1("tan",  1, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dtan", 1, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("tan",  1, BT_REAL, dr, g95_simplify_tan, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym_f1("dtan", 1, BT_REAL, dd, g95_simplify_tan, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("tan");
 
   add_sym_f1("tanh",  1, BT_REAL, dr, NULL, NULL,  x, BT_REAL, dr, 0, NULL);
