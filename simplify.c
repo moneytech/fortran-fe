@@ -1707,6 +1707,8 @@ int my_kind;
     arg = arg->next;
   }
 
+  if (arg == NULL ) return NULL;
+
   switch(x->ts.type) {
   case BT_INTEGER:
     mpz_init_set(max_val, x->value.integer);
@@ -1884,6 +1886,8 @@ int my_kind;
     x   = arg->expr;
     arg = arg->next;
   }
+
+  if (arg == NULL ) return NULL;
 
   if ( x->ts.type == BT_INTEGER ) {
     mpz_init_set(min_val, x->value.integer);
