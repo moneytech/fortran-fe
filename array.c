@@ -267,10 +267,8 @@ end_element:
   if (g95_match(" :") == MATCH_NO)
     ar->stride[i] = g95_int_expr(1);
   else {
-    if (init)
-      m = g95_match_init_expr(&ar->stride[i]);
-    else
-      m = g95_match_expr(&ar->stride[i]);
+    m = init ? g95_match_init_expr(&ar->stride[i])
+      : g95_match_expr(&ar->stride[i]);
 
     if (m == MATCH_NO) g95_error("Expected array subscript stride at %C");
     if (m != MATCH_YES) return MATCH_ERROR;
