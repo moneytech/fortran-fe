@@ -1813,7 +1813,7 @@ arith rc;
 	operator == INTRINSIC_GE || operator == INTRINSIC_GT ||
 	operator == INTRINSIC_LE || operator == INTRINSIC_LT) {
       temp.ts.type = BT_LOGICAL;
-      temp.ts.kind = g95_default_integer_kind();
+      temp.ts.kind = g95_default_logical_kind();
     }
 
     unary = 0;

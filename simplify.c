@@ -564,7 +564,7 @@ g95_expr *g95_simplify_ceiling(g95_expr *e, g95_expr *k) {
 g95_expr *ceil, *result;
 int kind;
 
-  kind = get_kind(BT_REAL, k, "CEILING", g95_default_integer_kind());
+  kind = get_kind(BT_REAL, k, "CEILING", g95_default_real_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -988,7 +988,7 @@ g95_expr *result;
 mpf_t floor;
 int kind;
 
-  kind = get_kind(BT_REAL, k, "FLOOR", g95_default_integer_kind());
+  kind = get_kind(BT_REAL, k, "FLOOR", g95_default_real_kind());
   if (kind == -1) g95_internal_error("g95_simplify_floor(): Bad kind");
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -1366,7 +1366,7 @@ g95_expr *g95_simplify_int(g95_expr *e, g95_expr *k) {
 g95_expr *rpart, *rtrunc, *result;
 int kind;
 
-  kind = get_kind(BT_REAL, k, "INT", g95_default_integer_kind());
+  kind = get_kind(BT_REAL, k, "INT", g95_default_real_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
