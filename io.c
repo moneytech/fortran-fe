@@ -1208,6 +1208,7 @@ get_io_list:
       dt->io_unit->ts.type != BT_CHARACTER) {
     g95_error("io-unit in %s statement at %C must be an internal file in a "
 	      "PURE procedure", io_kind_name(k));
+    m = MATCH_ERROR;
     goto cleanup;
   }
 
