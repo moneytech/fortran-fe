@@ -1059,6 +1059,11 @@ g95_expr *result;
 }
 
 
+typedef union {
+  arith (*f2)(g95_expr *, g95_expr **);
+  arith (*f3)(g95_expr *, g95_expr *, g95_expr **);
+}  eval_f;
+
 /* High level arithmetic subroutines.  These subroutines go into
  * eval_intrinsic(), which can do one of several things to it's
  * operands.  If the operands are incompatible with the intrinsic
@@ -1070,7 +1075,7 @@ g95_expr *result;
  * operands are array constructors. */
 
 static g95_expr *eval_intrinsic(intrinsic_op operator,
-				arith (*eval)(),
+				eval_f eval,
 				g95_expr *op1, g95_expr *op2) {
 g95_expr temp, *result;
 int unary;
@@ -1167,7 +1172,7 @@ arith rc;
   if (op1->expr_type != EXPR_CONSTANT ||
       (op2 != NULL && op2->expr_type != EXPR_CONSTANT)) goto incompatible;
 
-  rc = (unary) ? (*eval)(op1, &result) : (*eval)(op1, op2, &result);
+  rc = (unary) ? (*eval.f2)(op1, &result) : (*eval.f3)(op1, op2, &result);
   if (rc != ARITH_OK) {     /* Something went wrong */
     g95_error("%s at %L", g95_arith_error(rc), &op1->where);
     return NULL;
@@ -1194,90 +1199,106 @@ incompatible:
   return result;
 }
 
+static g95_expr *eval_intrinsic_f2(intrinsic_op operator,
+				arith (*eval)(g95_expr *, g95_expr **),
+				g95_expr *op1, g95_expr *op2) {
+eval_f f;
+  f.f2 = eval;
+  return eval_intrinsic(operator, f, op1, op2);
+}
+
+static g95_expr *eval_intrinsic_f3(intrinsic_op operator,
+				arith (*eval)(g95_expr *, g95_expr *,
+                                              g95_expr **),
+				g95_expr *op1, g95_expr *op2) {
+eval_f f;
+  f.f3 = eval;
+  return eval_intrinsic(operator, f, op1, op2);
+}
 
 
 g95_expr *g95_uplus(g95_expr *op) {
-  return eval_intrinsic(INTRINSIC_UPLUS, g95_arith_uplus, op, NULL);
+  return eval_intrinsic_f2(INTRINSIC_UPLUS, g95_arith_uplus, op, NULL);
 }
 
 g95_expr *g95_uminus(g95_expr *op) {
-  return eval_intrinsic(INTRINSIC_UMINUS, g95_arith_uminus, op, NULL);
+  return eval_intrinsic_f2(INTRINSIC_UMINUS, g95_arith_uminus, op, NULL);
 }
 
 g95_expr *g95_add(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_PLUS, g95_arith_plus, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_PLUS, g95_arith_plus, op1, op2);
 }
 
 g95_expr *g95_subtract(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_MINUS, g95_arith_minus, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_MINUS, g95_arith_minus, op1, op2);
 }
 
 g95_expr *g95_multiply(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_TIMES, g95_arith_times, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_TIMES, g95_arith_times, op1, op2);
 }
 
 g95_expr *g95_divide(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_DIVIDE, g95_arith_divide, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_DIVIDE, g95_arith_divide, op1, op2);
 }
 
 g95_expr *g95_power(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_POWER, g95_arith_power, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_POWER, g95_arith_power, op1, op2);
 }
 
 g95_expr *g95_concat(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_CONCAT, g95_arith_concat, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_CONCAT, g95_arith_concat, op1, op2);
 }
 
 g95_expr *g95_and(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_AND, g95_arith_and, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_AND, g95_arith_and, op1, op2);
 }
 
 g95_expr *g95_or(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_OR, g95_arith_or, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_OR, g95_arith_or, op1, op2);
 }
 
 g95_expr *g95_not(g95_expr *op1) {
-  return eval_intrinsic(INTRINSIC_NOT, g95_arith_not, op1, NULL);
+  return eval_intrinsic_f2(INTRINSIC_NOT, g95_arith_not, op1, NULL);
 }
 
 g95_expr *g95_eqv(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_EQV, g95_arith_eqv, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_EQV, g95_arith_eqv, op1, op2);
 }
 
 g95_expr *g95_neqv(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_NEQV, g95_arith_neqv, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_NEQV, g95_arith_neqv, op1, op2);
 }
 
 g95_expr *g95_eq(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_EQ, g95_arith_eq, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_EQ, g95_arith_eq, op1, op2);
 }
 
 g95_expr *g95_ne(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_NE, g95_arith_ne, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_NE, g95_arith_ne, op1, op2);
 }
 
 g95_expr *g95_gt(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_GT, g95_arith_gt, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_GT, g95_arith_gt, op1, op2);
 }
 
 g95_expr *g95_ge(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_GE, g95_arith_ge, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_GE, g95_arith_ge, op1, op2);
 }
 
 g95_expr *g95_lt(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_LT, g95_arith_lt, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_LT, g95_arith_lt, op1, op2);
 }
 
 g95_expr *g95_le(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_LE, g95_arith_le, op1, op2);
+  return eval_intrinsic_f3(INTRINSIC_LE, g95_arith_le, op1, op2);
 }
 
 g95_expr *g95_unary_user(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_USER, NULL, op1, NULL);
+  return eval_intrinsic_f2(INTRINSIC_USER, NULL, op1, NULL);
 }
 
 g95_expr *g95_user(g95_expr *op1, g95_expr *op2) {
-  return eval_intrinsic(INTRINSIC_USER, NULL, op1, op2);
+  return eval_intrinsic_f2(INTRINSIC_USER, NULL, op1, op2);
 }
 
 

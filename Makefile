@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-c -g -pedantic -Wall -pipe -Wwrite-strings
+CFLAGS=-c -g -pedantic -Wall -Wwrite-strings -Wstrict-prototypes
 GMPDIR=gmp
 LDFLAGS=-g
 LIBS=-lgmp
