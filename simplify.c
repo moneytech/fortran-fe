@@ -1960,14 +1960,9 @@ int kind;
 }
 
 g95_expr *g95_simplify_repeat(g95_expr *e, g95_expr *n) {
-/*
-int ncopies;
-int i, len, m;
-char *copy;
-*/
+g95_expr *result;
+int i, j, len, ncopies, nlen;
 
-   return NULL;
-/*
   if (e->expr_type != EXPR_CONSTANT || n->expr_type != EXPR_CONSTANT)  
     return NULL;
 
@@ -1978,26 +1973,29 @@ char *copy;
     }
   }
 
-  result = g95_copy_expr(e);
-
   len    = e->value.character.length;
+  nlen   = ncopies*len;
+
+  result = g95_constant_result(BT_CHARACTER,e->ts.kind);
 
   if (ncopies == 0) {
+    result->value.character.string=g95_getmem(1);
+    result->value.character.length=0;
     result->value.character.string='\0';
     return result;
   }
   else {
+    result->value.character.length=nlen;
+    result->value.character.string=g95_getmem(nlen+1);
     for (i=0; i<ncopies; ++i) {
-      for (m=0; m<len; ++m) {
-        copy[m] = result->value.character.string[m];
-        printf("Test %c\n", copy[m]);
+      printf("Test3 %d\n", i);
+      for (j=0; j<len; ++j) {
+	result->value.character.string[j+i*len] = e->value.character.string[j];
       }
-      printf("Test2 %d\n", i);
-      strcat(result->value.character.string, copy);
     }
+    result->value.character.string[nlen] = '\0';  /* For debugger */
     return result;
   }
-*/
 
 }
 
