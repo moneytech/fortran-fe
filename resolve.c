@@ -679,7 +679,8 @@ g95_symbol *s;
     /* TODO: Need to search for elemental references in generic interface */
   }
 
-  if (sym->attr.intrinsic) return g95_intrinsic_sub_interface(c);
+  if (sym->attr.intrinsic)
+    return g95_intrinsic_sub_interface(c) == SUCCESS ? MATCH_YES : MATCH_ERROR;
 
   return MATCH_NO;
 }
@@ -712,13 +713,7 @@ match m;
     return FAILURE;
   }
 
-  m = g95_intrinsic_sub_interface(c);
-  if (m == MATCH_YES) return SUCCESS;
-  if (m == MATCH_NO)
-    g95_error("Generic function '%s' at %L is not consistent with a specific "
-	      "intrinsic interface", sym->name, &c->loc);
-
-  return FAILURE;
+  return g95_intrinsic_sub_interface(c) == SUCCESS ? MATCH_YES : MATCH_ERROR;
 }
 
 
