@@ -516,7 +516,8 @@ g95_formal_arglist *f;
 
   for(; actual; actual=actual->next) {
     if (actual->name[0] == '\0') { 
-      if (g95_compare_types(&formal->sym->ts, &actual->expr->ts)==0) return 0;
+      if (formal == NULL ||
+	  g95_compare_types(&formal->sym->ts, &actual->expr->ts)==0) return 0;
       formal = formal->next;
 
     } else {  /* Search for an optional arg */
