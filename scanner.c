@@ -750,6 +750,14 @@ int len;
       goto got_form;
     }
 
+    if ((len>4 && filename[len-4] == '.' &&
+	 (filename[len-3] == 'f' || filename[len-3] == 'F') &&
+	 (filename[len-2] == 'o' || filename[len-2] == 'O') &&
+         (filename[len-1] == 'r' || filename[len-1] == 'R'))) {
+      fp->form = FORM_FIXED;
+      goto got_form;
+    }
+
     fp->form = FORM_FREE;
     g95_warning_now("Reading file %s as free form", filename);
   }
