@@ -331,10 +331,9 @@ match m;
 
   m = g95_intrinsic_func_interface(expr, 0);
   if (m == MATCH_YES) return SUCCESS;
-  if (m == MATCH_ERROR) return FAILURE;
-
-  g95_error("Generic function '%s' at %L is not consistent with a specific "
-	    "intrinsic interface", expr->symbol->name, &expr->where);
+  if (m == MATCH_NO)
+    g95_error("Generic function '%s' at %L is not consistent with a specific "
+	      "intrinsic interface", expr->symbol->name, &expr->where);
 
   return FAILURE;
 }
@@ -357,7 +356,7 @@ static match resolve_specific0(g95_symbol *sym, g95_expr *expr) {
   if (sym->attr.proc == PROC_MODULE || sym->attr.proc == PROC_ST_FUNCTION ||
       sym->attr.proc == PROC_INTERNAL) goto found;
 
-  return g95_intrinsic_func_interface(expr, 0);
+  return g95_intrinsic_func_interface(expr, 1);
 
 found:
   expr->ts = sym->ts;
@@ -409,7 +408,7 @@ g95_typespec ts;
   /* See if we have an intrinsic function reference */
 
   if (g95_intrinsic_name(sym->name, 0) && 
-      g95_intrinsic_func_interface(expr, 0) == MATCH_YES)
+      g95_intrinsic_func_interface(expr, 1) == MATCH_YES)
     return SUCCESS;
 
   /* The reference is to an external name */

@@ -276,6 +276,7 @@ typedef struct {
   char message[MAX_ERROR_MESSAGE];
 } g95_error_buf;
 
+extern int g95_suppress_error;
 
 
 /* Character length structures hold the expression that gives the
@@ -1399,7 +1400,6 @@ match g95_match_print(void);
 
 /* intrinsic.c */
 
-extern char g95_intrinsic_diagnostic[];
 match g95_intrinsic_func_interface(g95_expr *, int);
 try g95_intrinsic_sub_interface(g95_code *);
 

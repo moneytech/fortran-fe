@@ -657,6 +657,7 @@ int kind;
   if (kind == -1) return &g95_bad_expr;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
+
   if (y != NULL && y->expr_type != EXPR_CONSTANT) return NULL;
 
   if (y == NULL) {
@@ -1813,23 +1814,20 @@ int kind;
 }
 
 
-/* g95_simplify_min_max()-- This function is special since MAX() can take
+/* simplify_min_max()-- This function is special since MAX() can take
  * any number of arguments.  The simplified expression is a rewritten
  * version of the argument list containing at most one constant
  * element.  Other constant elements are deleted.  Because the
  * argument list has already been checked, this function always
- * succeeds.
- *
- * sign is 1 for MAX(), -1 for MIN().
- *
- * The caller needs to make sure the argument list remains with more
- * than one element. */
+ * succeeds.  sign is 1 for MAX(), -1 for MIN(). */
 
-void g95_simplify_min_max(g95_actual_arglist *arg, int sign) {
-g95_actual_arglist *last, *extremum=NULL;
+static g95_expr *simplify_min_max(g95_expr *expr, int sign) {
+g95_actual_arglist *arg, *last, *extremum=NULL;
 
   last = NULL;
   extremum = NULL;
+
+  arg = expr->value.function.actual;
 
   for(; arg; last=arg, arg=arg->next) {
     if (arg->expr->expr_type != EXPR_CONSTANT) continue;
@@ -1859,12 +1857,34 @@ g95_actual_arglist *last, *extremum=NULL;
 
     /* Delete the extra constant argument */
 
-    last->next = arg->next;
+    if (last == NULL)
+      expr->value.function.actual = arg->next;
+    else
+      last->next = arg->next;
 
     arg->next = NULL;
     g95_free_actual_arglist(arg);
     arg = last;
   }
+
+  /* If there is one value left, replace the function call with the
+   * expression */
+
+  if (expr->value.function.actual->next != NULL) return NULL;
+
+  return g95_copy_expr(expr->value.function.actual->expr);
+}
+
+
+g95_expr *g95_simplify_min(g95_expr *e) {
+
+  return simplify_min_max(e, -1);
+}
+
+
+g95_expr *g95_simplify_max(g95_expr *e) {
+
+  return simplify_min_max(e, 1);
 }
 
 

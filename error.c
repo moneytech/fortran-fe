@@ -33,6 +33,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
+int g95_suppress_error=0;
+
 static int terminal_width = 80, buffer_flag, errors,
            use_warning_buffer, warnings;
 
@@ -428,6 +430,8 @@ void g95_warning_check(void) {
 
 void g95_error(const char *format, ...) {
 va_list argp;
+
+  if (g95_suppress_error) return;
 
   error_buffer.flag = 1;
   error_ptr = error_buffer.message;

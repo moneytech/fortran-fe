@@ -837,7 +837,7 @@ g95_actual_arglist *ap;
     for(ap=p->value.function.actual; ap; ap=ap->next) 
       if (g95_simplify_expr(ap->expr, type) == FAILURE) return FAILURE;
 
-    if (g95_intrinsic_func_interface(p, 0) == MATCH_ERROR) 
+    if (g95_intrinsic_func_interface(p, 1) == MATCH_ERROR) 
         return FAILURE;
     break;
 
@@ -1089,7 +1089,7 @@ try t;
     }
 
     if (t == SUCCESS) {
-      m = g95_intrinsic_func_interface(e, 1);
+      m = g95_intrinsic_func_interface(e, 0);
 
       if (m == MATCH_NO)
 	g95_error("Function '%s' in initialization expression at %L "

@@ -28,64 +28,225 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "intrinsic.h"
 
-
 extern int g95_intrinsic_extension;
+extern char *g95_current_intrinsic, *g95_intrinsic_arg[5];
+extern locus *g95_current_intrinsic_where;
 
 
-/***** Functions to store error messages with reason for failure of 
- *      intrinsic resolution                                      ***/
-/* TODO Make these better, add more */
+/* must_be()-- The fundamental complaint function of this source file.
+ * This function can be called in all kinds of ways. */
 
-/* intrinsic_error()-- write an error message into static memory in
- * case a caller is interested in why something failed. */
+static void must_be(g95_expr *e, int n, const char *thing) {
 
-static void intrinsic_error(const char *format, ...) {
-va_list argp;
-
-  va_start(argp, format);
-  vsprintf(g95_intrinsic_diagnostic, format, argp);
-  va_end(argp);
+  g95_error("'%s' argument of '%s' intrinsic at %L must be %s",
+	    g95_intrinsic_arg[n], g95_current_intrinsic, &e->where, thing);
 }
 
 
-static void type_error(g95_expr *arg) {
-  intrinsic_error("Incorrect argument type in call to intrinsic at %%L",
-		  &arg->where);
+/* type_check()-- Check the type of an expression */
+
+static try type_check(g95_expr *e, int n, bt type) {
+
+  if (e->ts.type == type) return SUCCESS;
+
+  must_be(e, n, g95_typename(type));
+
+  return FAILURE;
 }
 
-static void kind_error(g95_expr *arg) {
-  intrinsic_error("Incorrect argument kind in call to intrinsic at %%L",
-		  &arg->where);
+
+/* numeric_check()-- Check that the expression is a numeric type */
+
+static try numeric_check(g95_expr *e, int n) {
+
+  if (g95_numeric_ts(&e->ts)) return SUCCESS;
+
+  must_be(e, n, "a numeric type");
+
+  return FAILURE;
 }
 
 
-/***** Functions to check specific arguments *****/
+/* int_or_real_check()-- Check that an expression is integer or real */
 
-static try check_arg_dim(g95_expr *arg, g95_expr *dim, int optional) {
+static try int_or_real_check(g95_expr *e, int n) {
+
+  if (e->ts.type != BT_INTEGER && e->ts.type != BT_REAL) {
+    must_be(e, n, "INTEGER or REAL");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
+/* kind_check()-- that the expression is an optional constant integer. */
+
+static try kind_check(g95_expr *k, int n) {
+
+  if (k == NULL) return SUCCESS;
+
+  if (type_check(k, n, BT_INTEGER) == FAILURE) return FAILURE;
+
+  if (k->expr_type != EXPR_CONSTANT) {
+    must_be(k, n, "a constant");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
+/* double_check()-- Make sure the expression is a double precision real */
+
+static try double_check(g95_expr *d, int n) {
+
+  if (type_check(d, n, BT_REAL) == FAILURE) return FAILURE;
+
+  if (d->ts.type != g95_default_double_kind()) {
+    must_be(d, n, "double presicion");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
+/* logical_array_check()-- Make sure the expression is a logical array */
+
+static try logical_array_check(g95_expr *array, int n) {
+
+  if (array->ts.type != BT_LOGICAL || array->rank == 0) {
+    must_be(array, 0, "a logical array");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
+/* array_check()-- Make sure an expression is an array */
+
+static try array_check(g95_expr *e, int n) {
+
+  if (e->rank == 0) return SUCCESS;
+
+  must_be(e, n, "an array");
+
+  return FAILURE;
+}
+
+
+/* scalar_check()-- Make sure an expression is a scalar */
+
+static try scalar_check(g95_expr *e, int n) {
+
+  if (e->rank != 0) return SUCCESS;
+
+  must_be(e, n, "a scalar");
+
+  return FAILURE;
+}
+
+
+/* same_type_check()-- Make sure two expression have the same type */
+
+static try same_type_check(g95_expr *e, int n, g95_expr *f, int m) {
+char *message;
+
+  if (g95_compare_types(&e->ts, &f->ts)) return SUCCESS;
+
+  message = alloca(100);
+  sprintf(message, "the same type and kind as '%s'", g95_intrinsic_arg[n]);
+  must_be(f, m, message);
+
+  return FAILURE;
+}
+
+
+/* rank_check()-- Make sure that an expression has a certain (nonzero) rank */
+
+static try rank_check(g95_expr *e, int n, int rank) {
+char *message;
+
+  if (e->rank == rank) return SUCCESS;
+
+  message = alloca(100);
+  sprintf(message, "of rank %d", rank);
+
+  must_be(e, n, message);
+
+  return FAILURE;
+}
+
+
+/* nonoptional_check()-- Make sure a variable expression is not an
+ * optional dummy argument */
+
+static try nonoptional_check(g95_expr *e, int n) {
+
+  if (e->expr_type == EXPR_VARIABLE && e->symbol->attr.optional) {
+    g95_error("'%s' argument of '%s' intrinsic at %L must not be OPTIONAL",
+	      g95_intrinsic_arg[n], g95_current_intrinsic, &e->where);
+
+  }
+
+  /* TODO: Recursive check on nonoptional variables? */
+
+  return SUCCESS;
+}
+
+
+/* kind_value_check()-- Check that an expression has a particular kind */
+
+static try kind_value_check(g95_expr *e, int n, int k) {
+char *message;
+
+  if (e->ts.kind != k) return SUCCESS;
+
+  message = alloca(100);
+  sprintf(message, "of kind %d", k);
+
+  must_be(e, n, message);
+  return FAILURE;
+}
+
+
+/* variable_check()-- Make sure an expression is a variable. */
+
+static try variable_check(g95_expr *e, int n) {
+
+  if (e->expr_type == EXPR_VARIABLE) return SUCCESS;
+
+  must_be(e, n, "a variable");
+
+  return FAILURE;
+}
+
+
+/* dim_check()-- Check the common DIM parameter for correctness */
+
+static try dim_check(g95_expr *dim, int n, int optional) {
 
   if (optional) {
     if (dim == NULL) return SUCCESS;
 
-    if (dim->expr_type == EXPR_VARIABLE && dim->symbol->attr.optional)
-      return FAILURE;
+    if (variable_check(dim, n) == FAILURE) return FAILURE;
+
+    if (nonoptional_check(dim, n) == FAILURE) return FAILURE;
+
+    return SUCCESS;
   }
 
   if (dim == NULL) {
-    intrinsic_error("Missing DIM parameter at %%L",&arg->where);
+    g95_error("Missing DIM parameter in intrinsic '%s' at %L",
+	      g95_current_intrinsic, g95_current_intrinsic_where);
     return FAILURE;
   }
 
-  if (dim->ts.type != BT_INTEGER) {
-    intrinsic_error("DIM parameter at %%L must be of type integer",
-                    &dim->where);
-    return FAILURE;
-  }
+  if (type_check(dim, n, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (dim->rank != 0) {
-    intrinsic_error("DIM parameter at %%L must be of scalar type",
-                    &dim->where);
-    return FAILURE;
-  }
+  if (scalar_check(dim, n) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -95,9 +256,9 @@ static try check_arg_dim(g95_expr *arg, g95_expr *dim, int optional) {
 
 try g95_check_all_any(g95_expr *mask, g95_expr *dim) {
 
-  if (mask->ts.type != BT_LOGICAL || mask->rank == 0) return FAILURE;
+  if (logical_array_check(mask, 0) == FAILURE) return FAILURE;
 
-  if (check_arg_dim(mask, dim, 1) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -105,43 +266,37 @@ try g95_check_all_any(g95_expr *mask, g95_expr *dim) {
 
 try g95_check_allocated(g95_expr *array) {
 
-  if (array->expr_type != EXPR_VARIABLE) return FAILURE;
+  if (variable_check(array, 0) == FAILURE) return FAILURE;
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  return (array->symbol->attr.allocatable) ? SUCCESS : FAILURE;
+  if (!array->symbol->attr.allocatable) {
+    must_be(array, 0, "ALLOCATABLE");
+    return FAILURE;
+  }
+
+  return SUCCESS;
 }
 
 
 try g95_check_associated(g95_expr *pointer, g95_expr *target) {
 symbol_attribute attr;
 
-  if (pointer->expr_type != EXPR_VARIABLE) return FAILURE;
+  if (variable_check(pointer, 0) == FAILURE) return FAILURE;
 
   attr = g95_variable_attr(pointer, NULL);
-  if (!attr.pointer) return FAILURE;
+  if (!attr.pointer) {
+    must_be(pointer, 0, "a POINTER");
+    return FAILURE;
+  }
 
   if (target == NULL) return SUCCESS;
 
   /* Target argument is optional */
 
   attr = g95_variable_attr(target, NULL);
-  if (!attr.pointer && !attr.target) return FAILURE;
-
-  return SUCCESS;
-}
-
-
-try g95_check_aint(g95_expr *a, g95_expr *kind) {
-
-  if (a->ts.type != BT_REAL) {
-    type_error(a);
-    return FAILURE;
-  }
-
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
+  if (!attr.pointer && !attr.target) {
+    must_be(target, 1, "a POINTER or a TARGET");
     return FAILURE;
   }
 
@@ -149,83 +304,27 @@ try g95_check_aint(g95_expr *a, g95_expr *kind) {
 }
 
 
-try g95_check_anint(g95_expr *a, g95_expr *kind) {
+/* g95_check_a_kind()-- Check subroutine suitable for aint, anint,
+ * ceiling, floor and nint. */
 
-  if (a->ts.type != BT_REAL) {
-    type_error(a);
-    return FAILURE;
-  }
+try g95_check_a_kind(g95_expr *a, g95_expr *kind) {
 
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
-    return FAILURE;
-  }
+  if (type_check(a, 0, BT_REAL) == FAILURE) return FAILURE;
+
+  if (kind_check(kind, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
 
-/* Atan2 family */
 
 try g95_check_atan2(g95_expr *y, g95_expr *x) {
 
-  if (x == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
+  if (type_check(y, 0, BT_REAL) == FAILURE) return FAILURE;
 
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (y->ts.type != BT_REAL) {
-    type_error(y);
-    return FAILURE;
-  }
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
 
   if (x->ts.kind != y->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-try g95_check_datan2(g95_expr *y, g95_expr *x) {
-
-  if (x == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
-
-  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (y->ts.type != BT_REAL || y->ts.kind != g95_default_double_kind()) {
-    type_error(y);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-
-}
-
-/* end atan2 */
-
-
-try g95_check_ceiling(g95_expr *a, g95_expr *kind) {
-
-  if (a->ts.type != BT_REAL) {
-    type_error(a);
-    return FAILURE;
-  }
-
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
+    must_be(x, 1, "of the same kind as 'y'");
     return FAILURE;
   }
 
@@ -233,18 +332,11 @@ try g95_check_ceiling(g95_expr *a, g95_expr *kind) {
 }
 
 
-try g95_check_char(g95_expr *a, g95_expr *kind) {
+try g95_check_char(g95_expr *i, g95_expr *kind) {
 
-  if (a->ts.type != BT_INTEGER) {
-    type_error(a);
-    return FAILURE;
-  }
+  if (type_check(i, 0, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
-    return FAILURE;
-  }
+  if (kind_check(kind, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -252,39 +344,18 @@ try g95_check_char(g95_expr *a, g95_expr *kind) {
 
 try g95_check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
 
-  if (!g95_numeric_ts(&x->ts)) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (numeric_check(x, 0) == FAILURE) return FAILURE;
 
   if (y != NULL) {
-    if (!g95_numeric_ts(&y->ts)) {
-      type_error(y);
-      return FAILURE;
-    }
+    if (numeric_check(y, 1) == FAILURE) return FAILURE;
+
     if (x->ts.type == BT_COMPLEX) {
-      intrinsic_error("Second argument to cmplx at %%L must not be present "
-		      "if first argument is complex");
+      must_be(y, 1, "not be present if 'x' is COMPLEX");
       return FAILURE;
     }
   }
 
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-try g95_check_cos(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (kind_check(kind, 2) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -292,9 +363,9 @@ try g95_check_cos(g95_expr *x) {
 
 try g95_check_count(g95_expr *mask, g95_expr *dim) {
 
-  if (mask->ts.type != BT_LOGICAL || mask->rank == 0) return FAILURE;
+  if (logical_array_check(mask, 0) == FAILURE) return FAILURE;
 
-  if (check_arg_dim(mask, dim, 1) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -302,17 +373,15 @@ try g95_check_count(g95_expr *mask, g95_expr *dim) {
 
 try g95_check_cshift(g95_expr *array, g95_expr *shift, g95_expr *dim) {
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
   if (array->rank == 1) {
-    if (shift->rank != 0) return FAILURE;
+    if (scalar_check(shift, 1) == FAILURE) return FAILURE;
   } else {
     /* TODO: more requirements on shift parameter */
   }
 
-  if (check_arg_dim(shift,dim,1) == FAILURE) {
-    return FAILURE;
-  }
+  if (dim_check(dim, 2, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -320,10 +389,7 @@ try g95_check_cshift(g95_expr *array, g95_expr *shift, g95_expr *dim) {
 
 try g95_check_dble(g95_expr *x) {
 
-  if (!g95_numeric_ts(&x->ts)) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (numeric_check(x, 0) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -331,43 +397,9 @@ try g95_check_dble(g95_expr *x) {
 
 try g95_check_digits(g95_expr *x) {
 
-  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (int_or_real_check(x, 0) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
-
-  return SUCCESS;
-}
-
-
-try g95_check_dim(g95_expr *x, g95_expr *y) {
-
-  if (y == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
-
-  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (y->ts.type != BT_INTEGER && y->ts.type != BT_REAL) {
-    type_error(y);
-    return FAILURE;
-  }
-
-  if (x->ts.type != y->ts.type) {
-    intrinsic_error("Types of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
-
-  if (x->ts.kind != y->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
 
   return SUCCESS;
 }
@@ -375,52 +407,25 @@ try g95_check_dim(g95_expr *x, g95_expr *y) {
 
 try g95_check_dot_product(g95_expr *vector_a, g95_expr *vector_b) {
 
-  if ((vector_a->ts.type != BT_LOGICAL || vector_b->ts.type != BT_LOGICAL) &&
-      (!g95_numeric_ts(&vector_a->ts) || !g95_numeric_ts(&vector_b->ts)))
-    return FAILURE;
+  switch(vector_a->ts.type) {
+  case BT_LOGICAL:
+    if (type_check(vector_b, 1, BT_LOGICAL) == FAILURE) return FAILURE;
+    break;
 
-  if (vector_a->rank != 1) return FAILURE;
-  if (vector_b->rank != 1) return FAILURE;
+  case BT_INTEGER:
+  case BT_REAL:
+  case BT_COMPLEX:
+    if (numeric_check(vector_b, 1) == FAILURE) return FAILURE;
+    break;
 
-  return SUCCESS;
-}
-
-
-try g95_check_dprod(g95_expr *x, g95_expr *y) {
-
-  if (y == NULL) {
-    intrinsic_error("Second argument missing at %%L");
+  default:
+    must_be(vector_a, 0, "numeric or LOGICAL");
     return FAILURE;
   }
 
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (rank_check(vector_a, 0, 1) == FAILURE) return FAILURE;
 
-  if (y->ts.type != BT_REAL) {
-    type_error(y);
-    return FAILURE;
-  }
-
-  if (x->ts.kind != g95_default_real_kind() ||
-                y->ts.kind != g95_default_real_kind()) {
-    kind_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-try g95_check_epsilon(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  g95_intrinsic_extension = 0;
+  if (rank_check(vector_b, 1, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -429,53 +434,33 @@ try g95_check_epsilon(g95_expr *x) {
 try g95_check_eoshift(g95_expr *array, g95_expr *shift, g95_expr *boundary,
 		      g95_expr *dim) {
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (shift->ts.type != BT_INTEGER) return FAILURE;
+  if (type_check(shift, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   if (array->rank == 1) {
-    if (shift->rank != 0) return FAILURE;
+    if (scalar_check(shift, 2) == FAILURE) return FAILURE;
   } else {
     /* TODO: more weird restrictions on shift */
   }
 
   if (boundary != NULL) {
-    if (!g95_compare_types(&array->ts, &boundary->ts)) return FAILURE;
+    if (same_type_check(array, 0, boundary, 2) == FAILURE) return FAILURE;
 
     /* TODO: more restrictions on boundary */
   }
 
-  if (check_arg_dim(shift,dim,1) == FAILURE) {
-    return FAILURE;
-  }
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
 
 
-try g95_check_exp(g95_expr *x) {
+try g95_check_epsilon(g95_expr *x) {
 
-  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
 
-  return SUCCESS;
-}
-
-
-try g95_check_floor(g95_expr *a, g95_expr *kind) {
-
-  if (a->ts.type != BT_REAL) {
-    type_error(a);
-    return FAILURE;
-  }
-
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
-    return FAILURE;
-  }
+  g95_intrinsic_extension = 0;
 
   return SUCCESS;
 }
@@ -483,10 +468,7 @@ try g95_check_floor(g95_expr *a, g95_expr *kind) {
 
 try g95_check_huge(g95_expr *x) {
 
-  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (int_or_real_check(x, 0) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
 
@@ -496,45 +478,11 @@ try g95_check_huge(g95_expr *x) {
 
 try g95_check_iand(g95_expr *i, g95_expr *j) {
 
-  if (j == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
-
-  if (i->ts.type != BT_INTEGER) {
-    type_error(i);
-    return FAILURE;
-  }
-
-  if (j->ts.type != BT_INTEGER) {
-    type_error(j);
-    return FAILURE;
-  }
+  if (type_check(i, 0, BT_INTEGER) == FAILURE ||
+      type_check(j, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   if (i->ts.kind != j->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
-
-  return SUCCESS;
-
-}
-
-
-try g95_check_ibclr(g95_expr *i, g95_expr *j) {
-
-  if (j == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
-
-  if (i->ts.type != BT_INTEGER) {
-    type_error(i);
-    return FAILURE;
-  }
-
-  if (j->ts.type != BT_INTEGER) {
-    type_error(j);
+    must_be(j, 1, "the same kind as 'i'");
     return FAILURE;
   }
 
@@ -542,53 +490,39 @@ try g95_check_ibclr(g95_expr *i, g95_expr *j) {
 }
 
 
-try g95_check_ibits(g95_expr *i, g95_expr *j, g95_expr *k) {
+try g95_check_ibclr(g95_expr *i, g95_expr *pos) {
 
-  if (j == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
-
-  if (k == NULL) {
-    intrinsic_error("Third argument missing at %%L");
-    return FAILURE;
-  }
-
-  if (i->ts.type != BT_INTEGER) {
-    type_error(i);
-    return FAILURE;
-  }
-
-  if (j->ts.type != BT_INTEGER) {
-    type_error(j);
-    return FAILURE;
-  }
-
-  if (k->ts.type != BT_INTEGER) {
-    type_error(k);
-    return FAILURE;
-  }
+  if (type_check(i,   0, BT_INTEGER) == FAILURE ||
+      type_check(pos, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
 
 
-try g95_check_ibset(g95_expr *i, g95_expr *j) {
+try g95_check_ibits(g95_expr *i, g95_expr *pos, g95_expr *len) {
 
-  if (j == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
+  if (type_check(i,   0, BT_INTEGER) == FAILURE ||
+      type_check(pos, 1, BT_INTEGER) == FAILURE ||
+      type_check(len, 2, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (i->ts.type != BT_INTEGER) {
-    type_error(i);
-    return FAILURE;
-  }
+  return SUCCESS;
+}
 
-  if (j->ts.type != BT_INTEGER) {
-    type_error(j);
-    return FAILURE;
-  }
+
+try g95_check_ibset(g95_expr *i, g95_expr *pos) {
+
+  if (type_check(i,   0, BT_INTEGER) == FAILURE ||
+      type_check(pos, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+try g95_check_idnint(g95_expr *a, g95_expr *kind) {
+
+  if (double_check(a, 0) == FAILURE) return FAILURE;
+
+  if (kind_check(kind, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -596,54 +530,24 @@ try g95_check_ibset(g95_expr *i, g95_expr *j) {
 
 try g95_check_ieor(g95_expr *i, g95_expr *j) {
 
-  if (j == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
-
-  if (i->ts.type != BT_INTEGER) {
-    type_error(i);
-    return FAILURE;
-  }
-
-  if (j->ts.type != BT_INTEGER) {
-    type_error(j);
-    return FAILURE;
-  }
-
-  if (i->ts.kind != j->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
+  if (type_check(i, 0, BT_INTEGER) == FAILURE ||
+      type_check(j, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
 
 
-try g95_check_index(g95_expr *i, g95_expr *j, g95_expr *k) {
+try g95_check_index(g95_expr *string, g95_expr *substring, g95_expr *back) {
 
-  if (j == NULL) {
-    intrinsic_error("Second argument missing at %%L");
+  if (type_check(string,    0, BT_CHARACTER) == FAILURE ||
+      type_check(substring, 1, BT_CHARACTER) == FAILURE) return FAILURE;
+
+
+  if (back != NULL && type_check(back, 2, BT_LOGICAL) == FAILURE)
     return FAILURE;
-  }
 
-  if (i->ts.type != BT_CHARACTER) {
-    type_error(i);
-    return FAILURE;
-  }
-
-  if (j->ts.type != BT_CHARACTER) {
-    type_error(j);
-    return FAILURE;
-  }
-
-  if (k!=NULL && k->ts.type != BT_LOGICAL) {
-    type_error(k);
-    return FAILURE;
-  }
-
-  if (i->ts.kind != j->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+  if (string->ts.kind != substring->ts.kind) {
+    must_be(substring, 1, "the same kind as 'string'");
     return FAILURE;
   }
 
@@ -653,16 +557,8 @@ try g95_check_index(g95_expr *i, g95_expr *j, g95_expr *k) {
 
 try g95_check_int(g95_expr *x, g95_expr *kind) {
 
-  if (!g95_numeric_ts(&x->ts)) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
-    return FAILURE;
-  }
+  if (numeric_check(x, 0) == FAILURE ||
+      kind_check(kind, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -670,23 +566,11 @@ try g95_check_int(g95_expr *x, g95_expr *kind) {
 
 try g95_check_ior(g95_expr *i, g95_expr *j) {
 
-  if (j == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
-
-  if (i->ts.type != BT_INTEGER) {
-    type_error(i);
-    return FAILURE;
-  }
-
-  if (j->ts.type != BT_INTEGER) {
-    type_error(j);
-    return FAILURE;
-  }
+  if (type_check(i, 0, BT_INTEGER) == FAILURE ||
+      type_check(j, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   if (i->ts.kind != j->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    must_be(j, 1, "the same kind as 'i'");
     return FAILURE;
   }
 
@@ -696,7 +580,10 @@ try g95_check_ior(g95_expr *i, g95_expr *j) {
 
 try g95_check_kind(g95_expr *x) {
 
-  if (x->ts.type == BT_DERIVED) return FAILURE;
+  if (x->ts.type == BT_DERIVED) {
+    must_be(x, 0, "a non-derived type");
+    return FAILURE;
+  }
 
   g95_intrinsic_extension = 0;
 
@@ -706,31 +593,8 @@ try g95_check_kind(g95_expr *x) {
 
 try g95_check_lbound(g95_expr *array, g95_expr *dim) {
 
-  if (array->rank == 0) return FAILURE;
-
-  if (check_arg_dim(array, dim, 1) == FAILURE) return FAILURE;
-
-  return SUCCESS;
-}
-
-
-try g95_check_log(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-try g95_check_log10(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (array_check(array, 0) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -738,138 +602,80 @@ try g95_check_log10(g95_expr *x) {
 
 try g95_check_logical(g95_expr *a, g95_expr *kind) {
 
-  if (a->ts.type != BT_LOGICAL) {
-    type_error(a);
-    return FAILURE;
-  }
+  if (type_check(a, 0, BT_LOGICAL) == FAILURE) return FAILURE;
+  if (kind_check(kind, 1) == FAILURE) return FAILURE;
 
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
+  return SUCCESS;
+}
+
+
+/* Min/max family.  */
+
+static try min_max_args(g95_actual_arglist *arg) {
+
+  if (arg == NULL || arg->next == NULL) {
+    g95_error("Intrinsic '%s' at %L must have at least two arguments",
+	      g95_current_intrinsic, g95_current_intrinsic_where);
     return FAILURE;
   }
 
   return SUCCESS;
 }
 
-
-/* Min/max family.  Even though several of the check functions could
- * be combined in various ways, the separate check functions allow us
- * to determine the exact intrinsic from the check function. */
 
 static try check_rest(bt type, int kind, g95_actual_arglist *arg) {
 g95_expr *x;
 int n;
 
-  n = 0; 
+  if (min_max_args(arg) == FAILURE) return FAILURE; 
+
+  n = 1;
 
   for(; arg; arg=arg->next, n++) {
     x = arg->expr;
     if (x->ts.type != type || x->ts.kind != kind) {
-     type_error(x); 
-     return FAILURE;
+      g95_error("'a%d' argument of '%s' intrinsic at %L must be %s(%d)",
+		n, g95_current_intrinsic, &x->where, g95_typename(type), kind);
+      return FAILURE;
     }
   }
-
-  if (n < 2) return FAILURE;
 
   return SUCCESS;
 }
 
 
-try g95_check_min(g95_actual_arglist *arg) {
+try g95_check_min_max(g95_actual_arglist *arg) {
 g95_expr *x;
 
-  if (arg == NULL) return FAILURE;
+  if (min_max_args(arg) == FAILURE) return FAILURE; 
 
   x = arg->expr;
-  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) {
+    g95_error("'a1' argument of '%s' intrinsic at %L must be INTEGER or REAL",
+	      g95_current_intrinsic, &x->where);
+    return FAILURE;
+  }
 
   return check_rest(x->ts.type, x->ts.kind, arg);
 }
 
 
-try g95_check_max(g95_actual_arglist *arg) {
-
-  return g95_check_min(arg);
-}
-
-
-try g95_check_min0(g95_actual_arglist *arg) {
-g95_expr *x;
-
-  if (arg == NULL) return FAILURE; 
-
-  x = arg->expr;
-  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+try g95_check_min_max_integer(g95_actual_arglist *arg) {
 
   return check_rest(BT_INTEGER, g95_default_integer_kind(), arg);
 }
 
 
-try g95_check_max0(g95_actual_arglist *arg) {
-
-  return g95_check_min0(arg);
-}
-
-
-try g95_check_min1(g95_actual_arglist *arg) {
-g95_expr *x;
-
-  if (arg == NULL) return FAILURE;
-
-  x = arg->expr;
-  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+try g95_check_min_max_real(g95_actual_arglist *arg) {
 
   return check_rest(BT_REAL, g95_default_real_kind(), arg);
 }
 
 
-try g95_check_max1(g95_actual_arglist *arg) {
+try g95_check_min_max_double(g95_actual_arglist *arg) {
 
-  return g95_check_min1(arg);
-}
-
-
-try g95_check_amin0(g95_actual_arglist *arg) {
-
-  if (arg == NULL) return FAILURE; 
-
-  return check_rest(BT_INTEGER, g95_default_integer_kind(), arg);
-}
-
-
-try g95_check_amax0(g95_actual_arglist *arg) {
-
-  return g95_check_amin0(arg);
-}
-
-
-try g95_check_amin1(g95_actual_arglist *arg) {
-
-  if (arg == NULL) return FAILURE; 
-
-  return check_rest(BT_REAL, g95_default_real_kind(), arg);
-}
-
-
-try g95_check_amax1(g95_actual_arglist *arg) {
-
-  return g95_check_amin1(arg);
-}
-
-
-try g95_check_dmin1(g95_actual_arglist *arg) {
-
-  if (arg == NULL) return FAILURE; 
-
-  return check_rest(BT_REAL, g95_default_double_kind(), arg); 
-}
-
-
-try g95_check_dmax1(g95_actual_arglist *arg) {
-
-  return g95_check_dmin1(arg);
+  return check_rest(BT_REAL, g95_default_double_kind(), arg);
 }
 
 
@@ -878,10 +684,7 @@ try g95_check_dmax1(g95_actual_arglist *arg) {
 
 try g95_check_min_max_exponent(g95_expr *x) {
 
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
 
@@ -892,54 +695,54 @@ try g95_check_min_max_exponent(g95_expr *x) {
 try g95_check_matmul(g95_expr *matrix_a, g95_expr *matrix_b) {
 
   if ((matrix_a->ts.type != BT_LOGICAL) && !g95_numeric_ts(&matrix_b->ts)) {
-    type_error(matrix_a);
+    must_be(matrix_a, 0, "numeric or LOGICAL");
     return FAILURE;
   }
 
   if ((matrix_b->ts.type != BT_LOGICAL) && !g95_numeric_ts(&matrix_a->ts)) {
-    type_error(matrix_b);
+    must_be(matrix_b, 0, "numeric or LOGICAL");
     return FAILURE;
   }
 
-  if (matrix_a->rank == 0 || matrix_b->rank == 0) return FAILURE;
+  switch(matrix_a->rank) {
+  case 1:
+    if (rank_check(matrix_b, 2, 2) == FAILURE) return FAILURE;
+    break;
 
-  if ((matrix_a->rank != 1 || matrix_b->rank != 2) &&
-      (matrix_a->rank != 2 || matrix_b->rank != 1))
+  case 2:
+    if (rank_check(matrix_b, 2, 1) == FAILURE) return FAILURE;
+    break;
+
+  default:
+    must_be(matrix_a, 0, "of rank 1 or 2");
     return FAILURE;
+  }
 
   return SUCCESS;
 }
 
 
-try g95_check_maxloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+try g95_check_minloc_maxloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
-  if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL) {
-    type_error(array);
-    return FAILURE;
-  }
+  if (int_or_real_check(array, 0) == FAILURE) return FAILURE;
 
-  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 0) == FAILURE) return FAILURE;
 
-  if (mask != NULL && (mask->rank != 0 || mask->ts.type != BT_LOGICAL))
-    return FAILURE;
+  if (mask != NULL && logical_array_check(mask, 2) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
 
 
-try g95_check_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+try g95_check_minval_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL) {
-    type_error(array);
-    return FAILURE;
-  }
+  if (int_or_real_check(array, 0) == FAILURE) return FAILURE;
 
-  if (check_arg_dim(array, dim, 1) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
-  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
-    return FAILURE;
+  if (mask != NULL && logical_array_check(mask, 2) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -947,64 +750,9 @@ try g95_check_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
 try g95_check_merge(g95_expr *tsource, g95_expr *fsource, g95_expr *mask) {
 
-  if (!g95_compare_types(&tsource->ts, &fsource->ts)) return FAILURE;
+  if (same_type_check(tsource, 0, fsource, 1) == FAILURE) return FAILURE;
 
-  if (mask->ts.type != BT_LOGICAL) return FAILURE;
-
-  return SUCCESS;
-}
-
-
-try g95_check_minloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
-
-  if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL) {
-    type_error(array);
-    return FAILURE;
-  }
-
-  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
-
-  if (mask != NULL && (mask->rank != 0 || mask->ts.type != BT_LOGICAL))
-    return FAILURE;
-
-  return SUCCESS;
-}
-
-
-try g95_check_minval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
-
-  if (array->rank == 0) return FAILURE;
-
-  if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL) {
-    type_error(array);
-    return FAILURE;
-  }
-
-  if (check_arg_dim(array, dim, 1) == FAILURE) return FAILURE;
-
-  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
-    return FAILURE;
-
-  return SUCCESS;
-}
-
-
-try g95_check_mod(g95_expr *a, g95_expr *p) {
-
-  if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL)) {
-    type_error(a);
-    return FAILURE;
-  }
-
-  if (a->ts.type != p->ts.type) {
-    intrinsic_error("Types of arguments to intrinsic at %%L must agree"); 
-    return FAILURE;
-  }
-  
-  if (a->ts.kind != p->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
+  if (type_check(mask, 2, BT_LOGICAL) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1012,20 +760,9 @@ try g95_check_mod(g95_expr *a, g95_expr *p) {
 
 try g95_check_modulo(g95_expr *a, g95_expr *p) {
 
-  if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL)) {
-    type_error(a);
-    return FAILURE;
-  }
+  if (int_or_real_check(a, 0) == FAILURE) return FAILURE;
 
-  if (a->ts.type != p->ts.type) {
-    intrinsic_error("Types of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
-
-  if (a->ts.kind != p->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
+  if (same_type_check(a, 0, p, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1033,65 +770,26 @@ try g95_check_modulo(g95_expr *a, g95_expr *p) {
 
 try g95_check_nearest(g95_expr *x, g95_expr *s) {
 
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
 
-  if (s->ts.type != BT_REAL) {
-    type_error(s);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-try g95_check_nint(g95_expr *x, g95_expr *kind) {
-
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (kind != NULL &&
-      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-try g95_check_idnint(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (x->ts.kind != g95_default_double_kind()) {
-    kind_error(x);
-    return FAILURE;
-  }
+  if (type_check(s, 0, BT_REAL) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
 
 
 try g95_check_null(g95_expr *mold) {
-g95_ref *ref;
+symbol_attribute attr;
 
   if (mold == NULL) return SUCCESS;
 
-  if (mold->ref == NULL) {
-    if (mold->symbol->attr.pointer == 0) return FAILURE;
-  } else {
-    for(ref=mold->ref; ref->next;)
-      ref = ref->next;
+  if (variable_check(mold, 0) == FAILURE) return FAILURE;
 
-    if (ref->component == NULL || ref->component->pointer == 0) return FAILURE;
+  attr = g95_variable_attr(mold, NULL);
+
+  if (!attr.pointer) {
+    must_be(mold, 0, "a POINTER");
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -1100,15 +798,16 @@ g95_ref *ref;
 
 try g95_check_pack(g95_expr *array, g95_expr *mask, g95_expr *vector) {
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (mask->rank == 0 || mask->ts.type != BT_INTEGER) return FAILURE;
+  if (array_check(mask, 1) == FAILURE) return FAILURE;
+
+  if (type_check(mask, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   if (vector != NULL) {
+    if (same_type_check(array, 0, vector, 2) == FAILURE) return FAILURE;
 
-    if (!g95_compare_types(&array->ts, &vector->ts)) return FAILURE;
-
-    if (vector->rank != 1) return FAILURE;
+    if (rank_check(vector, 2, 1) == FAILURE) return FAILURE;
 
     /* TODO: More constraints here */
   }
@@ -1120,7 +819,7 @@ try g95_check_pack(g95_expr *array, g95_expr *mask, g95_expr *vector) {
 try g95_check_precision(g95_expr *x) {
 
   if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-    type_error(x);
+    must_be(x, 0, "of type REAL or COMPLEX");
     return FAILURE;
   }
 
@@ -1132,10 +831,17 @@ try g95_check_precision(g95_expr *x) {
 
 try g95_check_present(g95_expr *a) {
 
-  if (a->expr_type != EXPR_VARIABLE) return FAILURE;
+  if (variable_check(a, 0) == FAILURE) return FAILURE;
 
-  if (a->symbol->attr.dummy == 0 || a->symbol->attr.optional == 0)
+  if (!a->symbol->attr.dummy) {
+    must_be(a, 0, "a dummy variable");
     return FAILURE;
+  }
+
+  if (!a->symbol->attr.optional) {
+    must_be(a, 0, "an OPTIONAL dummy variable");
+    return FAILURE;
+  }
 
   return SUCCESS;
 }
@@ -1143,17 +849,13 @@ try g95_check_present(g95_expr *a) {
 
 try g95_check_product(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (!g95_numeric_ts(&array->ts)) {
-    type_error(array);
-    return FAILURE;
-  }
+  if (numeric_check(array, 0) == FAILURE) return FAILURE;
 
-  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 0) == FAILURE) return FAILURE;
 
-  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
-    return FAILURE;
+  if (mask != NULL && logical_array_check(mask, 2) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1161,10 +863,7 @@ try g95_check_product(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
 try g95_check_radix(g95_expr *x) {
 
-  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (int_or_real_check(x, 0) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
 
@@ -1174,10 +873,7 @@ try g95_check_radix(g95_expr *x) {
 
 try g95_check_range(g95_expr *x) {
 
-  if (!g95_numeric_ts(&x->ts)) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (int_or_real_check(x, 0) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
 
@@ -1187,16 +883,9 @@ try g95_check_range(g95_expr *x) {
 /* real, float, sngl */
 try g95_check_real(g95_expr *a, g95_expr *kind) {
 
-  if (!g95_numeric_ts(&a->ts)) {
-    type_error(a);
-    return FAILURE;
-  }
+  if (numeric_check(a, 0) == FAILURE) return FAILURE;
 
-  if (kind != NULL && (kind->ts.type != BT_INTEGER ||
-		       kind->expr_type != EXPR_CONSTANT)) {
-    kind_error(kind);
-    return FAILURE;
-  }
+  if (kind_check(kind, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1204,20 +893,9 @@ try g95_check_real(g95_expr *a, g95_expr *kind) {
 
 try g95_check_repeat(g95_expr *x, g95_expr *y) {
 
-  if (y == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
+  if (type_check(x, 0, BT_CHARACTER) == FAILURE) return FAILURE;
 
-  if (x->ts.type != BT_CHARACTER) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  if (y->ts.type != BT_INTEGER) {
-    type_error(y);
-    return FAILURE;
-  }
+  if (type_check(y, 0, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1226,28 +904,20 @@ try g95_check_repeat(g95_expr *x, g95_expr *y) {
 try g95_check_reshape(g95_expr *source, g95_expr *shape,
 		      g95_expr *pad, g95_expr *order) {
 
-  if (source->rank == 0) return FAILURE;
+  if (array_check(source, 0) == FAILURE) return FAILURE;
 
-  if (shape->rank == 0) return FAILURE;
+  if (rank_check(shape, 1, 1) == FAILURE) return FAILURE;
 
-  if (shape->ts.type != BT_INTEGER) {
-    type_error(shape);
-    return FAILURE;
-  }
+  /* constant size check on shape */
 
-  if (shape->ts.type != BT_INTEGER) {
-    type_error(shape);
-    return FAILURE;
-  }
-
-  if (shape->rank != 1) return FAILURE;
+  if (type_check(shape, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   if (pad != NULL) {
-    if (!g95_compare_types(&source->ts, &pad->ts)) return FAILURE;
-    if (pad->rank == 0) return FAILURE;
+    if (same_type_check(source, 0, pad, 2) == FAILURE) return FAILURE;
+    if (array_check(pad, 2) == FAILURE) return FAILURE;
   }
 
-  if (order != NULL && order->rank == 0) return FAILURE;
+  if (order != NULL && array_check(order, 3) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1255,7 +925,9 @@ try g95_check_reshape(g95_expr *source, g95_expr *shape,
 
 try g95_check_scale(g95_expr *x, g95_expr *i) {
 
-  if (x->ts.type != BT_REAL || i->ts.type != BT_INTEGER) return FAILURE;
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
+
+  if (type_check(i, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1263,30 +935,13 @@ try g95_check_scale(g95_expr *x, g95_expr *i) {
 
 try g95_check_scan(g95_expr *x, g95_expr *y, g95_expr *z) {
 
-  if (y == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
+  if (type_check(x, 0, BT_CHARACTER) == FAILURE) return FAILURE;
 
-  if (x->ts.type != BT_CHARACTER) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (type_check(y, 1, BT_CHARACTER) == FAILURE) return FAILURE;
 
-  if (y->ts.type != BT_CHARACTER) {
-    type_error(y);
-    return FAILURE;
-  }
+  if (z != NULL && type_check(z, 2, BT_LOGICAL) == FAILURE) return FAILURE;
 
-  if (z!=NULL && z->ts.type != BT_LOGICAL) {
-    type_error(z);
-    return FAILURE;
-  }
-
-  if (x->ts.kind != y->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
+  if (same_type_check(x, 0, y, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1295,18 +950,15 @@ try g95_check_scan(g95_expr *x, g95_expr *y, g95_expr *z) {
 try g95_check_selected_real_kind(g95_expr *p, g95_expr *r) {
 
   if (p == NULL && r == NULL) {
+    g95_error("Missing arguments to %s intrinsic at %L", g95_current_intrinsic,
+	      g95_current_intrinsic_where);
+
     return FAILURE;
   }
 
-  if (p != NULL && p->ts.type != BT_INTEGER) {
-    type_error(p);
-    return FAILURE;
-  } 
+  if (p != NULL && type_check(p, 0, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (r != NULL && r->ts.type != BT_INTEGER) {
-    type_error(r);
-    return FAILURE;
-  }
+  if (r != NULL && type_check(r, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
 
@@ -1320,22 +972,11 @@ try g95_check_shape(g95_expr *source) {
 }
 
 
-try g95_check_sin(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
 try g95_check_size(g95_expr *array, g95_expr *dim) {
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (check_arg_dim(array, dim, 1) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1343,25 +984,9 @@ try g95_check_size(g95_expr *array, g95_expr *dim) {
 
 try g95_check_sign(g95_expr *a, g95_expr *b) {
 
-  if (a->ts.type != BT_INTEGER && a->ts.type != BT_REAL) {
-    type_error(a);
-    return FAILURE;
-  }
+  if (int_or_real_check(a, 0) == FAILURE) return FAILURE;
 
-  if (b->ts.type != BT_INTEGER && b->ts.type != BT_REAL) {
-    type_error(b);
-    return FAILURE;
-  }
-
-  if (a->ts.type != b->ts.type) {
-    intrinsic_error("Types of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }  
-  
-  if (a->ts.kind != b->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
+  if (same_type_check(a, 0, b, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1369,22 +994,15 @@ try g95_check_sign(g95_expr *a, g95_expr *b) {
 
 try g95_check_spread(g95_expr *source, g95_expr *dim, g95_expr *ncopies) {
 
-  if (source->rank >= G95_MAX_DIMENSIONS) return FAILURE;
-
-  if (check_arg_dim(source, dim, 0) == FAILURE) return FAILURE;
-
-  if (ncopies->ts.type != BT_INTEGER || ncopies->rank != 0) return FAILURE;
-
-  return SUCCESS;
-}
-
-
-try g95_check_sqrt(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-    type_error(x);
+  if (source->rank >= G95_MAX_DIMENSIONS) {
+    must_be(source, 0, "less than rank " stringize(G95_MAX_DIMENSIONS));
     return FAILURE;
   }
+
+  if (dim_check(dim, 1, 0) == FAILURE) return FAILURE;
+
+  if (type_check(ncopies, 2, BT_INTEGER) == FAILURE) return FAILURE;
+  if (scalar_check(ncopies, 2) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1392,50 +1010,27 @@ try g95_check_sqrt(g95_expr *x) {
 
 try g95_check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (!g95_numeric_ts(&array->ts)) {
-    type_error(array);
-    return FAILURE;
-  }
+  if (numeric_check(array, 0) == FAILURE) return FAILURE;
 
-  if (check_arg_dim(array, dim, 1) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
-  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
-    return FAILURE;
+  if (mask != NULL && logical_array_check(mask, 2) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
-
-/* Tangent family */
-
-try g95_check_tan(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-
-
-try g95_check_dtan(g95_expr *x) {
-
-  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
-    type_error(x);
-    return FAILURE;
-  }
-
-  return SUCCESS;
-}
-/* end of tangents */
 
 
 try g95_check_transfer(g95_expr *source, g95_expr *mold, g95_expr *size) {
 
-  if (size != NULL && (size->ts.type != BT_INTEGER || size->rank == 0))
-    return FAILURE;
+  if (size != NULL) {
+    if (type_check(size, 2, BT_INTEGER) == FAILURE) return FAILURE;
+
+    if (scalar_check(size, 2) == FAILURE) return FAILURE;
+
+    if (nonoptional_check(size, 2) == FAILURE) return FAILURE;
+  }
 
   return SUCCESS;
 }
@@ -1443,7 +1038,7 @@ try g95_check_transfer(g95_expr *source, g95_expr *mold, g95_expr *size) {
 
 try g95_check_transpose(g95_expr *matrix) {
 
-  if (matrix->rank != 2) return FAILURE;
+  if (rank_check(matrix, 0, 2) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1451,10 +1046,7 @@ try g95_check_transpose(g95_expr *matrix) {
 
 try g95_check_tiny(g95_expr *x) {
 
-  if (x->ts.type != BT_REAL) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
 
@@ -1464,11 +1056,9 @@ try g95_check_tiny(g95_expr *x) {
 
 try g95_check_ubound(g95_expr *array, g95_expr *dim) {
 
-  if (array->rank == 0) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (check_arg_dim(array, dim, 1) == FAILURE) {
-    return FAILURE;
-  }
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1476,11 +1066,13 @@ try g95_check_ubound(g95_expr *array, g95_expr *dim) {
 
 try g95_check_unpack(g95_expr *vector, g95_expr *mask, g95_expr *field) {
 
-  if (vector->rank == 0 || vector->rank != 1) return FAILURE;
+  if (rank_check(vector, 0, 1) == FAILURE) return FAILURE;
 
-  if (mask->rank == 0 || mask->ts.type != BT_LOGICAL) return FAILURE;
+  if (array_check(mask, 1) == FAILURE) return FAILURE;
 
-  if (!g95_compare_types(&vector->ts, &field->ts)) return FAILURE;
+  if (type_check(mask, 1, BT_LOGICAL) == FAILURE) return FAILURE;
+
+  if (same_type_check(vector, 0, field, 2) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1488,35 +1080,14 @@ try g95_check_unpack(g95_expr *vector, g95_expr *mask, g95_expr *field) {
 
 try g95_check_verify(g95_expr *x, g95_expr *y, g95_expr *z) {
 
-  if (y == NULL) {
-    intrinsic_error("Second argument missing at %%L");
-    return FAILURE;
-  }
+  if (type_check(x, 0, BT_CHARACTER) == FAILURE) return FAILURE;
 
-  if (x->ts.type != BT_CHARACTER) {
-    type_error(x);
-    return FAILURE;
-  }
+  if (same_type_check(x, 0, y, 1) == FAILURE) return FAILURE;
 
-  if (y->ts.type != BT_CHARACTER) {
-    type_error(y);
-    return FAILURE;
-  }
-
-  if (z!=NULL && z->ts.type != BT_LOGICAL) {
-    type_error(z);
-    return FAILURE;
-  }
-
-  if (x->ts.kind != y->ts.kind) {
-    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-    return FAILURE;
-  }
+  if (z != NULL && type_check(z, 2, BT_LOGICAL) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
-
-
 
 
 
@@ -1526,17 +1097,25 @@ try g95_check_verify(g95_expr *x, g95_expr *y, g95_expr *z) {
 try g95_check_date_and_time(g95_expr *date, g95_expr *time,
 			    g95_expr *zone, g95_expr *values) {
 
-  if (date != NULL && (date->ts.type != BT_CHARACTER || date->rank != 0))
-    return FAILURE;
+  if (date != NULL) {
+    if (type_check(date, 0, BT_CHARACTER) == FAILURE) return FAILURE;
+    if (scalar_check(date, 0) == FAILURE) return FAILURE;
+  }
 
-  if (time != NULL && (time->ts.type != BT_CHARACTER || time->rank != 0))
-    return FAILURE;
+  if (time != NULL) {
+    if (type_check(time, 1, BT_CHARACTER) == FAILURE) return FAILURE;
+    if (scalar_check(time, 1) == FAILURE) return FAILURE;
+  }
 
-  if (zone != NULL && (zone->ts.type != BT_CHARACTER || zone->rank != 0))
-    return FAILURE;
+  if (zone != NULL) {
+    if (type_check(zone, 2, BT_CHARACTER) == FAILURE) return FAILURE;
+    if (scalar_check(zone, 2) == FAILURE) return FAILURE;
+  }
 
-  if (values != NULL && (values->ts.type != BT_INTEGER || values->rank == 0))
-    return FAILURE;
+  if (values != NULL) {
+    if (type_check(values, 3, BT_INTEGER) == FAILURE) return FAILURE;
+    if (scalar_check(values, 3) == FAILURE) return FAILURE;
+  }
 
   return SUCCESS;
 }
@@ -1545,14 +1124,14 @@ try g95_check_date_and_time(g95_expr *date, g95_expr *time,
 try g95_check_mvbits(g95_expr *from, g95_expr *frompos, g95_expr *len,
 		     g95_expr *to, g95_expr *topos) {
 
-  if (from->ts.type != BT_INTEGER) return FAILURE;
-  if (frompos->ts.type != BT_INTEGER) return FAILURE;
+  if (type_check(from, 0, BT_INTEGER) == FAILURE) return FAILURE;
+  if (type_check(frompos, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (len->ts.type != BT_INTEGER) return FAILURE;
-  if (to->ts.type != BT_INTEGER || to->ts.kind != from->ts.kind)
-    return FAILURE;
+  if (type_check(len, 2, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (topos->ts.type != BT_INTEGER) return FAILURE;
+  if (same_type_check(from, 0, to, 3) == FAILURE) return FAILURE;
+
+  if (type_check(topos, 4, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1560,14 +1139,28 @@ try g95_check_mvbits(g95_expr *from, g95_expr *frompos, g95_expr *len,
 
 try g95_check_random_number(g95_expr *size, g95_expr *put, g95_expr *get) {
 
-  if (size->rank != 0 || size->ts.type != BT_INTEGER ||
-      size->ts.kind != g95_default_integer_kind()) return FAILURE;
+  if (scalar_check(size, 0) == FAILURE) return FAILURE;
 
-  if (put->rank == 0 || put->ts.type != BT_INTEGER ||
-      put->ts.kind != g95_default_integer_kind()) return FAILURE;
+  if (type_check(size, 0, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (get->rank == 0 || get->ts.type != BT_INTEGER ||
-      get->ts.kind != g95_default_integer_kind()) return FAILURE;
+  if (kind_value_check(size, 0, g95_default_integer_kind()) == FAILURE)
+    return FAILURE;
+
+
+  if (scalar_check(put, 1) == FAILURE) return FAILURE;
+
+  if (type_check(put, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+  if (kind_value_check(put, 1, g95_default_integer_kind()) == FAILURE)
+    return FAILURE;
+
+
+  if (scalar_check(get, 2) == FAILURE) return FAILURE;
+
+  if (type_check(get, 2, BT_INTEGER) == FAILURE) return FAILURE;
+
+  if (kind_value_check(get, 2, g95_default_integer_kind()) == FAILURE)
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -1575,7 +1168,7 @@ try g95_check_random_number(g95_expr *size, g95_expr *put, g95_expr *get) {
 
 try g95_check_random_seed(g95_expr *harvest) {
 
-  if (harvest->ts.type != BT_REAL) return FAILURE;
+  if (type_check(harvest, 0, BT_REAL) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
