@@ -754,7 +754,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("exp");
 
   add_sym("exponent", 0, 1, BT_INTEGER, di,
-	  NULL, g95_simplify_exponent, NULL,
+	  g95_check_exponent, g95_simplify_exponent, g95_resolve_exponent,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("floor", 0, 0, BT_INTEGER, di,
@@ -826,11 +826,11 @@ int di, dr, dd, dl, dc, dz;
 	  i, BT_INTEGER, di, 0, j,   BT_INTEGER, di, 0, NULL);
 
   add_sym("ishft", 0, 1, BT_INTEGER, di,
-	  NULL, g95_simplify_ishft, NULL,
+	  g95_check_ishft, g95_simplify_ishft, g95_resolve_ishft,
 	  i, BT_INTEGER, di, 0,   sh, BT_INTEGER, di, 0, NULL);
 
   add_sym("ishftc", 0, 1, BT_INTEGER, di,
-	  NULL, g95_simplify_ishftc, NULL,
+	  g95_check_ishftc, g95_simplify_ishftc, g95_resolve_ishftc,
 	  i, BT_INTEGER, di, 0,   sh, BT_INTEGER, di, 0,
 	  sz, BT_INTEGER, di, 1, NULL);
 
@@ -1125,7 +1125,8 @@ int di, dr, dd, dl, dc, dz;
 	  p, BT_INTEGER, di, 1,   r, BT_INTEGER, di, 1, NULL);
 
   add_sym("set_exponent", 0, 1, BT_REAL, dr,
-	  NULL, g95_simplify_set_exponent, NULL,
+	  g95_check_set_exponent, g95_simplify_set_exponent,
+	  g95_resolve_set_exponent,
 	  x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
   add_sym("shape", 1, 1, BT_INTEGER, di,

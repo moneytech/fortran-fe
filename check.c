@@ -202,7 +202,7 @@ static try nonoptional_check(g95_expr *e, int n) {
 static try kind_value_check(g95_expr *e, int n, int k) {
 char *message;
 
-  if (e->ts.kind != k) return SUCCESS;
+  if (e->ts.kind == k) return SUCCESS;
 
   message = alloca(100);
   sprintf(message, "of kind %d", k);
@@ -479,6 +479,14 @@ try g95_check_epsilon(g95_expr *x) {
 }
 
 
+try g95_check_exponent(g95_expr *x) {
+
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 try g95_check_huge(g95_expr *x) {
 
   if (int_or_real_check(x, 0) == FAILURE) return FAILURE;
@@ -586,6 +594,27 @@ try g95_check_ior(g95_expr *i, g95_expr *j) {
     must_be(j, 1, "the same kind as 'i'");
     return FAILURE;
   }
+
+  return SUCCESS;
+}
+
+
+try g95_check_ishft(g95_expr *i, g95_expr *shift) {
+
+  if (type_check(i, 0, BT_INTEGER) == FAILURE ||
+      type_check(shift, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+try g95_check_ishftc(g95_expr *i, g95_expr *shift, g95_expr *size) {
+
+  if (type_check(i, 0, BT_INTEGER) == FAILURE ||
+      type_check(shift, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+  if (size != NULL &&
+      type_check(size, 2, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -887,7 +916,7 @@ try g95_check_radix(g95_expr *x) {
 
 try g95_check_range(g95_expr *x) {
 
-  if (int_or_real_check(x, 0) == FAILURE) return FAILURE;
+  if (numeric_check(x, 0) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
 
@@ -975,6 +1004,19 @@ try g95_check_selected_real_kind(g95_expr *p, g95_expr *r) {
   if (r != NULL && type_check(r, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
+
+  return SUCCESS;
+}
+
+
+try g95_check_set_exponent(g95_expr *x, g95_expr *i) {
+
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
+
+  if (type_check(i, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+  if (kind_value_check(i, 1, g95_default_integer_kind()) == FAILURE)
+    return FAILURE;
 
   return SUCCESS;
 }

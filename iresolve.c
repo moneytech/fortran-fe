@@ -33,7 +33,7 @@ static char temp_name[30];
 /* String Pool.  This is used to provide a stable location for various
  * string constants. */
 
-#define G95_STRINGPOOL_SIZE 800
+#define G95_STRINGPOOL_SIZE 1300
 
 static char *pool_base, *pool_top;
 
@@ -148,6 +148,55 @@ void g95_resolve_btest(g95_expr *f, g95_expr *i, g95_expr *pos) {
 }
 
 
+static char *exponent_name(int kind) {
+
+  sprintf(temp_name, "__exponent_%d", kind);
+  return temp_name;
+}
+
+
+void g95_resolve_exponent(g95_expr *f, g95_expr *x) {
+
+  f->ts.type = BT_INTEGER;
+  f->ts.kind = g95_default_integer_kind();
+
+  f->value.function.name = get_string(exponent_name(x->ts.kind));
+}
+
+
+static char *ishft_name(int k1, int k2) {
+
+  sprintf(temp_name, "__ishft_%d_%d", k1, k2);
+  return temp_name;
+}
+
+
+void g95_resolve_ishft(g95_expr *f, g95_expr *i, g95_expr *shift) {
+
+  f->ts = i->ts;
+  f->value.function.name = get_string(ishft_name(i->ts.kind, shift->ts.kind));
+}
+
+
+static char *ishftc_name(int k1, int k2, int k3) {
+
+  sprintf(temp_name, "__ishftc_%d_%d_%d", k1, k2, k3);
+  return temp_name;
+}
+
+
+void g95_resolve_ishftc(g95_expr *f, g95_expr *i, g95_expr *shift,
+			g95_expr *size) {
+int s_kind;
+
+  s_kind = (size == NULL) ? g95_default_integer_kind() : shift->ts.kind;
+
+  f->ts = i->ts;
+  f->value.function.name =
+    get_string(ishftc_name(i->ts.kind, shift->ts.kind, s_kind));
+}
+
+
 static char *max_name(bt type, int kind) {
 static char max0[] = "__max0", amax1[] = "__amax1", dmax1[] = "__dmax1";
 
@@ -233,7 +282,6 @@ void g95_resolve_reshape(g95_expr *f) {
 }
 
 
-
 static char *scale_name(int real_kind, int int_kind) {
 
   sprintf(temp_name, "__scale%d_%d", real_kind, int_kind);
@@ -245,6 +293,20 @@ void g95_resolve_scale(g95_expr *f, g95_expr *x, g95_expr *y) {
 
   f->ts = x->ts;
   f->value.function.name = get_string(scale_name(x->ts.kind, x->ts.kind));
+}
+
+
+static char *set_exponent_name(int kind) {
+
+  sprintf(temp_name, "__set_exponent_%d", kind);
+  return temp_name;
+}
+
+
+void g95_resolve_set_exponent(g95_expr *f, g95_expr *x, g95_expr *i) {
+
+  f->ts = x->ts;
+  f->value.function.name = get_string(set_exponent_name(x->ts.kind));
 }
 
 
@@ -298,11 +360,12 @@ int i, j, k, ik, rk;
     add_string(min_name(BT_INTEGER, k));
     add_string(max_name(BT_INTEGER, k));
 
-
     for(j=0; g95_integer_kinds[j].kind; j++) {
       ik = g95_integer_kinds[j].kind;
 
       add_string(btest_name(k, ik));
+      add_string(ishft_name(k, ik));
+      add_string(ishftc_name(k, ik, g95_default_integer_kind()));
     }
   }
 
@@ -322,6 +385,9 @@ int i, j, k, ik, rk;
 
     add_string(min_name(BT_REAL, k));
     add_string(max_name(BT_REAL, k));
+
+    add_string(set_exponent_name(k));
+    add_string(exponent_name(k));
   }
 
   /* Generate a Cartesian product of read and integer kinds */
