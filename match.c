@@ -1920,6 +1920,7 @@ match m;
       if (expr->ref == NULL && expr->symbol->attr.dimension == 0 &&
 	  expr->symbol->ts.type != BT_DERIVED) {
 
+	memset(&ar, '\0', sizeof(ar));
 	m = g95_match_array_ref(&ar);
 	if (m == MATCH_ERROR) goto cleanup;
 
