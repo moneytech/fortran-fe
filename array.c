@@ -102,7 +102,8 @@ int i;
     }
     break;
 
-  default: g95_internal_error("g95_show_array_ref(): Unknown array reference");
+  default:
+    g95_internal_error("g95_show_array_ref(): Unknown array reference");
   }
 
   g95_status_char(')');

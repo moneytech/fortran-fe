@@ -921,7 +921,7 @@ g95_ref *ref;
       if (g95_resolve_expr(ref->start) == FAILURE) return FAILURE;
 
       if (ref->start != NULL && ref->start->ts.type != BT_INTEGER) {
-	g95_error("Substring index at %C must be of type INTEGER",
+	g95_error("Substring start index at %C must be of type INTEGER",
 		  &ref->start->where);
 	return FAILURE;
       }
@@ -929,7 +929,7 @@ g95_ref *ref;
       if (g95_resolve_expr(ref->end) == FAILURE) return FAILURE;
 
       if (ref->end != NULL && ref->end->ts.type != BT_INTEGER) {
-	g95_error("Substring index at %C must be of type INTEGER",
+	g95_error("Substring end index at %C must be of type INTEGER",
 		  &ref->end->where);
 	return FAILURE;
       }

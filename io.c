@@ -146,7 +146,9 @@ int old;
 
 static try resolve_tag(io_tag *tag, g95_expr *e) {
 
-  if (e == NULL || g95_resolve_expr(e) == FAILURE) return FAILURE;
+  if (e == NULL) return SUCCESS;
+
+  if (g95_resolve_expr(e) == FAILURE) return FAILURE;
 
   if (e->ts.type != tag->type) {
     g95_error("%s tag at %L must be of type %s", tag->name, &e->where,
