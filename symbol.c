@@ -251,21 +251,35 @@ int i;
 }
 
 
+/* g95_get_default_type()-- Given a symbol, return a pointer to the
+ * typespec for it's default type */
+
+g95_typespec *g95_get_default_type(g95_symbol *sym, g95_namespace *ns) {
+char letter;
+
+  letter = sym->name[0];
+  if (letter < 'a' || letter > 'z')
+    g95_internal_error("g95_get_default_type(): Bad symbol");
+
+  if (ns == NULL) ns = g95_current_ns;
+
+  return &ns->default_type[letter - 'a'];
+}
+
+
 /* g95_set_default_type()-- Given a pointer to a symbol, set its type
  * according to the first letter of its name.  Fails if the letter in
  * question has no default type. */
 
 try g95_set_default_type(g95_symbol *sym, int error_flag, g95_namespace *ns) {
-int i;
+g95_typespec *ts;
 
   if (sym->ts.type != BT_UNKNOWN)
     g95_internal_error("g95_set_default_type(): symbol already has a type");
 
-  i = sym->name[0] - 'a';
+  ts = g95_get_default_type(sym, ns);
 
-  if (ns == NULL) ns = g95_current_ns;
-
-  if (ns->default_type[i].type == BT_UNKNOWN) {
+  if (ts->type == BT_UNKNOWN) {
     if (error_flag)
       g95_error("Symbol '%s' at %L has no IMPLICIT type", sym->name,
 		&sym->declared_at);
@@ -273,7 +287,7 @@ int i;
     return FAILURE;
   }
 
-  sym->ts = ns->default_type[i];
+  sym->ts = *ts;
   sym->attr.implicit_type = 1;
 
   return SUCCESS;
@@ -1532,7 +1546,7 @@ int i;
     if (ns->parent != NULL)     /* Copy previous settings */
       ns->default_type[i - 'a'] = ns->parent->default_type[i - 'a'];
     else {
-      if ((i >= 'i') && (i <= 'n')) {
+      if ('i' <= i && i <= 'n') {
 	ns->default_type[i - 'a'].type = BT_INTEGER;
 	ns->default_type[i - 'a'].kind = g95_default_integer_kind();
       } else {

@@ -525,7 +525,7 @@ match m;
 
 static try resolve_unknown_f(g95_expr *expr) {
 g95_symbol *sym;
-g95_typespec ts;
+g95_typespec *ts;
 
   sym = expr->symbol; 
 
@@ -557,14 +557,14 @@ g95_typespec ts;
   if (sym->ts.type != BT_UNKNOWN)
     expr->ts = sym->ts;
   else {
-    ts = sym->ns->default_type[sym->name[0] - 'a'];
+    ts = g95_get_default_type(sym, sym->ns);
 
-    if (ts.type == BT_UNKNOWN) {
+    if (ts->type == BT_UNKNOWN) {
       g95_error("Function '%s' at %L has no implicit type",
 		sym->name, &expr->where);
       return FAILURE;
     } else
-      expr->ts = ts;
+      expr->ts = *ts;
   }
 
   return SUCCESS;

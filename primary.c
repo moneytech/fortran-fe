@@ -1539,10 +1539,15 @@ match m;
   switch(sym->attr.flavor) {
   case FL_VARIABLE:
   variable:
+    if (sym->ts.type == BT_UNKNOWN && g95_peek_char() == '%' && 
+	g95_get_default_type(sym, sym->ns)->type == BT_DERIVED)
+      g95_set_default_type(sym, 0, sym->ns);
+
     e = g95_get_expr();
 
     e->expr_type = EXPR_VARIABLE;
     e->symbol = sym;
+
     m = match_varspec(e, 0);
     break;
 
@@ -1636,6 +1641,14 @@ match m;
     break;
 
   case FL_UNKNOWN:
+
+    /* Special case for derived type variables that get their types
+     * via an IMPLICIT statement.  This can't wait for the resolution
+     * phase. */
+
+    if (g95_peek_char() == '%' &&
+	g95_get_default_type(sym, sym->ns)->type == BT_DERIVED)
+      g95_set_default_type(sym, 0, sym->ns);
 
 /* If the symbol has a dimension attribute, the expression is a variable */
 
@@ -1783,6 +1796,14 @@ match m;
   case FL_UNKNOWN:
     if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE)
       return MATCH_ERROR;
+
+    /* Special case for derived type variables that get their types
+     * via an IMPLICIT statement.  This can't wait for the resolution
+     * phase. */
+
+    if (g95_peek_char() == '%' &&
+	g95_get_default_type(sym, sym->ns)->type == BT_DERIVED)
+      g95_set_default_type(sym, 0, sym->ns);
 
     break;
 
