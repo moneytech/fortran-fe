@@ -870,13 +870,13 @@ int g95_compare_attr(symbol_attribute *a1, symbol_attribute *a2) {
     a1->target == a2->target       && a1->dummy == a2->dummy &&
     a1->common == a2->common       && a1->result == a2->result &&
     a1->entry == a2->entry         && a1->data == a2->data &&
-    a1->in_namelist == a2->in_namelist &&
+    a1->use_assoc == a2->use_assoc && a1->in_namelist == a2->in_namelist &&
     a1->in_common == a2->in_common && a1->saved_common == a2->saved_common && 
     a1->function == a2->function   && a1->subroutine == a2->subroutine &&
     a1->sequence == a2->sequence   && a1->elemental == a2->elemental &&
     a1->pure == a2->pure           && a1->recursive == a2->recursive &&
-    a1->intent == a2->intent       && a1->flavor == a2->flavor &&
-    a1->scope == a2->scope && a1->access == a2->access;
+    a1->access == a2->access       && a1->intent == a2->intent &&
+    a1->flavor == a2->flavor       && a1->scope == a2->scope;
 }
 
 
@@ -897,6 +897,7 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->result = 0;
   attr->entry = 0;
   attr->data = 0;
+  attr->use_assoc = 0;
   attr->in_namelist = 0;
   
   attr->in_common = 0;
@@ -908,10 +909,10 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->pure = 0;
   attr->recursive = 0;
 
-  attr->scope = SCOPE_UNKNOWN;
-  attr->flavor = FL_UNKNOWN;
-  attr->intent = INTENT_UNKNOWN;
   attr->access = ACCESS_UNKNOWN;
+  attr->intent = INTENT_UNKNOWN;
+  attr->flavor = FL_UNKNOWN;
+  attr->scope = SCOPE_UNKNOWN;
 }
 
 
@@ -932,7 +933,9 @@ try g95_missing_attr(symbol_attribute *attr, locus *loc) {
 }
 
 
-/* g95_copy_attr()-- copy one attribute over another, bit by bit. */
+/* g95_copy_attr()-- copy one attribute over another, bit by bit.
+ * Some attributes have a lot of side-effects but cannot be present
+ * given where we are called from, so we ignore some bits */
 
 try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src, locus *loc) {
 
