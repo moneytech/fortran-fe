@@ -245,7 +245,7 @@ g95_component *c;
 
   c->ts = current_ts;
   c->ts.cl = cl;
-  c->attr = current_attr;
+  g95_set_component_attr(c, &current_attr);
 
   c->initializer = *init;
   *init = NULL;
@@ -1029,7 +1029,8 @@ match m;
  * check for it explicitly.  After the statement is accepted, the name
  * is checked for especially in g95_get_symbol(). */
 
-    if (g95_new_block != NULL && strcmp(sym->name, g95_new_block->name) == 0) {
+    if (g95_new_block != NULL && sym != NULL &&
+	strcmp(sym->name, g95_new_block->name) == 0) {
       g95_error("Name '%s' at %C is the name of the procedure", sym->name);
       m = MATCH_ERROR;
       goto cleanup;
@@ -1155,8 +1156,12 @@ match m;
 
   if (g95_copy_attr(&sym->attr, &current_attr, NULL) == FAILURE) goto cleanup;
 
-  sym->ts = current_ts; 
   sym->result = result;
+
+  if (result == NULL)
+    sym->ts = current_ts; 
+  else
+    result->ts = current_ts;
 
   return MATCH_YES;
 
@@ -1854,19 +1859,20 @@ syntax:
  * interface's formal argument list. */
 
 match g95_match_modproc(void) {
+g95_symbol *sym, *saved_base;
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_symbol *sym, *generic_sym;
 match m;
 
   if (g95_state_stack->state != COMP_INTERFACE ||
       g95_state_stack->previous == NULL ||
       g95_state_stack->previous->state != COMP_MODULE ||
-      current_interface.type != INTERFACE_GENERIC) {
+      current_interface.type == INTERFACE_NAMELESS) {
     g95_error("MODULE PROCEDURE at %C must be in a generic module interface");
     return MATCH_ERROR;
   }
 
-  generic_sym = current_interface.sym;
+  if (current_interface.type == INTERFACE_INTRINSIC_OP)
+    saved_base = current_interface.ns->operator[current_interface.op];
 
   for(;;) {
     m = g95_match_name(name);
@@ -1886,8 +1892,25 @@ match m;
       return MATCH_ERROR;
     }
 
-    sym->next_if = generic_sym->generic;
-    generic_sym->generic = sym;
+    switch(current_interface.type) {
+    case INTERFACE_GENERIC:
+      sym->next_if = current_interface.sym->generic;
+      current_interface.sym->generic = sym;
+      break;
+
+    case INTERFACE_USER_OP:
+      sym->next_if = current_interface.sym->operator;
+      current_interface.sym->operator = sym;
+      break;
+
+    case INTERFACE_INTRINSIC_OP:
+      sym->next_if = current_interface.ns->operator[current_interface.op];
+      current_interface.ns->operator[current_interface.op] = sym;
+      break;
+
+    default:
+      break;
+    }
 
     if (g95_match_eos() == MATCH_YES) break;
     if (g95_match(" ,") != MATCH_YES) goto syntax;
@@ -1896,6 +1919,9 @@ match m;
   return MATCH_YES;
 
 syntax:
+  if (current_interface.type == INTERFACE_INTRINSIC_OP)
+    current_interface.ns->operator[current_interface.op] = saved_base;
+
   g95_syntax_error(ST_MODULE_PROC);
   return MATCH_ERROR;
 }

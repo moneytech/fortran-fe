@@ -1203,7 +1203,7 @@ new_attr:
       break;
 
     case REF_COMPONENT:
-      attr = ref->component->attr;
+      g95_get_component_attr(&attr, ref->component);
       ref = ref->next;
       if (ts != NULL) *ts = ref->component->ts;
 
@@ -1475,6 +1475,7 @@ match m;
 
     break;
 
+  case FL_GENERIC:
   case FL_MODULE_PROC:
     e = g95_get_expr();
     e->symbol = sym;

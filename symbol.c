@@ -502,6 +502,7 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
   conf(in_common, dummy);
   conf(in_common, allocatable);
   conf(in_common, result);
+  conf(dummy, result);
 
   conf(in_namelist, pointer);
   conf(in_namelist, allocatable);
@@ -782,7 +783,7 @@ try g95_add_function(symbol_attribute *attr, locus *loc) {
   if (check_used(attr, loc)) return FAILURE;
 
   if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_DUMMY_PROC &&
-      attr->flavor != FL_MODULE_PROC &&
+      attr->flavor != FL_MODULE_PROC && attr->flavor != FL_GENERIC &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
   attr->function = 1;
@@ -794,6 +795,7 @@ try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
   if (check_used(attr, loc)) return FAILURE;
 
   if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_MODULE_PROC &&
+      attr->flavor != FL_GENERIC &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
   attr->subroutine = 1;
@@ -1062,10 +1064,32 @@ g95_component *c;
   for(c=sym->components; c; c=c->next) {
     g95_status("(%s", c->name);
     g95_show_typespec(&c->ts);
+    if (c->pointer) g95_status(" POINTER");
+    if (c->dimension) g95_status(" DIMENSION");
     g95_show_array_spec(c->as);
-    g95_show_attr(&c->attr);
     g95_status(")");
   }
+}
+
+
+/* g95_set_component_attr()-- Set component attributes from a standard
+ * symbol attribute structure. */
+
+void g95_set_component_attr(g95_component *c, symbol_attribute *attr) {
+
+  c->dimension = attr->dimension;
+  c->pointer = attr->pointer;
+}
+
+
+/* g95_get_componentr_attr()-- Get a standard symbol attribute
+   structure given the component structure. */
+
+void g95_get_component_attr(symbol_attribute *attr, g95_component *c) {
+
+  g95_clear_attr(attr);
+  attr->dimension = c->dimension;
+  attr->pointer = c->pointer;
 }
 
 
@@ -1772,6 +1796,7 @@ g95_symbol *p, *q, *old;
     p->generic = old->generic;
     p->operator = old->operator;
     p->operator_access = old->operator_access;
+    p->component_access = old->component_access;
 
     if (p->namelist != NULL && old->namelist == NULL) {
       g95_free_namelist(p->namelist);

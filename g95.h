@@ -314,8 +314,10 @@ typedef struct {
 typedef struct g95_component {
   char name[G95_MAX_SYMBOL_LEN+1];
   g95_typespec ts;
+
+  int pointer, dimension;
   g95_array_spec *as;
-  symbol_attribute attr;
+
   locus loc;
   struct g95_expr *initializer;
   struct g95_component *next;
@@ -398,7 +400,7 @@ typedef struct g95_symbol {
  * generic name, the generic member points to the list of interfaces. */
 
   struct g95_symbol *operator, *generic, *next_if;
-  g95_access operator_access;
+  g95_access operator_access, component_access;
 
   g95_formal_arglist *formal;
   struct g95_namespace *formal_ns;
@@ -936,6 +938,8 @@ try g95_check_assign(g95_expr *, g95_expr *);
 try g95_check_pointer_assign(g95_expr *, g95_expr *);
 try g95_check_assign_symbol(g95_symbol *, g95_expr *);
 void g95_show_attr(symbol_attribute *);
+void g95_set_component_attr(g95_component *, symbol_attribute *);
+void g95_get_component_attr(symbol_attribute *, g95_component *);
 
 try g95_add_allocatable(symbol_attribute *, locus *);
 try g95_add_dimension(symbol_attribute *, locus *);

@@ -896,9 +896,9 @@ static void mio_component(g95_component *c) {
   mio_internal_string(c->name);
   mio_typespec(&c->ts);
   mio_array_spec(&c->as);
-  mio_symbol_attribute(&c->attr);
 
-  /* locus?? */
+  mio_integer(&c->dimension);
+  mio_integer(&c->pointer);
 
   mio_expr(&c->initializer);
   mio_rparen();
@@ -1331,6 +1331,7 @@ static void write_namespace(g95_namespace *);
 
 
 static void mio_symbol(g95_symbol *sym) {
+g95_component *dummy = NULL;
 
   mio_lparen();
 
@@ -1349,7 +1350,10 @@ static void mio_symbol(g95_symbol *sym) {
 
   mio_symbol_ref(&sym->result);
 
-  mio_component_list(&sym->components);
+  if (iomode == IO_OUTPUT && sym->component_access == ACCESS_PRIVATE)
+    mio_component_list(&dummy);
+  else
+    mio_component_list(&sym->components);
 
   mio_symbol_ref(&sym->common_head);
   mio_symbol_ref(&sym->common_next);

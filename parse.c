@@ -906,6 +906,8 @@ g95_state_data s;
 	error_flag = 1;
       }
 
+      s.sym->component_access = ACCESS_PRIVATE;
+      accept_statement(ST_PRIVATE);
       seen_private = 1;
       break;
 

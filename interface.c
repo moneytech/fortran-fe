@@ -273,10 +273,13 @@ g95_component *dt1, *dt2;
   for(;;) {
     if (strcmp(dt1->name, dt2->name) != 0) return 0;
 
-    if (g95_compare_attr(&dt1->attr, &dt2->attr) == 0) return 0;
+    if (dt1->pointer != dt2->pointer) return 0;
 
-    if (g95_compare_array_spec(dt1->as, dt2->as) == 0) return 0;
-      
+    if (dt1->dimension != dt2->dimension) return 0;
+
+    if (dt1->dimension && g95_compare_array_spec(dt1->as, dt2->as) == 0)
+      return 0;
+
     if (g95_compare_types(&dt1->ts, &dt2->ts) == 0) return 0;
 
     dt1 = dt1->next;
