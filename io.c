@@ -74,7 +74,8 @@ static io_tag
   tag_err = { "ERR", " err = %l", BT_UNKNOWN },
   tag_end = { "END", " end = %l", BT_UNKNOWN },
   tag_eor = { "EOR", " eor = %l", BT_UNKNOWN };
-  
+
+static g95_dt *current_dt;
 
 #define RESOLVE_TAG(x, y) if (resolve_tag(x, y) == FAILURE) return FAILURE;
 
@@ -115,6 +116,12 @@ match m;
 
   if (result->symbol->attr.intent == INTENT_IN) {
     g95_error("Variable tag cannot be INTENT(IN) at %C");
+    g95_free_expr(result);
+    return MATCH_ERROR;
+  }
+
+  if (g95_pure(NULL) && g95_impure_variable(result->symbol)) {
+    g95_error("Variable tag cannot be assigned in PURE procedure at %C");
     g95_free_expr(result);
     return MATCH_ERROR;
   }
@@ -274,6 +281,11 @@ match m;
 
   if (g95_match_eos() == MATCH_NO) goto syntax;
 
+  if (g95_pure(NULL)) {
+    g95_error("OPEN statement not allowed in PURE procedure at %C");
+    return MATCH_ERROR;
+  }
+
   new_st.op = EXEC_OPEN;
   new_st.ext.open = open;
   return MATCH_YES;
@@ -345,6 +357,11 @@ match m;
   }
 
   if (g95_match_eos() == MATCH_NO) goto syntax;
+
+  if (g95_pure(NULL)) {
+    g95_error("CLOSE statement not allowed in PURE procedure at %C");
+    return MATCH_ERROR;
+  }
 
   new_st.op = EXEC_CLOSE;
   new_st.ext.close = close;
@@ -434,6 +451,13 @@ match m;
 
 done:
   if (g95_match_eos() != MATCH_YES) goto syntax;
+
+  if (g95_pure(NULL)) {
+    g95_error("%s statement not allowed in PURE procedure at %C",
+	      g95_ascii_statement(st));
+
+    return MATCH_ERROR;
+  }
 
   new_st.op = op;
   new_st.ext.filepos = fp;
@@ -921,13 +945,38 @@ match m;
 				 io_kind_name(k));
   }
 
-  if (m == MATCH_YES && k == M_READ &&
-      expr->symbol->attr.intent == INTENT_IN) {
+  if (m == MATCH_YES)
+    switch(k) {
+    case M_READ:
+      if (expr->symbol->attr.intent == INTENT_IN) {
+	g95_error("Variable '%s' in input list at %C cannot be INTENT(IN)",
+		  expr->symbol->name);
+	m = MATCH_ERROR;
+      }
 
-    g95_error("Variable '%s' in input list at %C cannot be INTENT(IN)",
-	      expr->symbol->name);
-    m = MATCH_ERROR;
-  }
+      if (g95_pure(NULL) && g95_impure_variable(expr->symbol) &&
+	  current_dt->io_unit->ts.type == BT_CHARACTER) {
+	g95_error("Cannot read to variable '%s' in PURE procedure at %C",
+		  expr->symbol->name);
+	m = MATCH_ERROR;
+      }
+
+      break;
+
+    case M_WRITE:
+      if (current_dt->io_unit->ts.type == BT_CHARACTER &&
+	  g95_pure(NULL) && current_dt->io_unit->expr_type == EXPR_VARIABLE &&
+	  g95_impure_variable(current_dt->io_unit->symbol)) {
+	g95_error("Cannot write to internal file unit '%s' at %C inside a "
+		  "PURE procedure", current_dt->io_unit->symbol->name);
+	m = MATCH_ERROR;
+      }
+
+      break;
+
+    default:
+      break;
+    }
 
   if (m != MATCH_YES) {
     g95_free_expr(expr);
@@ -985,7 +1034,7 @@ g95_dt *dt;
 match m;
  
   comma_flag = 0;
-  dt = g95_getmem(sizeof(g95_dt));
+  current_dt = dt = g95_getmem(sizeof(g95_dt));
 
   if (g95_match_char('(') == MATCH_NO) {
     if (k == M_WRITE) goto syntax;
@@ -1081,6 +1130,13 @@ get_io_list:
   if (expr != NULL && expr->expr_type == EXPR_CONSTANT)
     g95_check_format_string(expr);
 
+  if (g95_pure(NULL) && (k == M_READ || k == M_WRITE) &&
+      dt->io_unit->ts.type != BT_CHARACTER) {
+    g95_error("io-unit in %s statement at %C must be an internal file in a "
+	      "PURE procedure", io_kind_name(k));
+    goto cleanup;
+  }
+
   new_st.op = (k == M_READ) ? EXEC_READ : EXEC_WRITE;
   new_st.ext.dt = dt;
   new_st.next = io_code;
@@ -1101,8 +1157,19 @@ match g95_match_read(void)  { return match_io(M_READ);  }
 
 match g95_match_write(void) { return match_io(M_WRITE); }
 
-match g95_match_print(void) { return match_io(M_PRINT); }
+match g95_match_print(void) {
+match m;
 
+  m = match_io(M_PRINT);
+  if (m != MATCH_YES) return m;
+
+  if (g95_pure(NULL)) {
+    g95_error("PRINT statement at %C not allowed within PURE procedure");
+    return MATCH_ERROR;
+  }
+
+  return MATCH_YES;
+}
 
 
 /* g95_free_inquire()-- Free a g95_inquire structure */
@@ -1213,6 +1280,11 @@ match m;
     new_st.expr = inquire->iolength;
     g95_free(inquire);
 
+    if (g95_pure(NULL)) {
+      g95_error("INQUIRE statement not allowed in PURE procedure at %C");
+      return MATCH_ERROR;
+    }
+
     new_st.block = code;
     return MATCH_YES;
   }
@@ -1234,6 +1306,11 @@ match m;
   }
 
   if (g95_match_eos() != MATCH_YES) goto syntax;
+
+  if (g95_pure(NULL)) {
+    g95_error("INQUIRE statement not allowed in PURE procedure at %C");
+    return MATCH_ERROR;
+  }
 
   new_st.op = EXEC_INQUIRE;
   new_st.ext.inquire = inquire;

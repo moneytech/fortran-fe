@@ -492,9 +492,9 @@ g95_code *c;
     expr = va_arg(argp, g95_expr *);
     if (expr == NULL) break;
 
-    if (c->ext.arglist == NULL) {
+    if (c->ext.actual == NULL) {
       tail = g95_get_actual_arglist();
-      c->ext.arglist = tail;
+      c->ext.actual = tail;
     } else {
       tail->next = g95_get_actual_arglist();
       tail = tail->next;

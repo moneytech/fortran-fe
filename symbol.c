@@ -404,6 +404,18 @@ symbol_attribute attr;
     return FAILURE;
   }
 
+  if (g95_pure(NULL)) {
+    if (g95_impure_variable(lvalue->symbol)) {
+      g95_error("Bad pointer object in PURE procedure at %L", &lvalue->where);
+      return FAILURE;
+    }
+
+    if (g95_impure_variable(rvalue->symbol)) {
+      g95_error("Bad target in pointer assignment in PURE procedure at %L",
+		&rvalue->where);
+    }
+  }
+
 /* TODO: further checks required
    g95_warning("Checks for pointer assignment are incomplete.");
 */
@@ -442,12 +454,6 @@ static mstring flavors[] = {
   minit(NULL, -1)
 },
 
-intents[] = {
-  minit("UNKNOWN-INTENT", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
-  minit("OUT", INTENT_OUT),                 minit("INOUT", INTENT_INOUT),
-  minit(NULL, -1)
-},
-
 procedures[] = {
   minit("UNKNOWN-PROC",   PROC_UNKNOWN),     minit("MODULE-PROC", PROC_MODULE),
   minit("INTERNAL-PROC",  PROC_INTERNAL),    minit("DUMMY-PROC",  PROC_DUMMY),
@@ -469,7 +475,7 @@ accessibility[] = {
 void g95_show_attr(symbol_attribute *attr) {
 
   g95_status("(%s %s %s %s", g95_code2string(flavors, attr->flavor),
-	     g95_code2string(intents, attr->intent),
+	     g95_intent_string(attr->intent),
 	     g95_code2string(accessibility, attr->access),
 	     g95_code2string(procedures, attr->proc));
 
@@ -721,6 +727,11 @@ try g95_add_save(symbol_attribute *attr, locus *loc) {
 
   if (check_used(attr, loc)) return FAILURE;
 
+  if (g95_pure(NULL)) {
+    g95_error("Symbol at %L cannot be SAVEd in a PURE procedure", loc);
+    return FAILURE;
+  }
+
   attr->save = 1;
   return check_conflict(attr, loc);
 }
@@ -920,8 +931,8 @@ try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *loc) {
   if (loc == NULL) loc = g95_current_locus();
 
   g95_error("INTENT (%s) conflicts with INTENT(%s) at %L",
-	    g95_code2string(intents, attr->intent),
-	    g95_code2string(intents, intent), loc);
+	    g95_intent_string(attr->intent),
+	    g95_intent_string(intent), loc);
 
   return FAILURE;
 }
@@ -2406,14 +2417,14 @@ static void save_symbol(g95_symbol *sym) {
   if (sym->attr.use_assoc) return;
 
   if (sym->attr.common) {
-    g95_add_saved_common(&sym->attr, NULL);
+    g95_add_saved_common(&sym->attr, &sym->declared_at);
     return;
   }
 
   if (sym->attr.in_common || sym->attr.dummy ||
       sym->attr.flavor != FL_VARIABLE) return;
 
-  g95_add_save(&sym->attr, NULL);
+  g95_add_save(&sym->attr, &sym->declared_at);
 }
 
 

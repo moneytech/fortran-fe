@@ -1154,7 +1154,7 @@ match m;
   if (g95_match_eos() == MATCH_YES) {
     new_st.op = EXEC_STOP;
     new_st.label = -1;
-    return MATCH_YES;
+    goto done;
   }
 
   m = g95_match(" %e%t", &e);
@@ -1165,7 +1165,7 @@ match m;
   if (e->ts.type == BT_CHARACTER) {
     new_st.op = EXEC_STOP;
     new_st.expr = e;
-    return MATCH_YES;
+    goto done;
   }
 
   if (e->ts.type != BT_INTEGER) goto syntax;
@@ -1185,6 +1185,13 @@ match m;
   new_st.label = label;
 
   g95_free_expr(e);
+
+done:
+  if (g95_pure(NULL)) {
+    g95_error("STOP statement not allowed in PURE procedure at %C");
+    goto cleanup;
+  }
+
   return MATCH_YES;
 
 syntax:
@@ -1371,6 +1378,12 @@ match m;
       goto cleanup;
     }
 
+    if (g95_pure(NULL) && g95_impure_variable(tail->expr->symbol)) {
+      g95_error("Bad allocate-object in ALLOCATE statement at %C for a "
+		"PURE procedure");
+      goto cleanup;
+    }
+
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
@@ -1381,10 +1394,18 @@ match m;
     if (m == MATCH_YES) break;
   }
 
-  if (stat != NULL && stat->symbol->attr.intent == INTENT_IN) {
-    g95_error("STAT variable '%s' of ALLOCATE statement at %C cannot be "
-	      "INTENT(IN)", stat->symbol->name);
-    goto cleanup;
+  if (stat != NULL) {
+    if (stat->symbol->attr.intent == INTENT_IN) {
+      g95_error("STAT variable '%s' of ALLOCATE statement at %C cannot be "
+		"INTENT(IN)", stat->symbol->name);
+      goto cleanup;
+    }
+
+    if (g95_pure(NULL) && g95_impure_variable(stat->symbol)) {
+      g95_error("Illegal STAT variable in ALLOCATE statement at %C for a PURE "
+		"procedure");
+      goto cleanup;
+    }
   }
 
   if (g95_match(" )%t") != MATCH_YES) goto syntax;
@@ -1430,6 +1451,11 @@ match m;
     attr = g95_variable_attr(tail->expr, NULL);
     if (attr.pointer == 0) {
       g95_error("Variable in NULLIFY statement at %C must be a POINTER");
+      goto cleanup;
+    }
+
+    if (g95_pure(NULL) && g95_impure_variable(tail->expr->symbol)) {
+      g95_error("Illegal variable in NULLIFY at %C for a PURE procedure");
       goto cleanup;
     }
 
@@ -1480,6 +1506,12 @@ match m;
     if (attr.pointer == 0 && attr.allocatable == 0) {
       g95_error("Expression in DEALLOCATE statement at %C must be "
 		"ALLOCATABLE or a POINTER");
+      goto cleanup;
+    }
+
+    if (g95_pure(NULL) && g95_impure_variable(tail->expr->symbol)) {
+      g95_error("Illegal deallocate-expression in DEALLOCATE at %C for a PURE "
+		"procedure");
       goto cleanup;
     }
 
@@ -1622,7 +1654,7 @@ int i;
 
   new_st.op = EXEC_CALL;
   new_st.sym = sym;
-  new_st.ext.arglist = arglist;
+  new_st.ext.actual = arglist;
 
   return MATCH_YES;
 
@@ -2215,7 +2247,13 @@ match m;
     g95_current_ns->data = new;
 
     if (g95_match_eos() == MATCH_YES) break;
-    g95_match_char(',');
+
+    g95_match_char(',');  /* Optional comma */
+  }
+
+  if (g95_pure(NULL)) {
+    g95_error("DATA statement at %C is not allowed in a PURE procedure");
+    return MATCH_ERROR;
   }
 
   return MATCH_YES;

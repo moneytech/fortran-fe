@@ -886,7 +886,7 @@ typedef struct g95_code {
   char *sub_name;
 
   union {
-    g95_actual_arglist *arglist;
+    g95_actual_arglist *actual;
     g95_case *case_list;
     g95_iterator *iterator;
     g95_alloc *alloc_list;
@@ -1006,6 +1006,7 @@ void g95_show_typespec(g95_typespec *);
 
 const char *g95_code2string(mstring *, int);
 int g95_string2code(mstring *, const char *);
+const char *g95_intent_string(sym_intent);
 
 void g95_init_1(void);
 void g95_init_2(void);
@@ -1398,6 +1399,9 @@ void g95_show_code(int, g95_code *);
 try g95_resolve_expr(g95_expr *);
 void g95_resolve_code(g95_code *, g95_namespace *);
 void g95_resolve(g95_namespace *);
+int g95_impure_variable(g95_symbol *);
+int g95_pure(g95_symbol *);
+int g95_elemental(g95_symbol *);
 try g95_resolve_iterator(g95_iterator *);
 
 /* array.c */
@@ -1441,6 +1445,7 @@ void g95_start_interface(void);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
 int g95_compare_types(g95_typespec *, g95_typespec *);
 void g95_check_interfaces(g95_namespace *);
+try g95_check_intents(g95_formal_arglist *, g95_actual_arglist *);
 g95_symbol *g95_search_interface(g95_interface *, int, g95_actual_arglist *);
 try g95_extend_expr(g95_expr *);
 void g95_free_formal_arglist(g95_formal_arglist *);

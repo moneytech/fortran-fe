@@ -899,12 +899,12 @@ static int compare_parameter(g95_symbol *formal, g95_expr *actual) {
 }
 
 
-/* compare_formal_actual()-- Given formal and actual argument lists,
+/* compare_actual_formal()-- Given formal and actual argument lists,
  * see if they are compatible.  If they are compatible, the actual
  * argument list is sorted to correspond with the formal list, and
  * elements for missing optional arguments are inserted.  */
 
-int compare_actual_formal(g95_actual_arglist *actual,
+static int compare_actual_formal(g95_actual_arglist *actual,
 			  g95_formal_arglist *formal) {
 g95_actual_arglist **new, *a, temp;
 g95_formal_arglist *f;
@@ -986,6 +986,54 @@ int i, n, na;
 }
 
 
+/* g95_check_intents()-- Given formal and actual argument lists that
+ * correspond to one another, check that they are compatible in the
+ * sense that intents are not mismatched.  */
+
+try g95_check_intents(g95_formal_arglist *f, g95_actual_arglist *a) {
+sym_intent a_intent, f_intent;
+
+  for(;; f=f->next, a=a->next) {
+    if (f == NULL && a == NULL) break;
+    if (f == NULL || a == NULL) {
+      g95_status("g95_check_intents(): List mismatch");
+      return SUCCESS;
+    }
+
+    if (a->expr == NULL || a->expr->expr_type != EXPR_VARIABLE) continue;
+
+    a_intent = a->expr->symbol->attr.intent;
+    f_intent = f->sym->attr.intent;
+
+    if (a_intent == INTENT_IN &&
+	(f_intent == INTENT_INOUT || f_intent == INTENT_OUT)) {
+
+      g95_error("Procedure argument at %L is INTENT(IN) while interface "
+		"specifies INTENT(%s)", &a->expr->where,
+		g95_intent_string(f_intent));
+      return FAILURE;
+    }
+
+    if (g95_pure(NULL) && !g95_impure_variable(a->expr->symbol)) {
+      if (f_intent == INTENT_INOUT || f_intent == INTENT_OUT) {
+	g95_error("Procedure argument at %L is local to a PURE procedure and "
+		  "is passed to an INTENT(%s) argument", &a->expr->where,
+		  g95_intent_string(f_intent));
+	return FAILURE;
+      }
+
+      if (a->expr->symbol->attr.pointer) {
+	g95_error("Procedure argument at %L is local to a PURE procedure and "
+		  "has the POINTER attribute", &a->expr->where);
+	return FAILURE;
+      }
+    }
+  }
+
+  return SUCCESS;
+}
+
+
 /* g95_search_interface()-- Given an interface pointer and an actual
  * argument list, search for a formal argument list that matches the
  * actual.  If found, returns a pointer to the symbol of the correct
@@ -998,7 +1046,10 @@ g95_symbol *g95_search_interface(g95_interface *intr, int sub_flag,
     if (sub_flag && intr->sym->attr.function) continue;
     if (!sub_flag && intr->sym->attr.subroutine) continue;
 
-    if (compare_actual_formal(actual, intr->sym->formal)) return intr->sym;
+    if (compare_actual_formal(actual, intr->sym->formal)) {
+      g95_check_intents(intr->sym->formal, actual);
+      return intr->sym;
+    }
   }
 
   return NULL;
@@ -1006,7 +1057,7 @@ g95_symbol *g95_search_interface(g95_interface *intr, int sub_flag,
 
 
 /* g95_extend_expr()-- This subroutine is called when an expression is
- * being built.  The expression node in question is either a user
+ * being resolved.  The expression node in question is either a user
  * defined operator or an instrinsic operator with arguments that
  * aren't compatible with the operator.  This subroutine builds an
  * actual argument list corresponding to the operands, then searches
@@ -1061,6 +1112,12 @@ int i;
   e->ts = sym->ts;
   e->value.function.actual = actual;
 
+  if (g95_pure(NULL) && !g95_pure(sym)) {
+    g95_error("Function '%s' called in lieu of an operator at %L must be PURE",
+	      sym->name, &e->where);
+    return FAILURE;
+  }
+
   return SUCCESS;
 }
 
@@ -1109,7 +1166,13 @@ g95_symbol *sym;
   c->sym = sym;
   c->expr = NULL;
   c->expr2 = NULL;
-  c->ext.arglist = actual;
+  c->ext.actual = actual;
+
+  if (g95_pure(NULL) && !g95_pure(sym)) {
+    g95_error("Subroutine '%s' called in lieu of assignment at %L must be "
+	      "PURE", sym->name, &c->loc);
+    return FAILURE;
+  }
 
   return SUCCESS;
 }

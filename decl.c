@@ -385,6 +385,12 @@ try t;
 	m = MATCH_ERROR;
       }
 
+      if (g95_pure(NULL)) {
+	g95_error("Initialization of pointer at %C is not allowed in a "
+		  "PURE procedure");
+	m = MATCH_ERROR;
+      }
+
       if (m != MATCH_YES) goto cleanup;
 
       initializer->ts = current_ts;
@@ -397,9 +403,17 @@ try t;
       }
 
       m = g95_match_init_expr(&initializer);
-      if (m == MATCH_NO)
+      if (m == MATCH_NO) {
 	g95_error("Expected an initialization expression at %C");
+	m = MATCH_ERROR;
+      }
 
+      if (current_attr.flavor != FL_PARAMETER && g95_pure(NULL)) {
+	g95_error("Initialization of variable at %C is not allowed in a "
+		  "PURE procedure");
+	m = MATCH_ERROR;
+      }
+      
       if (m != MATCH_YES) goto cleanup;
     }
   }
@@ -1033,13 +1047,12 @@ cleanup:
 /* match_prefix()-- Match a prefix associated with a function or
  * subroutine declaration.  If the typespec pointer is nonnull, then a
  * typespec can be matched.  Note that if nothing matches, MATCH_YES
- * is returned (the null string was matched).  This condition can be
- * detected by comparing *attr with zero.  */
+ * is returned (the null string was matched). */
 
-static match match_prefix(symbol_attribute *attr, g95_typespec *ts) {
+static match match_prefix(g95_typespec *ts) {
 int seen_type;
 
-  g95_clear_attr(attr); 
+  g95_clear_attr(&current_attr);
   seen_type = 0;
 
 loop:
@@ -1052,21 +1065,21 @@ loop:
   }
 
   if (g95_match("elemental% ") == MATCH_YES ) {
-    if (g95_add_elemental(attr, NULL) == FAILURE)
+    if (g95_add_elemental(&current_attr, NULL) == FAILURE)
       return MATCH_ERROR;
 
     goto loop;
   }
 
   if (g95_match("pure% ") == MATCH_YES) {
-    if (g95_add_pure(attr, NULL) == FAILURE)
+    if (g95_add_pure(&current_attr, NULL) == FAILURE)
       return MATCH_ERROR;
 
     goto loop;
   }
 
   if (g95_match("recursive% ") == MATCH_YES) {
-    if (g95_add_recursive(attr, NULL) == FAILURE)
+    if (g95_add_recursive(&current_attr, NULL) == FAILURE)
       return MATCH_ERROR;
 
     goto loop;
@@ -1075,6 +1088,24 @@ loop:
 /* At this point, the next item is not a prefix */
 
   return MATCH_YES;
+}
+
+
+/* copy_prefix()-- Copy attributes matched by match_prefix() to
+ * attributes on a symbol. */
+
+static try copy_prefix(symbol_attribute *dest, locus *where) {
+
+  if (current_attr.pure && g95_add_pure(dest, where) == FAILURE)
+    return FAILURE;
+
+  if (current_attr.elemental && g95_add_elemental(dest, where) == FAILURE)
+    return FAILURE;
+
+  if (current_attr.recursive && g95_add_recursive(dest, where) == FAILURE)
+    return FAILURE;
+
+  return SUCCESS;
 }
 
 
@@ -1212,13 +1243,12 @@ match m;
       g95_current_state() != COMP_INTERFACE &&
       g95_current_state() != COMP_CONTAINS) return MATCH_NO;
 
-  g95_clear_attr(&current_attr);
   g95_clear_ts(&current_ts);
 
   arglist = NULL;
   old_loc = *g95_current_locus();
 
-  m = match_prefix(&current_attr, &current_ts);
+  m = match_prefix(&current_ts);
   if (m != MATCH_YES) {
     g95_set_locus(&old_loc);
     return m;
@@ -1262,7 +1292,7 @@ match m;
   if (g95_add_function(&sym->attr, NULL) == FAILURE) goto cleanup;
 
   if (g95_missing_attr(&sym->attr, NULL) == FAILURE ||
-      g95_copy_attr(&sym->attr, &current_attr, NULL) == FAILURE) goto cleanup;
+      copy_prefix(&sym->attr, &sym->declared_at) == FAILURE) goto cleanup;
 
   if (current_ts.type != BT_UNKNOWN && sym->ts.type != BT_UNKNOWN) {
     g95_error("Function '%s' at %C already has a type of %s", name,
@@ -1370,7 +1400,6 @@ exec_construct:
 
 match g95_match_subroutine(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
-symbol_attribute attr;
 g95_symbol *sym;
 match m;
 
@@ -1378,9 +1407,7 @@ match m;
       g95_current_state() != COMP_INTERFACE &&
       g95_current_state() != COMP_CONTAINS) return MATCH_NO;
 
-  g95_clear_attr(&attr);
-
-  m = match_prefix(&attr, NULL);
+  m = match_prefix(NULL);
   if (m != MATCH_YES) return m;
 
   m = g95_match("subroutine% %n", name);
@@ -1397,6 +1424,9 @@ match m;
     g95_syntax_error(ST_SUBROUTINE);
     return MATCH_ERROR;
   }
+
+  if (copy_prefix(&sym->attr, &sym->declared_at) == FAILURE)
+    return MATCH_ERROR;
 
   return MATCH_YES;
 }
@@ -1946,7 +1976,8 @@ match m;
     m = g95_match_symbol(&sym);
     switch(m) {
     case MATCH_YES:
-      if (g95_add_save(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
+      if (g95_add_save(&sym->attr, g95_current_locus()) == FAILURE)
+	return MATCH_ERROR;
       goto next_item;
 
     case MATCH_NO:

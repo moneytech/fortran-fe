@@ -251,6 +251,18 @@ int g95_string2code(mstring *m, const char *string) {
 }
 
 
+/* g95_intent_string()-- Convert an intent code to a string. */
+
+const char *g95_intent_string(sym_intent i) {
+static mstring intents[] = {
+  minit("UNKNOWN-INTENT", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
+  minit("OUT", INTENT_OUT),                 minit("INOUT", INTENT_INOUT),
+  minit(NULL, -1)
+};
+
+  return g95_code2string(intents, i); 
+}
+
 
 /* Initialization functions */
 

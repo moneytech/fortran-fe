@@ -127,7 +127,7 @@ static void free_statement(g95_code *p) {
     break;
 
   case EXEC_CALL:
-    g95_free_actual_arglist(p->ext.arglist);
+    g95_free_actual_arglist(p->ext.actual);
     break;
 
   case EXEC_SELECT:
@@ -264,7 +264,7 @@ g95_dt *dt;
 
   case EXEC_CALL:
     g95_status("CALL %s ", c->sub_name);
-    g95_show_actual_arglist(c->ext.arglist);
+    g95_show_actual_arglist(c->ext.actual);
     break;
 
   case EXEC_RETURN:

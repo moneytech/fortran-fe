@@ -58,18 +58,24 @@ g95_symbol *sym;
  * Since a dummy argument cannot be a non-dummy procedure, the only
  * resort left for untyped names are the IMPLICIT types. */
 
-static void resolve_formal_arglist(g95_formal_arglist *f) {
+static void resolve_formal_arglist(g95_symbol *proc) {
+g95_formal_arglist *f;
 g95_symbol *sym;
 
-  for(; f; f=f->next) {
+  for(f=proc->formal; f; f=f->next) {
     sym = f->sym;
 
     if (sym == NULL) continue;  /* Alternate return placeholder */
 
-    if (sym->formal) resolve_formal_arglist(sym->formal);
+    if (sym->formal) resolve_formal_arglist(sym);
 
-    if (sym->attr.subroutine || sym->attr.external || sym->attr.intrinsic)
+    if (sym->attr.subroutine || sym->attr.external || sym->attr.intrinsic) {
+      if (g95_pure(proc) && !g95_pure(sym))
+	g95_error("Dummy procedure '%s' of PURE procedure at %L must also "
+		  "be PURE", sym->name, &sym->declared_at);
+
       continue;
+    }
 
     if (sym->ts.type == BT_UNKNOWN) {
       if (!sym->attr.function || sym->result == sym)
@@ -92,7 +98,20 @@ g95_symbol *sym;
     if (sym->attr.flavor == FL_UNKNOWN)
       g95_add_flavor(&sym->attr, FL_VARIABLE, &sym->declared_at);
 
-    if (sym->formal != NULL) resolve_formal_arglist(sym->formal);
+    if (g95_pure(proc)) {
+      if (proc->attr.function && !sym->attr.pointer &&
+	  sym->attr.intent != INTENT_IN)
+
+	g95_error("Argument '%s' of pure function '%s' at %L must be "
+		  "INTENT(IN)", sym->name, proc->name, &sym->declared_at);
+
+      if (proc->attr.subroutine && !sym->attr.pointer &&
+	  sym->attr.intent == INTENT_UNKNOWN) 
+
+	g95_error("Argument '%s' of pure subroutine '%s' at %L must have "
+		  "its INTENT specified", sym->name, proc->name,
+		  &sym->declared_at);
+    }
   }
 }
 
@@ -102,8 +121,9 @@ g95_symbol *sym;
 
 static void find_arglists(g95_symbol *sym) {
 
-  if (sym->formal == NULL) return;
-  resolve_formal_arglist(sym->formal);
+  if (sym->formal == NULL || sym->ns != g95_current_ns) return;
+
+  resolve_formal_arglist(sym);
 }
 
 
@@ -430,6 +450,9 @@ match m;
   return MATCH_NO;
 
 found:
+  if (sym->attr.interface)
+    g95_check_intents(sym->formal, expr->value.function.actual);
+
   expr->ts = sym->ts;
   expr->value.function.name = sym->name;
   expr->value.function.esym = sym;
@@ -492,6 +515,9 @@ g95_typespec ts;
   expr->value.function.name = sym->name;
   if (sym->as != NULL) expr->rank = sym->as->rank;
 
+  if (sym->attr.interface)
+    g95_check_intents(sym->formal, expr->value.function.actual);
+
   /* Type of the expression is either the type of the symbol or the
    * default type of the symbol */
 
@@ -519,6 +545,8 @@ g95_typespec ts;
  * to INTENT(OUT) or INTENT(INOUT).  */
 
 static try resolve_function(g95_expr *expr) {
+char *name;
+int flag;
 try t;
 
   if (resolve_actual_arglist(expr->value.function.actual) == FAILURE)
@@ -552,13 +580,30 @@ try t;
   /* If the expression is still a function (it might have simplified),
    * then we check to see if we are calling an elemental function */
 
-  if (expr->expr_type == EXPR_FUNCTION &&
-      expr->value.function.actual != NULL &&
-      ((expr->value.function.esym != NULL &&
-	expr->value.function.esym->attr.elemental) ||
-       (expr->value.function.isym != NULL &&
-	expr->value.function.isym->elemental)))
-    expr->rank = expr->value.function.actual->expr->rank;
+  if (expr->expr_type == EXPR_FUNCTION) {
+    if (expr->value.function.actual != NULL &&
+	((expr->value.function.esym != NULL &&
+	  expr->value.function.esym->attr.elemental) ||
+	 (expr->value.function.isym != NULL &&
+	  expr->value.function.isym->elemental)))
+      expr->rank = expr->value.function.actual->expr->rank;
+
+    if (g95_pure(NULL)) {
+      if (expr->value.function.esym) {
+	flag = g95_pure(expr->value.function.esym);
+	name = expr->value.function.esym->name;
+      } else {
+	flag = expr->value.function.isym->elemental;
+	name = expr->value.function.isym->name;
+      }
+
+      if (!flag) {
+	g95_error("Function references to '%s' at %L is to a non-PURE "
+		  "procedure within a PURE procedure", name, &expr->where);
+	t = FAILURE;
+      }
+    }
+  }
 
   return t;
 }
@@ -566,13 +611,22 @@ try t;
 
 /************* Subroutine resolution *************/
 
+static void pure_subroutine(g95_code *c, g95_symbol *sym) {
+
+  if (!g95_pure(NULL) || g95_pure(sym)) return;
+
+  g95_error("Subroutine call to '%s' at %L is not PURE", c->sub_name, &c->loc);
+}
+
+
 static match resolve_generic_s0(g95_code *c, g95_symbol *sym) {
 g95_symbol *s;
 
   if (sym->attr.generic) {
-    s = g95_search_interface(sym->generic, 1, c->ext.arglist);
+    s = g95_search_interface(sym->generic, 1, c->ext.actual);
     if (s != NULL) {
       c->sub_name = s->name;
+      pure_subroutine(c, s);
       return MATCH_YES;
     }
 
@@ -653,7 +707,10 @@ match m;
   return MATCH_NO;
 
 found:
+  if (sym->attr.interface) g95_check_intents(sym->formal, c->ext.actual);
   c->sub_name = sym->name;
+  pure_subroutine(c, sym);
+
   return MATCH_YES;
 }
 
@@ -706,7 +763,11 @@ g95_symbol *sym;
 
   /* The reference is to an external name */
 
+  if (sym->attr.interface) g95_check_intents(sym->formal, c->ext.actual);
   c->sub_name = sym->name;
+
+  pure_subroutine(c, sym);
+
   return SUCCESS;
 }
 
@@ -718,7 +779,7 @@ g95_symbol *sym;
 static try resolve_call(g95_code *c) {
 try t;
 
-  if (resolve_actual_arglist(c->ext.arglist) == FAILURE) return FAILURE;
+  if (resolve_actual_arglist(c->ext.actual) == FAILURE) return FAILURE;
 
   if (c->sub_name != NULL) return SUCCESS;
 
@@ -1373,6 +1434,12 @@ try g95_resolve_iterator(g95_iterator *iter) {
     return FAILURE;
   }
 
+  if (g95_pure(NULL) && g95_impure_variable(iter->var->symbol)) {
+    g95_error("Cannot assign to loop variable in PURE procedure at %L",
+	      &iter->var->where);
+    return FAILURE;
+  }
+
   if (g95_resolve_expr(iter->start) == FAILURE) return FAILURE;
 
   if (iter->start->ts.type != BT_INTEGER || iter->start->rank != 0) {
@@ -1435,6 +1502,24 @@ static void resolve_forall_iterators(g95_forall_iterator *iter) {
 
     iter = iter->next;
   }
+}
+
+
+/* derived_pointer()-- Given a pointer to a symbol that is a derived
+ * type, see if any components have the POINTER attribute.  The search
+ * is recursive if necessary.  Returns zero if no pointer components
+ * are found, nonzero otherwise. */
+
+static int derived_pointer(g95_symbol *sym) {
+g95_component *c;
+
+  for(c=sym->components; c; c=c->next) {
+    if (c->pointer) return 1;
+
+    if (c->ts.type == BT_DERIVED && derived_pointer(c->ts.derived)) return 1;
+  }
+
+  return 0;
 }
 
 
@@ -1503,6 +1588,22 @@ try t;
       if (t == FAILURE) break;
 
       if (g95_extend_assign(code, ns) == SUCCESS) break;
+
+      if (g95_pure(NULL)) {
+	if (g95_impure_variable(code->expr->symbol)) {
+	  g95_error("Cannot assign to variable '%s' in PURE procedure at %L",
+		    code->expr->symbol->name, &code->expr->where);
+	  break;
+	}
+
+	if (code->expr2->ts.type == BT_DERIVED &&
+	    derived_pointer(code->expr2->ts.derived)) {
+	  g95_error("Right side of assignment at %L is a derived type "
+		    "containing a POINTER in a PURE procedure",
+		    &code->expr2->where);
+	  break;
+	}
+      }
 
       g95_check_assign(code->expr, code->expr2, 1);
       break;
@@ -1849,6 +1950,50 @@ static void resolve_data(g95_data *d) {
 }
 
 
+/* g95_impure_variable()-- Determines if a variable is not 'pure', ie
+ * not assignable within a pure procedure.  Returns zero if assignment
+ * is OK, nonzero if there is a problem. */
+
+int g95_impure_variable(g95_symbol *sym) {
+
+  if (sym->attr.use_assoc || sym->attr.in_common ||
+      sym->ns != g95_current_ns) return 1;
+
+  /* TODO: Check storage association through EQUIVALENCE statements */
+
+  return 0;
+}
+
+
+/* g95_pure()-- Test whether a symbol is pure or not.  For a NULL
+ * pointer, checks the symbol of the current procedure. */
+
+int g95_pure(g95_symbol *sym) {
+symbol_attribute attr;
+
+  if (sym == NULL) sym = g95_current_ns->proc_name;
+  if (sym == NULL) return 0;
+
+  attr = sym->attr;
+  if (attr.function) return 0;
+
+  return attr.flavor == FL_PROCEDURE && (attr.pure || attr.elemental);
+}
+
+
+/* g95_elemental()-- Test whether the current procedure is elemental or not */
+
+int g95_elemental(g95_symbol *sym) {
+symbol_attribute attr;
+
+  if (sym == NULL) sym = g95_current_ns->proc_name;
+  if (sym == NULL) return 0;
+  attr = sym->attr;
+
+  return attr.flavor == FL_PROCEDURE && attr.elemental;
+}
+
+
 /* g95_resolve()-- This function is called after a complete program
  * unit has been compiled.  Its purpose is to examine all of the
  * expressions associated with a program unit, assign types to all
@@ -1868,8 +2013,14 @@ g95_data *d;
 
   g95_traverse_ns(ns, resolve_symbol);
 
-  for(n=ns->contained; n; n=n->sibling)
+  for(n=ns->contained; n; n=n->sibling) {
+    if (g95_pure(ns->proc_name) && !g95_pure(n->proc_name))
+      g95_error("Contained procedure '%s' at %L of a PURE procedure must "
+		"also be PURE", n->proc_name->name,
+		&n->proc_name->declared_at);
+
     g95_resolve(n);
+  }
 
   g95_check_interfaces(ns);
 

@@ -2015,16 +2015,21 @@ char *name;
 
   init_arglist(isym);
 
-  if (sort_actual(name, &c->ext.arglist, isym->formal, &c->loc) == FAILURE)
+  if (sort_actual(name, &c->ext.actual, isym->formal, &c->loc) == FAILURE)
     return FAILURE;
 
   if (isym->check != NULL) {
-    if (do_check(isym, c->ext.arglist) == FAILURE) return FAILURE;
+    if (do_check(isym, c->ext.actual) == FAILURE) return FAILURE;
   } else {
-    if (check_arglist(&c->ext.arglist, isym, 1) == FAILURE) return FAILURE;
+    if (check_arglist(&c->ext.actual, isym, 1) == FAILURE) return FAILURE;
   }
 
   c->sub_name = isym->lib_name;
+
+  if (g95_pure(NULL) && !isym->elemental)
+    g95_error("Subroutine call to intrinsic '%s' at %L is not PURE", &c->loc,
+	      c->sub_name);
+
   return SUCCESS;
 }
 
