@@ -418,13 +418,18 @@ symbol_attribute attr;
     return FAILURE;
   }
 
+  /* In pure functions, both lvalue and rvalue must be pure. An EXPR_NULL,
+   * which represents either the NULL() value or a NULLIFY statement, is
+   * always pure. */
+
   if (g95_pure(NULL)) {
     if (g95_impure_variable(lvalue->symbol)) {
       g95_error("Bad pointer object in PURE procedure at %L", &lvalue->where);
       return FAILURE;
     }
 
-    if (g95_impure_variable(rvalue->symbol)) {
+    if ((rvalue->expr_type != EXPR_NULL)
+        && g95_impure_variable(rvalue->symbol)) {
       g95_error("Bad target in pointer assignment in PURE procedure at %L",
 		&rvalue->where);
     }

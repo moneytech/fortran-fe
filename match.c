@@ -1453,7 +1453,7 @@ match m;
       goto cleanup;
     }
 
-    if (g95_pure(NULL) && g95_impure_variable(tail->expr->symbol)) {
+    if (g95_pure(NULL) && g95_impure_variable(p->symbol)) {
       g95_error("Illegal variable in NULLIFY at %C for a PURE procedure");
       goto cleanup;
     }
