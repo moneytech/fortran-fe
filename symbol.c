@@ -1239,36 +1239,51 @@ g95_st_label *lp;
 }
 
 
-/* g95_define_st_label()-- Called when a statement with a statement
- * label is about to be accepted.  The format_flag indicates whether
- * the statement in question is a format statement or not.  We add the
- * label to the list of the current namespace, making sure it hasn't
- * been defined previously and referenced correctly. */
+/* g95_new_internal_label() -- create a branch label for g95 internal use */
 
-void g95_define_st_label(int label, locus *label_locus, int format_flag) {
+int g95_new_internal_label() {
+static int next_label = 100000; /* only initialized at startup! */
+  return next_label++;
+}
+
+
+/* g95_define_st_label()-- Called when a statement with a statement
+ * label is about to be accepted. We add the label to the list of the
+ * current namespace, making sure it hasn't been defined previously
+ * and referenced correctly. */
+
+void g95_define_st_label(int label, locus *label_locus,
+                         int block_no, g95_sl_type type) {
 g95_st_label *lp;
 
   lp = get_st_label(label);
 
-  if (lp->defined != ST_LABEL_UNKNOWN) {
+  if (lp->defined == ST_LABEL_FORMAT || lp->defined == ST_LABEL_TARGET) {
     g95_error("Statement label %d at %C has already been defined at %L",
 	      label, &lp->where);
     return;
+  } else if (lp->defined == ST_LABEL_BAD_TARGET) {
+      g95_error("A bad definition of label %d at %C has already been rejected at %L",
+                label, &lp->where);
+      return;
   }
 
   lp->where = *label_locus;
+  lp->block_no = block_no;
 
-  if (format_flag) {
+  if (type == ST_LABEL_FORMAT) {
     if (lp->referenced == ST_LABEL_TARGET) 
       g95_error("Label %d at %C already referenced as branch target", label);
     else
       lp->defined = ST_LABEL_FORMAT;
-
-  } else {
+  } else if (type == ST_LABEL_TARGET) {
     if (lp->referenced == ST_LABEL_FORMAT)
       g95_error("Label %d at %C already referenced as a format label", label);
     else
       lp->defined = ST_LABEL_TARGET;
+  } else {
+    lp->defined = ST_LABEL_BAD_TARGET;
+    lp->referenced = ST_LABEL_BAD_TARGET;
   }
 }
 
@@ -1300,7 +1315,8 @@ try rc;
     goto done;
   }
 
-  if (label_type == ST_LABEL_TARGET && type == ST_LABEL_FORMAT) {
+  if ((label_type == ST_LABEL_TARGET || label_type == ST_LABEL_BAD_TARGET)
+      && type == ST_LABEL_FORMAT) {
     g95_error("Label %d at %C previously used as branch target", label);
     rc = FAILURE;
     goto done;

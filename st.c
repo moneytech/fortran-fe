@@ -27,6 +27,18 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include <string.h>
 
+
+/* Stack of block numbers for validating GOTO statements */
+
+typedef struct g95_block_stack {
+       int block_no;
+       struct g95_block_stack *prev;
+} g95_block_stack;
+
+#define g95_get_block_stack() g95_getmem(sizeof(g95_block_stack))
+
+g95_block_stack *block_stack;
+
 g95_code new_st;
 
 /* g95_clear_new_st()-- Zeroes out the new_st structure. */
@@ -35,6 +47,19 @@ void g95_clear_new_st(void) {
 
   memset(&new_st, '\0', sizeof(new_st));
   new_st.op = EXEC_NOP;
+  new_st.block_no = g95_state_stack->this_block_no;
+}
+
+
+/* g95_get_code() -- get a new code node */
+
+g95_code *g95_get_code(void) {
+g95_code *p;
+
+  p = g95_getmem(sizeof(g95_code));
+  p->block_no = g95_state_stack->this_block_no;
+
+  return p;
 }
 
 
@@ -274,19 +299,54 @@ static void resolve_forall_iterators(g95_forall_iterator *iter) {
 /* g95_resolve_code()-- Given a block of code, recursively resolve
  * everything pointed to by this code block */
 
-void g95_resolve_code(g95_code *code) {
+void g95_resolve_code(g95_code *code, g95_namespace *ns) {
 g95_alloc *a;
+g95_block_stack *s;
+g95_st_label *lp;
 
   for(; code; code=code->next) {
+
+    for(s = block_stack; s; s = s->prev)
+      if (s->block_no == code->block_no) break;
+
+    if (s == NULL) {
+      s = g95_get_block_stack();
+      s->block_no = code->block_no;
+      s->prev = block_stack;
+      block_stack = s;
+    }
+    else while (s != block_stack) {
+      g95_block_stack *t = block_stack;
+      block_stack = block_stack->prev;
+      g95_free(t);
+    }
+
     if (code->op != EXEC_SELECT && code->block != NULL)
-      g95_resolve_code(code->block);
+      g95_resolve_code(code->block,ns);
 
     g95_resolve_expr(code->expr);
     g95_resolve_expr(code->expr2);
 
     switch(code->op) {
-    case EXEC_NOP:  case EXEC_GOTO:    case EXEC_CYCLE:  case EXEC_IOLENGTH:
+    case EXEC_NOP:  case EXEC_CYCLE:  case EXEC_IOLENGTH:
     case EXEC_STOP: case EXEC_NULLIFY: case EXEC_EXIT:
+      break;
+
+    case EXEC_GOTO:
+      for(lp=ns->st_labels; lp; lp=lp->next)
+        if (lp->label == code->label) break; /* always in list */
+
+      for(s = block_stack; s; s = s->prev)
+        if (s->block_no == lp->block_no) break;
+
+      if (lp->defined == ST_LABEL_TARGET && s == NULL) {
+        g95_error("Label at %L is not in the same scoping unit as the "
+                  "GOTO statement at %L", &lp->where, &code->loc);
+      } else if (lp->defined == ST_LABEL_BAD_TARGET) {
+        g95_error("Statement at %L is not a valid branch target statement "
+                  "for the GOTO statement at %L", &lp->where, &code->loc);
+      } /* else: deal with undefined or FORMAT labels later */
+
       break;
 
     case EXEC_RETURN:
@@ -326,7 +386,7 @@ g95_alloc *a;
       break;
 
     case EXEC_SELECT:
-      g95_resolve_select(code);      /* Select is complicated */
+      g95_resolve_select(code,ns);      /* Select is complicated */
       break;
 
     case EXEC_DO:
@@ -458,7 +518,7 @@ g95_charlen *cl;
 
   g95_set_sym_defaults(ns);
 
-  g95_resolve_code(ns->code);
+  g95_resolve_code(ns->code,ns);
 
   for(cl=ns->cl_list; cl; cl=cl->next) {
     if (cl->length == NULL || g95_resolve_expr(cl->length) == FAILURE)

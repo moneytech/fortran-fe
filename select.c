@@ -452,7 +452,7 @@ static try check_case_expr(g95_expr *e, bt type) {
  *   Make sure that no case ranges overlap
  */
 
-void g95_resolve_select(g95_code *code) {
+void g95_resolve_select(g95_code *code, g95_namespace *ns) {
 g95_code *body;
 g95_expr *expr;
 g95_case *cp;
@@ -476,7 +476,7 @@ try t;
   overlap = 0;
  
   for(body=code->block; body; body=body->block) {
-    g95_resolve_code(body->next);
+    g95_resolve_code(body->next,ns);
 
     if (t == FAILURE) continue;
 

@@ -35,6 +35,15 @@ int g95_statement_label;
 static locus label_locus;
 static jmp_buf eof;
 
+
+/* Current block no. We use this to make sure branching statements
+ * are conforming. A unique number is assigned to each block. The
+ * main parser function initializes this to 0 for each new file.
+ * Note that this number has nothing to do with g95_current_block,
+ * which is a g95_symbol associated with the current block */
+
+int g95_new_block_no;
+
 g95_state_data *g95_state_stack;
 
 
@@ -476,6 +485,7 @@ static void push_state(g95_state_data *p, g95_compile_state new_state,
 
   p->state = new_state;
   p->previous = g95_state_stack;
+  p->this_block_no = ++g95_new_block_no;
   p->sym = sym;
   p->head = p->tail = NULL;
 
@@ -643,22 +653,29 @@ const char *p;
 
 static void accept_statement(g95_statement st) {
 
-  new_st.here = g95_statement_label;
+  new_st.here = 0;
 
   if (g95_statement_label != 0) {
     switch(st) {
-    case_executable:  case ST_DO:     case ST_IF_BLOCK:     case ST_END_SELECT:
-    case ST_ENDDO:    case ST_ENDIF:  case ST_SELECT_CASE:
-      g95_define_st_label(g95_statement_label, &label_locus, 0);
+    case ST_ENDDO:    case ST_ENDIF:  case ST_END_SELECT:
+    case_executable:
+    case_exec_markers:
+      new_st.here = g95_statement_label;
+      g95_define_st_label(g95_statement_label, &label_locus,
+                          g95_state_stack->this_block_no,ST_LABEL_TARGET);
       break;
 
     case ST_FORMAT:
-      g95_define_st_label(g95_statement_label, &label_locus, 1);
+      new_st.here = g95_statement_label;
+      g95_define_st_label(g95_statement_label, &label_locus,
+                          g95_state_stack->this_block_no,ST_LABEL_FORMAT);
       break;
 
     default:
       g95_error("Statement label not allowed in %s statement at %C",
 		g95_ascii_statement(st));
+      g95_define_st_label(g95_statement_label, &label_locus,
+                          g95_state_stack->this_block_no,ST_LABEL_BAD_TARGET);
       break;
     }
   }
@@ -684,10 +701,9 @@ static void accept_statement(g95_statement st) {
     if (g95_statement_label == 0) break;
 
     new_st.op = EXEC_NOP;
-    new_st.here = g95_statement_label;
 
-  case_executable:      case ST_IF_BLOCK:      case ST_SELECT_CASE:
-  case ST_WHERE_BLOCK:  case ST_FORALL_BLOCK:  case ST_DO:
+  case_executable:
+  case_exec_markers:
     g95_add_statement();
     break;
 
@@ -1202,10 +1218,12 @@ g95_statement st;
       d->op = EXEC_WHERE;
       d->expr = new_st.expr;
 
-      accept_statement(ST_ELSEWHERE);
+      accept_statement(st);
+
       break;
 
     case ST_END_WHERE:
+      accept_statement(st);
       break;
 
     default:
@@ -1257,6 +1275,7 @@ g95_statement st;
       break;
 
     case ST_END_FORALL:
+      accept_statement(st);
       break;
 
     case ST_NONE:
@@ -1335,9 +1354,12 @@ int seen_else;
       d = g95_new_level(g95_state_stack->head);
       d->op = EXEC_IF;
 
+      accept_statement(st);
+
       break;
 
     case ST_ENDIF:
+      accept_statement(st);
       break;
 
     default:
@@ -1373,7 +1395,11 @@ g95_select s;
   for(;;) {
     st = next_statement();
     if (st == ST_NONE) unexpected_eof();
-    if (st == ST_END_SELECT) goto done;
+    if (st == ST_END_SELECT) { /* empty SELECT CASE is OK */
+      accept_statement(st);
+      pop_state();
+      return;
+    }
     if (st == ST_CASE) break;
 
     g95_error("Expected a CASE or END SELECT statement following SELECT CASE "
@@ -1410,6 +1436,7 @@ g95_select s;
       break;
 
     case ST_END_SELECT:
+      accept_statement(st);
       break;
 
 /* Can't have an executable statement because of parse_executable() */
@@ -1420,7 +1447,6 @@ g95_select s;
     }
   } while(st != ST_END_SELECT);
 
-done:
   pop_state();
 }
 
@@ -1489,9 +1515,10 @@ loop:
   case ST_ENDDO:
     if (s.label != 0 && s.label != g95_statement_label)
       g95_error("Statement label in ENDDO at %C doesn't match DO label");
-    break;
+    /* fall throught */
 
   case ST_IMPLIED_ENDDO:
+    accept_statement(st);
     break;
 
   default:
@@ -1639,6 +1666,7 @@ g95_symbol *sym;
 
     case ST_END_FUNCTION:   case ST_END_MODULE:
     case ST_END_PROGRAM:    case ST_END_SUBROUTINE:
+      accept_statement(st);
       g95_free_namespace(g95_current_ns);
       g95_current_ns = parent_ns;
       break;
@@ -1671,9 +1699,11 @@ int n;
     unexpected_eof();
 
   case ST_CONTAINS:
+    accept_statement(st);
     goto contains;
 
   case_end:
+    accept_statement(st);
     goto done;
 
   default:
@@ -1689,9 +1719,11 @@ loop:
       unexpected_eof();
 
     case ST_CONTAINS:
+      accept_statement(st);
       goto contains;
   
     case_end:
+      accept_statement(st);
       goto done;
 
     default:
@@ -1781,8 +1813,6 @@ g95_state_data top, s;
 g95_statement st;
 locus prog_locus;
 
-  g95_clear_new_st();
-
   top.state = COMP_NONE;
   top.sym = NULL;
   top.previous = NULL;
@@ -1790,7 +1820,10 @@ locus prog_locus;
 
   g95_state_stack = &top;
 
+  g95_clear_new_st();
+
   g95_statement_label = 0;
+  g95_new_block_no = 0;
 
   if (setjmp(eof)) return FAILURE;   /* Come here on unexpected EOF */
 
@@ -1882,3 +1915,4 @@ duplicate_main:
   g95_error("Two main PROGRAMs at %L and %C", &prog_locus);
   return SUCCESS;
 }
+

@@ -108,7 +108,8 @@ typedef enum { AR_FULL=1, AR_ELEMENT, AR_SECTION } ar_type;
 
 /* Statement label types */
 
-typedef enum { ST_LABEL_UNKNOWN=1, ST_LABEL_TARGET, ST_LABEL_FORMAT
+typedef enum { ST_LABEL_UNKNOWN=1, ST_LABEL_TARGET,
+               ST_LABEL_BAD_TARGET, ST_LABEL_FORMAT
 } g95_sl_type;
 
 /* Intrinsic operators */
@@ -387,6 +388,8 @@ typedef struct g95_label_list {
 
 typedef struct g95_st_label {
   int label;
+  int block_no;
+  
   g95_sl_type defined, referenced;
 
   char *format;
@@ -529,6 +532,7 @@ extern g95_interface_info current_interface;
 typedef struct g95_state_data {
   g95_compile_state state;
   g95_symbol *sym;            /* Block name associated with this level */
+  int this_block_no;
   struct g95_code *head, *tail;
   struct g95_state_data *previous;
 } g95_state_data;
@@ -672,10 +676,12 @@ typedef struct g95_case {
   g95_expr *low, *high;
 
   struct g95_case *link[2], *next;
-  struct g95_code *back;
+  struct g95_code *code; /* back link to g95_code block for this case */
 
   int balance;
-  char cache;			/* Used during insertion in AVL tree */
+  char cache;		 /* used during insertion in AVL tree */
+
+  int label;             /* used during character select resolution */
  
 } g95_case;
 
@@ -779,6 +785,7 @@ typedef struct g95_code {
 
   struct g95_code *block, *next;
   locus loc;
+  int block_no;
 
   int here, label, label2, label3;
   g95_symbol *sym;
@@ -800,7 +807,7 @@ typedef struct g95_code {
 } g95_code;
 
 extern g95_code new_st;
-#define g95_get_code() g95_getmem(sizeof(g95_code))
+
 
 /* Storage for DATA statements */
 
@@ -1095,7 +1102,8 @@ g95_component *g95_find_component(g95_symbol *, const char *);
 void g95_show_components(g95_symbol *);
 
 void g95_check_st_labels(g95_namespace *);
-void g95_define_st_label(int, locus *, int);
+int g95_new_internal_label();
+void g95_define_st_label(int, locus *, int, g95_sl_type);
 try g95_reference_st_label(int, g95_sl_type);
 
 g95_namespace *g95_get_namespace(void);
@@ -1274,11 +1282,12 @@ int g95_kind_max(g95_expr *, g95_expr *);
 extern g95_code new_st, *program_tail;
 
 void g95_clear_new_st(void);
+g95_code *g95_get_code(void);
 g95_code *g95_new_level(g95_code *);
 g95_code *g95_add_statement(void);
 g95_code *g95_append_code(g95_code *, g95_code *);
 void g95_free_statements(g95_code *);
-void g95_resolve_code(g95_code *);
+void g95_resolve_code(g95_code *, g95_namespace *);
 void g95_resolve(g95_namespace *);
 try g95_resolve_iterator(g95_iterator *);
 void g95_undo_statement(void);
@@ -1331,7 +1340,7 @@ try g95_parent_procedure(g95_symbol *sym, int);
 void g95_free_case_list(g95_case *);
 match g95_match_case(void);
 match g95_match_select(void);
-void g95_resolve_select(g95_code *);
+void g95_resolve_select(g95_code *, g95_namespace *ns);
 
 /* io.c */
 
