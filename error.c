@@ -153,7 +153,7 @@ int i, m;
  * file and line, we only print the line once. */
 
 static void show_loci(locus *l1, locus *l2) {
-int offset, flag, i, m, c1, c2;
+int offset, flag, i, m, c1, c2, cmax;
 
   if (l1 == NULL) {
     error_printf("<During initialization>\n");
@@ -168,26 +168,31 @@ int offset, flag, i, m, c1, c2;
 
   if (c1 < c2) m = c2 - c1; else m = c1 - c2;
 
+
   if (l1->lp != l2->lp || l1->line != l2->line || m > terminal_width - 10)
     goto separate;
 
-  offset = (terminal_width - m) / 2;
+  offset = 0;
+  cmax = (c1 < c2) ? c2 : c1;
+  if (cmax > terminal_width - 5) offset = cmax - terminal_width + 5;
+
   if (offset < 0) offset = 0;
 
-  c1 = c1 - offset;
-  c2 = c2 - offset;
+  c1 -= offset;
+  c2 -= offset;
 
   show_locus(offset, l1);
 
 /* Arrange that '1' and '2' will show up even if the two columns are equal */
 
-  for(i=0; i<=m; i++) {
+  for(i=1; i<=cmax; i++) {
     flag = 0;
     if (i == c1) { error_char('1'); flag = 1; }
     if (i == c2) { error_char('2'); flag = 1; }
-
     if (flag == 0) error_char(' ');
   }
+
+  error_char('\n');
 
   return;
 
