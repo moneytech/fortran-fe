@@ -350,8 +350,8 @@ typedef struct {
 
 #define g95_get_array_spec() g95_getmem(sizeof(g95_array_spec))
 
-#ifndef IN_GCC
-typedef void * tree; /* Just a dummy place holder. */
+#ifndef BACKEND
+typedef void *tree; /* Just a dummy place holder. */
 #endif
 
 /* Components of derived types */
