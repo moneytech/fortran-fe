@@ -838,7 +838,7 @@ match m;
     tail->next = new;
     tail = new;
 
-    if (g95_match_char(',') != MATCH_YES) break;
+    if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
 
   if (g95_match_char(')') != MATCH_YES) goto syntax;
