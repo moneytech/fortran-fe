@@ -1352,6 +1352,9 @@ check_substring:
       else
 	tail->next = substring;
 
+      if (primary->expr_type == EXPR_CONSTANT)
+	primary->expr_type = EXPR_SUBSTRING;
+
       break;
 
     case MATCH_NO:
