@@ -1774,7 +1774,7 @@ mpf_t xr,xi;
     break;
 
   default:
-    g95_internal_error("g95_simplify_max: bad type");
+    g95_internal_error("g95_simplify_log: bad type");
   }
 
   return range_check(result, "LOG");
@@ -1818,154 +1818,60 @@ int kind;
   return result;
 }
 
-/* Max family */
 
-g95_expr *g95_simplify_max(g95_actual_arglist *arg) {
-g95_expr *x, *y, *result=NULL;
-mpz_t max_val;
-mpf_t rmax_val;
-bt my_type;
-int my_kind;
+/* g95_simplify_min_max()-- This function is special since MAX() can take
+ * any number of arguments.  The simplified expression is a rewritten
+ * version of the argument list containing at most one constant
+ * element.  Other constant elements are deleted.  Because the
+ * argument list has already been checked, this function always
+ * succeeds.
+ *
+ * sign is 1 for MAX(), -1 for MIN().
+ *
+ * The caller needs to make sure the argument list remains with more
+ * than one element. */
 
-  x   = arg->expr;
-  arg = arg->next;
+void g95_simplify_min_max(g95_actual_arglist *arg, int sign) {
+g95_actual_arglist *last, *extremum=NULL;
 
-  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
-    x   = arg->expr;
-    arg = arg->next;
-  }
+  last = NULL;
+  extremum = NULL;
 
-  if (arg == NULL ) return NULL;
+  for(; arg; last=arg, arg=arg->next) {
+    if (arg->expr->expr_type != EXPR_CONSTANT) continue;
 
-  switch(x->ts.type) {
-  case BT_INTEGER:
-    mpz_init_set(max_val, x->value.integer);
-    my_type = BT_INTEGER;
-    my_kind = x->ts.kind;
-    break;
-
-  case BT_REAL:
-    mpf_init_set(rmax_val, x->value.real);
-    my_type = BT_REAL;
-    my_kind = x->ts.kind;
-    break;
-
-  default:
-    g95_internal_error("g95_simplify_max(): bad type");
-  }
-
-  while(arg != NULL) {
-    y = arg->expr;
-    if (y->expr_type != EXPR_CONSTANT) {
-      x = y;
-      arg = arg->next;
-    } else {
-      if (my_type == BT_INTEGER) {
-        if (mpz_cmp(y->value.integer, max_val) > 0)
-       	  mpz_set(max_val, y->value.integer);
-      }
-
-      if (my_type == BT_REAL) {
-        if (mpf_cmp(y->value.real, rmax_val) > 0)
- 	  mpf_set(rmax_val, y->value.real);
-      }
-      x = y;
-      arg = arg->next;
+    if (extremum == NULL) {
+      extremum = arg;
+      continue;
     }
-  }
 
-  if (my_type == BT_INTEGER) {
-    result=g95_constant_result(BT_INTEGER,my_kind);
-    mpz_set(result->value.integer, max_val);
-    mpz_clear(max_val);
-  } else if (my_type == BT_REAL) {
-    result=g95_constant_result(BT_REAL,my_kind);
-    mpf_set(result->value.real, rmax_val);
-    mpf_clear(rmax_val);
-  }
+    switch(arg->expr->ts.type) {
+    case BT_INTEGER:
+      if (mpz_cmp(arg->expr->value.integer,
+		  extremum->expr->value.integer)*sign > 0)
+	mpz_set(extremum->expr->value.integer, arg->expr->value.integer);
 
-  return range_check(result,"MAX");
-}
+      break;
 
+    case BT_REAL:
+      if (mpf_cmp(arg->expr->value.real, extremum->expr->value.real)*sign > 0)
+	mpf_set(extremum->expr->value.real, arg->expr->value.real);
 
-g95_expr *g95_simplify_amax0(g95_actual_arglist *arg) {
-g95_expr *x, *y, *r, *result;
-mpz_t max_val;
+      break;
 
-  x   = arg->expr;
-  arg = arg->next;
-
-  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
-    x   = arg->expr;
-    arg = arg->next;
-  }
-
-  mpz_init_set(max_val, x->value.integer);
-
-  while(arg != NULL) {
-    y = arg->expr;
-    if (y->expr_type != EXPR_CONSTANT) {
-      x = y;
-      arg = arg->next;
-    } else {
-      if (mpz_cmp(y->value.integer, max_val) > 0)
-	mpz_set(max_val, y->value.integer);
-
-      x = y;
-      arg = arg->next;
+    default:
+      g95_internal_error("g95_simplify_max(): Bad type in arglist");
     }
+
+    /* Delete the extra constant argument */
+
+    last->next = arg->next;
+
+    arg->next = NULL;
+    g95_free_actual_arglist(arg);
+    arg = last;
   }
-
-  r = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
-  mpz_set(r->value.integer, max_val);
-  mpz_clear(max_val);
-
-  result = g95_int2real(r, g95_default_real_kind());
-  g95_free_expr(r);
-
-  return range_check(result,"AMAX0");
 }
-
-
-g95_expr *g95_simplify_max1(g95_actual_arglist *arg) {
-g95_expr *x, *y, *r, *result;
-mpf_t max_val;
-
-  x   = arg->expr;
-  arg = arg->next;
-
-  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
-    x   = arg->expr;
-    arg = arg->next;
-  }
-
-  mpf_init_set(max_val, x->value.real);
-
-  while(arg != NULL) {
-    y = arg->expr;
-    if (y->expr_type != EXPR_CONSTANT) {
-      x = y;
-      arg = arg->next;
-    } else {
-      if (mpf_cmp(y->value.real, max_val) > 0)
-	mpf_set(max_val, y->value.real);
-
-      x = y;
-      arg = arg->next;
-    }
-  }
-
-  r = g95_constant_result(BT_REAL, g95_default_real_kind());
-  mpf_set(r->value.real, max_val);
-  mpf_clear(max_val);
-
-  result = g95_real2int(r, g95_default_integer_kind());
-
-  g95_free_expr(r);
-  return range_check(result,"MAX1");
-}
-
-/* End of max functions */
 
 
 g95_expr *g95_simplify_maxexponent(g95_expr *x) {
@@ -1980,154 +1886,6 @@ int i;
 
   return result;
 }
-
-
-/* Min family */
-
-g95_expr *g95_simplify_min(g95_actual_arglist *arg) {
-g95_expr *x, *y, *result=NULL;
-mpz_t min_val;
-mpf_t rmin_val;
-bt my_type;
-int my_kind;
-
-  x   = arg->expr;
-  arg = arg->next;
-
-  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
-    x   = arg->expr;
-    arg = arg->next;
-  }
-
-  if (arg == NULL ) return NULL;
-
-  switch(x->ts.type) {
-  case BT_INTEGER:
-    mpz_init_set(min_val, x->value.integer);
-    my_type = BT_INTEGER;
-    my_kind = x->ts.kind;
-    break;
-
-  case BT_REAL:
-    mpf_init_set(rmin_val, x->value.real);
-    my_type = BT_REAL;
-    my_kind = x->ts.kind;
-    break;
-
-  default:
-    g95_internal_error("g95_simplify_min(): bad type"); /* noreturn */
-  }
-
-  while(arg != NULL) {
-    y = arg->expr;
-    if (y->expr_type != EXPR_CONSTANT) {
-      x = y;
-      arg = arg->next;
-    } else {
-      if (my_type == BT_INTEGER) {
-        if (mpz_cmp(y->value.integer, min_val) < 0)
-       	  mpz_set(min_val, y->value.integer);
-      } if (my_type == BT_REAL) {
-        if (mpf_cmp(y->value.real, rmin_val) < 0)
- 	  mpf_set(rmin_val, y->value.real);
-      }
-      x = y;
-      arg = arg->next;
-    }
-  }
-
-  if (my_type == BT_INTEGER) {
-    result = g95_constant_result(BT_INTEGER, my_kind);
-    mpz_set(result->value.integer, min_val);
-    mpz_clear(min_val);
-  } else if (my_type == BT_REAL) {
-    result = g95_constant_result(BT_REAL, my_kind);
-    mpf_set(result->value.real, rmin_val);
-    mpf_clear(rmin_val);
-  }
-
-  return range_check(result,"MIN");
-}
-
-
-g95_expr *g95_simplify_amin0(g95_actual_arglist *arg) {
-g95_expr *x, *y, *r, *result;
-mpz_t min_val;
-
-  x   = arg->expr;
-  arg = arg->next;
-  
-  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
-    x   = arg->expr;
-    arg = arg->next;
-  }
-
-  mpz_init_set(min_val, x->value.integer);
-
-  while(arg != NULL) {
-    y = arg->expr;
-    if (y->expr_type != EXPR_CONSTANT) {
-      x = y;
-      arg = arg->next;
-    } else {
-      if (mpz_cmp(y->value.integer, min_val) < 0)
-        mpz_set(min_val, y->value.integer);
-
-      x = y;
-      arg = arg->next;
-    }
-  }
-
-  r = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
-  mpz_set(r->value.integer, min_val);
-  mpz_clear(min_val);
-
-  result = g95_int2real(r, g95_default_real_kind());
-  g95_free_expr(r);
-
-  return range_check(result,"AMIN0");
-}
-
-
-g95_expr *g95_simplify_min1(g95_actual_arglist *arg) {
-g95_expr *x, *y, *r, *result;
-mpf_t min_val;
-
-  x   = arg->expr;
-  arg = arg->next;
-
-  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
-    x   = arg->expr;
-    arg = arg->next;
-  }
-
-  mpf_init_set(min_val, x->value.real);
-
-  while(arg != NULL) {
-    y = arg->expr;
-    if (y->expr_type != EXPR_CONSTANT) {
-      x = y;
-      arg = arg->next;
-    } else {
-      if (mpf_cmp(y->value.real, min_val) < 0)
-        mpf_set(min_val, y->value.real);
-
-      x = y;
-      arg = arg->next;
-    }
-  }
-
-  r = g95_constant_result(BT_REAL, g95_default_real_kind());
-  mpf_set(r->value.real, min_val);
-  mpf_clear(min_val);
-
-  result = g95_real2int(r, g95_default_integer_kind());
-  g95_free_expr(r);
-
-  return range_check(result,"MIN1");
-}
-
-/* End of min functions */
 
 
 g95_expr *g95_simplify_minexponent(g95_expr *x) {
@@ -2148,7 +1906,7 @@ g95_expr *g95_simplify_mod(g95_expr *a, g95_expr *p) {
 g95_expr *result;
 mpf_t quot, iquot, term;
 
-  if (a->expr_type != EXPR_CONSTANT && p->expr_type != EXPR_CONSTANT) 
+  if (a->expr_type != EXPR_CONSTANT || p->expr_type != EXPR_CONSTANT)
     return NULL;
 
   result = g95_constant_result(a->ts.type, a->ts.kind);
@@ -2200,7 +1958,7 @@ g95_expr *g95_simplify_modulo(g95_expr *a, g95_expr *p) {
 g95_expr *result;
 mpf_t quot, iquot, term;
 
-  if (a->expr_type != EXPR_CONSTANT && p->expr_type != EXPR_CONSTANT) 
+  if (a->expr_type != EXPR_CONSTANT || p->expr_type != EXPR_CONSTANT) 
     return NULL;
 
   result = g95_constant_result(a->ts.type, a->ts.kind);
@@ -2264,7 +2022,7 @@ int p, i, k;
 /* FIXME */
 /*This implementation is dopey and probably not quite right, but it's a start.*/
 
-  if (x->expr_type != EXPR_CONSTANT ) return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   k = g95_validate_kind(x->ts.type, x->ts.kind);
   if (k == -1) g95_internal_error("g95_simplify_precision(): Bad kind");
@@ -2355,7 +2113,7 @@ g95_expr *g95_simplify_idnint(g95_expr *e) {
 g95_expr *rtrunc, *itrunc, *result;
 int cmp;
 
-  if (e->expr_type != EXPR_CONSTANT ) return NULL;
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
   result->where = e->where;

@@ -922,7 +922,9 @@ static try check_logical(g95_expr *a, g95_expr *kind) {
 }
 
 
-/* Min/max family */
+/* Min/max family.  Even though several of the check functions could
+ * be combined in various ways, the separate check functions allow us
+ * to determine the exact intrinsic from the check function. */
 
 static try check_rest(bt type, int kind, g95_actual_arglist *arg) {
 g95_expr *x;
@@ -944,7 +946,7 @@ int n;
 }
 
 
-static try check_min_max(g95_actual_arglist *arg) {
+static try check_min(g95_actual_arglist *arg) {
 g95_expr *x;
 
   if (arg == NULL) return FAILURE;
@@ -954,7 +956,17 @@ g95_expr *x;
 }
 
 
-static try check_min0_max0(g95_actual_arglist *arg) {
+static try check_max(g95_actual_arglist *arg) {
+g95_expr *x;
+
+  if (arg == NULL) return FAILURE;
+
+  x = arg->expr;
+  return check_rest(x->ts.type, x->ts.kind, arg);
+}
+
+
+static try check_min0(g95_actual_arglist *arg) {
 g95_expr *x;
 
   if (arg == NULL) return FAILURE; 
@@ -964,7 +976,17 @@ g95_expr *x;
 }
 
 
-static try check_min1_max1(g95_actual_arglist *arg) {
+static try check_max0(g95_actual_arglist *arg) {
+g95_expr *x;
+
+  if (arg == NULL) return FAILURE; 
+
+  x = arg->expr;
+  return check_rest(BT_INTEGER, x->ts.kind, arg);
+}
+
+
+static try check_min1(g95_actual_arglist *arg) {
 g95_expr *x;
 
   if (arg == NULL) return FAILURE;
@@ -974,7 +996,17 @@ g95_expr *x;
 }
 
 
-static try check_amin0_amax0(g95_actual_arglist *arg) {
+static try check_max1(g95_actual_arglist *arg) {
+g95_expr *x;
+
+  if (arg == NULL) return FAILURE;
+
+  x = arg->expr;
+  return check_rest(BT_REAL, x->ts.kind, arg);
+}
+
+
+static try check_amin0(g95_actual_arglist *arg) {
 
   if (arg == NULL) return FAILURE; 
 
@@ -982,7 +1014,15 @@ static try check_amin0_amax0(g95_actual_arglist *arg) {
 }
 
 
-static try check_amin1_amax1(g95_actual_arglist *arg) {
+static try check_amax0(g95_actual_arglist *arg) {
+
+  if (arg == NULL) return FAILURE; 
+
+  return check_rest(BT_INTEGER, g95_default_integer_kind(), arg);
+}
+
+
+static try check_amin1(g95_actual_arglist *arg) {
 
   if (arg == NULL) return FAILURE; 
 
@@ -990,7 +1030,23 @@ static try check_amin1_amax1(g95_actual_arglist *arg) {
 }
 
 
-static try check_dmin1_dmax1(g95_actual_arglist *arg) {
+static try check_amax1(g95_actual_arglist *arg) {
+
+  if (arg == NULL) return FAILURE; 
+
+  return check_rest(BT_REAL, g95_default_real_kind(), arg);
+}
+
+
+static try check_dmin1(g95_actual_arglist *arg) {
+
+  if (arg == NULL) return FAILURE; 
+
+  return check_rest(BT_REAL, g95_default_double_kind(), arg); 
+}
+
+
+static try check_dmax1(g95_actual_arglist *arg) {
 
   if (arg == NULL) return FAILURE; 
 
@@ -1029,7 +1085,8 @@ static try check_matmul(g95_expr *matrix_a, g95_expr *matrix_b) {
   if (matrix_a->shape == NULL || matrix_b->shape == NULL) return FAILURE;
 
   if ((matrix_a->shape->rank != 1 || matrix_b->shape->rank != 2) &&
-      (matrix_a->shape->rank != 2 || matrix_b->shape->rank != 1)) return FAILURE;
+      (matrix_a->shape->rank != 2 || matrix_b->shape->rank != 1))
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -1127,12 +1184,12 @@ static try check_minval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
 static try check_mod(g95_expr *a, g95_expr *p) {
 
-  if ( (a->ts.type != BT_INTEGER && a->ts.type != BT_REAL) ) {
+  if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL)) {
     type_error(a);
     return FAILURE;
   }
 
-  if ( a->ts.type != p->ts.type ) {
+  if (a->ts.type != p->ts.type) {
    intrinsic_error("Types of arguments to intrinsic at %%L must agree"); 
    return FAILURE;
   }
@@ -1152,7 +1209,8 @@ static try check_modulo(g95_expr *a, g95_expr *p) {
     type_error(a);
     return FAILURE;
   }
-  if ( a->ts.type != p->ts.type ) {
+
+  if (a->ts.type != p->ts.type) {
    intrinsic_error("Types of arguments to intrinsic at %%L must agree");
    return FAILURE;
   }
@@ -1168,12 +1226,12 @@ static try check_modulo(g95_expr *a, g95_expr *p) {
 
 static try check_nearest(g95_expr *x, g95_expr *s) {
 
-  if ( x->ts.type != BT_REAL ) {
+  if (x->ts.type != BT_REAL) {
     type_error(x);
     return FAILURE;
   }
 
-  if ( s->ts.type != BT_REAL ) {
+  if (s->ts.type != BT_REAL) {
     type_error(s);
     return FAILURE;
   }
@@ -1280,7 +1338,7 @@ static try check_present(g95_expr *a) {
 
 static try check_product(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
-  if ( array->shape == NULL) {
+  if (array->shape == NULL) {
     return FAILURE;
   }
 
@@ -1677,14 +1735,19 @@ try t;
 
 /* max and min require special handling due to the variable number of args */
 
-  if (strcmp(specific->name,"min")  ==0 || strcmp(specific->name,"max")  ==0||
-      strcmp(specific->name,"min0") ==0 || strcmp(specific->name,"max0") ==0||
-      strcmp(specific->name,"min1") ==0 || strcmp(specific->name,"max1") ==0||
-      strcmp(specific->name,"amin0")==0 || strcmp(specific->name,"amax0")==0||
-      strcmp(specific->name,"amin1")==0 || strcmp(specific->name,"amax1")==0) {
-    t = (*specific->check_function)(arg);
-    return t;
-  }
+  if (specific->check_function == check_min ||
+      specific->check_function == check_max ||
+      specific->check_function == check_min0 ||
+      specific->check_function == check_max0 ||
+      specific->check_function == check_min1 ||
+      specific->check_function == check_max1 ||
+      specific->check_function == check_amin0 ||
+      specific->check_function == check_amax0 ||
+      specific->check_function == check_amin1 ||
+      specific->check_function == check_amax1 ||
+      specific->check_function == check_dmin1 ||
+      specific->check_function == check_dmax1)
+    return (*specific->check_function)(arg);
 
   a1 = arg->expr;
   arg = arg->next;
@@ -2190,22 +2253,22 @@ int di, dr, dd, dl, dc, dz;
 /* Note: amax0 is equivalent to real(max), max1 is equivalent to int(max) 
  * max function must take at least two arguments                        */
 
-  add_sym("max",   0, BT_REAL,    dr, g95_simplify_max, check_min_max,
+  add_sym("max",   0, BT_UNKNOWN, 0, NULL, check_max,
 	  a1, BT_UNKNOWN,    dr, 0,   a2, BT_UNKNOWN,    dr, 0, NULL);
 
-  add_sym("max0",  0, BT_INTEGER, di, g95_simplify_max, check_min0_max0,
+  add_sym("max0",  0, BT_INTEGER, di, NULL, check_max0,
 	  a1, BT_INTEGER, di, 0,   a2, BT_INTEGER, di, 0, NULL);
 
-  add_sym("max1",  0, BT_INTEGER, di, g95_simplify_max1, check_min1_max1,
+  add_sym("max1",  0, BT_INTEGER, di, NULL, check_max1,
 	  a1, BT_REAL,    dr, 0,   a2, BT_REAL,    dr, 0, NULL);
 
-  add_sym("amax1", 0, BT_REAL,    dr, g95_simplify_max, check_amin1_amax1,
+  add_sym("amax1", 0, BT_REAL,    dr, NULL, check_amax1,
 	  a1, BT_REAL,    dr, 0,   a2, BT_REAL,    dr, 0, NULL);
 
-  add_sym("dmax1", 0, BT_REAL,    dd, g95_simplify_max, check_dmin1_dmax1,
+  add_sym("dmax1", 0, BT_REAL,    dd, NULL, check_dmax1,
 	  a1, BT_REAL,    dd, 0,   a2, BT_REAL,    dd, 0, NULL);
 
-  add_sym("amax0", 0, BT_REAL,    dr, g95_simplify_amax0, check_amin0_amax0,
+  add_sym("amax0", 0, BT_REAL,    dr, NULL, check_amax0,
 	  a1, BT_INTEGER, di, 0,   a2, BT_INTEGER, di, 0, NULL);
 
   add_sym("maxexponent", 1, BT_INTEGER, di, g95_simplify_maxexponent,
@@ -2223,22 +2286,22 @@ int di, dr, dd, dl, dc, dz;
 
 /* Note: amin0 is equivalent to real(min), min1 is equivalent to int(min) */
 
-  add_sym("min",   0, BT_REAL,    dr, g95_simplify_min, check_min_max,
+  add_sym("min",   0, BT_UNKNOWN,  0, NULL, check_min,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
 
-  add_sym("min0",  0, BT_INTEGER, di, g95_simplify_min, check_min0_max0,
+  add_sym("min0",  0, BT_INTEGER, di, NULL, check_min0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
 
-  add_sym("amin1", 0, BT_REAL,    dr, g95_simplify_min, check_amin1_amax1,
+  add_sym("amin1", 0, BT_REAL,    dr, NULL, check_amin1,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
 
-  add_sym("dmin1", 0, BT_REAL,    dd, g95_simplify_min, check_dmin1_dmax1,
+  add_sym("dmin1", 0, BT_REAL,    dd, NULL, check_dmin1,
 	  a1, BT_REAL,    dd, 0, a2, BT_REAL,    dd, 0, NULL);
 
-  add_sym("amin0", 0, BT_REAL,    dr, g95_simplify_amin0, check_amin0_amax0,
+  add_sym("amin0", 0, BT_REAL,    dr, NULL, check_amin0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
 
-  add_sym("min1",  0, BT_INTEGER, di, g95_simplify_min1, check_min1_max1,
+  add_sym("min1",  0, BT_INTEGER, di, NULL, check_min1,
 	  a1, BT_REAL, dr, 0,   a2, BT_REAL, dr, 0, NULL);
 
   add_sym("minexponent", 1, BT_INTEGER, di, g95_simplify_minexponent,
@@ -2822,6 +2885,32 @@ intrinsic_arg *formal;
 }
 
 
+/* simplify_min_max()-- Simplify a call to the MIN/MAX family of
+ * functions */
+
+static void simplify_min_max(intrinsic_sym *specific, g95_expr *e) {
+
+  if (specific->check_function == check_max   ||
+      specific->check_function == check_max0  || 
+      specific->check_function == check_max1  ||
+      specific->check_function == check_amax1 ||
+      specific->check_function == check_dmax1)
+    g95_simplify_min_max(e->value.function.actual, 1);
+  else
+    g95_simplify_min_max(e->value.function.actual, -1);
+
+  /* If there is a only a single argument left, get rid of the
+   * function call */
+
+  if (e->value.function.actual->next == NULL)
+    g95_replace_expr(e, g95_copy_expr(e->value.function.actual->expr));
+  else            /* Make sure the final type is correct */
+    e->ts = (specific->check_function == check_min   ||
+	     specific->check_function == check_max)
+      ? e->value.function.actual->expr->ts : specific->ts;
+}
+
+
 /* do_simplify()-- Given an intrinsic symbol node and an expression
  * node, call the simplification function (if there is one), perhaps
  * replacing the expression with something simpler.  We return FAILURE
@@ -2832,23 +2921,31 @@ static try do_simplify(intrinsic_sym *specific, g95_expr *e) {
 g95_expr *result, *a1, *a2, *a3, *a4, *a5;
 g95_actual_arglist *arg;
 
+/* Max and min require special handling due to the variable number of args */
+
+  if (specific->check_function == check_max   ||
+      specific->check_function == check_max0  || 
+      specific->check_function == check_max1  ||
+      specific->check_function == check_amax1 ||
+      specific->check_function == check_dmax1 ||
+      specific->check_function == check_min   ||
+      specific->check_function == check_min0  ||
+      specific->check_function == check_min1  ||
+      specific->check_function == check_amin1 ||
+      specific->check_function == check_dmin1) {
+    simplify_min_max(specific, e);
+    if (e->expr_type != EXPR_FUNCTION) return SUCCESS;
+
+    result = NULL;
+    goto finish;
+  }
+
   if (specific->simplify == NULL) {
     result = NULL;
     goto finish;
   }
 
   arg = e->value.function.actual;
-
-/* Max and min require special handling due to the variable number of args */
-  if ((specific->simplify == g95_simplify_max)   || 
-      (specific->simplify == g95_simplify_amax0) || 
-      (specific->simplify == g95_simplify_max1)  || 
-      (specific->simplify == g95_simplify_min)   || 
-      (specific->simplify == g95_simplify_amin0) || 
-      (specific->simplify == g95_simplify_min1)) {
-    result = (*specific->simplify)(arg);
-    goto finish;
-  }
 
   a1 = arg->expr;
   arg = arg->next;
@@ -2903,7 +3000,6 @@ g95_actual_arglist *arg;
       (lib_name != NULL) ? lib_name : specific->lib_name;
 
     e->ts = specific->ts;
-
   } else
     g95_replace_expr(e, result);
 
