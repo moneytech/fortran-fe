@@ -1119,7 +1119,7 @@ int i;
   if (changed == sym)
     changed = sym->tlink;
   else
-    for(p=changed;; p=p->tlink)
+    for(p=changed; p; p=p->tlink)
       if (p->tlink == sym) {
 	p->tlink = sym->tlink;
 	break;
