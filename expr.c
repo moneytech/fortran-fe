@@ -171,7 +171,6 @@ int n;
       break;
     }
 
-    g95_free_ref_list(e->ref);
     break;
 
   case EXPR_OP:
@@ -184,7 +183,6 @@ int n;
     break;
 
   case EXPR_VARIABLE:
-    g95_free_ref_list(e->ref);
     break;
 
   case EXPR_ARRAY:
@@ -193,7 +191,6 @@ int n;
     break;
 
   case EXPR_SUBSTRING:
-    g95_free_ref_list(e->ref);
     g95_free(e->value.character.string);
     break;
 
@@ -212,6 +209,8 @@ int n;
 
     g95_free(e->shape);
   }
+
+  g95_free_ref_list(e->ref);
 
   memset(e, '\0', sizeof(g95_expr));
 }
@@ -394,20 +393,19 @@ char *s;
       g95_copy_actual_arglist(p->value.function.actual);
     break;
 
-  case EXPR_VARIABLE:
-    q->ref = copy_ref(p->ref);
-    break;
-
   case EXPR_STRUCTURE:
   case EXPR_ARRAY:
     q->value.constructor = g95_copy_constructor(p->value.constructor);
     break;
 
+  case EXPR_VARIABLE:
   case EXPR_NULL:
     break;
   }
 
   q->shape = g95_copy_shape(p->shape, p->rank);
+
+  q->ref = copy_ref(p->ref);
 
   return q;
 }
