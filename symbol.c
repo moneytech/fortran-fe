@@ -1988,7 +1988,13 @@ g95_symbol *p, *q, *old;
 	old->namelist_tail->next = NULL;
       }
     }
+
     p->namelist_tail = old->namelist_tail;
+
+    if (p->formal != old->formal) {
+      g95_free_formal_arglist(p->formal);
+      p->formal = old->formal;
+    }
 
     g95_free(p->old_symbol);
     p->old_symbol = NULL;
