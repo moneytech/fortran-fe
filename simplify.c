@@ -1016,21 +1016,73 @@ int k, pos;
 
 /* simplify_ibits() */
 g95_expr *g95_simplify_ibits(g95_expr *x, g95_expr *y, g95_expr *z) {
-/*g95_expr *result;
-int pos, len; */
+g95_expr *result;
+int pos, len;
+int i, k, bitsize;
+int *bits;
 
-  return NULL; 
+   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT ||  
+		   z->expr_type != EXPR_CONSTANT ) return NULL;
 
-/* Not done -- needs bit-size functions among other things
-   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT ||  z->expr_type != EXPR_CONSTANT ) return NULL;
+   if (x->ts.type != BT_INTEGER || y->ts.type != BT_INTEGER || 
+		     z->ts.type !=BT_INTEGER) {
+     g95_error("Arguments of IBITS at %L must be integer", &x->where);
+     return &g95_bad_expr;
+   }
 
-* Second argument must be nonnegative and pos+ln must be less than
- * bit_size(i); third argument must be nonnegative *
+  result = g95_constant_result(BT_INTEGER, x->ts.kind);
+  result->where = x->where;
 
-* Arg2+arg3 must be less than or equal to BIT_SIZE(I), no check yet *
+  if (g95_extract_int(y, &pos) != NULL || pos < 0 ) {
+    g95_error("Invalid second argument of IBITS at %L", &y->where);
+    return &g95_bad_expr;
+  }
 
+  if (g95_extract_int(z, &len) != NULL || len < 0 ) {
+    g95_error("Invalid third argument of IBITS at %L", &z->where);
+    return &g95_bad_expr;
+  }
 
-  */
+  k = g95_validate_kind(BT_INTEGER, x->ts.kind);
+
+  bitsize = g95_integer_kinds[k].bit_size;
+
+  if ( pos+len > bitsize ) {
+    g95_error("Sum of second and third arguments of IBITS exceeds bit size at %L", 
+		    &y->where);
+    return &g95_bad_expr;
+  }
+
+  bits = g95_getmem(bitsize);
+
+  if (bits == NULL) {
+    g95_internal_error("IBITS: Unable to allocate memory");
+  }
+
+  for ( i=0; i<bitsize; ++i ) {
+    bits[i] = 0;
+  }
+
+  for ( i=0; i<len; ++i ) {
+    bits[i] = mpz_tstbit(x->value.integer,i+pos);
+  }
+
+  for ( i=0; i<bitsize; ++i ) {
+    if ( bits[i] == 0 ) {
+      mpz_clrbit(result->value.integer,i);
+    }
+    else if ( bits[i] == 1) {
+      mpz_setbit(result->value.integer,i);
+    }
+    else {
+      g95_internal_error("IBITS: Bad bit");
+    }
+  }
+
+  g95_free(bits);
+
+  return range_check(result,"IBITS");
+
 }
 
 
@@ -1040,14 +1092,12 @@ int k, pos;
 
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
 
-/* Second argument must be nonnegative and less than bit_size(i) */
-  if (x->ts.type != BT_INTEGER || x->ts.type != BT_INTEGER) {
+  if (x->ts.type != BT_INTEGER || y->ts.type != BT_INTEGER) {
     g95_error("Arguments of IBSET at %L must be integer", &x->where);
     return &g95_bad_expr;
   }
 
-  result = g95_constant_result(BT_REAL, x->ts.kind);
-  result->where = x->where;
+  result = g95_copy_expr(x);
 
   if (g95_extract_int(y, &pos) != NULL || pos < 0 ) {
     g95_error("Invalid second argument of IBSET at %L", &y->where);
