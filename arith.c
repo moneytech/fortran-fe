@@ -144,14 +144,14 @@ int i;
 
 static int validate_logical(int kind) {
 
-  if (kind == 1) return 0;
+  if (kind == g95_default_logical_kind()) return 0;
   return -1;
 }
 
 
 static int validate_character(int kind) {
 
-  if (kind == 1) return 0;
+  if (kind == g95_default_character_kind()) return 0;
   return -1;
 }
 
@@ -229,23 +229,139 @@ done:
 }
 
 
+/* constant_result()-- Function to return a constant expression node
+ * of a given type and kind. */
 
-/* Generic functions that call more specific ones based on the type. */
+static g95_expr *constant_result(bt type, int kind) {
+g95_expr *result;
 
-arith g95_arith_uminus(g95_expr *op1, g95_expr *result) {
+  result = g95_get_expr();
+
+  result->expr_type = EXPR_CONSTANT;
+  result->ts.type = type;
+  result->ts.kind = kind;
+
+  return result;
+}
+
+
+/* Low-level arithmetic functions.  All of these subroutines assume
+ * that all operands are of the same type and return an operand of the
+ * same type.  The other thing about these subroutines is that they
+ * can fail in various ways-- overflow, underflow, division by zero,
+ * zero raised to the zero, etc.  */
+
+arith g95_arith_not(g95_expr *op1, g95_expr **resultp) {
+g95_expr *result;
+
+  result = constant_result(BT_LOGICAL, op1->ts.kind);
+  result->value.logical = !op1->value.logical;
+  *resultp = result;
+
+  return ARITH_OK;
+}
+
+
+arith g95_arith_and(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
+
+  result = constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result->value.logical = op1->value.logical && op2->value.logical;
+  *resultp = result;
+
+  return ARITH_OK;
+}
+
+
+arith g95_arith_or(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
+
+  result = constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result->value.logical = op1->value.logical || op2->value.logical;
+  *resultp = result;
+
+  return ARITH_OK;
+}
+
+
+arith g95_arith_eqv(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
+
+  result = constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result->value.logical = op1->value.logical == op2->value.logical;
+  *resultp = result;
+
+  return ARITH_OK;
+}
+
+
+arith g95_arith_neqv(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
+
+  result = constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result->value.logical = op1->value.logical != op2->value.logical;
+  *resultp = result;
+
+  return ARITH_OK;
+}
+
+
+/* check_range()-- Make sure a constant numeric expression is within
+ * the range for it's type and kind. */
+
+static arith check_range(g95_expr *e) {
 arith rc;
+
+  switch(e->ts.type) {
+  case BT_INTEGER:
+    rc = g95_check_integer_range(e->value.integer, e->ts.kind);
+    break;    
+
+  case BT_REAL:
+    rc = g95_check_real_range(e->value.real, e->ts.kind);
+    break;    
+
+  case BT_COMPLEX:
+    rc = g95_check_real_range(e->value.complex.r, e->ts.kind);
+    if (rc != ARITH_OK)
+      rc = g95_check_real_range(e->value.complex.i, e->ts.kind);
+
+    break;
+
+  default:
+    g95_internal_error("check_range(): Bad type");
+  }
+
+  return rc;
+}
+
+
+/* g95_arith_uplus()-- It may seem silly to have a subroutine that
+ * actually computes the unary plus of a constant, but it prevents us
+ * from making exceptions in the code elsewhere. */
+
+arith g95_arith_uplus(g95_expr *op1, g95_expr **resultp) {
+
+  *resultp = op1;
+  return ARITH_OK;
+}
+
+
+arith g95_arith_uminus(g95_expr *op1, g95_expr **resultp) {
+g95_expr *result;
+arith rc;
+
+  result = constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
     mpz_init(result->value.integer);
     mpz_neg(result->value.integer, op1->value.integer);
-    rc = ARITH_OK;
     break;
 
   case BT_REAL:
     mpf_init(result->value.real);
     mpf_neg(result->value.real, op1->value.real);
-    rc = ARITH_OK;
     break;
 
   case BT_COMPLEX:
@@ -260,24 +376,32 @@ arith rc;
     g95_internal_error("g95_arith_uminus(): Bad basic type");
   }
 
+  rc = check_range(result);
+
+  if (rc != ARITH_OK)
+    g95_free_expr(result);
+  else
+    *resultp = result;
+
   return rc;
 }
 
 
-arith g95_arith_plus(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_plus(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 arith rc;
+
+  result = constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
     mpz_init(result->value.integer);
     mpz_add(result->value.integer, op1->value.integer, op2->value.integer);
-    rc = g95_check_integer_range(result->value.integer, result->ts.kind);
     break;
 
   case BT_REAL:
     mpf_init(result->value.real);
     mpf_add(result->value.real, op1->value.real, op2->value.real);
-    rc = g95_check_real_range(result->value.real, result->ts.kind);
     break;
 
   case BT_COMPLEX:
@@ -289,35 +413,38 @@ arith rc;
 
     mpf_add(result->value.complex.i, op1->value.complex.i,
 	    op2->value.complex.i);
-
-    rc = g95_check_real_range(result->value.complex.r, result->ts.kind);
-    if (rc == ARITH_OK) 
-      rc = g95_check_real_range(result->value.complex.i, result->ts.kind);
-
     break;
 
   default:
     g95_internal_error("g95_arith_plus(): Bad basic type");
   }
 
+  rc = check_range(result);
+
+  if (rc != ARITH_OK)
+    g95_free_expr(result);
+  else
+    *resultp = result;
+
   return rc;
 }
 
 
-arith g95_arith_minus(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_minus(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 arith rc;
+
+  result = constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
     mpz_init(result->value.integer);
     mpz_sub(result->value.integer, op1->value.integer, op2->value.integer);
-    rc = g95_check_integer_range(result->value.integer, result->ts.kind);
     break;
 
   case BT_REAL:
     mpf_init(result->value.real);
     mpf_sub(result->value.real, op1->value.real, op2->value.real);
-    rc = g95_check_real_range(result->value.real, result->ts.kind);
     break;
 
   case BT_COMPLEX:
@@ -330,35 +457,39 @@ arith rc;
     mpf_sub(result->value.complex.i, op1->value.complex.i,
 	    op2->value.complex.i);
 
-    rc = g95_check_real_range(result->value.complex.r, result->ts.kind);
-    if (rc == ARITH_OK)
-      rc = g95_check_real_range(result->value.complex.i, result->ts.kind);
-
     break;
 
   default:
     g95_internal_error("g95_arith_minus(): Bad basic type");
   }
 
+  rc = check_range(result);
+
+  if (rc != ARITH_OK)
+    g95_free_expr(result);
+  else
+    *resultp = result;
+
   return rc;
 }
 
 
-arith g95_arith_times(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_times(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 mpf_t x, y;
 arith rc;
+
+  result = constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
     mpz_init(result->value.integer);
     mpz_mul(result->value.integer, op1->value.integer, op2->value.integer);
-    rc = g95_check_integer_range(result->value.integer, result->ts.kind);
     break;
 
   case BT_REAL:
     mpf_init(result->value.real);
     mpf_mul(result->value.real, op1->value.real, op2->value.real);
-    rc = g95_check_real_range(result->value.real, result->ts.kind);
     break;
 
   case BT_COMPLEX:
@@ -379,58 +510,63 @@ arith rc;
     mpf_clear(x);
     mpf_clear(y);
 
-    rc = g95_check_real_range(result->value.complex.r, result->ts.kind);
-    if (rc == ARITH_OK)
-      rc = g95_check_real_range(result->value.complex.i, result->ts.kind);
-
     break;
 
   default:
     g95_internal_error("g95_arith_times(): Bad basic type");
   }
 
+  rc = check_range(result);
+
+  if (rc != ARITH_OK)
+    g95_free_expr(result);
+  else
+    *resultp = result;
+
   return rc;
 }
 
 
-arith g95_arith_divide(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_divide(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 mpf_t x, y, div;
 arith rc;
 
+  result = constant_result(op1->ts.type, op1->ts.kind);
+
   switch(op1->ts.type) {
   case BT_INTEGER:
+    mpz_init(result->value.integer);
+
     if (mpz_sgn(op2->value.integer) == 0) {
       rc = ARITH_DIV0;
       break;
     }
 
-    mpz_init(result->value.integer);
     mpz_tdiv_q(result->value.integer, op1->value.integer,
 	       op2->value.integer);
-
-    rc = g95_check_integer_range(result->value.integer, result->ts.kind);
     break;
 
   case BT_REAL:
+    mpf_init(result->value.real);
+
     if (mpf_sgn(op2->value.real) == 0) {
       rc = ARITH_DIV0;
       break;
     }
 
-    mpf_init(result->value.real);
     mpf_div(result->value.real, op1->value.real, op2->value.real);
-    rc = g95_check_real_range(result->value.real, result->ts.kind);
     break;
 
   case BT_COMPLEX:
+    mpf_init(result->value.complex.r);
+    mpf_init(result->value.complex.i);
+
     if (mpf_sgn(op2->value.complex.r) == 0 &&
 	mpf_sgn(op2->value.complex.i) == 0) {
       rc = ARITH_DIV0;
       break;
     }
-
-    mpf_init(result->value.complex.r);
-    mpf_init(result->value.complex.i);
 
     mpf_init(x);
     mpf_init(y);
@@ -460,52 +596,180 @@ arith rc;
     g95_internal_error("g95_arith_divide(): Bad basic type");
   }
 
+  rc = check_range(result);
+
+  if (rc != ARITH_OK)
+    g95_free_expr(result);
+  else
+    *resultp = result;
+
   return rc;
+}
+
+
+/* complex_reciprocal()-- Compute the reciprocal of a complex number
+ * (guaranteed nonzero) */
+
+static void complex_reciprocal(g95_expr *op) {
+mpf_t mod, a, result_r, result_i;
+
+  mpf_init(mod);
+  mpf_init(a);
+
+  mpf_mul(mod, op->value.complex.r, op->value.complex.r);
+  mpf_mul(a, op->value.complex.i, op->value.complex.i);
+  mpf_add(mod, mod, a);
+
+  mpf_init(result_r);
+  mpf_div(result_r, op->value.complex.r, mod);
+
+  mpf_init(result_i);
+  mpf_neg(result_i, op->value.complex.i);
+  mpf_div(result_i, result_i, mod);
+
+  mpf_set(op->value.complex.r, result_r);
+  mpf_set(op->value.complex.i, result_i);
+
+  mpf_clear(result_r);
+  mpf_clear(result_i);
+
+  mpf_clear(mod);
+  mpf_clear(a);
+}
+
+
+/* complex_pow_ui()-- Raise a complex number to positive power */
+
+static void complex_pow_ui(g95_expr *base, int power, g95_expr *result) {
+mpf_t temp_r, temp_i, a;
+
+  mpf_init_set_ui(result->value.complex.r, 1);
+  mpf_init_set_ui(result->value.complex.i, 0);
+
+  mpf_init(temp_r);
+  mpf_init(temp_i);
+  mpf_init(a);
+
+  for(; power>0; power--) {
+    mpf_mul(temp_r, base->value.complex.r, result->value.complex.r);
+    mpf_mul(a,      base->value.complex.i, result->value.complex.i);
+    mpf_sub(temp_r, temp_r, a);
+
+    mpf_mul(temp_i, base->value.complex.r, result->value.complex.i);
+    mpf_mul(a,      base->value.complex.i, result->value.complex.r);
+    mpf_add(temp_i, temp_i, a);
+
+    mpf_set(result->value.complex.r, temp_r);
+    mpf_set(result->value.complex.i, temp_i);
+  }
+
+  mpf_clear(temp_r);
+  mpf_clear(temp_i);
+  mpf_clear(a);
 }
 
 
 /* g95_arith_power()-- Raise a number to an integer power */
 
-arith g95_arith_power(g95_expr *op1, g95_expr *op2, g95_expr *result) {
-//g95_expr *prod;
-int ipower;
+arith g95_arith_power(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+int power, apower;
+g95_expr *result;
+mpz_t unity_z;
+mpf_t unity_f;
 arith rc;
 
   rc = ARITH_OK;
 
-#if 0
-  if (g95_extract_int(op2, &power) != NULL) return ARITH0TO0;  /* Fix */
+  if (g95_extract_int(op2, &power) != NULL)
+    g95_internal_error("g95_arith_power(): Bad exponent");
 
-  if (prod == 0) {
-  }
+  result = constant_result(op1->ts.type, op1->ts.kind);
 
-  prod = g95_copy_expr(op1);
+  rc = ARITH_OK;
 
-  if (prod > 0) {
-  }
-#endif
+  if (power == 0) {     /* Handle something to the zeroth power */
+    switch(op1->ts.type) {
+    case BT_INTEGER:
+      if (mpz_sgn(op1->value.integer) == 0)
+	rc = ARITH_0TO0;
+      else
+	mpz_init_set_ui(result->value.integer, 1);
+	
+      break;
 
-  switch(mpz_sgn(op2->value.integer)) {
-  case -1:
-    mpz_init_set_ui(result->value.integer, 0);
-    break;
+    case BT_REAL:
+      if (mpf_sgn(op1->value.real) == 0)
+	rc = ARITH_0TO0;
+      else
+	mpf_init_set_ui(result->value.real, 1);
 
-  case 0:
-    if (mpz_sgn(op1->value.integer) == 0) rc = ARITH_0TO0;
-    break;
+      break;
 
-  case 1:   /* Doesn't handle a**b  for 0<=a<=1 and b > 100000 correctly */
-    if (mpz_cmp_si(op2->value.integer, 100000) == 1)
-      rc = ARITH_OVERFLOW;
-    else {
-      ipower = mpz_get_si(op2->value.integer);
-      mpz_init(result->value.integer);
-      mpz_pow_ui(result->value.integer, op1->value.integer, ipower);
-      rc = g95_check_integer_range(result->value.integer, result->ts.kind);
+    case BT_COMPLEX:
+      if (mpf_sgn(op1->value.complex.r) == 0 &&
+	  mpf_sgn(op1->value.complex.i) == 0)
+	rc = ARITH_0TO0;
+      else {
+	mpf_init_set_ui(result->value.complex.r, 1);
+	mpf_init_set_ui(result->value.complex.r, 0);
+      }
+
+      break;
+
+    default:
+      g95_internal_error("g95_arith_power(): Bad base");
     }
-
-    break;
   }
+
+  if (power != 0) {
+    apower = power;
+    if (power < 0)
+      apower = -power;
+    else
+      apower = power;
+
+    switch(op1->ts.type) {
+    case BT_INTEGER:
+      mpz_init(result->value.integer);
+      mpz_pow_ui(result->value.integer, op1->value.integer, apower);
+
+      if (power < 0) {
+	mpz_init_set_ui(unity_z, 1);
+	mpz_tdiv_q(result->value.integer, unity_z, result->value.integer);
+	mpz_clear(unity_z);
+      }
+
+      break;
+
+    case BT_REAL:
+      mpf_init(result->value.real);
+      mpf_pow_ui(result->value.real, op1->value.real, apower);
+
+      if (power < 0) {
+	mpf_init_set_ui(unity_f, 1);
+	mpf_div(result->value.real, unity_f, result->value.real);
+	mpf_clear(unity_f);
+      }
+
+      break;
+
+    case BT_COMPLEX:
+      complex_pow_ui(op1, apower, result);
+      if (power < 0) complex_reciprocal(result);
+
+      break;
+
+    default:
+      break;
+    }
+  }
+
+  if (rc == ARITH_OK) rc = check_range(result);
+
+  if (rc != ARITH_OK)
+    g95_free_expr(result);
+  else
+    *resultp = result;
 
   return rc;
 }
@@ -513,8 +777,11 @@ arith rc;
 
 /* g95_arith_concat()-- Concatenate two string constants */
 
-arith g95_arith_concat(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_concat(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 int len;
+
+  result = constant_result(BT_CHARACTER, g95_default_character_kind());
 
   len = op1->value.character.length + op2->value.character.length;
 
@@ -529,9 +796,10 @@ int len;
 
   result->value.character.string[len] = '\0';
 
+  *resultp = result;
+
   return ARITH_OK;
 }
-
 
 
 /* g95_compare_expr()-- Comparison operators.  Assumes that the two
@@ -568,41 +836,269 @@ static int compare_complex(g95_expr *op1, g95_expr *op2) {
 
 /* Specific comparison subroutines */
 
-void g95_arith_eq(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_eq(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 
+  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (op1->ts.type == BT_COMPLEX) ?
     compare_complex(op1, op2) : (g95_compare_expr(op1, op2) == 0);
+
+  *resultp = result;
+  return ARITH_OK;
 }
 
 
-void g95_arith_ne(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_ne(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 
+  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (op1->ts.type == BT_COMPLEX) ?
     !compare_complex(op1, op2) : (g95_compare_expr(op1, op2) != 0);
+
+  *resultp = result;
+  return ARITH_OK;
 }
 
 
-void g95_arith_gt(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_gt(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 
+  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (g95_compare_expr(op1, op2) > 0);
+  *resultp = result;
+
+  return ARITH_OK;
 }
 
 
-void g95_arith_ge(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_ge(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 
+  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (g95_compare_expr(op1, op2) >= 0);
+  *resultp = result;
+
+  return ARITH_OK;
 }
 
 
-void g95_arith_lt(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_lt(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 
+  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (g95_compare_expr(op1, op2) < 0);
+  *resultp = result;
+
+  return ARITH_OK;
 }
 
 
-void g95_arith_le(g95_expr *op1, g95_expr *op2, g95_expr *result) {
+arith g95_arith_le(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
+g95_expr *result;
 
+  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (g95_compare_expr(op1, op2) <= 0);
+  *resultp = result;
+
+  return ARITH_OK;
+}
+
+
+/* High level arithmetic subroutines.  These subroutines go into
+ * eval_intrinsic(), which can do one of several things to it's
+ * operands.  If the operands are incompatible with the intrinsic
+ * operation, we return a node pointing to the operands and hope that
+ * an operator interface is found during resolution.
+ *
+ * If the operands are compatible and are constants, then we try doing
+ * the arithmetic.  We also handle the cases where either or both
+ * operands are array constructors. */
+
+static g95_expr *eval_intrinsic(intrinsic_op operator,
+				arith (*eval)(),
+				g95_expr *op1, g95_expr *op2) {
+g95_expr temp, *result;
+int unary;
+arith rc;
+
+  switch(operator) {
+  case INTRINSIC_NOT:    /* Logical unary */
+    if (op1->ts.type != BT_LOGICAL) goto incompatible;
+
+    unary = 1;
+    break;
+
+    /* Logical binary operators */
+  case INTRINSIC_OR:     case INTRINSIC_AND:
+  case INTRINSIC_NEQV:   case INTRINSIC_EQV:
+    if (op1->ts.type != BT_LOGICAL || op2->ts.type != BT_LOGICAL)
+      goto incompatible;
+
+    unary = 0;
+    break;
+
+  case INTRINSIC_UPLUS:   case INTRINSIC_UMINUS:  /* Numeric unary */
+    if (!g95_numeric_ts(&op1->ts)) goto incompatible;
+
+    unary = 1;
+    break;
+
+  case INTRINSIC_GE:  case INTRINSIC_LT:  /* Additional restrictions */
+  case INTRINSIC_LE:  case INTRINSIC_GT:  /* for ordering relations */
+    if (op1->ts.type == BT_COMPLEX || op2->ts.type != BT_COMPLEX)
+      goto incompatible;
+
+    /* Fall through */
+
+  case INTRINSIC_EQ:      case INTRINSIC_NE:     case INTRINSIC_PLUS:
+  case INTRINSIC_MINUS:   case INTRINSIC_TIMES:  case INTRINSIC_DIVIDE:
+  case INTRINSIC_POWER:   /* Numeric binary */
+    if (!g95_numeric_ts(&op1->ts) || !g95_numeric_ts(&op2->ts))
+      goto incompatible;
+
+    /* Insert any necessary type conversions to make the operands compatible */
+
+    temp.expr_type = EXPR_OP;
+    temp.ts.type = BT_UNKNOWN;
+    temp.operator = operator;
+
+    temp.op1 = op1;
+    temp.op2 = op2;
+
+    g95_type_convert_binary(&temp);
+
+    unary = 0;
+    break;
+
+  case INTRINSIC_CONCAT:   /* Character binary */
+    if (op1->ts.type != BT_CHARACTER || op1->ts.type != BT_CHARACTER)
+      goto incompatible;
+
+    unary = 0;
+    break;
+
+  case INTRINSIC_USER:
+    goto incompatible;
+
+  default:
+    g95_internal_error("eval_intrinsic(): Bad operator");
+  }
+
+  /* Try to combine the operators */
+
+  if (operator == INTRINSIC_POWER && op2->ts.type != BT_INTEGER)
+    goto incompatible;
+
+  rc = (unary) ? (*eval)(op1, &result) : (*eval)(op1, op2, &result);
+  if (rc != ARITH_OK) goto incompatible;  /* Something went wrong */
+
+  g95_free_expr(op1);
+  g95_free_expr(op2);
+
+  return result;
+
+  /* Create a run-time expression */
+
+incompatible:
+  result = g95_get_expr();
+  result->ts.type = BT_UNKNOWN;
+
+  result->expr_type = EXPR_OP;
+  result->operator = operator;
+
+  result->op1 = op1;
+  result->op2 = op2;
+
+  result->where = op1->where;
+
+  return result;
+}
+
+
+
+
+g95_expr *g95_uplus(g95_expr *op) {
+  return eval_intrinsic(INTRINSIC_UPLUS, g95_arith_uplus, op, NULL);
+}
+
+g95_expr *g95_uminus(g95_expr *op) {
+  return eval_intrinsic(INTRINSIC_UMINUS, g95_arith_uminus, op, NULL);
+}
+
+g95_expr *g95_add(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_PLUS, g95_arith_plus, op1, op2);
+}
+
+g95_expr *g95_subtract(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_MINUS, g95_arith_minus, op1, op2);
+}
+
+g95_expr *g95_multiply(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_TIMES, g95_arith_times, op1, op2);
+}
+
+g95_expr *g95_divide(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_DIVIDE, g95_arith_divide, op1, op2);
+}
+
+g95_expr *g95_power(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_POWER, g95_arith_power, op1, op2);
+}
+
+g95_expr *g95_concat(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_CONCAT, g95_arith_concat, op1, op2);
+}
+
+g95_expr *g95_and(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_AND, g95_arith_and, op1, op2);
+}
+
+g95_expr *g95_or(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_OR, g95_arith_or, op1, op2);
+}
+
+g95_expr *g95_not(g95_expr *op1) {
+  return eval_intrinsic(INTRINSIC_NOT, g95_arith_not, op1, NULL);
+}
+
+g95_expr *g95_eqv(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_EQV, g95_arith_eqv, op1, op2);
+}
+
+g95_expr *g95_neqv(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_NEQV, g95_arith_neqv, op1, op2);
+}
+
+g95_expr *g95_eq(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_EQ, g95_arith_eq, op1, op2);
+}
+
+g95_expr *g95_ne(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_NE, g95_arith_ne, op1, op2);
+}
+
+g95_expr *g95_gt(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_GT, g95_arith_gt, op1, op2);
+}
+
+g95_expr *g95_ge(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_GE, g95_arith_ge, op1, op2);
+}
+
+g95_expr *g95_lt(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_LT, g95_arith_lt, op1, op2);
+}
+
+g95_expr *g95_le(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_LE, g95_arith_le, op1, op2);
+}
+
+g95_expr *g95_unary_user(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_USER, NULL, op1, NULL);
+}
+
+g95_expr *g95_user(g95_expr *op1, g95_expr *op2) {
+  return eval_intrinsic(INTRINSIC_USER, NULL, op1, op2);
 }
 
 

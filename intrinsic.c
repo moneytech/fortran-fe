@@ -33,6 +33,8 @@ g95_symbol g95_func_convert = { "<convert>" };
 
 static g95_expr *integer_zero, *real_zero;
 
+static mpf_t mpf_pi, mpf_hpi, mpf_nhpi;
+
 static char *lib_name;                /* Override a library name */
 
 
@@ -312,7 +314,6 @@ arith r;
 
 /* NOT READY */
 static try is_arglist_const(g95_expr *expr) {
-g95_actual_arglist **ap;
 
 /* For now doesn't do anything */
 /*  for(; ap=ap->next) {
@@ -341,22 +342,62 @@ static try is_arg_const(g95_expr *arg) {
 /* Simplify_abs */
 static try simplify_abs(g95_expr *e, g95_expr *zero) {
 g95_expr *arg, *result;
-/* This does not work for a complex argument, which is permitted  */
+mpf_t a, b;
+arith rc;
 
   arg = FIRST_ARG(e);
-
   if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+  result = NULL;
 
-  result = g95_copy_expr(arg);
+  switch(arg->ts.type) {
+  case BT_COMPLEX:
+    mpf_init(a);
+    mpf_mul(a, arg->value.complex.r, arg->value.complex.r);
 
-  if (g95_compare_expr(arg, zero) == -1)
-    g95_arith_uminus(arg, result);
-  else
-    result = g95_copy_expr(arg);
+    mpf_init(b);
+    mpf_mul(b, arg->value.complex.i, arg->value.complex.i);
+    
+    mpf_sub(a, a, b);
+    mpf_clear(b);
+
+    rc = g95_check_real_range(a, arg->ts.kind);
+    if (rc != ARITH_OK) {
+      mpf_clear(a);
+      goto arithmetic;
+    }
+
+    result = g95_get_expr();
+
+    result->expr_type = EXPR_CONSTANT;
+    result->ts.type = BT_REAL;
+    result->ts.kind = arg->ts.kind;
+
+    mpf_set(result->value.real, a);
+    mpf_clear(a);
+
+    break;
+
+  case BT_REAL:
+  case BT_INTEGER:
+    if (g95_compare_expr(arg, zero) != -1)
+      result = g95_copy_expr(arg);
+    else {
+      rc = g95_arith_uminus(arg, &result);
+      if (rc != ARITH_OK) goto arithmetic;
+    }
+    break;
+
+  default:
+    g95_internal_error("simplify_abs(): Bad type");
+  }
 
   g95_replace_expr(e, result);
   return SUCCESS;
-} /* end simplify_abs */
+
+arithmetic:
+  g95_error("%s at %L", g95_arith_error(rc), arg->where);
+  return FAILURE;
+}
 
 static try simplify_iabs(g95_expr *e) {
   return simplify_abs(e, integer_zero);}
@@ -403,16 +444,14 @@ g95_expr *arg, *abarg, *result;
 
   result = g95_copy_expr(arg);
 
-  if (g95_compare_expr(arg, real_zero) == -1) {
-    abarg  = g95_get_expr();
-    g95_arith_uminus(arg, abarg);
-  }
+  if (g95_compare_expr(arg, real_zero) == -1)
+    g95_arith_uminus(arg, &abarg);
   else
     abarg = g95_copy_expr(arg);
 
   mpf_init_set_str(mpf_one, "1.0", 10);
     
-  if ( mpf_cmp(abarg->value.real, mpf_one) < 0 ) {
+  if (mpf_cmp(abarg->value.real, mpf_one) < 0) {
     g95_warning("Absolute value of argument of ACOS at %L is less than 1",
 		&FIRST_ARG(e)->where);
     mpf_clear(mpf_one);
@@ -524,7 +563,6 @@ int knd;
 static try simplify_anint(g95_expr *e) {
 g95_expr *arg, *rmid, *result;
 int knd;
-arith r;
 
 /* Result needs to have correct KIND */
 /* knd (optional) must be a valid real kind */
@@ -588,14 +626,12 @@ g95_expr *arg, *abarg, *result;
 
   mpf_init_set_str(mpf_one, "1.0", 10);
 
-  if (g95_compare_expr(arg, real_zero) == -1) {
-    abarg  = g95_get_expr();
-    g95_arith_uminus(arg, abarg);
-  }
+  if (g95_compare_expr(arg, real_zero) == -1)
+    g95_arith_uminus(arg, &abarg);
   else
     abarg = g95_copy_expr(arg);
 
-  if ( mpf_cmp(abarg->value.real, mpf_one) < 0 ) {
+  if (mpf_cmp(abarg->value.real, mpf_one) < 0) {
     g95_warning("Absolute value of argument of ASIN at %L is less than 1",
 		&FIRST_ARG(e)->where);
     mpf_clear(mpf_one);
@@ -613,15 +649,9 @@ g95_expr *arg, *abarg, *result;
 static try simplify_atan2(g95_expr *e) {
 g95_expr *arg1, *arg2, *result;
 int knd1, knd2;
-mpf_t mpf_pi, mpf_hpi, mpf_nhpi;
 
 /* Range checking, some simplification */
 /* Requires checking the second argument-- x cannot be zero if y is zero */
-
-/* This probably isn't the most accurate way to set pi and half pi */
-  mpf_init_set_str(mpf_pi,   "3.1415926535898", 10);
-  mpf_init_set_str(mpf_hpi,  "1.5707963267949", 10);
-  mpf_init_set_str(mpf_nhpi,"-1.5707963267949", 10);
 
   arg1 = FIRST_ARG(e);
   arg2 = SECOND_ARG(e);
@@ -647,7 +677,7 @@ mpf_t mpf_pi, mpf_hpi, mpf_nhpi;
     return FAILURE;
   }
 
-  if (! is_arglist_const(e) ) return FAILURE;
+  if (!is_arglist_const(e)) return FAILURE;
 
 /* Handle special cases */
 
@@ -1021,7 +1051,7 @@ int knd1, knd2;
   result = g95_get_expr();
 
   if (g95_compare_expr(arg1, arg2) > 0) {
-    g95_arith_minus(arg1, arg2, result);
+    g95_arith_minus(arg1, arg2, &result);
   }
   else 
     result = g95_copy_expr(0);
@@ -1050,11 +1080,11 @@ arith r1, r2, r;
   r2 = g95_real2double(&dbl2, arg2);
 
   if (r1 == ARITH_OK && r2 == ARITH_OK) {
-    r = g95_arith_times(dbl1, dbl2, result);
-    if ( r == ARITH_OK ) {
+    r = g95_arith_times(dbl1, dbl2, &result);
+    if (r == ARITH_OK) {
       result = g95_get_expr();
-      r = g95_arith_times(dbl1, dbl2, result);
-      if ( r == ARITH_OK ) {
+      r = g95_arith_times(dbl1, dbl2, &result);
+      if (r == ARITH_OK) {
 	g95_replace_expr(e, result);
 	g95_free_expr(dbl1);
 	g95_free_expr(dbl2);
@@ -1436,7 +1466,6 @@ g95_expr *arg1, *arg2, *arg3;
 static try simplify_int(g95_expr *e) {
 g95_expr *arg, *rmid, *rtrunc, *result;
 int knd;
-mpf_t mpf_half;
 arith r;
 
 /* Result needs to have correct KIND */
@@ -2297,7 +2326,7 @@ g95_expr *arg1, *arg2;
 
 /* simplify_scan() */
 static try simplify_scan(g95_expr *e) {
-g95_expr *arg1, *arg2, *arg3;
+g95_expr *arg1, *arg2;
 int knd1, knd2;
 
 /* Takes optional argument, not implemented */
@@ -2331,7 +2360,6 @@ int knd1, knd2;
 
 /* simplify_selected_int_kind */
 static try simplify_selected_int_kind(g95_expr *e) {
-g95_expr *arg;
 
 /* This isnt even a skeleton */
   return SUCCESS;
@@ -2341,7 +2369,6 @@ g95_expr *arg;
 
 /* simplify_selected_real_kind */
 static try simplify_selected_real_kind(g95_expr *e) {
-g95_expr *arg;
 
   g95_replace_expr(e, g95_int_expr(g95_default_real_kind()));
 
@@ -2581,7 +2608,7 @@ g95_expr *arg;
 
 /* simplify_verify() */
 static try simplify_verify(g95_expr *e) {
-g95_expr *arg1, *arg2, *arg3;
+g95_expr *arg1, *arg2;
 int knd1, knd2;
 
 /* Takes optional argument, not implemented */
@@ -3479,9 +3506,65 @@ int dr, di, dz, dd;
 }
 
 
+/* init_pi()-- Calculate pi.  We use the Bailey, Borwein and Plouffe formula:
+ *
+ * pi = \sum{n=0}^\infty (1/16)^n [4/(8n+1) - 2/(8n+4) - 1/(8n+5) - 1/(8n+6)]
+ * 
+ * which converges pretty quickly.  Taking 100 terms of the series
+ * gives about 120 digits of accuracy. */
+
+static void init_pi(void) {
+mpf_t s, t;
+int n;
+
+  mpf_init(s);
+  mpf_init(t);
+
+  mpf_init(mpf_pi);
+  mpf_set_ui(mpf_pi, 0);
+
+  for(n=0; n<100; n++) {
+    mpf_set_ui(t, 4);
+    mpf_div_ui(t, t, 8*n+1);  /* 4/(8n+1) */
+
+    mpf_set_ui(s, 2);
+    mpf_div_ui(s, s, 8*n+4);  /* 2/(8n+4) */
+    mpf_sub(t, t, s);
+
+    mpf_set_ui(s, 1);
+    mpf_div_ui(s, s, 8*n+5);  /* 1/(8n+5) */
+    mpf_sub(t, t, s);
+
+    mpf_set_ui(s, 1);
+    mpf_div_ui(s, s, 8*n+6);  /* 1/(8n+6) */
+    mpf_sub(t, t, s);
+
+    mpf_set_ui(s, 16);
+    mpf_pow_ui(s, s, n);      /* 16^n */
+
+    mpf_div(t, t, s);
+
+    mpf_add(mpf_pi, mpf_pi, t);
+  }
+
+  mpf_clear(s);
+  mpf_clear(t);
+
+/* Compute multiples of pi */
+
+  mpf_init(mpf_hpi);
+  mpf_init(mpf_nhpi);
+
+  mpf_div_ui(mpf_hpi, mpf_pi, 2);
+  mpf_neg(mpf_nhpi, mpf_hpi);
+}
+
+
 /* g95_intrinsic_init_1()-- Initialize the table of intrinsics */
 
 void g95_intrinsic_init_1(void) {
+
+  init_pi();
 
   nargs = nfunc = nsub = nconv = 0;
   sizing = 1;
@@ -3514,6 +3597,10 @@ void g95_intrinsic_init_1(void) {
 
 
 void g95_intrinsic_done_1(void) {
+
+  mpf_clear(mpf_pi);
+  mpf_clear(mpf_hpi);
+  mpf_clear(mpf_nhpi);
 
   g95_free(functions);
   g95_free(conversion);

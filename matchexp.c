@@ -192,7 +192,7 @@ match m;
 
 
 static match match_mult_operand(g95_expr **result) {
-g95_expr *e, *exp;
+g95_expr *e, *exp ,*r;
 locus where;
 match m;
 
@@ -213,7 +213,10 @@ match m;
     return MATCH_ERROR;
   }
 
-  *result = build_node(INTRINSIC_POWER, &where, e, exp);
+  r = g95_power(e, exp);
+  r->where = where;
+  *result = r;
+
   return MATCH_YES;
 }
 
@@ -254,9 +257,13 @@ int i;
       return MATCH_ERROR;
     }
 
-    all = build_node(i, &where, all, e);
-  }
+    if (i == INTRINSIC_TIMES)
+      all = g95_multiply(all, e);
+    else
+      all = g95_divide(all, e);
 
+    all->where = where;
+  }
 
   *result = all;
   return MATCH_YES;
@@ -292,9 +299,14 @@ int i;
 
   if (i == 0)
     all = e;
-  else
-    all = build_node((i == -1) ? INTRINSIC_UMINUS : INTRINSIC_UPLUS,
-		     &where, e, NULL);
+  else {
+    if (i == -1)
+      all = g95_uminus(e);
+    else
+      all = g95_uplus(e);
+  }
+
+  all->where = where;
 
 /* Append add-operands to the sum */
 
@@ -310,8 +322,12 @@ int i;
       return MATCH_ERROR;
     }
 
-    all = build_node((i == -1) ? INTRINSIC_MINUS : INTRINSIC_PLUS,
-		     &where, all, e);
+    if (i == -1)
+      all = g95_subtract(all, e);
+    else
+      all = g95_add(all, e);
+
+    all->where = where;
   }
 
   *result = all;
@@ -341,7 +357,8 @@ match m;
     }
     if (m != MATCH_YES) return MATCH_ERROR;
 
-    all = build_node(INTRINSIC_CONCAT, &where, all, e);
+    all = g95_concat(all, e);
+    all->where = where;
   }
 
   *result = all;
@@ -352,7 +369,7 @@ match m;
 /* match_level_4()-- Match a level 4 expression */
 
 static match match_level_4(g95_expr **result) {
-g95_expr *left, *right;
+g95_expr *left, *right, *r;
 locus old_loc;
 locus where;
 match m;
@@ -384,13 +401,44 @@ int i;
     return MATCH_ERROR;
   }
 
-  *result = build_node(i, &where, left, right);
+  switch(i) {
+  case INTRINSIC_EQ:
+    r = g95_eq(left, right);
+    break;
+
+  case INTRINSIC_NE:
+    r = g95_ne(left, right);
+    break;
+
+  case INTRINSIC_LT:
+    r = g95_lt(left, right);
+    break;
+
+  case INTRINSIC_LE:
+    r = g95_le(left, right);
+    break;
+
+  case INTRINSIC_GT:
+    r = g95_gt(left, right);
+    break;
+
+  case INTRINSIC_GE:
+    r = g95_ge(left, right);
+    break;
+
+  default:
+    r = NULL;
+  }
+
+  r->where = where;
+  *result = r;
+
   return MATCH_YES;
 }
 
 
 static match match_and_operand(g95_expr **result) {
-g95_expr *e;
+g95_expr *e, *r;
 locus where;
 match m;
 int i;
@@ -401,7 +449,12 @@ int i;
   m = match_level_4(&e);
   if (m != MATCH_YES) return m;
 
-  *result = i ? build_node(INTRINSIC_NOT, &where, e, NULL) : e;
+  r = e;
+  if (i) r = g95_not(e);
+
+  r->where = where;
+  *result = r;
+
   return MATCH_YES;
 }
 
@@ -425,7 +478,9 @@ match m;
       return MATCH_ERROR;
     }
 
-    all = build_node(INTRINSIC_AND, &where, all, e);
+    all = g95_and(all, e);
+    all->where = where;
+
     where = *g95_current_locus();
   }
 
@@ -453,7 +508,9 @@ match m;
       return MATCH_ERROR;
     }
 
-    all = build_node(INTRINSIC_OR, &where, all, e);
+    all = g95_or(all, e);
+    all->where = where;
+
     where = *g95_current_locus();
   }
 
@@ -492,7 +549,12 @@ int i;
       return MATCH_ERROR;
     }
 
-    all = build_node(i, &where, all, e);
+    if (i == INTRINSIC_EQV)
+      all = g95_eqv(all, e);
+    else
+      all = g95_neqv(all, e);
+
+    all->where = where;
     where = *g95_current_locus();
   }
 

@@ -897,21 +897,43 @@ int g95_validate_kind(bt, int);
 arith g95_check_integer_range(mpz_t, int);
 arith g95_check_real_range(mpf_t, int);
 
-arith g95_arith_uminus(g95_expr *, g95_expr *);
-arith g95_arith_plus(g95_expr *, g95_expr *, g95_expr *);
-arith g95_arith_minus(g95_expr *, g95_expr *, g95_expr *);
-arith g95_arith_times(g95_expr *, g95_expr *, g95_expr *);
-arith g95_arith_divide(g95_expr *, g95_expr *, g95_expr *);
-arith g95_arith_power(g95_expr *, g95_expr *, g95_expr *);
-arith g95_arith_concat(g95_expr *, g95_expr *, g95_expr *);
+arith g95_arith_uminus(g95_expr *, g95_expr **);
+arith g95_arith_plus(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_minus(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_times(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_divide(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_power(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_concat(g95_expr *, g95_expr *, g95_expr **);
 
 int g95_compare_expr(g95_expr *, g95_expr *);
-void g95_arith_eq(g95_expr *, g95_expr *, g95_expr *);
-void g95_arith_ne(g95_expr *, g95_expr *, g95_expr *);
-void g95_arith_gt(g95_expr *, g95_expr *, g95_expr *);
-void g95_arith_ge(g95_expr *, g95_expr *, g95_expr *);
-void g95_arith_lt(g95_expr *, g95_expr *, g95_expr *);
-void g95_arith_le(g95_expr *, g95_expr *, g95_expr *);
+arith g95_arith_eq(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_ne(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_gt(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_ge(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_lt(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_le(g95_expr *, g95_expr *, g95_expr **);
+
+g95_expr *g95_uplus(g95_expr *op);
+g95_expr *g95_uminus(g95_expr *op);
+g95_expr *g95_add(g95_expr *, g95_expr *);
+g95_expr *g95_subtract(g95_expr *, g95_expr *);
+g95_expr *g95_multiply(g95_expr *, g95_expr *);
+g95_expr *g95_divide(g95_expr *, g95_expr *);
+g95_expr *g95_power(g95_expr *, g95_expr *);
+g95_expr *g95_concat(g95_expr *, g95_expr *);
+g95_expr *g95_and(g95_expr *, g95_expr *);
+g95_expr *g95_or(g95_expr *, g95_expr *);
+g95_expr *g95_not(g95_expr *);
+g95_expr *g95_eqv(g95_expr *, g95_expr *);
+g95_expr *g95_neqv(g95_expr *, g95_expr *);
+g95_expr *g95_eq(g95_expr *, g95_expr *);
+g95_expr *g95_ne(g95_expr *, g95_expr *);
+g95_expr *g95_gt(g95_expr *, g95_expr *);
+g95_expr *g95_ge(g95_expr *, g95_expr *);
+g95_expr *g95_lt(g95_expr *, g95_expr *);
+g95_expr *g95_le(g95_expr *, g95_expr *);
+g95_expr *g95_unary_user(g95_expr *, g95_expr *);
+g95_expr *g95_user(g95_expr *, g95_expr *);
 
 g95_expr *g95_convert_integer(char *, int, int);
 g95_expr *g95_convert_real(char *, int);
@@ -1129,6 +1151,7 @@ char *g95_extract_int(g95_expr *, int *);
 
 g95_expr *g95_build_funcall(g95_symbol *func, ...);
 void g95_free_ref_list(g95_ref *);
+void g95_type_convert_binary(g95_expr *);
 try g95_resolve_expr(g95_expr *);
 void g95_expr_init_1(void);
 

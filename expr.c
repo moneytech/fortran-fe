@@ -541,7 +541,7 @@ va_list argp;
 
 
 
-/* type_convert_binary()-- Given an expression node with some sort of
+/* g95_type_convert_binary()-- Given an expression node with some sort of
  * numeric binary expression, insert type conversions required to make
  * the operands have the same type.
  *
@@ -550,11 +550,16 @@ va_list argp;
  * of the exponent.  For example, 1**2.3 becomes 1.0**2.3, but
  * 1.0**2 stays as it is. */
 
-static void type_convert_binary(g95_expr *e) {
+void g95_type_convert_binary(g95_expr *e) {
 g95_expr *op1, *op2;
 
   op1 = e->op1;
   op2 = e->op2;
+
+  if (op1->ts.type == BT_UNKNOWN || op2->ts.type == BT_UNKNOWN) {
+    e->ts.type = BT_UNKNOWN;
+    return;
+  }
 
 /* Kind conversions */
 
@@ -601,7 +606,6 @@ g95_expr *op1, *op2;
 /* Integer combined with real */
 
   if (op1->ts.type == BT_REAL && op2->ts.type == BT_INTEGER) {
-
     e->ts.type = BT_REAL;
     e->ts.kind = op1->ts.kind;
 
@@ -624,23 +628,92 @@ done:
 }
 
 
+/* is_constant_constructor()-- Recursively checks all elements of a
+ * constructor to see if everything is constant. */
+
+static int is_constant_expr(g95_expr *);
+
+static int is_constant_constructor(g95_constructor *c) {
+
+  if (c == NULL) return 1;
+
+  for(; c; c=c->next) {
+    if (!is_constant_expr(c->expr)) return 0;
+
+    if (!is_constant_constructor(c->child)) return 0;
+    
+    if (c->iter != NULL) {
+      if (!is_constant_expr(c->iter->start)) return 0;
+      if (!is_constant_expr(c->iter->end))   return 0;
+      if (!is_constant_expr(c->iter->step))  return 0;
+    }
+  }
+
+  return 1;
+}
+
+
+/* is_constant_expr()-- Function to determine if an expression is
+ * constant or not.  This function expects that the expression has
+ * already been simplified.  Mutually recursive with
+ * constant_constructor().  */
+
+static int is_constant_expr(g95_expr *e) {
+int rv;
+
+  if (e == NULL) return 1; 
+
+  switch(e->expr_type) {
+  case EXPR_OP:
+  case EXPR_FUNCTION:
+  case EXPR_VARIABLE:
+    rv = 0; 
+    break;
+
+  case EXPR_CONSTANT:
+    rv = 1;
+    break;
+
+  case EXPR_SUBSTRING:
+    rv = is_constant_expr(e->op1) && is_constant_expr(e->op2);
+    break;
+
+  case EXPR_STRUCTURE:
+  case EXPR_ARRAY:
+    rv = is_constant_constructor(e->value.constructor);
+    break;
+  }
+
+  return rv;
+}
+
+
 /* simplify_expr()-- Given an expression, simplify it by collapsing
- * constant expressions. */
+ * constant expressions.  Most simplification takes place when the
+ * expression tree is being constructed.  The exception we take care
+ * of here is when it is decided that a function call refers to an
+ * intrinsic function that must be simplified, either after we've
+ * parsed an initialization expression or after resolving a name to an
+ * intrinsic.
+ *
+ * We work by recursively simplifying expression nodes, simplifying
+ * intrinsic functions where possible, which can lead to further
+ * constant collapsing.  If an operator has constant operand(s), we
+ * rip the expression apart, and rebuild it, hoping that it becomes
+ * something simpler. */
 
-static arith simplify_expr(g95_expr *p, int init_flag) {
-g95_expr new_expr, *op1, *op2;
+static void simplify_expr(g95_expr *p, int init_flag) {
+g95_expr *op1, *op2, *result;
 g95_actual_arglist *ap;
-int binary_flag;
-arith result;
 
-  if (p->rank != 0) return ARITH_OK;
+  if (p == NULL) return; 
 
 /* Replace a parameter variable with its value */
 
   if (p->expr_type == EXPR_VARIABLE &&
       p->symbol->attr.flavor == FL_PARAMETER) {
     g95_replace_expr(p, g95_copy_expr(p->symbol->value));
-    return ARITH_OK;
+    return;
   }
 
 /* Simplify a function.  First simplify the arguments */
@@ -657,165 +730,111 @@ arith result;
 
     if (const_flag && init_flag) g95_intrinsic_func_interface(p);
 
-    return ARITH_OK;
+    return;
   }
 
 /* Arithmetic simplifications */
 
-  if (p->expr_type != EXPR_OP) return ARITH_OK;
+  if (p->expr_type != EXPR_OP) return;
+  if (p->operator == INTRINSIC_USER) return;
+
+  op1 = p->op1;
+  op2 = p->op2;
+
+  simplify_expr(op1, init_flag);
+  simplify_expr(op2, init_flag);
+
+  if (!is_constant_expr(op1) || (op2 != NULL && !is_constant_expr(op2)))
+    return;
+
+/* Rip p apart */
+
+  p->op1 = NULL;
+  p->op2 = NULL;
 
   switch(p->operator) {
-  case INTRINSIC_UPLUS:   case INTRINSIC_UMINUS: case INTRINSIC_NOT:
-    binary_flag = 0;
-    break;
-
-  case INTRINSIC_PLUS:    case INTRINSIC_MINUS:  case INTRINSIC_TIMES:
-  case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:  case INTRINSIC_CONCAT:
-  case INTRINSIC_AND:     case INTRINSIC_OR:     case INTRINSIC_EQV:
-  case INTRINSIC_NEQV:    case INTRINSIC_EQ:     case INTRINSIC_NE:
-  case INTRINSIC_GT:      case INTRINSIC_GE:     case INTRINSIC_LT:
-  case INTRINSIC_LE:
-    binary_flag = 1;
-    break;
-
-  case INTRINSIC_USER:
-    binary_flag = (p->op2 != NULL);
-    break;
-
-  default:
-    g95_internal_error("simplify_expr(): Bad operator");
-  }
-
-  result = simplify_expr(op1 = p->op1, init_flag);
-  if (result != ARITH_OK) return result;
-
-  if (binary_flag) {
-    result = simplify_expr(op2 = p->op2, init_flag);
-    if (result != ARITH_OK) return result;
-
-    if (op2->expr_type != EXPR_CONSTANT) return ARITH_OK;
-  }
-
-  if (op1->expr_type != EXPR_CONSTANT) return ARITH_OK;
-
-  if (p->operator == INTRINSIC_USER) return ARITH_OK;
-
-  new_expr = *p;
-  new_expr.expr_type = EXPR_CONSTANT;
-  new_expr.where = op1->where;
-
-  result = ARITH_OK;     /* For operations that always work */
-
-  if (!binary_flag)
-    new_expr.ts.kind = op1->ts.kind;
-  else {
-    new_expr.ts.kind = g95_kind_max(op1, op2);
-
-    if (g95_numeric_ts(&op1->ts) && g95_numeric_ts(&op2->ts))
-      type_convert_binary(&new_expr);
-  }
-
-  new_expr.ts.type = op1->ts.type;
-
-  switch(p->operator) {
-    case INTRINSIC_UPLUS:  /* Unary pluses are gotten rid of */
-      new_expr.value = op1->value;
+    case INTRINSIC_UPLUS:
+      result = g95_uplus(op1);
       break;
 
-/* Farm out the more complicated arithmetic operations */
-
     case INTRINSIC_UMINUS:
-      result = g95_arith_uminus(op1, &new_expr);      break;
+      result = g95_uminus(op1);
+      break;
 
     case INTRINSIC_PLUS:
-      result = g95_arith_plus(op1, op2, &new_expr);   break;
+      result = g95_add(op1, op2);
+      break;
 
     case INTRINSIC_MINUS:
-      result = g95_arith_minus(op1, op2, &new_expr);  break;
+      result = g95_subtract(op1, op2);
+      break;
 
     case INTRINSIC_TIMES:
-      result = g95_arith_times(op1, op2, &new_expr);  break;
+      result = g95_multiply(op1, op2);
+      break;
 
     case INTRINSIC_DIVIDE:
-      result = g95_arith_divide(op1, op2, &new_expr); break;
+      result = g95_divide(op1, op2);
+      break;
 
     case INTRINSIC_POWER:
-      if (op1->ts.type != BT_INTEGER || op2->ts.type != BT_INTEGER)
-	return ARITH_OK;
-
-      result = g95_arith_power(op1, op2, &new_expr);
+      result = g95_power(op1, op2);
       break;
 
     case INTRINSIC_CONCAT:
-      result = g95_arith_concat(op1, op2, &new_expr); break;
+      result = g95_concat(op1, op2);
+      break;
 
     case INTRINSIC_EQ:      
-      g95_arith_eq(op1, op2, &new_expr);
-      new_expr.ts.type = BT_LOGICAL;
-      new_expr.ts.kind = g95_default_logical_kind();
+      result = g95_eq(op1, op2);
       break;
 
     case INTRINSIC_NE:
-      g95_arith_ne(op1, op2, &new_expr);
-      new_expr.ts.type = BT_LOGICAL;
-      new_expr.ts.kind = g95_default_logical_kind();
+      result = g95_ne(op1, op2);
       break;
 
     case INTRINSIC_GT:
-      g95_arith_gt(op1, op2, &new_expr);
-      new_expr.ts.type = BT_LOGICAL;
-      new_expr.ts.kind = g95_default_logical_kind();
+      result = g95_gt(op1, op2);
       break;
 
     case INTRINSIC_GE:
-      g95_arith_ge(op1, op2, &new_expr);
-      new_expr.ts.type = BT_LOGICAL;
-      new_expr.ts.kind = g95_default_logical_kind();
+      result = g95_ge(op1, op2);
       break;
 
     case INTRINSIC_LT:
-      g95_arith_lt(op1, op2, &new_expr);
-      new_expr.ts.type = BT_LOGICAL;
-      new_expr.ts.kind = g95_default_logical_kind();
+      result = g95_lt(op1, op2);
       break;
 
     case INTRINSIC_LE:
-      g95_arith_le(op1, op2, &new_expr);
-      new_expr.ts.type = BT_LOGICAL;
-      new_expr.ts.kind = g95_default_logical_kind();
+      result = g95_le(op1, op2);
       break;
 
-/* Logical simplifications are so simple we do them here */
-
     case INTRINSIC_NOT:
-      new_expr.value.logical = !op1->value.logical; break;
+      result = g95_not(op1);
+      break;
 
     case INTRINSIC_AND:
-      new_expr.value.logical = op1->value.logical && op2->value.logical; break;
+      result = g95_and(op1, op2);
+      break;
 
     case INTRINSIC_OR:
-      new_expr.value.logical = op1->value.logical || op2->value.logical; break;
+      result = g95_or(op1, op2);
+      break;
 
     case INTRINSIC_EQV:
-      new_expr.value.logical = op1->value.logical == op2->value.logical; break;
+      result = g95_eqv(op1, op2);
+      break;
 
     case INTRINSIC_NEQV:
-      new_expr.value.logical = op1->value.logical != op2->value.logical; break;
+      result = g95_neqv(op1, op2);
+      break;
 
     default: g95_internal_error("simplify_expr(): Impossible operator"); 
   }
 
-  if (result != ARITH_OK) {
-    g95_error("%s at %C", g95_arith_error(result));
-    return result;
-  }
+  g95_replace_expr(p, result);
 
-  *p = new_expr;
-
-  g95_free_expr(op1);
-  if (binary_flag) g95_free_expr(op2);
-
-  return result;
+  return;
 }
 
 
@@ -1029,7 +1048,7 @@ try t;
   case INTRINSIC_DIVIDE:
   case INTRINSIC_POWER:
     if (g95_numeric_ts(&op1->ts) && g95_numeric_ts(&op2->ts)) {
-      type_convert_binary(e);
+      g95_type_convert_binary(e);
       break;
     }
 
@@ -1086,7 +1105,7 @@ try t;
     }
 
     if (g95_numeric_ts(&op1->ts) && g95_numeric_ts(&op2->ts)) {
-      type_convert_binary(e);
+      g95_type_convert_binary(e);
 	
       e->ts.type = BT_LOGICAL;
       e->ts.kind = g95_default_logical_kind();
@@ -1132,7 +1151,7 @@ try t;
     break;
   }
 
-  if (simplify_expr(e, 0) != ARITH_OK) t = FAILURE;
+  simplify_expr(e, 0);
 
   return t;
 
@@ -1189,66 +1208,6 @@ match m;
 }
 
 
-/* is_constant_constructor()-- Recursively checks all elements of a
- * constructor to see if everything is constant. */
-
-static int is_constant_expr(g95_expr *);
-
-static int is_constant_constructor(g95_constructor *c) {
-
-  if (c == NULL) return 1;
-
-  for(; c; c=c->next) {
-    if (!is_constant_expr(c->expr)) return 0;
-
-    if (!is_constant_constructor(c->child)) return 0;
-    
-    if (c->iter != NULL) {
-      if (!is_constant_expr(c->iter->start)) return 0;
-      if (!is_constant_expr(c->iter->end))   return 0;
-      if (!is_constant_expr(c->iter->step))  return 0;
-    }
-  }
-
-  return 1;
-}
-
-
-/* is_constant_expr()-- Function to determine if an expression is
- * constant or not.  This function expects that the expression has
- * already been simplified.  Mutually recursive with
- * constant_constructor(). */
-
-static int is_constant_expr(g95_expr *e) {
-int rv;
-
-  if (e == NULL) return 1; 
-
-  switch(e->expr_type) {
-  case EXPR_OP:
-  case EXPR_FUNCTION:
-  case EXPR_VARIABLE:
-    rv = 0; 
-    break;
-
-  case EXPR_CONSTANT:
-    rv = 1;
-    break;
-
-  case EXPR_SUBSTRING:
-    rv = is_constant_expr(e->op1) && is_constant_expr(e->op2);
-    break;
-
-  case EXPR_STRUCTURE:
-  case EXPR_ARRAY:
-    rv = is_constant_constructor(e->value.constructor);
-    break;
-  }
-
-  return rv;
-}
-
-
 /* g95_match_init_expr()-- Match an initialization expression.  We work
  * by first matching an expression, then reducing it to a constant */
 
@@ -1261,7 +1220,7 @@ match m;
 
 /* Constant for now */
 
-  if (simplify_expr(expr, 1) != ARITH_OK) return MATCH_ERROR;
+  simplify_expr(expr, 1);
 
   if (!is_constant_expr(expr)) {
     g95_error("Expected an initialization expression at %C");
