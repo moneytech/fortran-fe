@@ -941,6 +941,7 @@ g95_symbol *s;
     s = g95_search_interface(sym->generic, expr->value.function.actual);
     if (s != NULL) {
       expr->value.function.name = s->name;
+      expr->ts = s->ts;
       return MATCH_YES;
     }
 
@@ -981,7 +982,6 @@ match m;
   }
 
   m = g95_intrinsic_func_interface(expr, 0);
-
   if (m == MATCH_YES) return SUCCESS;
   if (m == MATCH_ERROR) return FAILURE;
 
@@ -999,23 +999,22 @@ static match resolve_specific0(g95_symbol *sym, g95_expr *expr) {
   if (sym->attr.external || sym->attr.interface) {
     if (sym->attr.dummy) {
       sym->attr.proc = PROC_DUMMY;
-      expr->value.function.name = sym->name;
-      return MATCH_YES;
+      goto found;
     }
 
     sym->attr.proc = PROC_EXTERNAL;
-    expr->value.function.name = sym->name;
-
-    return MATCH_YES;
+    goto found;
   }
 
   if (sym->attr.proc == PROC_MODULE || sym->attr.proc == PROC_ST_FUNCTION ||
-      sym->attr.proc == PROC_INTERNAL) {
-    expr->value.function.name = sym->name;
-    return MATCH_YES;
-  }
+      sym->attr.proc == PROC_INTERNAL) goto found;
 
   return g95_intrinsic_func_interface(expr, 0);
+
+found:
+  expr->ts = sym->ts;
+  expr->value.function.name = sym->name;
+  return MATCH_YES;
 }
 
 
@@ -1056,7 +1055,7 @@ g95_typespec ts;
   if (sym->attr.dummy) {
     sym->attr.proc = PROC_DUMMY;
     expr->value.function.name = sym->name;
-    return SUCCESS;
+    goto set_type;
   }
 
   /* See if we have an intrinsic function reference */
@@ -1072,6 +1071,8 @@ g95_typespec ts;
 
   /* Type of the expression is either the type of the symbol or the
    * default type of the symbol */
+
+ set_type:
 
   if (sym->ts.type != BT_UNKNOWN)
     expr->ts = sym->ts;
@@ -1169,6 +1170,8 @@ g95_namespace *child;
 
     if (sym_upper == NULL)
       g95_internal_error("g95_resolve_modproc(): Module procedure not found");
+
+    if (sym_lower->result != NULL) sym_lower = sym_lower->result;
 
     if (sym_lower->ts.type == BT_UNKNOWN)
       g95_set_default_type(sym_lower, 1, child);
