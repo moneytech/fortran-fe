@@ -1276,7 +1276,7 @@ int i, rank;
     if (ref->type != REF_ARRAY) continue;
 
     if (ref->ar.type == AR_FULL) {
-      rank = e->symbol->as->rank;
+      rank = ref->ar.as->rank;
       break;
     }
 
