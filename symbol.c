@@ -378,6 +378,7 @@ g95_expr lvalue;
   lvalue.expr_type = EXPR_VARIABLE;
   lvalue.ts = sym->ts;
   lvalue.symbol = sym;
+  lvalue.where = sym->declared_at;
 
   return g95_check_assign(&lvalue, rvalue);
 }
