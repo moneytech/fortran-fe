@@ -54,7 +54,7 @@ void g95_free(void *p) {
 
 /* add_path()-- adds path to the list pointed to by list */
 
-void add_path(g95_directorylist **list, const char *path) {
+static void add_path(g95_directorylist **list, const char *path) {
 g95_directorylist *this; 
 
   if (*path == '\0')
