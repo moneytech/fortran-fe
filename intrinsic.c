@@ -371,19 +371,13 @@ static try check_atan2(g95_expr *y, g95_expr *x) {
     return FAILURE;
   }
 
-	/* Integer is an extension, may need to remove it */
-  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL ) {
+  if (x->ts.type != BT_REAL ) {
     type_error(x);
     return FAILURE;
   }
 
-  if (y->ts.type != BT_INTEGER && y->ts.type != BT_REAL ) {
+  if (y->ts.type != BT_REAL ) {
     type_error(y);
-    return FAILURE;
-  }
-
-  if (x->ts.type != y->ts.type) {
-    intrinsic_error("Types of arguments to intrinsic at %%L must agree");
     return FAILURE;
   }
 
@@ -483,10 +477,10 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
 /* Cosine family */
 
 static try check_cos(g95_expr *x) {
-/* May need to remove integer */
-  if (!g95_numeric_ts(&x->ts)) {
-   type_error(x);
-   return FAILURE;
+
+  if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
+    type_error(x);
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -679,7 +673,7 @@ static try check_eoshift(g95_expr *array, g95_expr *shift, g95_expr *boundary,
 
 static try check_exp(g95_expr *x) {
 
-  if (!g95_numeric_ts(&x->ts)) {
+  if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
     type_error(x);
     return FAILURE;
   }
@@ -759,7 +753,7 @@ static try check_lbound(g95_expr *array, g95_expr *dim) {
 
 static try check_log(g95_expr *x) {
 
-  if (!g95_numeric_ts(&x->ts)) {
+  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
    type_error(x);
    return FAILURE;
   }
@@ -770,7 +764,7 @@ static try check_log(g95_expr *x) {
 
 static try check_log10(g95_expr *x) {
 
-  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) {
+  if (x->ts.type != BT_REAL) {
    type_error(x);
    return FAILURE;
   }
@@ -1243,10 +1237,10 @@ static try check_shape(g95_expr *source) {
 /* Sine family */
 
 static try check_sin(g95_expr *x) {
-/* May need to remove integer */
-  if (!g95_numeric_ts(&x->ts)) {
-   type_error(x);
-   return FAILURE;
+
+  if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
+    type_error(x);
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -1318,9 +1312,9 @@ static try check_spread(g95_expr *source, g95_expr *dim, g95_expr *ncopies) {
 
 static try check_sqrt(g95_expr *x) {
 
-  if (!g95_numeric_ts(&x->ts)) {
-    type_error(x);
-    return FAILURE;
+  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
+   type_error(x);
+   return FAILURE;
   }
 
   return SUCCESS;
@@ -1351,10 +1345,10 @@ static try check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 /* Tangent family */
 
 static try check_tan(g95_expr *x) {
-/* May need to remove integer */
-  if (!g95_numeric_ts(&x->ts)) {
-   type_error(x);
-   return FAILURE;
+
+  if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
+    type_error(x);
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -1892,7 +1886,7 @@ int di, dr, dd, dl, dc, dz;
 	     x, BT_REAL, dr, 0, NULL);
   add_sym_f1("dexp", 0, BT_REAL,    dd, g95_simplify_exp, NULL, x, BT_REAL,
 	     dd, 0, NULL);
-  add_sym_f1("cexp", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX,
+  add_sym_f1("cexp", 0, BT_COMPLEX, dz, g95_simplify_exp, NULL, x, BT_COMPLEX,
 	     dz, 0, NULL);
   make_generic("exp");
 
@@ -2027,8 +2021,6 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f3("maxval", 1, BT_REAL, dr, NULL, check_maxval, ar, BT_REAL, dr, 0,
 	     dm, BT_INTEGER, di, 1,   msk, BT_LOGICAL, dl, 1, NULL);
 
-/* KAH Takes any type for ts and fs */
-
   add_sym_f3("merge", 0, BT_REAL, dr, NULL, check_merge, ts, BT_REAL, dr, 0,
 	     fs, BT_REAL, dr, 0,   msk, BT_LOGICAL, dl, 0, NULL);
 
@@ -2080,12 +2072,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("not", 0, BT_INTEGER, di, g95_simplify_not, NULL,
 	     i, BT_INTEGER, di, 0, NULL);
 
-/* KAH Takes and returns pointers-- using BT_INTEGER as a placeholder */
-
   add_sym_f1("null", 1, BT_INTEGER, di, g95_simplify_null, check_null,
 	     mo, BT_INTEGER, di, 1, NULL);
-
-/* KAH Takes arrays and an optional vector and returns a vector */
 
   add_sym_f3("pack", 1, BT_REAL, dr, NULL, check_pack, ar, BT_REAL, dr, 0,
 	     msk, BT_LOGICAL, dl, 0,   v, BT_REAL, dr, 1, NULL);
@@ -2298,23 +2286,18 @@ int di, dr, dc;
   add_sym_f1("cpu_time", 1, BT_UNKNOWN, 0, NULL, NULL,
 	     tm, BT_REAL, dr, 0, NULL);
 
-/* KAH Last argument is a vector */
   add_sym_f4("date_and_time", 1, BT_UNKNOWN, 0, NULL, check_date_and_time,
 	  dt, BT_CHARACTER, dc, 1,   tm, BT_CHARACTER, dc, 1,
 	  zn, BT_CHARACTER, dc, 1,   vl, BT_INTEGER,   di, 1, NULL);
 
-/* KAH j, ln and pt must be non-negative. i and t must have same kind
- * parameter. */
   add_sym_f5("mvbits", 0, BT_UNKNOWN, 0, g95_simplify_mvbits, check_mvbits,
 	     f, BT_INTEGER, di, 0,   fp, BT_INTEGER, di, 0,
 	     ln, BT_INTEGER, di, 0,   t, BT_INTEGER, di, 0,
 	     tp, BT_INTEGER, di, 0, NULL);
 
-/* KAH Can take an array */
   add_sym_f3("random_number", 1, BT_UNKNOWN, 0, NULL, check_random_number,
 	     h, BT_REAL, dr, 0, NULL);
 
-/* KAH Second two possible arguments are integer arrays */
   add_sym_f1("random_seed", 1, BT_UNKNOWN, 0, NULL, check_random_seed,
 	     sz, BT_INTEGER, di, 1,   pt, BT_INTEGER, di, 1,
 	     gt, BT_INTEGER, di, 1, NULL);

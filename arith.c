@@ -425,6 +425,27 @@ int i, sign;
 }
 
 
+void hypercos(mpf_t *arg, mpf_t *result) {
+mpf_t neg, term1, term2, x, xp;
+
+  mpf_init_set(x, *arg);
+
+  mpf_init(neg);
+  mpf_init(term1);
+  mpf_init(term2);
+  mpf_init(xp);
+
+  mpf_neg(neg,x);
+
+  exponential(&x,&term1);
+  exponential(&neg,&term2);
+
+  mpf_add(xp,term1,term2);
+  mpf_div_ui(*result,xp,2);
+
+}
+
+
 void hypersine(mpf_t *arg, mpf_t *result) {
 mpf_t neg, term1, term2, x, xp;
 

@@ -109,6 +109,13 @@ static g95_expr *range_check(g95_expr *result, const char *name) {
 	== ARITH_OK) return result;
     break;
 
+  case BT_COMPLEX:
+    if (g95_check_real_range(result->value.complex.r,result->ts.kind)==ARITH_OK 
+	    && g95_check_real_range(result->value.complex.i,result->ts.kind)==
+		    ARITH_OK)
+      return result;
+    break;
+
   default:
     g95_internal_error("range_check(): Bad type");
   }
@@ -615,7 +622,7 @@ int i;
 
 
 g95_expr *g95_simplify_atan2(g95_expr *y, g95_expr *x) {
-g95_expr *re1, *re2, *result;
+g95_expr *result;
 mpf_t term;
 int i;
 
@@ -662,22 +669,8 @@ int i;
     }
   }
 
-  switch (x->ts.type) {
-  case BT_INTEGER: 
-    if (g95_option.pedantic == 1) 
-        g95_warning_now("Integer initialization constant to ATAN at %L is nonstandard",&x->where);
-    re1 = g95_int2real(x,x->ts.kind);
-    re2 = g95_int2real(y,y->ts.kind);
-    mpf_div(term,re2->value.real,re1->value.real);
-    arctangent(&term,&result->value.real);
-    break;
-  case BT_REAL: 
-    mpf_div(term,y->value.real,x->value.real);
-    arctangent(&term,&result->value.real);
-    break;
-  default:
-    g95_internal_error("in g95_simplify_atan(): Bad type");
-  }
+  mpf_div(term,y->value.real,x->value.real);
+  arctangent(&term,&result->value.real);
 
   mpf_clear(term);
 
@@ -852,7 +845,8 @@ g95_expr *result;
 
 
 g95_expr *g95_simplify_cos(g95_expr *x) {
-g95_expr *re, *result;
+g95_expr *result;
+mpf_t xp, xq;
 int i;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
@@ -864,18 +858,25 @@ int i;
   result->where = x->where; 
 
   switch (x->ts.type) {
-  case BT_INTEGER: 
-    if (g95_option.pedantic == 1) 
-        g95_warning_now("Integer initialization constant to COS at %L is nonstandard",&x->where);
-    re = g95_int2real(x,x->ts.kind);
-    cosine(&re->value.real,&result->value.real);
-    break;
   case BT_REAL: 
     cosine(&x->value.real,&result->value.real);
     break;
   case BT_COMPLEX: 
-    g95_error("Complex cos at %L has not yet been implemented",&x->where);
-    return &g95_bad_expr;
+    mpf_init(xp);
+    mpf_init(xq);
+
+    cosine(&x->value.complex.r,&xp);
+    hypercos(&x->value.complex.i,&xq);
+    mpf_mul(result->value.complex.r,xp,xq);
+    
+    sine(&x->value.complex.r,&xp);
+    hypersine(&x->value.complex.i,&xq);
+    mpf_mul(xp,xp,xq);
+    mpf_neg(result->value.complex.i,xp);
+
+    mpf_clear(xp);
+    mpf_clear(xq);
+    break;
   default:
     g95_internal_error("in g95_simplify_cos(): Bad type");
   }
@@ -887,7 +888,6 @@ int i;
 
 g95_expr *g95_simplify_cosh(g95_expr *x) {
 g95_expr *result;
-mpf_t xp, xq;
 int i;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
@@ -898,15 +898,7 @@ int i;
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
 
-  mpf_init(xp);
-  mpf_init(xq);
-
-  exponential(&x->value.real,&xp);
-  hypersine(&x->value.real,&xq);
-  mpf_sub(result->value.real,xp,xq);
-
-  mpf_clear(xp);
-  mpf_clear(xq);
+  hypercos(&x->value.real,&result->value.real);
 
   return range_check(result, "COSH");
 
@@ -1042,7 +1034,8 @@ int i;
 
 
 g95_expr *g95_simplify_exp(g95_expr *x) {
-g95_expr *re, *result;
+g95_expr *result;
+mpf_t xp, xq;
 double absval, rhuge;
 int i;
 
@@ -1055,12 +1048,6 @@ int i;
   result->where = x->where; 
 
   switch (x->ts.type) {
-  case BT_INTEGER: 
-    if (g95_option.pedantic == 1) 
-        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
-    re = g95_int2real(x,x->ts.kind);
-    exponential(&re->value.real,&result->value.real);
-    break;
   case BT_REAL: 
     absval = mpf_get_d(x->value.real);
     if ( absval < 0 ) absval = -absval;
@@ -1085,8 +1072,17 @@ int i;
     exponential(&x->value.real,&result->value.real);
     break;
   case BT_COMPLEX: 
-    g95_error("Complex exponent at %L has not yet been implemented",&x->where);
-    return &g95_bad_expr;
+    /* Using Euler's formula */
+    mpf_init(xp);
+    mpf_init(xq);
+    exponential(&x->value.complex.r,&xq);
+    cosine(&x->value.complex.i,&xp);
+    mpf_mul(result->value.complex.r,xq,xp);
+    sine(&x->value.complex.i,&xp);
+    mpf_mul(result->value.complex.i,xq,xp);
+    mpf_clear(xp);
+    mpf_clear(xq);
+    break;
   default:
     g95_internal_error("in g95_simplify_exp(): Bad type");
   }
@@ -1940,7 +1936,6 @@ int tv;
 
 g95_expr *g95_simplify_log(g95_expr *x) {
 g95_expr *result;
-mpf_t ri;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -1948,23 +1943,6 @@ mpf_t ri;
   result->where = x->where; 
 
   switch(x->ts.type) {
-  case BT_INTEGER:
-    if (g95_option.pedantic == 1) 
-      g95_warning_now("Integer initialization constant to LOG at %L is "
-		  "nonstandard", &x->where);
-
-    if (mpz_cmp(x->value.integer, mpz_zero) <= 0) {
-      g95_error("Argument of LOG at %L cannot be less than or equal to zero",
-		&x->where);
-      return &g95_bad_expr;
-    }
-
-    mpf_init(ri);
-    mpf_set_z(ri, x->value.integer);
-
-    natural_logarithm(&ri, &result->value.real);
-    break;
-
   case BT_REAL:
     if (mpf_cmp(x->value.real, mpf_zero) <= 0) {
       g95_error("Argument of LOG at %L cannot be less than or equal to zero",
@@ -1996,7 +1974,6 @@ mpf_t ri;
 
 g95_expr *g95_simplify_log10(g95_expr *x) {
 g95_expr *result;
-mpf_t ri;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -2004,23 +1981,6 @@ mpf_t ri;
   result->where = x->where; 
 
   switch(x->ts.type) {
-  case BT_INTEGER:
-    if (g95_option.pedantic == 1) 
-      g95_warning_now("Integer initialization constant to LOG10 at %L is "
-		  "nonstandard", &x->where);
-
-    if (mpz_cmp(x->value.integer, mpz_zero) <= 0) {
-      g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
-		&x->where);
-      return &g95_bad_expr;
-    }
-
-    mpf_init(ri);
-    mpf_set_z(ri, x->value.integer);
-
-    common_logarithm(&ri, &result->value.real);
-    break;
-
   case BT_REAL:
     if (mpf_cmp(x->value.real, mpf_zero) <= 0) {
       g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
@@ -3253,7 +3213,8 @@ int sgn;
 
 
 g95_expr *g95_simplify_sin(g95_expr *x) {
-g95_expr *re, *result;
+g95_expr *result;
+mpf_t xp, xq;
 int i;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
@@ -3265,18 +3226,24 @@ int i;
   result->where = x->where; 
 
   switch (x->ts.type) {
-  case BT_INTEGER: 
-    if (g95_option.pedantic == 1) 
-        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
-    re = g95_int2real(x,x->ts.kind);
-    sine(&re->value.real,&result->value.real);
-    break;
   case BT_REAL: 
     sine(&x->value.real,&result->value.real);
     break;
   case BT_COMPLEX: 
-    g95_error("Complex sin at %L has not yet been implemented",&x->where);
-    return &g95_bad_expr;
+    mpf_init(xp);
+    mpf_init(xq);
+
+    sine(&x->value.complex.r,&xp);
+    hypercos(&x->value.complex.i,&xq);
+    mpf_mul(result->value.complex.r,xp,xq);
+    
+    cosine(&x->value.complex.r,&xp);
+    hypersine(&x->value.complex.i,&xq);
+    mpf_mul(result->value.complex.i,xp,xq);
+
+    mpf_clear(xp);
+    mpf_clear(xq);
+    break;
   default:
     g95_internal_error("in g95_simplify_sin(): Bad type");
   }
@@ -3383,36 +3350,23 @@ int i, p;
 
 
 g95_expr *g95_simplify_sqrt(g95_expr *e) {
-g95_expr *sroot, *result;
+g95_expr *result;
 mpf_t ac, ad, s, t, w;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL; 
 
+  result = g95_constant_result(e->ts.type, e->ts.kind);
+  result->where = e->where;
+
   switch (e->ts.type) {
-  case BT_INTEGER:
-    if (mpz_cmp_si(e->value.integer, 0) < 0) goto negative_arg;
-
-    sroot = g95_copy_expr(e);
-    mpz_sqrt(sroot->value.integer, e->value.integer);
-    result = g95_int2real(sroot, g95_default_real_kind());
-    g95_free_expr(sroot);
-
-    break;
-
   case BT_REAL:
     if (mpf_cmp_si(e->value.real, 0) < 0) goto negative_arg;
-
-    result = g95_constant_result(BT_REAL, e->ts.kind);
-    result->where = e->where;
     mpf_sqrt(result->value.real, e->value.real);
 
     break;
 
   case BT_COMPLEX:
     /*Formula taken from Numerical Recipes to avoid over- and underflow*/
-
-    result = g95_constant_result(BT_COMPLEX, e->ts.kind);
-    result->where = e->where;
 
     mpf_init(ac);
     mpf_init(ad);
@@ -3499,7 +3453,7 @@ mpf_t ac, ad, s, t, w;
 
 
 g95_expr *g95_simplify_tan(g95_expr *x) {
-g95_expr *re, *result;
+g95_expr *result;
 mpf_t mpf_sin, mpf_cos, mag_cos;
 int i;
 
@@ -3511,61 +3465,31 @@ int i;
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
 
-  switch (x->ts.type) {
-  case BT_INTEGER: 
-    if (g95_option.pedantic == 1) 
-        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
-    re = g95_int2real(x,x->ts.kind);
-    mpf_init(mpf_sin);
-    mpf_init(mpf_cos);
-    mpf_init(mag_cos);
-    sine(&re->value.real,&mpf_sin);
-    cosine(&re->value.real,&mpf_cos);
-    mpf_abs(mag_cos, mpf_cos);
-    if ( mpf_cmp_ui(mag_cos,0) == 0 ) {
-      g95_error("Tangent undefined at %L",x->where);
-      mpf_clear(mpf_sin);
-      mpf_clear(mpf_cos);
-      mpf_clear(mag_cos);
-      return &g95_bad_expr;
-    }
-    else if ( mpf_cmp(mag_cos,g95_real_kinds[i].tiny) < 0 ) {
-      g95_error("Tangent cannot be accurately evaluated at %L",x->where);
-      mpf_clear(mpf_sin);
-      mpf_clear(mpf_cos);
-      mpf_clear(mag_cos);
-      return &g95_bad_expr;
-    }
-    else {
-      mpf_div(result->value.real,mpf_sin,mpf_cos);
-      mpf_clear(mpf_sin);
-      mpf_clear(mpf_cos);
-      mpf_clear(mag_cos);
-    }
-    break;
-  case BT_REAL: 
-    mpf_init(mpf_sin);
-    mpf_init(mpf_cos);
-    mpf_init(mag_cos);
-    sine(&x->value.real,&mpf_sin);
-    cosine(&x->value.real,&mpf_cos);
-    mpf_abs(mag_cos, mpf_cos);
-    if ( mpf_cmp(mag_cos,g95_real_kinds[i].tiny) < 0 ) {
-      g95_error("Tangent undefined at %L",&x->where);
-      mpf_clear(mpf_sin);
-      mpf_clear(mpf_cos);
-      mpf_clear(mag_cos);
-      return &g95_bad_expr;
-    }
-    else {
-      mpf_div(result->value.real,mpf_sin,mpf_cos);
-      mpf_clear(mpf_sin);
-      mpf_clear(mpf_cos);
-      mpf_clear(mag_cos);
-    }
-    break;
-  default:
-    g95_internal_error("in g95_simplify_tan(): Bad type");
+  mpf_init(mpf_sin);
+  mpf_init(mpf_cos);
+  mpf_init(mag_cos);
+  sine(&x->value.real,&mpf_sin);
+  cosine(&x->value.real,&mpf_cos);
+  mpf_abs(mag_cos, mpf_cos);
+  if ( mpf_cmp_ui(mag_cos,0) == 0 ) {
+    g95_error("Tangent undefined at %L",x->where);
+    mpf_clear(mpf_sin);
+    mpf_clear(mpf_cos);
+    mpf_clear(mag_cos);
+    return &g95_bad_expr;
+  }
+  else if ( mpf_cmp(mag_cos,g95_real_kinds[i].tiny) < 0 ) {
+    g95_error("Tangent cannot be accurately evaluated at %L",&x->where);
+    mpf_clear(mpf_sin);
+    mpf_clear(mpf_cos);
+    mpf_clear(mag_cos);
+    return &g95_bad_expr;
+  }
+  else {
+    mpf_div(result->value.real,mpf_sin,mpf_cos);
+    mpf_clear(mpf_sin);
+    mpf_clear(mpf_cos);
+    mpf_clear(mag_cos);
   }
 
   return range_check(result, "TAN");
@@ -3575,7 +3499,7 @@ int i;
 
 g95_expr *g95_simplify_tanh(g95_expr *x) {
 g95_expr *result;
-mpf_t neg, xp, xq;
+mpf_t xp, xq;
 int i;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
@@ -3586,18 +3510,11 @@ int i;
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
 
-  mpf_init(neg);
   mpf_init(xp);
   mpf_init(xq);
 
-  mpf_neg(neg,x->value.real);
-
-  exponential(&x->value.real,&xq);
-  exponential(&neg,&xp);
-  mpf_add(xp,xp,xq);
-  mpf_div_ui(xp,xp,2);
-
   hypersine(&x->value.real,&xq);
+  hypercos(&x->value.real,&xp);
 
   mpf_div(result->value.real,xq,xp);
 
