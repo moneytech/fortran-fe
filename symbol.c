@@ -374,7 +374,7 @@ g95_expr lvalue;
 /* Get rid of this copy, use version in modules.c only */
 
 static mstring flavors[] = {
-  minit("UNKNOWN",     FL_UNKNOWN),      minit("PROGRAM",     FL_PROGRAM),
+  minit("UNKNOWN-FL",  FL_UNKNOWN),      minit("PROGRAM",     FL_PROGRAM),
   minit("BLOCK-DATA",  FL_BLOCK_DATA),   minit("MODULE",      FL_MODULE),
   minit("VARIABLE",    FL_VARIABLE),     minit("PARAMETER",   FL_PARAMETER),
   minit("LABEL",       FL_LABEL),        minit("PROCEDURE",   FL_PROCEDURE),
@@ -383,21 +383,22 @@ static mstring flavors[] = {
 },
 
 intents[] = {
-  minit("UNKNOWN", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
-  minit("OUT", INTENT_OUT),          minit("INOUT", INTENT_INOUT),
+  minit("UNKNOWN-INTENT", INTENT_UNKNOWN),  minit("IN", INTENT_IN),
+  minit("OUT", INTENT_OUT),                 minit("INOUT", INTENT_INOUT),
   minit(NULL, -1)
 },
 
 procedures[] = {
-  minit("UNKNOWN", PROC_UNKNOWN),      minit("MODULE-PROC", PROC_MODULE),
-  minit("INTERNAL", PROC_INTERNAL),    minit("DUMMY", PROC_DUMMY),
-  minit("INTRINSIC", PROC_INTRINSIC),  minit("ST-FUNCTION", PROC_ST_FUNCTION),
-  minit("EXTERNAL", PROC_EXTERNAL),    minit(NULL, -1)
+  minit("UNKNOWN-PROC",   PROC_UNKNOWN),     minit("MODULE-PROC", PROC_MODULE),
+  minit("INTERNAL-PROC",  PROC_INTERNAL),    minit("DUMMY-PROC",  PROC_DUMMY),
+  minit("INTRINSIC-PROC", PROC_INTRINSIC),
+  minit("EXTERNAL-PROC",  PROC_EXTERNAL),
+  minit("STATEMENT-PROC", PROC_ST_FUNCTION), minit(NULL, -1)
 },
 
 accessibility[] = {
-  minit("UNKNOWN", ACCESS_UNKNOWN),   minit("PUBLIC", ACCESS_PUBLIC),
-  minit("PRIVATE", ACCESS_PRIVATE),   minit(NULL, -1)
+  minit("UNKNOWN-ACCESS", ACCESS_UNKNOWN),   minit("PUBLIC", ACCESS_PUBLIC),
+  minit("PRIVATE", ACCESS_PRIVATE),          minit(NULL, -1)
 };
 
 
