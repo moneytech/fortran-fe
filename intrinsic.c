@@ -1664,8 +1664,16 @@ static void resolve_intrinsic(g95_intrinsic_sym *specific, g95_expr *e) {
 g95_expr *a1, *a2, *a3, *a4, *a5;
 g95_actual_arglist *arg;
 
-  if ( (e->value.function.actual != NULL) && specific->elemental) 
-    e->rank = e->value.function.actual->expr->rank;
+  /* The rank of an elemental is the rank of its array argument(s) */
+
+  if ((e->value.function.actual != NULL) && specific->elemental) {
+    for(arg=e->value.function.actual; arg; arg=arg->next) {
+      if (arg->expr != NULL && arg->expr->rank > 0) {
+	e->rank = arg->expr->rank;
+	break;
+      }
+    }
+  }
 
   if (specific->resolve == NULL) {
     if (e->value.function.name == NULL)
@@ -1824,10 +1832,10 @@ g95_actual_arglist *arg;
 
 static try check_specific(g95_intrinsic_sym *specific, g95_expr *expr,
 			  int error_flag) {
-g95_actual_arglist **ap;
+g95_actual_arglist *arg, **ap;
 g95_intrinsic_arg *formal;
+int i, r;
 try t;
-int i;
 
   ap = &expr->value.function.actual;
 
@@ -1855,6 +1863,25 @@ int i;
     if (t == SUCCESS) expr->ts = specific->ts;
   } else
     t = do_check(specific, *ap);
+
+  /* Check ranks for elemental intrinsics */
+
+  if (t == SUCCESS && specific->elemental) {
+    r = 0;
+    for(arg=expr->value.function.actual; arg; arg=arg->next) {
+      if (arg->expr == NULL || arg->expr->rank == 0) continue;
+      if (r == 0) {
+	r = arg->expr->rank;
+	continue;
+      }
+
+      if (arg->expr->rank != r) {
+	g95_error("Ranks of arguments to elemental intrinsic '%s' differ "
+		  "at %L", specific->name, &arg->expr->where);
+	return FAILURE;
+      }
+    }
+  }
 
   if (t == FAILURE) remove_nullargs(ap);
 
