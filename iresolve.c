@@ -23,55 +23,85 @@ Boston, MA 02111-1307, USA.  */
 /* iresolve.c-- assign name and types to intrinsic procedures */
 
 #include <string.h>
+#include <stdarg.h>
 
 #include "g95.h"
 #include "intrinsic.h"
 
-static char temp_name[30];
+
+/* String pool subroutines.  This are used to provide static locations
+ * for the string constants that represent library function names. */
+
+typedef struct string_node {
+  struct string_node *next;
+  char string[1];
+} string_node;
+
+#define HASH_SIZE 13
+
+static string_node *string_head[HASH_SIZE];
 
 
-/* String Pool.  This is used to provide a stable location for various
- * string constants. */
+/* hash()-- Return a hash code based on the name */
 
-#define G95_STRINGPOOL_SIZE 1300
+static int hash(char *name) {
+int h;
 
-static char *pool_base, *pool_top;
+  h = 1;
+  while(*name)
+    h = 5311966*h + *name++;
 
-
-
-/* add_string()-- Add a string to the string pool */
-
-static void add_string(char *string) {
-int len;
-
-  len = strlen(string);
-
-  if ((pool_top - pool_base) + len + 2 >= G95_STRINGPOOL_SIZE)
-    g95_internal_error("add_string(): string pool size too small");
-
-  strcpy(pool_top, string);
-
-  pool_top = strchr(pool_top, '\0') + 1;
-  *pool_top = '\0';
+  if (h < 0) h = -h;
+  return h % HASH_SIZE;
 }
 
 
-/* get_string()-- Find a string in the string pool */
+/* get_string()-- Given printf-like arguments, return a static address
+ * of the resulting string.  If the name is not in the table, it is
+ * added. */
 
-static char *get_string(char *string) {
-char *p;
+static char *get_string(const char *format, ...) {
+char temp_name[50];
+string_node *p;
+va_list ap;
+int h;
 
-  p = pool_base;
+  va_start(ap, format); 
+  vsprintf(temp_name, format, ap);
+  va_end(ap);
 
-  while(*p) {
-    if (strcmp(p, string) == 0) return p;
-    p = strchr(p, '\0') + 1;
+  h = hash(temp_name);
+
+  /* Search */
+
+  for(p=string_head[h]; p; p=p->next)
+    if (strcmp(p->string, temp_name) == 0) return p->string;
+
+  /* Add */
+
+  p = g95_getmem(sizeof(string_node) + strlen(temp_name));
+
+  strcpy(p->string, temp_name);
+
+  p->next = string_head[h];
+  string_head[h] = p;
+
+  return p->string;
+}
+
+
+
+static void free_strings(void) {
+string_node *p, *q;
+int h;
+
+  for(h=0; h<HASH_SIZE; h++) {
+    for(p=string_head[h]; p; p=q) {
+      q = p->next;
+      g95_free(p);
+    }
   }
-
-  g95_internal_error("get_string(): string '%s' not found", string);
-  return NULL;
 }
-
 
 
 /********************** Resolution functions **********************/
@@ -105,16 +135,6 @@ static char any0[] = "__any0", any1[] = "__any1";
 }
 
 
-/* dot_name()-- Given a type and kind, return a static pointer to the
- * name of the appropriate dot_product intrinsic. */
-
-static char *dot_name(bt type, int kind) {
-
-  sprintf(temp_name, "__dot_product_%c%d", g95_type_letter(type), kind);
-  return temp_name;
-}
-
-
 void g95_resolve_dot_product(g95_expr *f, g95_expr *a, g95_expr *b) {
 g95_expr temp;
 
@@ -128,14 +148,8 @@ g95_expr temp;
     f->ts = temp.ts;
   }
 
-  f->value.function.name = get_string(dot_name(f->ts.type, f->ts.kind));
-}
-
-
-static char *btest_name(int k1, int k2) {
-
-  sprintf(temp_name, "__btest_%d_%d", k1, k2);
-  return temp_name;
+  f->value.function.name = get_string("__dot_product_%c%d",
+				      g95_type_letter(f->ts.type), f->ts.kind);
 }
 
 
@@ -144,14 +158,8 @@ void g95_resolve_btest(g95_expr *f, g95_expr *i, g95_expr *pos) {
   f->ts.type = BT_LOGICAL;
   f->ts.kind = g95_default_logical_kind();
 
-  f->value.function.name = get_string(btest_name(i->ts.kind, pos->ts.kind));
-}
-
-
-static char *exponent_name(int kind) {
-
-  sprintf(temp_name, "__exponent_%d", kind);
-  return temp_name;
+  f->value.function.name = get_string("__btest_%d_%d", i->ts.kind,
+				      pos->ts.kind);
 }
 
 
@@ -160,28 +168,15 @@ void g95_resolve_exponent(g95_expr *f, g95_expr *x) {
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
 
-  f->value.function.name = get_string(exponent_name(x->ts.kind));
-}
-
-
-static char *ishft_name(int k1, int k2) {
-
-  sprintf(temp_name, "__ishft_%d_%d", k1, k2);
-  return temp_name;
+  f->value.function.name = get_string("__exponent_%d", x->ts.kind);
 }
 
 
 void g95_resolve_ishft(g95_expr *f, g95_expr *i, g95_expr *shift) {
 
   f->ts = i->ts;
-  f->value.function.name = get_string(ishft_name(i->ts.kind, shift->ts.kind));
-}
-
-
-static char *ishftc_name(int k1, int k2, int k3) {
-
-  sprintf(temp_name, "__ishftc_%d_%d_%d", k1, k2, k3);
-  return temp_name;
+  f->value.function.name = get_string("__ishft_%d_%d", i->ts.kind,
+				      shift->ts.kind);
 }
 
 
@@ -193,7 +188,7 @@ int s_kind;
 
   f->ts = i->ts;
   f->value.function.name =
-    get_string(ishftc_name(i->ts.kind, shift->ts.kind, s_kind));
+    get_string("__ishftc_%d_%d_%d", i->ts.kind, shift->ts.kind, s_kind);
 }
 
 
@@ -204,8 +199,7 @@ static char max0[] = "__max0", amax1[] = "__amax1", dmax1[] = "__dmax1";
   if (type == BT_REAL && kind == g95_default_real_kind()) return amax1;
   if (type == BT_REAL && kind == g95_default_double_kind()) return dmax1;
 
-  sprintf(temp_name, "__max_%c%d", g95_type_letter(type), kind);
-  return temp_name;
+  return get_string("__max_%c%d", g95_type_letter(type), kind);
 }
 
 
@@ -216,23 +210,16 @@ void g95_resolve_max(g95_expr *f, g95_expr *a1) {
 }
 
 
-static char *maxval_name(bt type, int kind) {
-
-  sprintf(temp_name, "__maxval_%c%d", g95_type_letter(type), kind);
-  return temp_name;
-}
-
-
 void g95_resolve_maxval(g95_expr *f, g95_expr *array, g95_expr *dim,
 			g95_expr *mask) {
 
   f->ts = array->ts;
-
-  f->value.function.name =
-    get_string(maxval_name(array->ts.type, array->ts.kind));
-
   if (dim != NULL && array->rank != 1)
     f->rank = array->rank - 1;
+
+  f->value.function.name =
+    get_string("__maxval_%c%d", g95_type_letter(array->ts.type),
+	       array->ts.kind);
 }
 
 
@@ -243,8 +230,7 @@ static char min0[] = "__min0", amin1[] = "__amin1", dmin1[] = "__dmin1";
   if (type == BT_REAL && kind == g95_default_real_kind()) return amin1;
   if (type == BT_REAL && kind == g95_default_double_kind()) return dmin1;
 
-  sprintf(temp_name, "__min_%c%d", g95_type_letter(type), kind);
-  return temp_name;
+  return get_string("__min_%c%d", g95_type_letter(type), kind);
 }
 
 
@@ -255,58 +241,37 @@ void g95_resolve_min(g95_expr *f, g95_expr *a1) {
 }
 
 
-
-static char *minval_name(bt type, int kind) {
-
-  sprintf(temp_name, "__minval_%c%d", g95_type_letter(type), kind);
-  return temp_name;
-}
-
-
 void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
 			     g95_expr *mask) {
   f->ts = array->ts;
 
-  f->value.function.name =
-    get_string(minval_name(array->ts.type, array->ts.kind));
-
   if (dim != NULL && array->rank != 1)
     f->rank = array->rank - 1;
+
+  f->value.function.name =
+    get_string("__minval_%c%d", g95_type_letter(array->ts.type),
+	       array->ts.kind);
 }
 
 
 
 void g95_resolve_reshape(g95_expr *f) {
+  /* Help me */
 
-
-}
-
-
-static char *scale_name(int real_kind, int int_kind) {
-
-  sprintf(temp_name, "__scale%d_%d", real_kind, int_kind);
-  return temp_name;
 }
 
 
 void g95_resolve_scale(g95_expr *f, g95_expr *x, g95_expr *y) {
 
   f->ts = x->ts;
-  f->value.function.name = get_string(scale_name(x->ts.kind, x->ts.kind));
-}
-
-
-static char *set_exponent_name(int kind) {
-
-  sprintf(temp_name, "__set_exponent_%d", kind);
-  return temp_name;
+  f->value.function.name = get_string("__scale_%d_%d", x->ts.kind, x->ts.kind);
 }
 
 
 void g95_resolve_set_exponent(g95_expr *f, g95_expr *x, g95_expr *i) {
 
   f->ts = x->ts;
-  f->value.function.name = get_string(set_exponent_name(x->ts.kind));
+  f->value.function.name = get_string("__set_exponent_%d", x->ts.kind);
 }
 
 
@@ -318,13 +283,6 @@ void g95_resolve_shape(g95_expr *f, g95_expr *source) {
 }
 
 
-static char *sum_name(bt type, int kind) {
-
-  sprintf(temp_name, "__sum_%c%d", g95_type_letter(type), kind);
-  return temp_name;
-}
-
-
 void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
 		     g95_expr *mask) {
 
@@ -333,78 +291,21 @@ void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
   if (dim != NULL && array->rank != 1) f->rank = array->rank - 1;
 
   f->value.function.name =
-    get_string(sum_name(array->ts.type, array->ts.kind));
+    get_string("__sum_%c%d", g95_type_letter(array->ts.type), array->ts.kind);
 }
+
 
 
 
 void g95_iresolve_init_1(void) {
-int i, j, k, ik, rk;
+int i;
 
-  pool_base = pool_top = g95_getmem(G95_STRINGPOOL_SIZE);
-  *pool_base = '\0';
-
-  add_string(dot_name(BT_LOGICAL, g95_default_logical_kind()));
-
-  /* Generate names of integer subroutines */
-
-  for(i=0; g95_integer_kinds[i].kind; i++) {
-    k = g95_integer_kinds[i].kind;
-
-    add_string(dot_name(BT_INTEGER, k));
-    add_string(sum_name(BT_INTEGER, k));
-
-    add_string(maxval_name(BT_INTEGER, k));
-    add_string(minval_name(BT_INTEGER, k));
-
-    add_string(min_name(BT_INTEGER, k));
-    add_string(max_name(BT_INTEGER, k));
-
-    for(j=0; g95_integer_kinds[j].kind; j++) {
-      ik = g95_integer_kinds[j].kind;
-
-      add_string(btest_name(k, ik));
-      add_string(ishft_name(k, ik));
-      add_string(ishftc_name(k, ik, g95_default_integer_kind()));
-    }
-  }
-
-  /* Generate names of real and complex names */
-
-  for(i=0; g95_real_kinds[i].kind; i++) { 
-    k = g95_integer_kinds[i].kind;
-
-    add_string(dot_name(BT_REAL, k));
-    add_string(dot_name(BT_COMPLEX, k));
-
-    add_string(sum_name(BT_REAL, k));
-    add_string(sum_name(BT_COMPLEX, k));
-
-    add_string(maxval_name(BT_REAL, k));
-    add_string(minval_name(BT_REAL, k));
-
-    add_string(min_name(BT_REAL, k));
-    add_string(max_name(BT_REAL, k));
-
-    add_string(set_exponent_name(k));
-    add_string(exponent_name(k));
-  }
-
-  /* Generate a Cartesian product of read and integer kinds */
-
-  for(i=0; g95_real_kinds[i].kind; i++) {
-    rk = g95_real_kinds[i].kind;
-    for(j=0; g95_integer_kinds[j].kind; j++) {
-      ik = g95_integer_kinds[j].kind;
-
-      add_string(scale_name(rk, ik));
-    }
-  }
+  for(i=0; i<HASH_SIZE; i++)
+    string_head[i] = NULL;
 }
-
 
 
 void g95_iresolve_done_1(void) {
 
-  g95_free(pool_base);
+  free_strings();
 }
