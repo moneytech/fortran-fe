@@ -1516,7 +1516,8 @@ int i;
   if (m == MATCH_NO) goto syntax;
   if (m != MATCH_YES) return m;
 
-  if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+  if (g95_find_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+  if (sym == NULL) g95_get_symbol(name, NULL, 0, &sym);
 
   if (!sym->attr.generic &&
       !sym->attr.subroutine &&
