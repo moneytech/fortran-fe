@@ -939,6 +939,23 @@ static try check_log10(g95_expr *x) {
 }
 
 
+static try check_logical(g95_expr *a, g95_expr *kind) {
+
+  if (a->ts.type != BT_LOGICAL) {
+    type_error(a);
+    return FAILURE;
+  }
+
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)) {
+    kind_error(kind);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
 /* Min/max family */
 
 static try check_rest(bt type, int kind, g95_actual_arglist *arg) {
@@ -2182,7 +2199,7 @@ int di, dr, dd, dl, dc, dz;
 
   make_generic("log10");
 
-  add_sym("logical", 0, BT_LOGICAL, dl, g95_simplify_logical, NULL,
+  add_sym("logical", 0, BT_LOGICAL, dl, g95_simplify_logical, check_logical,
 	  l, BT_LOGICAL, dl, 0,   knd, BT_INTEGER, di, 1, NULL);
 
   add_sym("matmul", 1, BT_REAL, dr, NULL, check_matmul,
@@ -2319,7 +2336,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("rrspacing",0, BT_REAL, dr, g95_simplify_rrspacing, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
-  add_sym("scale", 0, BT_REAL, dr, g95_simplify_scale, check_scan,
+  add_sym("scale", 0, BT_REAL, dr, g95_simplify_scale, NULL,
 	  x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
   add_sym("scan", 0, BT_INTEGER, di, g95_simplify_scan, check_scan,

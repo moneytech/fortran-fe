@@ -614,9 +614,10 @@ int kind;
   result->where = e->where;
   
   ceil = g95_copy_expr(e);
-  mpf_ceil(ceil->value.real, e->value.real);
 
-  result = g95_real2int(ceil, kind);
+  mpf_ceil(ceil->value.real, e->value.real);
+  mpz_set_f(result->value.integer,ceil->value.real);
+
   g95_free_expr(ceil);
 
   return range_check(result, "CEILING");
@@ -629,22 +630,6 @@ int c, kind;
 
   kind = get_kind(k, "CHAR", g95_default_character_kind());
   if (kind == -1) return &g95_bad_expr;
-
-  if (k != NULL) {
-    if (k->expr_type != EXPR_CONSTANT) {
-      g95_error("KIND parameter of CHAR at %L must be an initialization "
-		"expression", &k->where);
-
-      return &g95_bad_expr;
-    }
-
-    if (g95_extract_int(k, &kind) != NULL ||
-	g95_validate_kind(BT_CHARACTER, kind) < 0) {
-
-      g95_error("Invalid KIND parameter of CHAR at %L", &k->where);
-      return &g95_bad_expr;
-    }
-  }
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -1048,11 +1033,13 @@ int kind;
 
   if (e->ts.type != EXPR_CONSTANT) return NULL;
 
-  floor = g95_constant_result(BT_REAL, kind);
-  floor->where = e->where;
+  result = g95_constant_result(BT_INTEGER, kind);
+  result->where = e->where;
+  
+  floor = g95_copy_expr(e);
   
   mpf_floor(floor->value.real, e->value.real);
-  result=g95_real2int(floor, kind);
+  mpz_set_f(result->value.integer,floor->value.real);
 
   g95_free_expr(floor);
 
@@ -1414,7 +1401,6 @@ int i, j, k, count, index=0, start;
 	}
       }
     } else {
-      index = 0;
       for(i=0; i<len; i++) {
         for(j=0; j<lensub; j++) {
 	  if (y->value.character.string[j] == x->value.character.string[i]) {
@@ -1434,14 +1420,15 @@ int i, j, k, count, index=0, start;
 	}
       }
     }
+
   } else {
+
     if (lensub == 0) {
       mpz_set_si(result->value.integer,len+1);
       return result;
     }
-
     else if (lensub == 1) {
-      for(i=index; i<len; i++) {
+      for(i=0; i<len; i++) {
         for(j=0; j<lensub; j++) {
 	  if (y->value.character.string[j]==x->value.character.string[len-i]) {
 	    index = len-i+1;
@@ -1450,8 +1437,6 @@ int i, j, k, count, index=0, start;
 	}
       }
     } else {
-
-      index = 0;
       for(i=0; i<len; i++) {
         for(j=0; j<lensub; j++) {
 	  if (y->value.character.string[j]==x->value.character.string[len-i]) {
@@ -1490,15 +1475,18 @@ int kind;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
+  result = g95_constant_result(BT_INTEGER, kind);
+  result->where = e->where;
+
   switch(e->ts.type) {
   case BT_INTEGER:
-    result = g95_int2int(e, kind);
+    mpz_set_f(result->value.integer,e->value.real);
     break;
 
   case BT_REAL:
     rtrunc = g95_copy_expr(e);
     mpf_trunc(rtrunc->value.real, e->value.real);
-    result = g95_real2int(rtrunc, kind);
+    mpz_set_f(result->value.integer,rtrunc->value.real);
     g95_free_expr(rtrunc);
     break;
 
@@ -1506,7 +1494,8 @@ int kind;
     rpart = g95_complex2real(e, kind);
     rtrunc = g95_copy_expr(rpart);
     mpf_trunc(rtrunc->value.real, rpart->value.real);
-    result = g95_real2int(rtrunc, kind);
+    mpz_set_f(result->value.integer,rtrunc->value.real);
+    g95_free_expr(rpart);
     g95_free_expr(rtrunc);
     break;
 
@@ -1524,9 +1513,13 @@ g95_expr *rtrunc, *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
+  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+  result->where = e->where;
+
   rtrunc = g95_copy_expr(e);
+
   mpf_trunc(rtrunc->value.real, e->value.real);
-  result = g95_real2int(rtrunc, g95_default_integer_kind());
+  mpz_set_f(result->value.integer,rtrunc->value.real);
 
   g95_free_expr(rtrunc);
   return range_check(result,"IFIX");
@@ -1538,9 +1531,13 @@ g95_expr *rtrunc, *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
+  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+  result->where = e->where;
+
   rtrunc = g95_copy_expr(e);
+  
   mpf_trunc(rtrunc->value.real, e->value.real);
-  result = g95_real2int(rtrunc, g95_default_integer_kind());
+  mpz_set_f(result->value.integer,rtrunc->value.real);
 
   g95_free_expr(rtrunc);
   return range_check(result,"IDINT");
@@ -2380,6 +2377,9 @@ int cmp;
 
   if (e->expr_type != EXPR_CONSTANT ) return NULL;
 
+  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+  result->where = e->where;
+
   rtrunc = g95_copy_expr(e);
 
   cmp = mpf_cmp_ui(e->value.real, 0);
@@ -2392,7 +2392,7 @@ int cmp;
     mpf_set_si(rtrunc->value.real, 0);
   }
 
-  result = g95_real2int(rtrunc, g95_default_double_kind());
+  mpz_set_f(result->value.integer,rtrunc->value.real);
 
   g95_free_expr(rtrunc);
 
@@ -2402,30 +2402,13 @@ int cmp;
 
 g95_expr *g95_simplify_not(g95_expr *e) {
 g95_expr *result;
-int k, isize;
-int i;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  k = g95_validate_kind(e->ts.kind, e->ts.kind);
-  if (k == -1) g95_internal_error("g95_simplify_not(): Bad kind");
-
-  isize = g95_integer_kinds[k].bit_size;
 
   result = g95_constant_result(e->ts.type,e->ts.kind);
   result->where = e->where;
 
-  for ( i=0; i<isize; ++i ) {
-    if (mpz_tstbit(e->value.integer,i) == 0) {
-      mpz_setbit(result->value.integer,i);
-    }
-    else if (mpz_tstbit(e->value.integer,i) == 1) {
-      mpz_clrbit(result->value.integer,i);
-    }
-    else {
-      g95_internal_error("g95_simplify_not(): Bad bit in argument");
-    }
-  }
+  mpz_com(result->value.integer,e->value.integer);
 
   return range_check(result,"NOT"); 
 }
@@ -3402,7 +3385,7 @@ int count, i, len, lentrim;
 g95_expr *g95_simplify_verify(g95_expr *s, g95_expr *set, g95_expr *b) {
 g95_expr *result;
 int back;
-size_t index, len, lenset;
+size_t index=0, len, lenset;
 
   if (s->expr_type != EXPR_CONSTANT || set->expr_type != EXPR_CONSTANT)  
     return NULL;
