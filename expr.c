@@ -72,7 +72,6 @@ g95_actual_arglist *a2;
   while(a1) {
     a2 = a1->next;
     g95_free_expr(a1->expr);
-    g95_free_st_label(a1->label);
     g95_free(a1);
     a1 = a2;
   }
