@@ -1356,7 +1356,8 @@ match m;
       m = match_varspec(e);
       break;
     }
-    
+
+    g95_gobble_whitespace();
     lparen = (g95_peek_char() == '(');
 
     if (sym->attr.external || sym->attr.intrinsic) {
