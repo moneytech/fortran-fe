@@ -1605,6 +1605,8 @@ g95_symtree *st;
 
     u = find_use_name(atom_name);
 
+    if (u != NULL) u->found = 1;
+
     if (only_flag && u == NULL) continue;
 
     if (u != NULL && u->local_name[0] != '\0')
