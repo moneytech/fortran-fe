@@ -889,11 +889,9 @@ cons_stack *c;
   sym = expr->symbol;
 
   for(c=base; c; c=c->previous)
-    if (sym == c->iterator->var->symbol) break;
+    if (sym == c->iterator->var->symbol) return SUCCESS;
 
-  if (c == NULL) return FAILURE;
-
-  return SUCCESS;
+  return FAILURE;
 }
 
 
@@ -1036,6 +1034,25 @@ iterator_stack *p;
 }
 
 
+/* expand_expr()-- Expand an expression with that is inside of a
+ * constructor, recursing into other constructors if present. */
+
+static try expand_expr(g95_expr *e) {
+
+  if (e->expr_type == EXPR_ARRAY)
+    return expand_constructor(e->value.constructor.head);
+
+  e = g95_copy_expr(e);
+
+  if (g95_simplify_expr(e, 1) == FAILURE) {
+    g95_free_expr(e);
+    return FAILURE;
+  }
+
+  return expand_work_function(e);
+}
+
+
 static try expand_iterator(g95_constructor *c) {
 g95_expr *start, *end, *step;
 iterator_stack frame;
@@ -1085,8 +1102,7 @@ try t;
   iter_stack = &frame;
 
   while(mpz_sgn(trip) > 0) {
-    if (expand_constructor(c->expr->value.constructor.head) == FAILURE)
-      goto cleanup;
+    if (expand_expr(c->expr) == FAILURE) goto cleanup;
 
     mpz_add(frame.value, frame.value, step->value.integer);
     mpz_sub_ui(trip, trip, 1);

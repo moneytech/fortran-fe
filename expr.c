@@ -424,13 +424,21 @@ int g95_kind_max(g95_expr *e1, g95_expr *e2) {
 }
 
 
+/* numeric_type()-- Returns nonzero if the type is numeric, zero
+ * otherwise */
+
+static int numeric_type(bt type) {
+
+  return type == BT_COMPLEX || type == BT_REAL || type == BT_INTEGER;
+}
+
+
 /* g95_numeric_ts()-- Returns nonzero if the typespec is a numeric
  * type, zero otherwise. */
 
 int g95_numeric_ts(g95_typespec *ts) {
 
-  return (ts->type == BT_COMPLEX || ts->type == BT_REAL ||
-	  ts->type == BT_INTEGER);
+  return numeric_type(ts->type);
 }
 
 
@@ -910,6 +918,19 @@ g95_actual_arglist *ap;
 }
 
 
+/* et0()-- Returns the type of an expression with the exception that
+ * iterator variables are automatically integers no matter what else
+ * they may be declared as. */
+
+static bt et0(g95_expr *e) {
+
+  if (e->expr_type == EXPR_VARIABLE && g95_check_iter_variable(e) == SUCCESS)
+    return BT_INTEGER;
+
+  return e->ts.type;
+}
+
+
 /* check_intrinsic_op()-- Check an intrinsic arithmetic operation to
  * see if it is consistent with some type of expression. */
 
@@ -922,7 +943,7 @@ static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
   switch(e->operator) {
   case INTRINSIC_UPLUS:
   case INTRINSIC_UMINUS:
-    if (!g95_numeric_ts(&e->op1->ts)) goto not_numeric;
+    if (!numeric_type(et0(e->op1))) goto not_numeric;
     break;
 
   case INTRINSIC_EQ:  case INTRINSIC_NE:  case INTRINSIC_GT:
@@ -932,13 +953,12 @@ static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
   case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:
     if ((*check_function)(e->op2) == FAILURE) return FAILURE;
 
-    if (g95_numeric_ts(&e->op1->ts) == 0 ||
-	g95_numeric_ts(&e->op2->ts) == 0) goto not_numeric;
+    if (!numeric_type(et0(e->op1)) ||
+	!numeric_type(et0(e->op2))) goto not_numeric;
 
     if (e->operator != INTRINSIC_POWER) break;
     
-    if (check_function == check_init_expr &&
-	e->op2->ts.type != BT_INTEGER) {
+    if (check_function == check_init_expr && et0(e->op2) != BT_INTEGER) {
       g95_error("Exponent at %L must be INTEGER for an initialization "
 		"expression", &e->op2->where);
       return FAILURE;
@@ -949,7 +969,7 @@ static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
   case INTRINSIC_CONCAT:
     if ((*check_function)(e->op2) == FAILURE) return FAILURE;
 
-    if (e->op1->ts.type != BT_CHARACTER || e->op2->ts.type != BT_CHARACTER) {
+    if (et0(e->op1) != BT_CHARACTER || et0(e->op2) != BT_CHARACTER) {
       g95_error("Concatenation operator in expression at %L "
 		"must have two CHARACTER operands", &e->op1->where);
       return FAILURE;
@@ -964,7 +984,7 @@ static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
     break;
 
   case INTRINSIC_NOT:
-    if (e->op1->ts.type != BT_LOGICAL) {
+    if (et0(e->op1) != BT_LOGICAL) {
       g95_error(".NOT. operator in expression at %L must have a LOGICAL "
 		"operand", &e->op1->where);
       return FAILURE;
@@ -976,7 +996,7 @@ static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
   case INTRINSIC_EQV:    case INTRINSIC_NEQV:
     if ((*check_function)(e->op2) == FAILURE) return FAILURE;
 
-    if (e->op1->ts.type != BT_LOGICAL || e->op2->ts.type != BT_LOGICAL) {
+    if (et0(e->op1) != BT_LOGICAL || et0(e->op2) != BT_LOGICAL) {
       g95_error("LOGICAL operands are required in expression at %L",
 		&e->where);
       return FAILURE;
