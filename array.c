@@ -394,29 +394,39 @@ int i;
  * the expressions that make up the shape and make sure everything is
  * integral. */
 
-void g95_resolve_array_spec(g95_array_spec *as) {
+try g95_resolve_array_spec(g95_array_spec *as) {
 g95_expr *e;
 int i;
+
+  if (as == NULL) return SUCCESS;
 
   for(i=0; i<as->rank; i++) {
     e = as->lower[i];
 
     if (e != NULL) {
       g95_resolve_expr(e);
-      if (e->ts.type != BT_INTEGER)
-	g95_error("Array specification at %L must be of INTEGER type",
-		  &e->where);
+      if (e->ts.type != BT_INTEGER) goto non_integral;
+      if (e->rank != 0) goto non_scalar;
     }
 
     e = as->upper[i];
 
     if (e != NULL) {
       g95_resolve_expr(e);
-      if (e->ts.type != BT_INTEGER)
-	g95_error("Array specification at %L must be of INTEGER type",
-		  &e->where);
+      if (e->ts.type != BT_INTEGER) goto non_integral;
+      if (e->rank != 0) goto non_scalar;
     }
   }
+
+  return SUCCESS;
+
+ non_integral:
+  g95_error("Array specification at %L must be of INTEGER type", &e->where);
+  return FAILURE;
+
+ non_scalar:
+  g95_error("Array specfication at %L must be scalar", &e->where);
+  return FAILURE;
 }
 
 

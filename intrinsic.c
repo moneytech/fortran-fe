@@ -32,8 +32,6 @@ Boston, MA 02111-1307, USA.  */
 #include "intrinsic.h"
 
 
-static char *lib_name;                /* Override a library name */
-
 extern g95_integer_info g95_integer_kinds[];
 extern g95_real_info g95_real_kinds[];
 
@@ -1619,8 +1617,7 @@ g95_actual_arglist *arg;
 
   if (specific->resolve == NULL) {
     if (e->value.function.name == NULL)
-      e->value.function.name = (lib_name != NULL)
-	? lib_name : specific->lib_name;
+      e->value.function.name = specific->lib_name;
 
     if (e->ts.type == BT_UNKNOWN) e->ts = specific->ts;
     return;
@@ -1774,7 +1771,6 @@ try t;
 int i;
 
   ap = &expr->value.function.actual;
-  lib_name = NULL;
 
 /* Don't attempt to sort the argument list for min or max */
 

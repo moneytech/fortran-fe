@@ -1076,7 +1076,7 @@ static void resolve_symbol(g95_symbol *sym) {
     return;
   }
 
-  /* Resolve inital values and make sure they are compatible with the
+  /* Resolve initial values and make sure they are compatible with the
    * variable */
 
   if (sym->value != NULL) {
@@ -1103,6 +1103,8 @@ static void resolve_symbol(g95_symbol *sym) {
     g95_error("Symbol at %L is not a DUMMY variable", &sym->declared_at);
     return;
   }
+
+  g95_resolve_array_spec(sym->as);
 }
 
 
