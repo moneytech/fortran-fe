@@ -443,6 +443,11 @@ mpf_t neg, term1, term2, x, xp;
   mpf_add(xp,term1,term2);
   mpf_div_ui(*result,xp,2);
 
+  mpf_clear(neg);
+  mpf_clear(term1);
+  mpf_clear(term2);
+  mpf_clear(x);
+  mpf_clear(xp);
 }
 
 
@@ -464,6 +469,11 @@ mpf_t neg, term1, term2, x, xp;
   mpf_sub(xp,term1,term2);
   mpf_div_ui(*result,xp,2);
 
+  mpf_clear(neg);
+  mpf_clear(term1);
+  mpf_clear(term2);
+  mpf_clear(x);
+  mpf_clear(xp);
 }
 
 
