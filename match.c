@@ -401,12 +401,22 @@ match m;
   m = g95_match(" %e =", &var);
   if (m != MATCH_YES) return MATCH_NO;
 
+  e1 = e2 = e3 = NULL;
+
   if (var->expr_type != EXPR_VARIABLE) {
     g95_error("Loop variable expected for DO loop at %C");
     goto cleanup;
   }
 
-  e1 = e2 = e3 = NULL;
+  if (var->ref != NULL) {
+    g95_error("Loop variable at %C must be a scalar variable");
+    goto cleanup;
+  }
+
+  if (var->symbol->attr.pointer) {
+    g95_error("Loop variable at %C cannot have the POINTER attribute");
+    goto cleanup;
+  }
 
   m = g95_match_expr(&e1);
   if (m == MATCH_NO) goto syntax;
