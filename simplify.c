@@ -2282,6 +2282,7 @@ g95_expr *e;
 
   mpz_init(index);
   rank = 0;
+  head = tail = NULL;
 
   for(;;) {
     e = g95_get_array_element(shape_exp, rank);
@@ -2291,7 +2292,7 @@ g95_expr *e;
       g95_error("Integer too large in shape specification at %L",
 		&e->where);
       g95_free_expr(e);
-      goto done;
+      goto bad_reshape;
     }
 
     g95_free_expr(e);
@@ -2300,12 +2301,12 @@ g95_expr *e;
       g95_error("Too many dimensions in shape specification for RESHAPE "
 		"at %L", &e->where);
 
-      goto done;
+      goto bad_reshape;
     }
 
     if (shape[rank] < 0) {
       g95_error("Shape specification at %L cannot be negative", &e->where);
-      goto done;
+      goto bad_reshape;
     }
 
     rank++;
@@ -2314,7 +2315,7 @@ g95_expr *e;
   if (rank == 0) {
     g95_error("Shape specification at %L cannot be the null array",
 	      &shape_exp->where);
-    goto done;
+    goto bad_reshape;
   }
 
   /* Now unpack the order array if present */
@@ -2333,13 +2334,13 @@ g95_expr *e;
       if (e == NULL) {
 	g95_error("ORDER parameter of RESHAPE at %L is not the same size "
 		  "as SHAPE parameter", &e->where);
-	goto done;
+	goto bad_reshape;
       }
 
       if (g95_extract_int(e, &order[i]) != NULL) {
 	g95_error("Error in ORDER parameter of RESHAPE at %L", &e->where);
 	g95_free_expr(e);
-	goto done;
+	goto bad_reshape;
       }
 
       g95_free_expr(e);
@@ -2347,14 +2348,14 @@ g95_expr *e;
       if (order[i] < 1 || order[i] > rank) {
 	g95_error("ORDER parameter of RESHAPE at %L is out of range",
 		  &e->where);
-	goto done;
+	goto bad_reshape;
       }
 
       order[i]--;
 
       if (x[order[i]]) {
 	g95_error("Invalid permutation in ORDER parameter at %L", &e->where);
-	goto done;
+	goto bad_reshape;
       }
 
       x[order[i]] = 1;
@@ -2374,8 +2375,6 @@ g95_expr *e;
   nsource = mpz_get_ui(size);
   mpz_clear(size);
 
-  head = tail = NULL;
-
   /* If it weren't for that pesky permutation we could just loop
    * through the source and round out any shortage with pad elements.
    * But no, someone just had to have the compiler do something the
@@ -2394,7 +2393,7 @@ g95_expr *e;
 
     if (mpz_cmp_ui(index, INT_MAX) > 0) {
       g95_internal_error("Reshaped array too large at %L", &e->where);
-      goto done;
+      goto bad_reshape;
     }
 
     j = mpz_get_ui(index);
@@ -2407,7 +2406,7 @@ g95_expr *e;
       if (npad == 0) {
 	g95_error("PAD parameter required for short SOURCE parameter at %L",
 		  &source->where);
-	goto done;
+	goto bad_reshape;
       }
 
       j = j % npad;
@@ -2420,6 +2419,8 @@ g95_expr *e;
       tail->next = g95_get_constructor();
       tail = tail->next;
     }
+
+    if (e == NULL) goto bad_reshape;
 
     tail->where = e->where;
     tail->expr = e;
@@ -2451,7 +2452,8 @@ g95_expr *e;
 
   return e;
 
-done:
+bad_reshape:
+  g95_free_constructor(head);
   mpz_clear(index);
   return &g95_bad_expr;
 }
