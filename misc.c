@@ -25,6 +25,18 @@ Boston, MA 02111-1307, USA.  */
 #include <string.h>
 #include "g95.h"
 
+static struct 
+{
+  const char *option;
+  const char *description;
+}
+lang_options[] = {
+#include "lang-options.h"
+    { " ", " " } /* Ugly hack to avoid compile error. Will be moved
+                    to driver executable anyway */
+};
+
+
 g95_option_t g95_option;
 
 
@@ -304,33 +316,25 @@ void g95_done_2(void) {
 
 /* display_help()-- Display help message and exit */
 
+#define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
+
 static void display_help(void) {
+int i;
 
   g95_status("GNU Fortran 95 Compiler " VERSION
-	     " (C) 2000-2001 Free Software Foundation\n"
+    " (C) 2000-2001 Free Software Foundation\n"
     "Compiled " __DATE__ " " __TIME__ "\n\n"
     "Usage: g95 [options] file\n"
-    "Options:\n"
-    "  --help                  Display this information\n"
-    "  -v                      Output namespace and code structures\n"
-    "  -Wline-truncation       Warn about truncated source lines\n"
-    "  -F                      Parse an F program\n"
-    "  -ffixed-line-length-80  80 character line width in fixed mode\n"
-    "  -fdollar-ok             Allow dollar signs in entity names\n"
-    "  -ffree-form             Assume that the source file is free form\n"
-    "  -ffixed-form            Assume that the source file is fixed form\n"
-    "  -fqkind=<n>             Set the kind for a real with the 'q' exponent\n"
-    "  -i8                     Set the default integer kind to double precision\n"
-    "  -pedantic               Warn about use of non-standard features\n"
-    "  -r                      Run the resolution phase\n"
-    "  -r8                     Set the default real kind to double precision\n"
-    "  -I[directory]           Append directory to the include/module\n"
-    "                          file search path\n"
-    "  -M[directory]           put generated module files in directory,\n"
-    "                          search there for modules\n"
-    "\n"
-    "See http://g95.sourceforge.net for more information.\n");
+    "Options:\n");
 
+
+  if (ARRAY_SIZE (lang_options) > 0) {
+    for (i = 0; i < ARRAY_SIZE (lang_options); i++) {
+      printf ("  %-23.23s %s\n", lang_options[i].option, lang_options[i].description);
+    }
+  }
+
+  g95_status("\nSee http://g95.sourceforge.net for more information.\n");
   exit(0);
 }
 
