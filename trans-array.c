@@ -3552,8 +3552,11 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
                 }
               else
                 {
-                  start = info->start[n];
-                  /* We will reuse this.  */
+                  /* Check we haven't somehow got out of sync.  */
+                  assert (info->dim[dim] == n);
+
+                  /* Evaluate and remember the start of the section.  */
+                  start = info->start[dim];
                   stride = g95_evaluate_now (stride, &loop.pre);
                 }
 
@@ -3567,9 +3570,6 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
                   /* For elemental dimensions, we only need the offset.  */
                   continue;
                 }
-
-              /* Check we haven't somehow got out of sync.  */
-              assert (info->dim[dim] == n);
 
               /* Vector subscripts need copying and are handled elsewhere.  */
               assert (info->ref->u.ar.dimen_type[n] == DIMEN_RANGE);
@@ -3585,7 +3585,7 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
               /* Multiply the stride by the section stride to get the
                  total stride.  */
               stride = fold (build (MULT_EXPR, g95_array_index_type, stride,
-                             info->stride[n]));
+                             info->stride[dim]));
               tmp = g95_conv_descriptor_stride (parm, g95_rank_cst[dim]);
               g95_add_modify_expr (&loop.pre, tmp, stride);
 

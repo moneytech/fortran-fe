@@ -92,6 +92,7 @@ g95_trans_call (g95_code *code)
       sym = *psym;
       psym = &sym;
       strcpy (psym->name, code->sub_name);
+      psym->backend_decl = NULL_TREE;
     }
 
   g95_conv_function_call (&se, psym, code->ext.actual);

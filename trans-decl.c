@@ -1548,7 +1548,7 @@ g95_generate_function_code (g95_namespace * ns)
 
     fnbody = DECL_SAVED_TREE (fndecl);
 
-    dump_file = dump_begin (TDI_simple, &dump_flags);
+    dump_file = dump_begin (TDI_original, &dump_flags);
     if (dump_file)
       {
         fprintf (dump_file, "%s()\n", ns->proc_name->name);
@@ -1560,7 +1560,7 @@ g95_generate_function_code (g95_namespace * ns)
               print_c_tree (dump_file, fnbody);
           }
         fprintf (dump_file, "\n");
-        dump_end (TDI_simple, dump_file);
+        dump_end (TDI_original, dump_file);
       }
   }
 

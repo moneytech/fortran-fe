@@ -68,7 +68,9 @@ typedef struct g95_se
    creating the scalarization loops. Then passed as part of a g95_se structure
    to translate the expression inside the loop.  Note that these chains are
    terminated by g95_se_terminator, not NULL.  A NULL pointer in a g95_se
-   indicates to g95_conv_* that this is a scalar expression.  */
+   indicates to g95_conv_* that this is a scalar expression.
+   Note that some member arrays correspond to scalarizer rank and others
+   are variable rank.  */
 typedef struct g95_ss_info
 {
   int dimen;
@@ -82,15 +84,17 @@ typedef struct g95_ss_info
   /* To move some of the array index calculation out of the innermost loop.  */
   tree offset;
   tree stride0;
-  /* Holds the SS for a subscript.  */
+  /* Holds the SS for a subscript.  Indexed by actual dimension.  */
   struct g95_ss *subscript[G95_MAX_DIMENSIONS];
-  /* stride and delta are used to acces this inside a scalarization loop.
-     start is used in the calculation of these.  */
+  /* stride and delta are used to access this inside a scalarization loop.
+     start is used in the calculation of these.  Indexed by scalarizer
+     dimension.  */
   tree start[G95_MAX_DIMENSIONS];
   tree stride[G95_MAX_DIMENSIONS];
   tree delta[G95_MAX_DIMENSIONS];
 
-  /* Translation from scalariser dimensions to actual dimensions.  */
+  /* Translation from scalariser dimensions to actual dimensions.
+      actual = dim[scalarizer]  */
   int dim[G95_MAX_DIMENSIONS];
 } g95_ss_info;
 
