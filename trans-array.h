@@ -95,7 +95,7 @@ int g95_can_put_var_on_stack (tree);
 /* Build expressions for accessing components of an array descriptor.  */
 tree g95_conv_descriptor_data (tree);
 tree g95_conv_descriptor_base (tree);
-tree g95_conv_descriptor_rank (tree);
+tree g95_conv_descriptor_dtype (tree);
 tree g95_conv_descriptor_stride (tree, tree);
 tree g95_conv_descriptor_lbound (tree, tree);
 tree g95_conv_descriptor_ubound (tree, tree);

@@ -162,7 +162,7 @@ g95_descriptor_data_type (tree desc)
 
 #define DATA_FIELD 0
 #define BASE_FIELD 1
-#define RANK_FIELD 2
+#define DTYPE_FIELD 2
 #define DIMENSION_FIELD 3
 #define STRIDE_SUBFIELD 0
 #define LBOUND_SUBFIELD 1
@@ -204,7 +204,7 @@ g95_conv_descriptor_base (tree desc)
 }
 
 tree
-g95_conv_descriptor_rank (tree desc)
+g95_conv_descriptor_dtype (tree desc)
 {
   tree field;
   tree type;
@@ -212,7 +212,7 @@ g95_conv_descriptor_rank (tree desc)
   type = TREE_TYPE (desc);
   assert (G95_DESCRIPTOR_TYPE_P (type));
 
-  field = g95_advance_chain (TYPE_FIELDS (type), RANK_FIELD);
+  field = g95_advance_chain (TYPE_FIELDS (type), DTYPE_FIELD);
   assert (field != NULL_TREE
           && TREE_TYPE (field) == g95_array_index_type);
 
@@ -593,9 +593,10 @@ g95_trans_allocate_temp_array (g95_loopinfo * loop, g95_ss_info * info,
   sizevar = NULL_TREE;
   size = integer_one_node;
 
-  /* Fill in the array rank.  */
-  tmp = g95_conv_descriptor_rank (desc);
-  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, g95_rank_cst[info->dimen]);
+  /* Fill in the array dtype.  */
+  tmp = g95_conv_descriptor_dtype (desc);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
+               G95_TYPE_DESCRIPTOR_DTYPE (TREE_TYPE (desc)));
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_pre (loop, stmt, stmt);
 
@@ -2553,9 +2554,10 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
   offsetvar = NULL_TREE;
   offset = integer_zero_node;
 
-  /* Set the rank.  */
-  tmp = g95_conv_descriptor_rank (descriptor);
-  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, g95_rank_cst[rank]);
+  /* Set the dtype.  */
+  tmp = g95_conv_descriptor_dtype (descriptor);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
+               G95_TYPE_DESCRIPTOR_DTYPE (TREE_TYPE (descriptor)));
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_list (phead, ptail, stmt, stmt);
 
@@ -3098,9 +3100,10 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
   else
     needpack = packedvar = NULL_TREE;
 
-  /* Set the rank.  */
-  tmp = g95_conv_descriptor_rank (tmpdesc);
-  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, g95_rank_cst[sym->as->rank]);
+  /* Set the dtype.  */
+  tmp = g95_conv_descriptor_dtype (tmpdesc);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
+               G95_TYPE_DESCRIPTOR_DTYPE(TREE_TYPE (tmpdesc)));
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_list (&head, &tail, stmt, stmt);
   oldstride = create_tmp_var (g95_array_index_type, "stride");
@@ -3686,10 +3689,10 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
              We don't have to worry about numeric overflows when calculating
              the offsets because all elements are within the array data.  */
 
-          /* Set the Rank.  */
-          tmp = g95_conv_descriptor_rank (parm);
+          /* Set the dtype.  */
+          tmp = g95_conv_descriptor_dtype (parm);
           tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
-                       g95_rank_cst[info->ref->u.ar.dimen]);
+                       G95_TYPE_DESCRIPTOR_DTYPE (parmtype));
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_pre (&loop, stmt, stmt);
 

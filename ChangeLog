@@ -1,3 +1,9 @@
+2002-09-08  Paul Brook  <paul@nowt.org>
+
+	* trans-types.c: Change rank field to dtype field in array descriptor.
+	* trans-array.c: Implement filling of dtype array descriptor field.
+	* trans-intrinsic.c: Fix broken LEN intrinsic.
+
 2002-09-07  Paul Brook  <paul@nowt.org>
 
 	* trans-intrinsic.c: Remove outdated todo intrinsic list.

@@ -59,6 +59,8 @@ tree ppvoid_type_node;
 tree pchar_type_node;
 static GTY(()) tree g95_desc_dim_type = NULL;
 
+static unsigned HOST_WIDE_INT g95_max_array_element_size;
+
 /* Create the backend type nodes. We map them to their
    equivalent C type, at least for now.  We also give
    names to the types here, and we push them in the
@@ -66,6 +68,8 @@ static GTY(()) tree g95_desc_dim_type = NULL;
 void
 g95_init_types (void)
 {
+  unsigned HOST_WIDE_INT n;
+
   /* Name the types.  */
 #define PUSH_TYPE(name, node) \
   pushdecl (build_decl (TYPE_DECL, get_identifier (name), node))
@@ -134,6 +138,13 @@ g95_init_types (void)
 
   g95_array_index_kind = TYPE_PRECISION (integer_type_node) / 8;
   g95_array_index_type = g95_get_int_type (g95_array_index_kind);
+
+
+  n = TREE_INT_CST_LOW (TYPE_SIZE (g95_array_index_type));
+  if (n > sizeof(HOST_WIDE_INT) * 8)
+    n = sizeof(HOST_WIDE_INT) * 8;
+  n += G95_DTYPE_SIZE_SHIFT;
+  g95_max_array_element_size = (~(unsigned HOST_WIDE_INT)0) >> n;
 }
 
 /* Get a type node for an integer kind */
@@ -345,7 +356,7 @@ g95_get_stack_array_type (tree size)
     {
       array *data
       array *base;
-      index rank;
+      index dtype;
       struct descriptor_dimension dimension[N_DIM];
     }
 
@@ -360,7 +371,13 @@ g95_get_stack_array_type (tree size)
    the descriptor directly.
 
    This is represented internaly as a RECORD_TYPE. The index nodes are
-   g95_array_index_type and the data node is a pointer to the data.
+   g95_array_index_type and the data node is a pointer to the data. See below
+   for the handling of character types.
+
+   The dtype member is formatted as follows:
+    rank = dtype & G95_DTYPE_RANK_MASK // 3 bits
+    type = (dtype & G95_DTYPE_TYPE_MASK) >> G95_DTYPE_TYPE_SHIFT // 3 bits
+    size = dtype >> G95_DTYPE_SIZE_SHIFT
 
    I originaly used nested ARRAY_TYPE nodes to represent arrays, but this
    generated poor code for assumed/deferred size arrays.  These require
@@ -499,6 +516,57 @@ g95_get_desc_dim_type (void)
   g95_desc_dim_type = type;
   return type;
 }
+
+static tree
+g95_get_dtype_cst (tree type, int rank)
+{
+  tree size;
+  int n;
+
+  if (G95_DESCRIPTOR_TYPE_P (type))
+    return (G95_TYPE_DESCRIPTOR_DTYPE(type));
+
+  /* TODO: Correctly identify LOGICAL types.  */
+  switch (TREE_CODE (type))
+    {
+    case INTEGER_TYPE:
+      n = G95_DTYPE_INTEGER;
+      break;
+
+    case REAL_TYPE:
+      n = G95_DTYPE_REAL;
+      break;
+
+    case COMPLEX_TYPE:
+      n = G95_DTYPE_COMPLEX;
+      break;
+
+    case RECORD_TYPE:
+      /* Array descriptors have already been dealt with.  */
+      n = G95_DTYPE_DERIVED;
+      break;
+
+    case POINTER_TYPE:
+      n = G95_DTYPE_CHARACTER;
+      break;
+
+    default:
+      abort ();
+    }
+
+  size = TYPE_SIZE_UNIT (type);
+  assert (INTEGER_CST_P (size));
+  assert (TREE_INT_CST_HIGH (size) == 0);
+  assert (rank < G95_DTYPE_RANK_MASK);
+  if (TREE_INT_CST_LOW (size) > g95_max_array_element_size)
+    internal_error ("Array elemnt size too big");
+
+  n = rank |
+      (n << G95_DTYPE_TYPE_SHIFT) |
+      (TREE_INT_CST_LOW (size) << G95_DTYPE_SIZE_SHIFT);
+
+  return build_int_2 (n, 0);
+}
 
 /* Build an array (descriptor) type with given bounds.  */
 /* TODO: remember and reuse array types.  */
@@ -524,6 +592,7 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
   TYPE_LANG_SPECIFIC (fat_type) = (struct lang_type *)
     ggc_alloc_cleared (sizeof (struct lang_type));
   G95_TYPE_DESCRIPTOR_RANK (fat_type) = dimen;
+  G95_TYPE_DESCRIPTOR_DTYPE (fat_type) = g95_get_dtype_cst (etype, dimen);
 
   tmp = TYPE_NAME (etype);
   if (tmp && TREE_CODE (tmp) == TYPE_DECL)
@@ -604,8 +673,8 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
   DECL_CONTEXT (decl) = fat_type;
   fieldlist = chainon (fieldlist, decl);
 
-  /* Add the rank component.  */
-  decl = build_decl (FIELD_DECL, get_identifier ("rank"),
+  /* Add the dtype component.  */
+  decl = build_decl (FIELD_DECL, get_identifier ("dtype"),
                      g95_array_index_type);
   DECL_CONTEXT (decl) = fat_type;
   fieldlist = chainon (fieldlist, decl);

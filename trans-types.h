@@ -23,6 +23,23 @@ enum
   NUM_F95_TYPES
 };
 
+#define G95_DTYPE_RANK_MASK 0x07
+#define G95_DTYPE_TYPE_SHIFT 3
+#define G95_DTYPE_TYPE_MASK 0x38
+#define G95_DTYPE_SIZE_SHIFT 6
+
+enum
+{
+  G95_DTYPE_UNKNOWN = 0,
+  G95_DTYPE_INTEGER,
+  /* TODO: recognize logical types.  */
+  G95_DTYPE_LOGICAL,
+  G95_DTYPE_REAL,
+  G95_DTYPE_COMPLEX,
+  G95_DTYPE_DERIVED,
+  G95_DTYPE_CHARACTER
+};
+
 extern GTY(()) tree g95_type_nodes[NUM_F95_TYPES];
 
 extern int g95_array_index_kind;

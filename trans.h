@@ -364,6 +364,7 @@ struct lang_type GTY (())
   tree ubound[G95_MAX_DIMENSIONS];
   tree stride[G95_MAX_DIMENSIONS];
   tree size;
+  tree dtype;
 };
 
 /* String nodes only.  */
@@ -390,6 +391,7 @@ struct lang_decl GTY (())
   (TYPE_LANG_SPECIFIC(node)->stride[dim])
 #define G95_TYPE_DESCRIPTOR_RANK(node) (TYPE_LANG_SPECIFIC(node)->rank)
 #define G95_TYPE_DESCRIPTOR_SIZE(node) (TYPE_LANG_SPECIFIC(node)->size)
+#define G95_TYPE_DESCRIPTOR_DTYPE(node) (TYPE_LANG_SPECIFIC(node)->dtype)
 
 /* I changed this from sorry(...) because it should not return.  */
 /* TODO: Remove g95_todo_error before releasing g95.  */

@@ -1199,7 +1199,7 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   g95_conv_function_val (se, sym);
   fntype =TREE_TYPE (TREE_TYPE (se->expr));
   se->expr = build (CALL_EXPR, TREE_TYPE (fntype), se->expr, arglist);
-    
+
 
   if (! sym->attr.pure)
     TREE_SIDE_EFFECTS (se->expr) = 1;

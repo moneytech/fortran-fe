@@ -1591,18 +1591,40 @@ g95_conv_intrinsic_len (g95_se * se, g95_expr * expr)
 {
   tree len;
   tree type;
+  tree decl;
   g95_se argse;
+  g95_expr *arg;
 
   assert (!se->ss);
 
-  g95_init_se (&argse, se);
-  g95_conv_simple_rhs (&argse, expr);
-  g95_add_stmt_to_pre (se, argse.pre, argse.pre_tail);
-  g95_add_stmt_to_post (se, argse.post, argse.post_tail);
-  len = argse.string_length;
+  arg = expr->value.function.actual->expr;
 
   type = g95_typenode_for_spec (&expr->ts);
-  se->expr = g95_simple_convert (type, len);
+  switch (arg->expr_type)
+    {
+    case EXPR_VARIABLE:
+      decl = g95_get_symbol_decl (arg->symbol);
+      assert (G95_DECL_STRING (decl));
+      len = G95_DECL_STRING_LENGTH (decl);
+      assert (len);
+      se->expr = g95_simple_convert (type, len);
+      break;
+
+    case EXPR_CONSTANT:
+      decl = build_int_2 (arg->value.character.length, 0);
+      break;
+
+    default:
+      /* Anybody stupid enough to do this deserves everything they get.  */
+      g95_init_se (&argse, se);
+      g95_conv_simple_rhs (&argse, expr->value.function.actual->expr);
+      g95_add_stmt_to_pre (se, argse.pre, argse.pre_tail);
+      g95_add_stmt_to_post (se, argse.post, argse.post_tail);
+      len = argse.string_length;
+
+      se->expr = g95_simple_convert (type, len);
+      break;
+    }
 }
 
 /* The length of a character string not including trailing blanks.  */
