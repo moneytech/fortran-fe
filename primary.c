@@ -1244,6 +1244,40 @@ cleanup:
 }
 
 
+/* expression_rank()-- Given an expression node of type
+ * EXPR_VARIABLE, compute the rank of the expression by examining the
+ * base symbol and any reference structures it may have. */
+
+int expression_rank(g95_expr *e) {
+g95_ref *ref;
+int i, rank;
+
+  if (e->ref == NULL)
+    return (e->symbol->as == NULL) ? 0 : e->symbol->as->rank;
+
+  rank = 0;
+
+  for(ref=e->ref; ref; ref=ref->next) {
+    if (ref->type != REF_ARRAY) continue;
+
+    if (ref->ar.type == AR_FULL) {
+      rank = e->symbol->as->rank;
+      break;
+    }
+
+    if (ref->ar.type == AR_SECTION) { /* Figure out the rank of the section */
+      for(i=0; i<G95_MAX_DIMENSIONS; i++)
+	if (ref->ar.end[i] != NULL) rank++;
+
+      break;
+    }
+  }
+
+  return rank;
+}
+
+
+
 /* match_varspec()-- Match any additional specifications associated
  * with the current variable like member references or substrings. */
 
@@ -1275,7 +1309,7 @@ match m;
   sym = sym->ts.derived;
 
   for(;;) {
-    m = g95_match(" %n", name);
+    m = g95_match_name(name);
     if (m == MATCH_NO) g95_error("Expected structure component name at %C");
     if (m != MATCH_YES) return MATCH_ERROR;
 
@@ -1323,6 +1357,7 @@ check_substring:
     }
   }
 
+  primary->rank = expression_rank(primary);
   return MATCH_YES;
 }
 
@@ -1492,9 +1527,7 @@ match m;
     e = g95_get_expr();
 
     e->expr_type = EXPR_VARIABLE;
-    if (sym->as != NULL) e->rank = sym->as->rank;
     e->symbol = sym;
-
     m = match_varspec(e, 0);
     break;
 
@@ -1717,10 +1750,8 @@ match g95_match_variable(g95_expr **result, int equiv_flag) {
 g95_state_data *st;
 g95_symbol *sym;
 g95_expr *expr;
-g95_ref *ref;
 locus where;
 match m;
-int i;
 
   m = g95_match_symbol(&sym);
   if (m != MATCH_YES) return m;
@@ -1763,25 +1794,6 @@ int i;
   if (m != MATCH_YES) {
     g95_free_expr(expr);
     return m;
-  }
-
-/* Follow the reference list to see if there is an array section
- * somewhere in it all (there can be only one) */
-
-  for(ref=expr->ref; ref; ref=ref->next) {
-    if (ref->type != REF_ARRAY) continue;
-
-    if (ref->ar.type == AR_FULL) {
-      expr->rank = sym->as->rank;
-      break;
-    }
-
-    if (ref->ar.type == AR_SECTION) { /* Figure out the rank of the section */
-      for(i=0; i<G95_MAX_DIMENSIONS; i++)
-	if (ref->ar.end[i] != NULL) expr->rank++;
-
-      break;
-    }
   }
 
   *result = expr;
