@@ -675,7 +675,7 @@ error:
 }
 
 
-/* g95_free_constructor()-- Free a chains of g95_constructor structures */
+/* g95_free_constructor()-- Free chains of g95_constructor structures */
 
 void g95_free_constructor(g95_constructor *p) {
 g95_constructor *next;
@@ -756,6 +756,64 @@ cleanup:
 }
 
 
+/* check_constructor_type()-- Given an expression, compare it's type
+ * with the type of the constructor.  Returns nonzero if an error was
+ * issued.  The cons_state variable keeps track of whether the type of
+ * the constructor being read or resolved is known to be good, bad or
+ * just starting out. */
+
+static g95_typespec constructor_ts;
+static enum { CONS_START, CONS_GOOD, CONS_BAD } cons_state;
+
+static int check_constructor_type(g95_expr *expr) {
+
+  if (cons_state == CONS_BAD) return 0;  /* Supress further errors */
+
+  if (cons_state == CONS_START) {
+    if (expr->ts.type == BT_UNKNOWN)
+      cons_state = CONS_BAD;
+    else {
+      cons_state = CONS_GOOD;
+      constructor_ts = expr->ts;
+    }
+
+    return 0;
+  }
+
+  if (constructor_ts.type != expr->ts.type) {
+    g95_error("Element in %s array constructor at %L is %s",
+	      g95_typename(constructor_ts.type), &expr->where,
+	      g95_typename(expr->ts.type));
+
+    cons_state = CONS_BAD;
+    return 1;
+  }
+
+  if (constructor_ts.type == BT_DERIVED) {
+    if (constructor_ts.derived == expr->ts.derived) return 0;
+
+    g95_error("Element in DERIVED %s array constructor at %L is "
+	      "DERIVED %s", constructor_ts.derived->name, &expr->where,
+	      expr->ts.derived->name);
+
+    cons_state = CONS_BAD;
+    return 1;
+  }
+
+  if (constructor_ts.kind != expr->ts.kind) {
+    g95_error("Element in %s kind %d array constructor at %L is "
+	      "%s kind %d", g95_typename(constructor_ts.type),
+	      constructor_ts.kind, &expr->where,
+	      g95_typename(expr->ts.type), expr->ts.kind);
+
+    cons_state = CONS_BAD;
+    return 1;
+  }
+
+  return 0;
+}
+
+
 /* match_array_cons_element()-- match a single element of an array
  * constructor, which can be a single expression or a list of
  * elements. */
@@ -770,6 +828,11 @@ match m;
 
   m = g95_match_expr(&expr);
   if (m != MATCH_YES) return m;
+
+  if (check_constructor_type(expr)) {
+    g95_free_expr(expr);
+    return MATCH_ERROR;
+  }
 
   p = g95_get_constructor();
   p->expr = expr;
@@ -791,6 +854,8 @@ match m;
 
   where = *g95_current_locus();
   head = NULL;
+
+  cons_state = CONS_START;
 
   if (g95_match(" /)") == MATCH_YES) goto empty;   /* Special case */
 
@@ -819,6 +884,8 @@ empty:
   expr->value.constructor = head;
   expr->where = where;
 
+  if (cons_state == CONS_GOOD) expr->ts = constructor_ts;
+
   *result = expr;
   return MATCH_YES;
 
@@ -834,13 +901,13 @@ cleanup:
 /* resolve_array_list()-- Recursive array list resolution function.
  * All of the elements must be of the same type. */
 
-static try resolve_array_list(g95_constructor *p, g95_typespec *ts) {
+static try resolve_array_list(g95_constructor *p) {
 try t;
 
   for(;p ;p=p->next) {
 
     if (p->child != NULL) {
-      if (resolve_array_list(p->child, ts) == FAILURE) t = FAILURE;
+      if (resolve_array_list(p->child) == FAILURE) t = FAILURE;
       if (g95_resolve_iterator(p->iter) == FAILURE) t = FAILURE;
     }
 
@@ -851,38 +918,7 @@ try t;
       continue;
     }
 
-    if (ts->type == BT_UNKNOWN) {  /* First element of constructor */
-      *ts = p->expr->ts;
-      continue;
-    }
-
-    if (ts->type != p->expr->ts.type) {
-      g95_error("Element in %s array constructor at %L is %s",
-		g95_typename(ts->type), &p->expr->where,
-		g95_typename(p->expr->ts.type));
-
-      t = FAILURE;
-      continue;
-    }
-
-    if (ts->type == BT_DERIVED) {
-      if (ts->derived != p->expr->ts.derived) {
-	g95_error("Element in DERIVED %s array constructor at %L is "
-		  "DERIVED %s", ts->derived->name, &p->expr->where,
-		  p->expr->ts.derived->name);
-
-	t = FAILURE;
-      }
-    } else {
-
-      if (ts->kind != p->expr->ts.kind) {
-	g95_error("Element in %s kind %d array constructor at %L is "
-		  "%s kind %d", g95_typename(ts->type), ts->kind,
-		  &p->expr->where,
-		  g95_typename(p->expr->ts.type), p->expr->ts.kind);
-	t = FAILURE;
-      }
-    }
+    if (check_constructor_type(p->expr)) t = FAILURE;
   }
 
   return t;
@@ -893,15 +929,15 @@ try t;
  * an array list.  TODO: String lengths. */
 
 try g95_resolve_array_constructor(g95_expr *expr) {
-g95_typespec ts;
 try t;
 
-  ts.type = BT_UNKNOWN;
-  ts.kind = 0;
+  constructor_ts.type = BT_UNKNOWN;
+  constructor_ts.kind = 0;
+  constructor_ts.derived = NULL;
 
-  t = resolve_array_list(expr->value.constructor, &ts);
+  t = resolve_array_list(expr->value.constructor);
 
-  expr->ts = ts;
+  if (cons_state == CONS_GOOD) expr->ts = constructor_ts;
   expr->expr_type = EXPR_ARRAY;
 
   return t;

@@ -189,12 +189,6 @@ g95_expr *init;
     }
   } else {
     if (g95_check_assign_symbol(sym, init) == FAILURE) return FAILURE;
-  
-    if (init->expr_type != EXPR_CONSTANT) {
-      g95_error("Initialization value must be constant for symbol at %L",
-		var_locus);
-      return FAILURE;
-    }
 
     sym->value = init;
     *initp = NULL;
