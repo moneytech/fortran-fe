@@ -2224,21 +2224,8 @@ static void set_sym_defaults(g95_symbol *sym) {
 
   if (sym->ts.type != BT_UNKNOWN) return;
 
-  switch(sym->attr.flavor) {
-  case FL_VARIABLE:
-  case FL_PARAMETER:
-    break;
-
-  case FL_PROCEDURE:
-    if (sym->attr.function) break;
-
-    /* Fall through */
-
-  default:
-    return;
-  }
-
-  g95_set_default_type(sym, 0);
+  if (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER)
+    g95_set_default_type(sym, 0);
 }
 
 
