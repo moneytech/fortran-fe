@@ -1498,3 +1498,28 @@ int i;
 
   return result;
 }
+
+
+/* g95_simplify_radix()-- Simplify the RADIX intrinsic */
+
+g95_expr *g95_simplify_radix(bt type, int kind) {
+
+  return g95_int_expr(2);
+}
+
+
+/* g95_simplify_epsilon()-- Simplify the EPSILON intrinsic */
+
+g95_expr *g95_simplify_epsilon(int kind) {
+g95_expr *result;
+int i;
+
+  i = validate_real(kind);
+  if (i == -1) g95_internal_error("g95_simplify_epsilon(): Bad kind");
+
+  result = constant_result(BT_REAL, kind);
+  mpf_init_set(result->value.real, g95_real_kinds[i].epsilon);
+
+  return result;
+}
+

@@ -639,7 +639,8 @@ try g95_add_intrinsic(symbol_attribute *attr, locus *loc) {
   if (attr->dummy) {
     if (g95_add_flavor(attr, FL_DUMMY_PROC, loc) == FAILURE) return FAILURE;
   } else {
-    if (g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+    if (attr->flavor != FL_PROCEDURE &&
+	g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
     attr->scope = SCOPE_INTRINSIC;
   }
 
