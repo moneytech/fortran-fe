@@ -1,4 +1,4 @@
-/* Array transtation routines
+/* Array translation routines
    Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
    and Steven Bosscher <s.bosscher@student.tudelft.nl>
@@ -609,9 +609,13 @@ g95_trans_array_constructor_subarray (stmtblock_t * pblock, tree type,
   assert (ss != g95_ss_terminator);
   ss = g95_reverse_ss (ss);
 
-  /* Initialize the loop.  */
+  /* Initialize the scalarizer.  */
   g95_init_loopinfo (&loop);
   g95_add_ss_to_loop (&loop, ss);
+
+  /* Initialize the loop.  */
+  g95_conv_ss_startstride (&loop);
+  g95_conv_loop_setup (&loop);
 
   /* Make the loop body.  */
   g95_mark_ss_chain_used (ss, 1);
@@ -664,7 +668,7 @@ g95_trans_array_constructor_value (stmtblock_t * pblock, tree type,
         {
           /* Array constructors can be nested.  */
           g95_trans_array_constructor_value (&body, type, pointer,
-              c->expr->value.constructor.head, poffset, offsetvar);
+              c->expr->value.constructor, poffset, offsetvar);
         }
       else if (c->expr->rank > 0)
         {
@@ -837,7 +841,7 @@ g95_get_array_cons_size (mpz_t *size, g95_constructor * c)
     {
       if (c->expr->expr_type == EXPR_ARRAY)
         {
-          g95_get_array_cons_size (&len, c->expr->value.constructor.head);
+          g95_get_array_cons_size (&len, c->expr->value.constructor);
           if (mpz_sgn (len) < 0)
             {
               mpz_set (*size, len);
@@ -906,7 +910,7 @@ g95_trans_array_constructor (g95_loopinfo * loop, g95_ss * ss)
   offsetvar = g95_create_var_np (g95_array_index_type, "offset");
   TREE_USED (offsetvar) = 0;
   g95_trans_array_constructor_value (&loop->pre, type,
-      ss->data.info.data, ss->expr->value.constructor.head, &offset,
+      ss->data.info.data, ss->expr->value.constructor, &offset,
       &offsetvar);
 
   if (TREE_USED (offsetvar))
@@ -1608,6 +1612,7 @@ g95_start_scalarized_body (g95_loopinfo * loop, stmtblock_t * pbody)
   g95_start_block (pbody);
 }
 
+/* Finish off a scalarized loop.  Generates the loop code.  */
 static void
 g95_trans_scalarized_loop_end (g95_loopinfo * loop, int n, stmtblock_t * pbody)
 {
@@ -2213,7 +2218,7 @@ g95_conv_loop_setup (g95_loopinfo * loop)
         {
           if (ss->type == G95_SS_CONSTRUCTOR)
             {
-              if (ss->expr->value.constructor.shape)
+              if (ss->expr->shape)
                 {
                   /* The frontend has worked out the size for us.  */
                   loopspec[n] = ss;
@@ -2222,7 +2227,7 @@ g95_conv_loop_setup (g95_loopinfo * loop)
                 {
                   /* Try to figure out the size of the constructior.  */
                   g95_get_array_cons_size (&i,
-                      ss->expr->value.constructor.head);
+                      ss->expr->value.constructor);
                   /* A negative value meens we failed. */
                   if (mpz_sgn (i) > 0)
                     {
@@ -2285,7 +2290,7 @@ g95_conv_loop_setup (g95_loopinfo * loop)
       switch (loopspec[n]->type)
         {
         case G95_SS_CONSTRUCTOR:
-          cshape = loopspec[n]->expr->value.constructor.shape;
+          cshape = loopspec[n]->expr->shape;
           if (cshape)
             {
               mpz_set (i, cshape[n]);
@@ -2627,7 +2632,7 @@ g95_conv_array_initializer (tree type, g95_expr * expr)
 
   list = NULL_TREE;
   /* We assume the frontend already did any expansions and conversions.  */
-  for (c = expr->value.constructor.head; c; c = c->next)
+  for (c = expr->value.constructor; c; c = c->next)
     {
       if (c->iterator)
         {

@@ -1,3 +1,9 @@
+2002-12-12  Paul Brook  <paul@nowt.org>
+
+	* trans-array.c (g95_trans_array_constructor_subarray): Fully
+	initialize the scalarizer.
+	(various): Update to new format of g95_expr->value.constructor.
+
 2002-12-08  Paul Brook  <paul@nowt.org>
 
 	* trans-array.c (g95_put_offset_into_var): New function.
