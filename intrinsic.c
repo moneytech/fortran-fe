@@ -1461,6 +1461,14 @@ static try check_reshape(g95_expr *source, g95_expr *shape,
 }
 
 
+static try check_scale(g95_expr *x, g95_expr *i) {
+
+  if (x->ts.type != BT_REAL || i->ts.type != BT_INTEGER) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_scan(g95_expr *x, g95_expr *y, g95_expr *z) {
 
   if (y == NULL) {
@@ -2449,7 +2457,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("rrspacing", 0, 1, BT_REAL, dr, g95_simplify_rrspacing, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
-  add_sym("scale", 0, 1, BT_REAL, dr, g95_simplify_scale, NULL,
+  add_sym("scale", 0, 1, BT_REAL, dr, g95_simplify_scale, check_scale,
 	  x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
   add_sym("scan", 0, 1, BT_INTEGER, di, g95_simplify_scan, check_scan,

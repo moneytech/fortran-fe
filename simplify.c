@@ -2595,27 +2595,71 @@ int i, p;
 }
 
 
-g95_expr *g95_simplify_scale(g95_expr *x, g95_expr *i) {
-g95_expr *result;
-long exp;
-unsigned long exp2;
+static char *scale_name(int real_kind, int int_kind) {
+static char buffer[20];
+ 
+  sprintf(buffer, "__scale%d_%d", real_kind, int_kind);
+  return buffer;
+}
 
-  if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT)
-    return NULL;
+
+g95_expr *g95_simplify_scale(g95_expr *x, g95_expr *i) {
+int k, neg_flag, power, exp_range;
+mpf_t scale, radix;
+g95_expr *result;
+
+  if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT) {
+    result = g95_build_funcall(NULL, g95_copy_expr(x), g95_copy_expr(i), NULL);
+    result->ts = x->ts;
+    result->where = x->where;
+
+    result->value.function.name =
+      g95_get_string(scale_name(x->ts.kind, i->ts.kind));
+
+    return result;
+  }
 
   result = g95_constant_result(BT_REAL, x->ts.kind);
   result->where = x->where;
 
-  exp = (long) mpz_get_d(i->value.integer);
-
-  if (exp >= 0) {
-    exp2 = (unsigned) exp;
-    mpf_mul_2exp(result->value.real, x->value.real,exp2);
-  } else {
-    exp = -exp;
-    exp2 = (unsigned) exp;
-    mpf_div_2exp(result->value.real, x->value.real,exp2);
+  if (mpf_sgn(x->value.real) == 0) {
+    mpf_set_ui(result->value.real, 0);
+    return result;
   }
+
+  k = g95_validate_kind(BT_REAL, x->ts.kind);
+  exp_range = g95_real_kinds[k].max_exponent - g95_real_kinds[k].min_exponent;
+
+  /* This check filters out values of i that would overflow an int */
+
+  if (mpz_cmp_si(i->value.integer, exp_range+2) > 0 ||
+      mpz_cmp_si(i->value.integer, -exp_range-2) < 0) {
+    g95_error("Result of SCALE overflows its kind at %L", &result->where);
+    return &g95_bad_expr;
+  }
+
+  /* Compute scale = radix ** power */
+
+  power = mpz_get_si(i->value.integer);
+
+  if (power >= 0)
+    neg_flag = 0;
+  else {
+    neg_flag = 1;
+    power = -power;
+  }
+
+  mpf_init_set_ui(radix, g95_real_kinds[k].radix);
+  mpf_init(scale);
+  mpf_pow_ui(scale, radix, power);
+
+  if (neg_flag)
+    mpf_div(result->value.real, x->value.real, scale);
+  else
+    mpf_mul(result->value.real, x->value.real, scale);
+
+  mpf_clear(scale);
+  mpf_clear(radix);
 
   return range_check(result, "SCALE");
 }
@@ -3289,7 +3333,7 @@ int n, limit;
 
 
 void g95_simplify_init_1(void) {
-int i;
+int i, j;
 
   init_pi();
 
@@ -3303,7 +3347,7 @@ int i;
 
   invert_table(ascii_table, xascii_table);
 
-  /* Names of the various dot product subroutines */
+  /* Names of the various DOT_PRODUCT subroutines */
 
   g95_add_string(dot_name(BT_LOGICAL, g95_default_logical_kind()));
 
@@ -3314,6 +3358,13 @@ int i;
     g95_add_string(dot_name(BT_REAL, g95_real_kinds[i].kind));
     g95_add_string(dot_name(BT_COMPLEX, g95_real_kinds[i].kind));
   }
+
+  /* Names of the various forms of the SCALE intrinsic */
+
+  for(i=0; g95_real_kinds[i].kind; i++)
+    for(j=0; g95_integer_kinds[j].kind; j++)
+      g95_add_string(scale_name(g95_real_kinds[i].kind,
+				g95_integer_kinds[j].kind));
 }
 
 
