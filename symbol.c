@@ -987,10 +987,11 @@ try g95_add_procedure(symbol_attribute *attr, procedure_type t, locus *where) {
 
   attr->proc = t;
 
-/* Statement functions are always functions */
+/* Statement functions are always scalar and functions */
 
-  if (t == PROC_ST_FUNCTION && !attr->function &&
-      g95_add_function(attr, where) == FAILURE) return FAILURE;
+  if (t == PROC_ST_FUNCTION &&
+      ((!attr->function && g95_add_function(attr, where) == FAILURE) 
+       || attr->dimension)) return FAILURE;
 
   return check_conflict(attr, where);
 }
