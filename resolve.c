@@ -107,19 +107,17 @@ static void resolve_formal_arglists(g95_namespace *ns) {
 }
 
 
-/* resolve_modproc()-- Resolve module procedure types.  Because module
- * procedures can call one another, function types have to be worked
- * out before any of the contained procedures can be resolved.  If a
- * function in a module procedure doesn't already have a type, the
- * only way it can get one is through an IMPLICIT. */
+/* resolve_contained_functions()-- Resolve contained function types.
+ * Because contained functions can call one another, they have to be
+ * worked out before any of the contained procedures can be resolved.
+ * If a function doesn't already have a type, the only way it can get
+ * one is through an IMPLICIT type or a RESULT variable. */
 
-void resolve_modproc(g95_namespace *ns) {
+void resolve_contained_functions(g95_namespace *ns) {
 g95_symbol *sym_upper, *sym_lower, *result;
 g95_namespace *child;
 
   resolve_formal_arglists(ns);
-
-  if (namespace_kind(ns) != COMP_MODULE) return;
 
   for(child=ns->contained; child; child=child->sibling) {
     if (namespace_kind(child) != COMP_FUNCTION) continue;
@@ -1010,7 +1008,7 @@ g95_charlen *cl;
 
   g95_check_operator_interfaces(ns);
 
-  resolve_modproc(ns);
+  resolve_contained_functions(ns);
 
   g95_traverse_ns(ns, copy_result_type);
 
