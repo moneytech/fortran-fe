@@ -31,8 +31,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-static struct
-{
+static struct {
   char *option;
   char *description;
 }
@@ -342,9 +341,12 @@ void g95_done_2(void) {
 /* display_help()-- Display help message and exit */
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
+#define WO 25
+#define WD 52
 
 static void display_help(void) {
-size_t i;
+int i, lo, ld, pld, no, nd, seennl; 
+const char *co, *cd, *cdp;
 
   g95_status("GNU Fortran 95 Compiler " G95_VERSION
     " (C) 2000-2002 Free Software Foundation\n"
@@ -352,11 +354,65 @@ size_t i;
     "Usage: g95 [options] file\n"
     "Options:\n");
 
+  for(i=0; i<ARRAY_SIZE(lang_options); i++) {
+    no = nd = 0;
+    seennl = 0;
 
-  if (ARRAY_SIZE (lang_options) > 0) {
-    for (i = 0; i < ARRAY_SIZE (lang_options); i++) {
-      printf ("  %-23.23s %s\n", lang_options[i].option, lang_options[i].description);
-    }
+    /* Print options list formatted as 2, WO, 1, WD */
+    do {
+      co = cd = "";
+      if (no >= 0) co = &lang_options[i].option[no];
+
+      if (nd >= 0) {  /* Skip leading blanks */ 
+	for(;;) {
+	  cd = &lang_options[i].description[nd];
+	  if (cd[0] != ' ') break;
+	  nd++;
+	}
+
+	if (seennl) {  /* Skip the first \n if already seen */
+	  nd++;
+	  cd = &lang_options[i].description[nd];
+	  seennl = 0;
+	}
+      }
+
+      lo = strlen(co);
+      ld = strlen(cd);
+      /* print at most WD letters with, if possible, non broken words */
+
+      if ((pld = ld) > WD){
+	pld = WD;
+	/* break on the last non white space */
+	while(cd[pld] != ' ' && pld > 0)
+	  pld--;
+
+	if (pld == 0) pld = WD; /* no white space, just print it all */
+      }
+
+      /* deal with \n */
+
+      if ((cdp = strchr(cd,'\n')) != NULL && (cdp-cd) < pld) {
+	pld = cdp-cd;
+	seennl = 1;
+      }
+
+      g95_status("  %-*.*s %.*s\n", WO, WO, co, pld, cd);
+
+	/* update pointers */
+      if (lo > WO)
+	no += WO;
+      else
+	no = -1;
+
+      if (ld > WD || seennl)
+	nd += pld;
+      else
+	nd = -1;
+
+    } while(no >=0 || nd >=0);
+#undef WO
+#undef WD
   }
 
   g95_status("\nSee http://g95.sourceforge.net for more information.\n");
