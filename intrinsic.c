@@ -872,8 +872,8 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL,    dd, 0, p, BT_REAL,    dd, 0, NULL);
   make_generic("mod");
 
-  add_sym("modulo", 0, BT_INTEGER, di, g95_simplify_modulo, not_ready,
-	  a, BT_INTEGER, di, 0, p, BT_INTEGER, di, 0, NULL);
+  add_sym("modulo", 0, BT_REAL, di, g95_simplify_modulo, NULL,
+	  a, BT_REAL, di, 0, p, BT_REAL, di, 0, NULL);
 
   add_sym("nearest", 0, BT_REAL, dr, g95_simplify_nearest, NULL,
 	  x, BT_REAL, dr, 0, s, BT_REAL, dr, 0, NULL);

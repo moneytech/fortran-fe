@@ -273,7 +273,7 @@ char ch;
   result->value.character.string = g95_getmem(len+1);
 
   for ( count=0, i=0; i<len; ++i ) {
-    ch = *(e->value.character.string + i);
+    ch = e->value.character.string[i];
     if ( ch != ' ' ) break;
     ++count;
   }
@@ -915,35 +915,41 @@ g95_expr *result;
 
 
 g95_expr *g95_simplify_ibclr(g95_expr *x, g95_expr *y) {
-/*g95_expr *result; */
-
-  return NULL; 
-
- /* Second argument must be nonnegative and less than bit_size(i) */
-  /* Not done -- needs bit-size functions 
-
-  if (x->ts.kind != y->ts.kind) {
-    g95_error("KIND of arguments of IBCLR at %L must agree", &x->where);
-    return &g95_bad_expr;
-  }
+g95_expr *result;
+int k, pos;
 
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
 
+/* Second argument must be nonnegative and less than bit_size(i) */
   if (x->ts.type != BT_INTEGER || x->ts.type != BT_INTEGER) {
     g95_error("Arguments of IBCLR at %L must be integer", &x->where);
     return &g95_bad_expr;
   }
 
-  result = g95_constant_result(BT_REAL, e->ts.kind);
+  result = g95_constant_result(BT_REAL, x->ts.kind);
   result->where = x->where;
 
-  return result;
-  */
+  if (g95_extract_int(y, &pos) != NULL || pos < 0 ) {
+    g95_error("Invalid second argument of IBCLR at %L", &y->where);
+    return &g95_bad_expr;
+  }
+
+  k = g95_validate_kind(BT_INTEGER, x->ts.kind);
+
+  if ( pos > g95_integer_kinds[k].bit_size ) {
+    g95_error("Second argument of IBCLR exceeds bit size at %L", &y->where);
+    return &g95_bad_expr;
+  }
+
+  mpz_clrbit(result->value.integer,pos);
+  return range_check(result,"IBCLR");
 }
 
 
 /* simplify_ibits() */
 g95_expr *g95_simplify_ibits(g95_expr *x, g95_expr *y, g95_expr *z) {
+/*g95_expr *result;
+int pos, len; */
 
   return NULL; 
 
@@ -960,33 +966,35 @@ g95_expr *g95_simplify_ibits(g95_expr *x, g95_expr *y, g95_expr *z) {
 }
 
 
-g95_expr *g95_simplify_ibset(g95_expr *e) {
-g95_expr *arg1, *arg2;
+g95_expr *g95_simplify_ibset(g95_expr *x, g95_expr *y) {
+g95_expr *result;
+int k, pos;
 
-  return NULL; 
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
 
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER ) {
-    g95_warning("Arguments of IBSET at %L must be integer",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
-  }
-
-/* Range checking */
 /* Second argument must be nonnegative and less than bit_size(i) */
-
-  if ( g95_compare_expr(arg2, integer_zero) < 0 ) {
-    g95_warning("Last argument of IBSET at %L must be nonnegative",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (x->ts.type != BT_INTEGER || x->ts.type != BT_INTEGER) {
+    g95_error("Arguments of IBSET at %L must be integer", &x->where);
+    return &g95_bad_expr;
   }
-/* Second argument must be less than BIT_SIZE(I), no check yet */
 
-  //  return SUCCESS;
+  result = g95_constant_result(BT_REAL, x->ts.kind);
+  result->where = x->where;
+
+  if (g95_extract_int(y, &pos) != NULL || pos < 0 ) {
+    g95_error("Invalid second argument of IBSET at %L", &y->where);
+    return &g95_bad_expr;
+  }
+
+  k = g95_validate_kind(BT_INTEGER, x->ts.kind);
+
+  if ( pos > g95_integer_kinds[k].bit_size ) {
+    g95_error("Second argument of IBSET exceeds bit size at %L", &y->where);
+    return &g95_bad_expr;
+  }
+
+  mpz_setbit(result->value.integer,pos);
+  return range_check(result,"IBSET");
 }
 
 
@@ -1048,33 +1056,84 @@ g95_expr *result;
 }
 
 
-g95_expr *g95_simplify_index(g95_expr *e) {
-g95_expr *arg1, *arg2, *arg3;
+g95_expr *g95_simplify_index(g95_expr *x, g95_expr *y, g95_expr *b) {
+  return NULL;
+  /* FIXME -- this doesn't work yet, will fix it next time
+g95_expr *result;
+int back, len, lensub;
+int i, j, index;
 
-  return NULL; 
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  
+    return NULL;
   
-/* Takes optional argument, not really implemented */
-
-/* Type checking */
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER) {
-    g95_warning("First two arguments of INDEX at %L must be character",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (x->ts.type != BT_CHARACTER || y->ts.type != BT_CHARACTER) {
+    g95_error("First two arguments of INDEX at %L must be character",
+		&x->where);
+    return &g95_bad_expr;
   }
 
-  if (arg3->ts.type != BT_LOGICAL) {
-    g95_warning("Optional argument of INDEX at %L must be logical",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if ( b != NULL && b->ts.type != BT_LOGICAL) {
+    g95_error("Optional argument of INDEX at %L must be logical", &x->where);
+    return &g95_bad_expr;
   }
 
-  //  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
+  if ( b != NULL && b->value.logical != 0  ) back = 1;
+  else back = 0;
 
-  //  return SUCCESS;
+  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+  result->where = x->where;
+
+  len    = x->value.character.length;
+  lensub = y->value.character.length;
+
+  if ( len < lensub ) {
+    mpz_set_si(result->value.integer,0);
+    return result;
+  }
+
+  if ( back == 0  ) {
+
+    if (lensub == 0) {
+      mpz_set_si(result->value.integer,1);
+      return result;
+    }
+
+    index = 0;
+    for ( i=0; i<len; ++i ) {
+      for ( j=0; j<lensub; ++j ) {
+	if ( y->value.character.string[j] == x->value.character.string[i] ) {
+	  index = i+1;
+	  goto done;
+	}
+      }
+    }
+  }
+
+  else {
+
+    if (lensub == 0) {
+      mpz_set_si(result->value.integer,len+1);
+      return result;
+    }
+
+    index = 0;
+    for ( i=0; i<len; ++i ) {
+      for ( j=0; j<lensub; ++j ) {
+	if (y->value.character.string[j] == x->value.character.string[len-i]
+	  && y->value.character.string[j+1] == x->value.character.string[len-i+1]) {
+	  index = len-i+1;
+    printf("Test -- c1 is %c, c2 is %c, index is %d\n", y->value.character.string[j],x->value.character.string[len-i], i);
+	  goto done;
+	}
+      }
+    }
+  }
+
+done:
+    mpz_set_si(result->value.integer,index);
+    return result;
+    */
+
 }
 
 
@@ -1488,7 +1547,8 @@ mpf_t quot, iquot, term;
     		else {
 	      	  if (g95_compare_expr(p, integer_zero) != 0) {
 			result =g95_constant_result(BT_INTEGER,a->ts.kind);
-       		 	mpz_mod(result->value.integer, a->value.integer, 
+			result->where = a->where;
+       		 	mpz_tdiv_r(result->value.integer, a->value.integer, 
                                                        p->value.integer);
 			return range_check(result, "MOD");
       		  }
@@ -1508,10 +1568,17 @@ mpf_t quot, iquot, term;
 	    	else {
       		  if (g95_compare_expr(p, real_zero) != 0) {
 			result =g95_constant_result(BT_REAL,a->ts.kind);
+			result->where = a->where;
+			mpf_init(quot);
+			mpf_init(iquot);
+			mpf_init(term);
 			mpf_div(quot, a->value.real,p->value.real);
 			mpf_trunc(iquot, quot);
 			mpf_mul(term, iquot, p->value.real);
 			mpf_sub(result->value.real, a->value.real, term);
+			mpf_clear(quot);
+			mpf_clear(iquot);
+			mpf_clear(term);
 			return range_check(result, "MOD");
       		  }
       		  else {
@@ -1548,6 +1615,7 @@ mpf_t quot, iquot, term;
     		else {
 	      	  if (g95_compare_expr(p, integer_zero) != 0) {
 			result =g95_constant_result(BT_INTEGER,a->ts.kind);
+			result->where = a->where;
 			mpz_fdiv_r(result->value.integer, a->value.integer, 
                                                        p->value.integer);
 			return range_check(result, "MODULO");
@@ -1568,9 +1636,16 @@ mpf_t quot, iquot, term;
 	    	else {
       		  if (g95_compare_expr(p, real_zero) != 0) {
 			result =g95_constant_result(BT_REAL,a->ts.kind);
+			result->where = a->where;
+			mpf_init(quot);
+			mpf_init(iquot);
+			mpf_init(term);
 			mpf_div(quot, a->value.real,p->value.real);
 			mpf_floor(iquot, quot);
 			mpf_mul(term, iquot, p->value.real);
+			mpf_clear(quot);
+			mpf_clear(iquot);
+			mpf_clear(term);
 			mpf_sub(result->value.real, a->value.real, term);
 			return range_check(result, "MODULO");
       		  }
