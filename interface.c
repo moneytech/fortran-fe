@@ -613,3 +613,70 @@ g95_interface **head, *intr;
     *head = intr;
   }
 }
+
+
+
+
+/* find_modproc()-- Work function for g95_check_parent_modproc() */
+
+static g95_symbol *module_procedure;
+static try modproc_return;
+
+static void find_modproc(g95_symbol *generic_sym) {
+g95_interface *ip;
+
+  if (generic_sym->attr.flavor != FL_GENERIC) return;
+
+  for(ip=generic_sym->generic; ip; ip=ip->next)
+    if (ip->sym == module_procedure) break;
+
+  if (ip == NULL) return;
+
+  if (module_procedure->attr.function && generic_sym->attr.function == 0 &&
+      g95_add_function(&generic_sym->attr, NULL) == FAILURE)
+    modproc_return = FAILURE;
+
+  if (module_procedure->attr.subroutine && generic_sym->attr.subroutine == 0 &&
+      g95_add_subroutine(&generic_sym->attr, NULL) == FAILURE)
+    modproc_return = FAILURE;
+}
+
+
+/* g95_check_parent_modproc()-- Given a symbol that is the name of a
+ * subroutine or a function contained in a module, check to see if the
+ * name is a module procedure in the module.  If so, we update the
+ * parent symbol to reflect whether the symbol is a function or a
+ * subroutine. */
+
+try g95_check_parent_modproc(g95_symbol *sym, int sub_flag) {
+g95_symbol *m;
+
+  if (g95_state_stack->state != COMP_CONTAINS) return SUCCESS;
+
+  if (g95_state_stack->previous->state != COMP_MODULE) return SUCCESS;
+
+  if (g95_find_symbol(sym->name, g95_current_ns->parent, 0, &m))
+    return SUCCESS;
+
+  if (m == NULL) return SUCCESS;
+
+  if (m->attr.flavor != FL_MODULE_PROC) return SUCCESS;
+
+  if (sub_flag) {
+    if (g95_add_subroutine(&m->attr, NULL) == FAILURE) return FAILURE;
+  } else {
+    if (g95_add_function(&m->attr, NULL) == FAILURE) return FAILURE;
+  }
+
+/* At this point, we've made the module procedure a FUNCTION or a
+ * SUBROUTINE.  We now need to find the generic procedure(s) that have
+ * this particular procedure and update the function/subroutine bits */
+
+  module_procedure = m;
+  modproc_return = SUCCESS;
+
+  g95_traverse_ns(g95_current_ns->parent, &find_modproc);
+
+  return modproc_return;
+}
+

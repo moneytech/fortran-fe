@@ -1055,7 +1055,6 @@ cleanup:
 }
 
 
-
 /* match_result()-- Match a RESULT specification following a function
  * declaration or ENTRY statement.  Also matches the end-of-statement. */
 
@@ -1159,9 +1158,11 @@ match m;
   sym->result = result;
 
   if (result == NULL)
-    sym->ts = current_ts; 
+    sym->ts = current_ts;
   else
     result->ts = current_ts;
+
+  if (g95_check_parent_modproc(sym, 0) == FAILURE) goto cleanup;
 
   return MATCH_YES;
 
@@ -1280,6 +1281,8 @@ match m;
 
   m = g95_match_eos();
   if (m != MATCH_YES) goto error;
+
+  if (g95_check_parent_modproc(sym, 1) == FAILURE) goto error;
 
   return MATCH_YES;
 
