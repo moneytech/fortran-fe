@@ -1629,6 +1629,16 @@ match g95_match_private(g95_statement *st) {
 
   if (g95_match("private") != MATCH_YES) return MATCH_NO;
 
+  if (g95_current_state() == COMP_DERIVED) {
+    if (g95_match_eos() == MATCH_YES) {
+      *st = ST_PRIVATE;
+      return MATCH_YES;
+    }
+
+    g95_syntax_error(ST_PRIVATE);
+    return MATCH_ERROR;
+  }
+
   if (g95_match_eos() == MATCH_YES) {
     *st = ST_PRIVATE;
     return MATCH_YES;

@@ -1458,6 +1458,19 @@ match m;
 
     break;
 
+  case FL_MODULE_PROC:
+    e = g95_get_expr();
+    e->symbol = sym;
+    e->expr_type = EXPR_FUNCTION;
+
+    if (g95_add_function(&sym->attr, NULL) == FAILURE) {
+      m = MATCH_ERROR;
+      break;
+    }
+
+    m = g95_match_actual_arglist(0, &e->value.function.actual, NULL);
+    break;
+
   default:
     g95_error("Symbol at %C is not appropriate for an expression");
     return MATCH_ERROR;

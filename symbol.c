@@ -654,17 +654,15 @@ try g95_add_pointer(symbol_attribute *attr, locus *loc) {
   return check_conflict(attr, loc);
 }
 
-try g95_add_private(symbol_attribute *attr, locus *loc) {
+/* No checks for use-association in public and private statements */
 
-  if (check_used(attr, loc)) return FAILURE;
+try g95_add_private(symbol_attribute *attr, locus *loc) {
 
   attr->private = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_public(symbol_attribute *attr, locus *loc) {
-
-  if (check_used(attr, loc)) return FAILURE;
 
   attr->public = 1;
   return check_conflict(attr, loc);
@@ -791,6 +789,7 @@ try g95_add_function(symbol_attribute *attr, locus *loc) {
   if (check_used(attr, loc)) return FAILURE;
 
   if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_DUMMY_PROC &&
+      attr->flavor != FL_MODULE_PROC &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
   attr->function = 1;
@@ -801,7 +800,7 @@ try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
 
   if (check_used(attr, loc)) return FAILURE;
 
-  if (attr->flavor != FL_PROCEDURE &&
+  if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_MODULE_PROC &&
       g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
 
   attr->subroutine = 1;

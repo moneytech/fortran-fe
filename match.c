@@ -309,19 +309,19 @@ int i, c;
     return MATCH_NO;
   }
 
-  for(i=0;;) {
+  i = 0;
+
+  do {
     buffer[i++] = c;
-
-    old_loc = *g95_current_locus();
-    c = g95_next_char();
-
-    if (!isalnum(c) && c != '_') break;
 
     if (i >= G95_MAX_SYMBOL_LEN) {
       g95_error("Name at %C is too long");
       return MATCH_ERROR;
     }
-  }
+
+    old_loc = *g95_current_locus();
+    c = g95_next_char();
+  } while(isalnum(c) || c == '_' || (g95_option.dollar && c == '$'));
 
   buffer[i] = '\0';
   g95_set_locus(&old_loc);

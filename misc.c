@@ -233,6 +233,7 @@ static void display_help(void) {
     "  -Wline-truncation       Warn about truncated source lines\n"
     "  -F                      Parse an F program\n"
     "  -ffixed-line-length-80  80 character line width in fixed mode\n"
+    "  -fdollar-ok             Allow dollar sign in entity names\n"
     "  -pedantic               Warn about use of non-standard features\n"
     "  -r                      Run the resolution phase\n"
     "  -I[directory]           Append directory to the include/module\n"
@@ -283,6 +284,11 @@ char *option;
 
   if (strcmp(option, "-ffixed-line-length-80") == 0) {
     g95_option.fixed_80 = 1;
+    return 1;
+  }
+
+  if (strcmp(option, "-fdollar-ok") == 0) {
+    g95_option.dollar = 1;
     return 1;
   }
 

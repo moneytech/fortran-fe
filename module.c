@@ -656,10 +656,10 @@ static void mio_internal_string(char *string) {
 
 
 enum { AB_ALLOCATABLE, AB_DIMENSION, AB_EXTERNAL, AB_INTRINSIC, AB_OPTIONAL,
-       AB_POINTER, AB_PRIVATE, AB_PUBLIC, AB_SAVE, AB_TARGET, AB_DUMMY,
-       AB_COMMON, AB_RESULT, AB_ENTRY, AB_DATA, AB_IN_NAMELIST,
-       AB_IN_COMMON, AB_SAVED_COMMON, AB_FUNCTION, AB_SUBROUTINE,
-       AB_SEQUENCE, AB_ELEMENTAL, AB_PURE, AB_RECURSIVE
+       AB_POINTER, AB_SAVE, AB_TARGET, AB_DUMMY, AB_COMMON, AB_RESULT,
+       AB_ENTRY, AB_DATA, AB_IN_NAMELIST, AB_IN_COMMON, AB_SAVED_COMMON,
+       AB_FUNCTION, AB_SUBROUTINE, AB_SEQUENCE, AB_ELEMENTAL, AB_PURE,
+       AB_RECURSIVE
 } attribute_bits;
 
 
@@ -689,7 +689,6 @@ attr_bits[] = {
   minit("ALLOCATABLE", AB_ALLOCATABLE), minit("DIMENSION",    AB_DIMENSION),
   minit("EXTERNAL",    AB_EXTERNAL),    minit("INTRINSIC",    AB_INTRINSIC),
   minit("OPTIONAL",    AB_OPTIONAL),    minit("POINTER",      AB_POINTER),
-  minit("PRIVATE",     AB_PRIVATE),     minit("PUBLIC",       AB_PUBLIC),
   minit("SAVE",        AB_SAVE),        minit("TARGET",       AB_TARGET),
   minit("DUMMY",       AB_DUMMY),       minit("COMMON",       AB_COMMON),
   minit("RESULT",      AB_RESULT),      minit("ENTRY",        AB_ENTRY),
@@ -704,7 +703,9 @@ attr_bits[] = {
 
 /* mio_symbol_attribute()-- Symbol attributes are stored in list with
  * the first three elements being the enumerated fields, while the
- * remaining elements (if any) indicate the individual attribute bits */
+ * remaining elements (if any) indicate the individual attribute bits.
+ * PUBLIC and PRIVATE attributes are not saved-- they control what
+ * symbols are exported when a module is written. */
 
 void mio_symbol_attribute(symbol_attribute *attr) {
 atom_type t;
@@ -722,8 +723,6 @@ atom_type t;
     if (attr->intrinsic)     mio_name(AB_INTRINSIC, attr_bits);
     if (attr->optional)      mio_name(AB_OPTIONAL, attr_bits);
     if (attr->pointer)       mio_name(AB_POINTER, attr_bits);
-    if (attr->private)       mio_name(AB_PRIVATE, attr_bits);
-    if (attr->public)        mio_name(AB_PUBLIC, attr_bits);
     if (attr->save)          mio_name(AB_SAVE, attr_bits);
     if (attr->target)        mio_name(AB_TARGET, attr_bits);
     if (attr->dummy)         mio_name(AB_DUMMY, attr_bits);
@@ -760,8 +759,6 @@ atom_type t;
       case AB_INTRINSIC:     attr->intrinsic = 1;     break;
       case AB_OPTIONAL:      attr->optional = 1;      break;
       case AB_POINTER:       attr->pointer = 1;       break;
-      case AB_PRIVATE:       attr->private = 1;       break;
-      case AB_PUBLIC:        attr->public = 1;        break;
       case AB_SAVE:          attr->save = 1;          break;
       case AB_TARGET:        attr->target = 1;        break;
       case AB_DUMMY:         attr->dummy = 1;         break;
