@@ -2752,6 +2752,7 @@ g95_actual_arglist *head, *tail, *next;
 	tail->next = head;
 
       tail = head;
+      tail->next = NULL;
     }
   }
 
@@ -3022,13 +3023,20 @@ try t;
   lib_name = NULL;
 
 /* Don't attempt to sort the argument list for min or max */
-  if (strcmp(specific->name,"min")  ==0 || strcmp(specific->name,"max")  ==0 ||
-      strcmp(specific->name,"min0") ==0 || strcmp(specific->name,"max0") ==0 ||
-      strcmp(specific->name,"min1") ==0 || strcmp(specific->name,"max1") ==0 ||
-      strcmp(specific->name,"amin0")==0 || strcmp(specific->name,"amax0")==0 ||
-      strcmp(specific->name,"amin1")==0 || strcmp(specific->name,"amax1")==0) {
+
+  if (specific->check_function == check_min ||
+      specific->check_function == check_max ||
+      specific->check_function == check_min0 ||
+      specific->check_function == check_max0 ||
+      specific->check_function == check_min1 ||
+      specific->check_function == check_max1 ||
+      specific->check_function == check_amin0 ||
+      specific->check_function == check_amax0 ||
+      specific->check_function == check_amin1 ||
+      specific->check_function == check_amax1 ||
+      specific->check_function == check_dmin1 ||
+      specific->check_function == check_dmax1)
     return do_check(specific, *ap);
-  } 
 
   if (sort_actual(specific->name, ap, specific->arg) == FAILURE)
     return FAILURE;
