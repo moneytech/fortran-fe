@@ -48,6 +48,12 @@ g95_integer_info g95_integer_kinds[] = {
   { 0,  0,   0,   0 }
 };
 
+g95_logical_info g95_logical_kinds[] = {
+  { 4,  2,  31,  32 },
+  { 8,  2,  63,  64 },
+  { 0,  0,   0,   0 }
+};
+
 g95_real_info g95_real_kinds[] = {
   { 4,  2,  24,  -148,  128 },
   { 8,  2,  53, -1073, 1024 },
@@ -654,7 +660,15 @@ int g95_default_double_kind(void)    { return g95_real_kinds[1].kind; }
 
 int g95_default_character_kind(void) { return 1; }
 
-int g95_default_logical_kind(void)   { return 4; }
+int g95_default_logical_kind(void)   
+{ 
+  if ( g95_option.i8 == 1 ) {
+    return g95_logical_kinds[1].kind; 
+  }
+  else {
+    return g95_logical_kinds[0].kind; 
+  }
+}
 
 int g95_default_complex_kind(void)   { return g95_default_real_kind(); }
 
@@ -689,9 +703,14 @@ int i;
 
 
 static int validate_logical(int kind) {
+int i;
 
-  if (kind == g95_default_logical_kind()) return 0;
-  return -1;
+  for(i=0;; i++) {
+    if (g95_logical_kinds[i].kind == 0) { i = -1; break; }
+    if (g95_logical_kinds[i].kind == kind) break;
+  }
+
+  return i;
 }
 
 
