@@ -1282,11 +1282,6 @@ match m;
 
   m = MATCH_ERROR;
 
-  if (current_attr.recursive && result == NULL) {
-    g95_error("RECURSIVE function at %C requires a RESULT specification");
-    goto cleanup;
-  }
-
   if (g95_add_function(&sym->attr, NULL) == FAILURE) goto cleanup;
 
   if (g95_missing_attr(&sym->attr, NULL) == FAILURE ||
@@ -1295,7 +1290,6 @@ match m;
   if (current_ts.type != BT_UNKNOWN && sym->ts.type != BT_UNKNOWN) {
     g95_error("Function '%s' at %C already has a type of %s", name,
 	      g95_basic_typename(sym->ts.type));
-    m = MATCH_ERROR;
     goto cleanup;
   }
 

@@ -25,6 +25,10 @@ Boston, MA 02111-1307, USA.  */
 #include <string.h>
 #include <sys/stat.h>
 
+#ifdef __GLIBC__
+#include <mcheck.h>
+#endif
+
 #include "g95.h"
 
 static struct 
@@ -543,7 +547,10 @@ int errors, warnings, i;
 
   if (argc == 1) display_help();
 
+#ifdef __GLIBC__
   mtrace();
+#endif
+
   init_options();
 
   argv++;
@@ -559,19 +566,18 @@ int errors, warnings, i;
 
   if (g95_option.source == NULL) g95_fatal_error("Need a file to compile");
 
-  if (g95_new_file(g95_option.source, g95_option.form) == SUCCESS)
-    g95_parse_file();
-  else
-    return 3;
+  if (g95_new_file(g95_option.source, g95_option.form) != SUCCESS) return 3;
+
+  g95_parse_file();
 
   g95_done_1();
+  release_options();
 
   g95_get_errors(&warnings, &errors);
 
   if (!g95_option.quiet)
     g95_status("Warnings: %d  Errors: %d\n", warnings, errors);
 
-  release_options();
   if (errors > 0) return 2;
   if (warnings > 0) return 1;
   return 0;

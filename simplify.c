@@ -2025,11 +2025,11 @@ int p, i, k;
 }
 
 
-g95_expr *g95_simplify_nint(g95_expr *e, g95_expr *k) {
+static g95_expr *simplify_nint(char *name, g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *itrunc, *result;
 int kind, cmp;
 
-  kind = get_kind(BT_REAL, k, "NINT", g95_default_integer_kind());
+  kind = get_kind(BT_INTEGER, k, name, g95_default_integer_kind());
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -2055,39 +2055,19 @@ int kind, cmp;
   g95_free_expr(itrunc);
   g95_free_expr(rtrunc);
 
-  return range_check(result, "NINT");
+  return range_check(result, name);
 }
 
 
-g95_expr *g95_simplify_idnint(g95_expr *e) {
-g95_expr *rtrunc, *itrunc, *result;
-int cmp;
+g95_expr *g95_simplify_nint(g95_expr *e, g95_expr *k) {
 
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
+  return simplify_nint("NINT", e, k);
+}
 
-  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind(),
-			       &e->where);
 
-  rtrunc = g95_copy_expr(e);
-  itrunc = g95_copy_expr(e);
+g95_expr *g95_simplify_idnint(g95_expr *e, g95_expr *k) {
 
-  cmp = mpf_cmp_ui(e->value.real, 0);
-
-  if (cmp > 0) {
-    mpf_add(rtrunc->value.real, e->value.real, mpf_half);
-    mpf_trunc(itrunc->value.real, rtrunc->value.real);
-  } else if (cmp < 0) {
-    mpf_sub(rtrunc->value.real, e->value.real, mpf_half);
-    mpf_trunc(itrunc->value.real, rtrunc->value.real);
-  } else
-    mpf_set_ui(itrunc->value.real, 0);
-
-  mpz_set_f(result->value.integer, itrunc->value.real);
-
-  g95_free_expr(itrunc);
-  g95_free_expr(rtrunc);
-
-  return range_check(result, "IDNINT");
+  return simplify_nint("IDNINT", e, k);
 }
 
 

@@ -2156,6 +2156,7 @@ static void free_uop_tree(g95_symtree *rb) {
  * red-black tree and all the symbols that it contains. */
 
 static void free_sym_tree(g95_symtree *rb) {
+g95_namespace *ns;
 g95_symbol *sym;
 
   if (rb == NIL) return;
@@ -2164,6 +2165,12 @@ g95_symbol *sym;
   free_sym_tree(rb->right);
 
   sym = rb->n.sym;
+
+  if (sym->formal_ns != NULL) {
+    ns = sym->formal_ns;
+    sym->formal_ns = NULL;
+    g95_free_namespace(ns);
+  }
 
   sym->refs--;
   if (sym->refs < 0) g95_internal_error("free_sym_tree(): Negative refs");
@@ -2203,12 +2210,12 @@ int i;
     g95_free_interface(ns->operator[i]);
 
   g95_free_data(ns->data);
-
+  next_ns = ns->contained;
   g95_free(ns);
 
   /* Recursively free any contained namespaces */
 
-  for(next_ns=ns->contained; next_ns;) {
+  while(next_ns != NULL) {
     ns = next_ns;
     next_ns = next_ns->sibling;
 
