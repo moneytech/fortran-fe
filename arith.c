@@ -331,10 +331,23 @@ int i, sign;
 
   mpf_init_set(x, *arg);
 
-/* Special case */
+/* Special cases */
   if ( mpf_cmp_ui(x,0) ==  0 ) {
     mpf_set_ui(*result,0);
   }
+  else if ( mpf_cmp_ui(x,1) ==  0 ) {
+    mpf_init(num);
+    mpf_div_ui(num,mpf_hpi,2);
+    mpf_set(*result,num);
+    mpf_clear(num);
+  }
+  else if ( mpf_cmp_si(x,-1) == 0 ) {
+    mpf_init(num);
+    mpf_div_ui(num,mpf_hpi,2);
+    mpf_neg(*result,num);
+    mpf_clear(num);
+  }
+/* General cases */
 
   else {
 
