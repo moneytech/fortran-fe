@@ -1453,10 +1453,13 @@ g95_actual_arglist *arg;
  finish:
   if (result == &g95_bad_expr) return FAILURE;
 
-  if (result == NULL)      /* Must call at run-time */
+  if (result == NULL) {     /* Must call at run-time */
     e->value.function.name =
       (lib_name != NULL) ? lib_name : specific->lib_name;
-   else
+
+    e->ts = specific->ts;
+
+  } else
     g95_replace_expr(e, result);
 
 
