@@ -2727,7 +2727,8 @@ try t;
   result = g95_start_constructor(BT_INTEGER, g95_default_integer_kind(),
 				 &source->where);
 
-  if (source->rank == 0) return result;
+  if (source->rank == 0 ||
+      source->expr_type != EXPR_VARIABLE) return result;
 
   ar = g95_find_array_ref(source);
 
@@ -2772,7 +2773,9 @@ int n, d;
     n = 1;
     d = 1;
   } else {
-    if (dim->expr_type != EXPR_CONSTANT) return NULL;
+    if (dim->expr_type != EXPR_CONSTANT ||
+	array->expr_type != EXPR_VARIABLE) return NULL;
+
     d = mpz_get_ui(dim->value.integer);
     ar = g95_find_array_ref(array);
     if (g95_array_ref_shape(ar, shape) == FAILURE) return NULL;

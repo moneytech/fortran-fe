@@ -277,7 +277,8 @@ static try dim_rank_check(g95_expr *dim, g95_expr *array) {
 g95_array_ref *ar;
 int rank;
 
-  if (dim->expr_type != EXPR_CONSTANT) return SUCCESS;
+  if (dim->expr_type != EXPR_CONSTANT ||
+      array->expr_type != EXPR_VARIABLE) return SUCCESS;
 
   ar = g95_find_array_ref(array);
   rank = array->rank;
@@ -1125,7 +1126,7 @@ try g95_check_set_exponent(g95_expr *x, g95_expr *i) {
 try g95_check_shape(g95_expr *source) {
 g95_array_ref *ar;
 
-  if (source->rank == 0) return SUCCESS;
+  if (source->rank == 0 || source->expr_type != EXPR_VARIABLE) return SUCCESS;
 
   ar = g95_find_array_ref(source);
 
