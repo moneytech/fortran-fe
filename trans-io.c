@@ -687,8 +687,6 @@ tree g95_trans_iolength(g95_code *c) {
  * fields are valid for both reading and writing, but improper use has
  * been filtered out by now. */
 
-extern g95_st_label format_asterisk;
-
 static tree build_dt(tree *function, g95_code *code) {
 stmtblock_t block, post_block;
 g95_expr *unity;
@@ -718,7 +716,7 @@ tree tmp;
   }
 
   if (dt->format_expr == NULL &&
-      (dt->format_label == NULL || dt->format_label == &format_asterisk)) {
+      (dt->format_label == NULL || dt->format_label == &g95_format_asterisk)) {
     unity = g95_int_expr(1);
     set_parameter_value(&block, ioparm_list_format, unity);
     g95_free_expr(unity);

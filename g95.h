@@ -831,7 +831,7 @@ typedef struct {
   g95_expr *io_unit, *format_expr, *rec, *advance, *iostat, *size;
 
   g95_symbol *namelist;
-/* A format_label of `format_asterisk' indicates the "*" format */
+/* A format_label of `g95_format_asterisk' indicates the "*" format */
   g95_st_label *format_label;
   g95_st_label *err, *end, *eor;
 
@@ -1486,6 +1486,8 @@ match g95_match_select(void);
 void g95_resolve_select(g95_code *);
 
 /* io.c */
+
+extern g95_st_label g95_format_asterisk;
 
 void g95_free_open(g95_open *);
 match g95_match_open(void);

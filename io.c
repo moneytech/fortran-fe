@@ -23,7 +23,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-g95_st_label format_asterisk =
+g95_st_label g95_format_asterisk =
   { -1, ST_LABEL_FORMAT, ST_LABEL_FORMAT, NULL, 0 };
 
 
@@ -562,7 +562,7 @@ g95_st_label *label;
   if (g95_match_char('*') == MATCH_YES) {
     if (dt->format_expr != NULL || dt->format_label != NULL) goto conflict;
 
-    dt->format_label = &format_asterisk;
+    dt->format_label = &g95_format_asterisk;
     return MATCH_YES;
   }
 
@@ -737,7 +737,7 @@ g95_expr *e;
       return FAILURE;
     }
 
-    if (dt->format_label == &format_asterisk) {
+    if (dt->format_label == &g95_format_asterisk) {
       g95_error("END tag at %L is incompatible with list directed format (*)",
 		&dt->end_where);
       return FAILURE;
@@ -750,7 +750,7 @@ g95_expr *e;
     }
   }
 
-  if (dt->advance != NULL && dt->format_label == &format_asterisk) {
+  if (dt->advance != NULL && dt->format_label == &g95_format_asterisk) {
     g95_error("ADVANCE tag at %L is incompatible with list directed "
 	      "format (*)", &dt->advance->where);
     return FAILURE;
