@@ -233,8 +233,6 @@ static try dim_check(g95_expr *dim, int n, int optional) {
   if (optional) {
     if (dim == NULL) return SUCCESS;
 
-    if (variable_check(dim, n) == FAILURE) return FAILURE;
-
     if (nonoptional_check(dim, n) == FAILURE) return FAILURE;
 
     return SUCCESS;
@@ -767,13 +765,47 @@ try g95_check_matmul(g95_expr *matrix_a, g95_expr *matrix_b) {
 }
 
 
-try g95_check_minloc_maxloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+/* minloc/maxloc().  Whoever came up with this interface was probably
+ * on something.  The possibilities for the occupation of the second
+ * and third parameters are:
+ *       Arg #2     Arg #3
+ *       NULL       NULL
+ *       DIM        NULL
+ *       MASK       NULL
+ *       NULL       MASK             minloc(array, mask=m)
+ *       DIM        MASK
+ */
+
+try g95_check_minloc_maxloc(g95_expr *array, g95_expr *a2, g95_expr *a3) {
 
   if (int_or_real_check(array, 0) == FAILURE) return FAILURE;
 
-  if (dim_check(dim, 1, 0) == FAILURE) return FAILURE;
+  if (array_check(array, 0) == FAILURE) return FAILURE;
 
-  if (mask != NULL && logical_array_check(mask, 2) == FAILURE) return FAILURE;
+  if (a3 != NULL) {
+    if (logical_array_check(a3, 2) == FAILURE) return FAILURE;
+
+    if (a2 != NULL) {
+      if (scalar_check(a2, 1) == FAILURE) return FAILURE;
+      if (type_check(a2, 1, BT_INTEGER) == FAILURE) return FAILURE;
+    }
+  } else {
+    if (a2 != NULL) {
+      switch(a2->ts.type) {
+      case BT_INTEGER:
+	if (scalar_check(a2, 1) == FAILURE) return FAILURE;
+	break;
+
+      case BT_LOGICAL:  /* The '2' makes the error message correct */
+	if (logical_array_check(a2, 2) == FAILURE) return FAILURE;
+	break;
+
+      default:
+	type_check(a2, 1, BT_INTEGER);  /* Guaranteed to fail */
+	return FAILURE;
+      }
+    }
+  }
 
   return SUCCESS;
 }
