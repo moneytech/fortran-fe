@@ -1448,6 +1448,7 @@ try g95_check_constructor(g95_expr *, try (*)(g95_expr *));
 g95_constructor *g95_copy_constructor(g95_constructor *src);
 g95_expr *g95_get_array_element(g95_expr *, int);
 try g95_array_size(g95_expr *, mpz_t *);
+try g95_array_dimen_size(g95_expr *, int, mpz_t *);
 try g95_array_ref_shape(g95_array_ref *, mpz_t *);
 g95_array_ref *g95_find_array_ref(g95_expr *);
 

@@ -301,7 +301,7 @@ g95_typespec *ts;
 
 try g95_check_assign(g95_expr *lvalue, g95_expr *rvalue, int conform) {
 mpz_t lsize, rsize;
-int lflag, rflag;
+int lflag, rflag, d;
 g95_symbol *sym;
 try t;
 
@@ -328,21 +328,22 @@ try t;
   if (lvalue->rank != 0 && rvalue->rank != 0) {
     t = SUCCESS;
 
-    lflag = g95_array_size(lvalue, &lsize) == SUCCESS;
-    rflag = g95_array_size(rvalue, &rsize) == SUCCESS;
+    for(d=0; d<rvalue->rank; d++) {
+      lflag = g95_array_dimen_size(lvalue, d, &lsize) == SUCCESS;
+      rflag = g95_array_dimen_size(rvalue, d, &rsize) == SUCCESS;
 
-    if (lflag && rflag && mpz_cmp(lsize, rsize) < 0) {
+      if (lflag && rflag && mpz_cmp(lsize, rsize) != 0) {
+	g95_error("Array assignment at %L has different shape on dimension %d",
+		  &rvalue->where, d+1);
 
-      g95_error("Array assignment at %L has more values on the right "
-		"than left", &rvalue->where);
+	t = FAILURE;
+      }
 
-      t = FAILURE;
+      if (lflag) mpz_clear(lsize);
+      if (rflag) mpz_clear(rsize);
+
+      if (t == FAILURE) return FAILURE;
     }
-
-    if (lflag) mpz_clear(lsize);
-    if (rflag) mpz_clear(rsize);
-
-    if (t == FAILURE) return FAILURE;
   }
 
   if (g95_compare_types(&lvalue->ts, &rvalue->ts)) return SUCCESS;

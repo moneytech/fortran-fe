@@ -1068,8 +1068,7 @@ try t;
     goto cleanup;
 
   if (mpz_sgn(step->value.integer) == 0) {
-    g95_error("Iterator step at %L cannot be zero",
-	      &step->where);
+    g95_error("Iterator step at %L cannot be zero", &step->where);
     goto cleanup;
   }
 
@@ -1126,7 +1125,9 @@ g95_expr *e;
     e = c->expr;
 
     if (e->expr_type == EXPR_ARRAY) {
-      if (expand_constructor(e->value.constructor.head) == FAILURE) return FAILURE;
+      if (expand_constructor(e->value.constructor.head) == FAILURE)
+	return FAILURE;
+
       continue;
     }
 
@@ -1428,6 +1429,49 @@ int d;
   return SUCCESS;
 }
 
+/* g95_array_dimen_size()-- Given a shape argument to the RESHAPE
+ * intrinsic, figure out how many elements are in the SHAPE
+ * specification for a given dimension. */
+
+try g95_array_dimen_size(g95_expr *array, int dimen, mpz_t *result) {
+g95_ref *ref;
+
+  if (dimen > array->rank -1 )
+    g95_internal_error("g95_array_dimen_size(): Wrong dimension");
+
+  if (array->rank == 1)
+    return g95_array_size(array, result);
+    
+  switch(array->expr_type) {
+  case EXPR_ARRAY:
+    mpz_init_set(*result, array->value.constructor.shape[dimen]);
+    break;
+
+  case EXPR_VARIABLE:
+    for(ref=array->ref; ref; ref=ref->next) {
+      if (ref->type != REF_ARRAY) continue;
+
+      if (ref->u.ar.type == AR_FULL) {
+	if (spec_dimen_size(ref->u.ar.as, dimen, result) == FAILURE) return FAILURE;
+	goto done;
+      }
+
+      if (ref->u.ar.type == AR_SECTION) {
+	if (ref_dimen_size(&ref->u.ar, dimen, result) == FAILURE) return FAILURE;
+	goto done;
+      }
+    }
+
+    if (spec_dimen_size(array->symbol->as, dimen, result) == FAILURE) return FAILURE;
+    break;
+
+  default:
+    return FAILURE;
+  }
+
+done:
+  return SUCCESS;
+}
 
 /* g95_array_size()-- Given a shape argument to the RESHAPE
  * intrinsic, figure out how many elements are in the SHAPE

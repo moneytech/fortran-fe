@@ -87,7 +87,7 @@ void g95_init_options(void) {
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
 void g95_display_help(void) {
-int i, lo, ld, pld, no, nd, seennl, WO, WD; 
+int i, lo, ld, pld, no, nd, seennl, WO, WD, lo_size;
 const char *co, *cd, *cdp;
 
   WO = 25;
@@ -98,7 +98,9 @@ const char *co, *cd, *cdp;
     "Usage: g95 [options] file\n"
     "Options:\n");
 
-  for(i=0; i<ARRAY_SIZE(lang_options); i++) {
+  lo_size = (int) (sizeof(lang_options) / sizeof(lang_options[0]));
+
+  for(i=0; i<lo_size; i++) {
     no = nd = 0;
     seennl = 0;
 

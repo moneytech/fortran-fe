@@ -143,7 +143,7 @@ void g95_resolve_aint(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = a->ts.type;
   f->ts.kind = (kind == NULL) ? a->ts.kind
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
     g95_get_string("__aint_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
@@ -167,7 +167,7 @@ void g95_resolve_anint(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = a->ts.type;
   f->ts.kind = (kind == NULL) ? a->ts.kind
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
     g95_get_string("__anint_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
@@ -225,7 +225,7 @@ void g95_resolve_ceiling(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = (kind == NULL) ? g95_default_integer_kind()
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
     g95_get_string("__ceiling_%d_%c%d", f->ts.kind,
@@ -237,7 +237,7 @@ void g95_resolve_char(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = BT_CHARACTER;
   f->ts.kind = (kind == NULL) ? g95_default_character_kind()
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
     g95_get_string("__char_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
@@ -249,7 +249,7 @@ void g95_resolve_cmplx(g95_expr *f, g95_expr *x, g95_expr *y, g95_expr *kind) {
 
   f->ts.type = BT_COMPLEX;
   f->ts.kind = (kind == NULL) ? g95_default_real_kind()
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
 
   if (y == NULL)
     f->value.function.name =
@@ -383,7 +383,7 @@ void g95_resolve_floor(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = (kind == NULL) ? g95_default_integer_kind()
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
     g95_get_string("__floor%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
@@ -459,7 +459,7 @@ void g95_resolve_int(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = (kind == NULL) ? g95_default_integer_kind()
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
     g95_get_string("__int_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
@@ -538,7 +538,7 @@ void g95_resolve_logical(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = BT_LOGICAL;
   f->ts.kind = (kind == NULL) ? g95_default_logical_kind()
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
   f->rank = a->rank;
 
   f->value.function.name =
@@ -676,7 +676,7 @@ void g95_resolve_nint(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = (kind == NULL) ? g95_default_integer_kind()
-    : mpz_get_ui(kind->value.integer);
+    : mpz_get_si(kind->value.integer);
 
   f->value.function.name =
     g95_get_string("__nint_%d_%d", f->ts.kind, a->ts.kind);
@@ -720,7 +720,7 @@ void g95_resolve_real(g95_expr *f, g95_expr *a, g95_expr *kind) {
   f->ts.type = BT_REAL;
 
   if (kind != NULL)
-    f->ts.kind = mpz_get_ui(kind->value.integer);
+    f->ts.kind = mpz_get_si(kind->value.integer);
   else
     f->ts.kind = (a->ts.type == BT_COMPLEX) ?
       a->ts.kind : g95_default_real_kind();
@@ -746,7 +746,7 @@ mpz_t rank;
   f->ts = source->ts;
 
   g95_array_size(shape, &rank);
-  f->rank = mpz_get_ui(rank);
+  f->rank = mpz_get_si(rank);
   mpz_clear(rank);
 
   f->value.function.name =
