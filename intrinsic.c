@@ -75,8 +75,9 @@ typedef struct intrinsic_sym {
 static intrinsic_sym *functions, *subroutines, *conversion, *next_sym;
 static intrinsic_arg *next_arg;
 
-static int nfunc, nsub, nargs, nconv, sizing;
+static int nfunc, nsub, nargs, nconv;
 
+enum { SZ_NOTHING=0, SZ_SUBS, SZ_FUNCS, SZ_CONVS} sizing;
 
 /* intrinsic_error()-- write an error message into static memory in
  * case a caller is interested in why something failed. */
@@ -1764,12 +1765,11 @@ static void add_sym(const char *name, int elemental, int actual_ok, bt type,
 int optional, first_flag;
 va_list argp;
 
-  if (sizing) {
-    if (type == BT_UNKNOWN)
+  if (sizing == SZ_SUBS) {
       nsub++;
-    else
+  } else if (sizing == SZ_FUNCS) {
       nfunc++;
-  } else {
+  } else { /* must be SZ_NOTHING, conversions are not add_sym()'ed */
     strcpy(next_sym->name, name);
 
     strcpy(next_sym->lib_name, "__");
@@ -1796,7 +1796,7 @@ va_list argp;
     kind = va_arg(argp, int);
     optional = va_arg(argp, int);
 
-    if (sizing)
+    if (sizing != SZ_NOTHING)
       nargs++;
     else {
       next_arg++;
@@ -1899,7 +1899,7 @@ int g95_intrinsic_name(char *name, int subroutine_flag) {
 static void make_generic(const char *name) {
 intrinsic_sym *g;
 
-  if (sizing) return; 
+  if (sizing != SZ_NOTHING) return; 
 
   g = find_function(name);
   if (g == NULL)
@@ -2435,9 +2435,6 @@ int di, dr, dd, dl, dc, dz;
 	  stg, BT_CHARACTER, dc, 0,  set, BT_CHARACTER, dc, 0,
 	  bck, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("scale", 0, 1, BT_REAL, dr, g95_simplify_scale, NULL,
-	  x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
-
   add_sym("selected_int_kind", 0, 1, BT_INTEGER, di,
 	  g95_simplify_selected_int_kind, NULL,
 	  r, BT_INTEGER, di, 0, NULL);
@@ -2663,7 +2660,7 @@ static void add_conv(bt from_type, int from_kind, bt to_type, int to_kind,
 g95_typespec from, to;
 intrinsic_sym *sym;
 
-  if (sizing) {
+  if (sizing == SZ_CONVS) {
     nconv++;
     return;
   }
@@ -2747,10 +2744,12 @@ int i, j;
 void g95_intrinsic_init_1(void) {
 
   nargs = nfunc = nsub = nconv = 0;
-  sizing = 1;
 
+  sizing = SZ_FUNCS;
   add_functions();
+  sizing = SZ_SUBS;
   add_subroutines();
+  sizing = SZ_CONVS;
   add_conversions();
 
   functions = g95_getmem(sizeof(intrinsic_sym)*(nfunc+nsub)
@@ -2763,7 +2762,7 @@ void g95_intrinsic_init_1(void) {
 
   next_arg = ((intrinsic_arg *) (subroutines + nsub)) - 1;
 
-  sizing = 0;
+  sizing = SZ_NOTHING;
   nconv = 0;
 
   add_functions();
