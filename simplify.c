@@ -2745,13 +2745,9 @@ try t;
 
       f = g95_simplify_size(source, e);
       if (f == NULL) {
-	e = g95_build_funcall(NULL, g95_copy_expr(source), e, NULL);
-	e->value.function.isym = g95_find_function("size");
-
-	e->ts.type = BT_INTEGER;
-	e->ts.kind = g95_default_integer_kind();
-	e->where = source->where;
-
+        g95_free_expr (e);
+        g95_free_expr (result);
+        return NULL;
       } else {
 	g95_free_expr(e);
 	e = f;

@@ -1273,7 +1273,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("set_exponent", G95_ISYM_SET_EXPONENT);
 
   add_sym("shape", 0, 1, BT_INTEGER, di,
-	  g95_check_shape, g95_simplify_shape, NULL,
+	  g95_check_shape, g95_simplify_shape, g95_resolve_shape,
 	  src, BT_REAL, dr, 0, NULL);
 
   make_generic("shape", G95_ISYM_SHAPE);
