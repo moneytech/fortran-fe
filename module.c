@@ -2101,7 +2101,7 @@ static void write_symbol0(g95_symbol *sym) {
 static void write_operator(g95_symbol *sym) {
 
   if (sym->operator == NULL ||
-      !check_access(sym->attr.access, sym->ns->default_access)) return;
+      !check_access(sym->operator_access, sym->ns->default_access)) return;
 
   mio_symbol_interface(sym->name, sym->module, &sym->operator);
 }
