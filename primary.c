@@ -22,6 +22,7 @@ Boston, MA 02111-1307, USA.  */
 /* primary.c-- Match primary expressions */
 
 #include <ctype.h>
+#include <string.h>
 #include "g95.h"
 
 /* match_kind_param()-- Matches a kind-parameter expression, which is

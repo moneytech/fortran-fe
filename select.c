@@ -21,6 +21,8 @@ Boston, MA 02111-1307, USA.  */
 
 /* select.c-- Handle the SELECT CASE statement. */
 
+#include <string.h>
+
 #include "g95.h"
 
 

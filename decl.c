@@ -22,6 +22,8 @@ Boston, MA 02111-1307, USA.  */
 
 /* decl.c -- Declaration statement matcher.  */
 
+#include <string.h>
+
 #include "g95.h"
 
 

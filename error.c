@@ -28,6 +28,7 @@ Boston, MA 02111-1307, USA.  */
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "g95.h"
 
@@ -269,7 +270,7 @@ locus *l1, *l2, *loc;
 	break;
 
       case 'c':
-	c_arg[n++] = va_arg(argp, char);
+	c_arg[n++] = va_arg(argp, int);
 	break;
 
       case 's':

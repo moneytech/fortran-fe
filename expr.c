@@ -23,6 +23,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "g95.h"
 

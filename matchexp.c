@@ -22,6 +22,7 @@ Boston, MA 02111-1307, USA.  */
 /* matchexp.c-- Expression parser */
 
 
+#include <string.h>
 #include <ctype.h>
 #include "g95.h"
 
