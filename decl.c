@@ -1492,7 +1492,6 @@ match m;
   }
 
   if (g95_set_array_spec(sym, as, &var_locus) == FAILURE) {
-    g95_free_array_spec(as);
     m = MATCH_ERROR;
     goto cleanup;
   }
