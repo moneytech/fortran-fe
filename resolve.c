@@ -1916,9 +1916,11 @@ static void resolve_symbol(g95_symbol *sym) {
    * dummy argument. */
 
   if (sym->attr.flavor == FL_VARIABLE && sym->ts.type == BT_CHARACTER
-      && sym->ts.cl->length == NULL && sym->attr.dummy == 0)
+      && sym->ts.cl->length == NULL && sym->attr.dummy == 0) {
     g95_error("Entity with assumed character length at %L must be a "
 	      "dummy argument or a PARAMETER", &sym->declared_at);
+    return;
+  }  
 
   /* Make sure the types of derived parameters are consistent.  This
    * type checking is deferred until resolution because the type may
@@ -1938,6 +1940,15 @@ static void resolve_symbol(g95_symbol *sym) {
 
     g95_error("Symbol at %L is not a DUMMY variable", &sym->declared_at);
     return;
+  }
+  
+  /* Constraints on allocatable */
+  if (sym->attr.flavor == FL_VARIABLE && sym->attr.allocatable) {
+    if (sym->as == NULL || sym->as->type != AS_DEFERRED) {
+      g95_error("Allocatable array at %L must have a deferred shape",
+		&sym->declared_at);
+      return;
+    }
   }
 
   g95_resolve_array_spec(sym->as);
