@@ -207,7 +207,7 @@ g95_expr *init;
       return FAILURE;
     }
   } else {
-    // if (g95_check_assign_symbol(sym, init) == FAILURE) return FAILURE;
+    if (g95_check_assign_symbol(sym, init) == FAILURE) return FAILURE;
 
     sym->value = init;
     *initp = NULL;
