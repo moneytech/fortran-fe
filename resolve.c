@@ -1461,6 +1461,7 @@ try t;
 
   case EXPR_VARIABLE:
     t = resolve_variable(e);
+    if (t == SUCCESS) expression_rank(e);
     break;
 
   case EXPR_SUBSTRING:
@@ -1597,6 +1598,129 @@ g95_component *c;
 }
 
 
+/* resolve_deallocate_expr()-- Resolve the argument of a deallocate
+ * expression.  The expression must be a pointer or a full array. */
+
+static try resolve_deallocate_expr(g95_expr *e) {
+symbol_attribute attr;
+int allocatable;
+g95_ref *ref;
+
+  if (g95_resolve_expr(e) == FAILURE) return FAILURE;
+
+  attr = g95_variable_attr(e, NULL);
+  if (attr.pointer) return SUCCESS;
+
+  if (e->expr_type != EXPR_VARIABLE) goto bad;
+
+  allocatable = e->symbol->attr.allocatable;
+  for(ref=e->ref; ref; ref=ref->next)
+    switch(ref->type) {
+    case REF_ARRAY:
+      if (ref->u.ar.type != AR_FULL) allocatable = 0;
+      break;
+
+    case REF_COMPONENT:
+      allocatable = (ref->u.c.component->as != NULL &&
+		     ref->u.c.component->as->type == AS_DEFERRED);
+      break;
+
+    case REF_SUBSTRING:
+      allocatable = 0;
+      break;
+    }
+
+  if (attr.allocatable == 0) {
+  bad:
+    g95_error("Expression in DEALLOCATE statement at %L must be "
+	      "ALLOCATABLE or a POINTER", &e->where);
+  }
+
+  return SUCCESS;
+}
+
+
+/* resolve_allocate_expr()-- Resolve the expression in an ALLOCATE
+ * statement, doing the additional checks to see whether the
+ * expression is OK or not.  The expression must have a trailing array
+ * reference that gives the size of the array. */
+
+static try resolve_allocate_expr(g95_expr *e) {
+symbol_attribute attr;
+g95_ref *ref, *ref2;
+int i, allocatable;
+g95_array_ref *ar;
+
+  if (g95_resolve_expr(e) == FAILURE) return FAILURE;
+
+  attr = g95_expr_attr(e);
+
+  /* See if this is a pointer to a scalar variable */
+
+  if (attr.pointer && !attr.dimension) return SUCCESS;
+
+  /* Make sure the expression is allocatable */
+
+  ref2 = NULL;
+
+  if (e->expr_type != EXPR_VARIABLE)
+    allocatable = 0;
+  else {
+    allocatable = e->symbol->attr.allocatable;
+
+    for(ref=e->ref; ref; ref2=ref, ref=ref->next)
+      switch(ref->type) {
+      case REF_ARRAY:
+       	break;
+
+      case REF_COMPONENT:
+	allocatable = (ref->u.c.component->as != NULL &&
+		       ref->u.c.component->as->type == AS_DEFERRED);
+	break;
+
+      case REF_SUBSTRING:
+	allocatable = 0;
+	break;
+      }
+  }
+
+  /* Make sure the next-to-last reference node is an array specification. */
+
+  if (ref2 == NULL || ref2->type != REF_ARRAY || ref2->u.ar.type == AR_FULL) {
+    g95_error("Array specification required in ALLOCATE statement "
+	      "at %L", &e->where);
+    return FAILURE;
+  }
+
+  if (ref2->type == AR_ELEMENT) return SUCCESS;
+
+  /* Make sure that the array section reference makes sense in the
+   * context of an ALLOCATE specification. */
+
+  ar = &ref2->u.ar;
+
+  for(i=0; i<ar->dimen; i++)
+    switch(ar->dimen_type[i]) {
+    case DIMEN_ELEMENT:
+      break;
+
+    case DIMEN_RANGE:
+      if (ar->start[i] != NULL && ar->end[i] != NULL &&
+	  ar->stride[i] == NULL) break;
+
+      /* Fall Through */
+
+    case DIMEN_UNKNOWN:
+    case DIMEN_VECTOR:
+      g95_error("Bad array specification in ALLOCATE statement at %L",
+		&e->where);
+      return FAILURE;
+    }
+
+  return SUCCESS;
+}
+
+
 /* resolve_branch()-- Given a branch to a label and a namespace, if
  * the branch is conforming.  The code node described where the branch
  * is located. */
@@ -1712,12 +1836,9 @@ try t;
  * everything pointed to by this code block */
 
 void resolve_code(g95_code *code, g95_namespace *ns) {
-symbol_attribute attr;
-int i, forall_save=0;
-g95_array_ref *ar;
+int forall_save=0;
 code_stack frame;
 g95_alloc *a;
-g95_ref *ref;
 try t;
 
   frame.prev = cs_base;
@@ -1833,46 +1954,9 @@ try t;
 	g95_error("STAT tag in ALLOCATE statement at %L must be "
 		  "of type INTEGER", &code->expr->where);
 
-      for(a=code->ext.alloc_list; a; a=a->next) {
-	if (g95_resolve_expr(a->expr) == FAILURE) continue;
-
-	attr = g95_variable_attr(a->expr, NULL);
-
-	if (attr.allocatable == 0 && attr.pointer == 0) {
-	  g95_error("Expression in ALLOCATE statement at %L must be "
-		    "ALLOCATABLE or a POINTER", &a->expr->where);
-	  continue;
-	}
-
-	if (!attr.dimension) continue;
-
-	ref = a->expr->ref;
-	while(ref && ref->next)
-	  ref = ref->next;
-
-	if (ref == NULL || ref->type != REF_ARRAY ||
-	    ref->u.ar.type == AR_FULL) {
-	  g95_error("Array specification required in ALLOCATE statement "
-		    "at %L", &a->expr->where);
-	  continue;
-	}
-
-	if (ref->type == AR_ELEMENT) continue;
-
-	/* Make sure that the array reference makes sense in the
-	 * context of an ALLOCATE specification */
-
-	ar = &ref->u.ar;
-
-	for(i=0; i<ar->dimen; i++)
-	  if (ar->dimen_type[i] == DIMEN_VECTOR || ar->stride[i] != NULL) {
-	    g95_error("Bad array specification in ALLOCATE statement at %L",
-		      &a->expr->where);
-	    break;
-	  }
-
-      }
-
+      for(a=code->ext.alloc_list; a; a=a->next)
+        resolve_allocate_expr(a->expr);
+     
       break;
 
     case EXEC_DEALLOCATE:
@@ -1881,15 +1965,8 @@ try t;
 	g95_error("STAT tag in DEALLOCATE statement at %L must be of type "
 		  "INTEGER", &code->expr->where);
 
-      for(a=code->ext.alloc_list; a; a=a->next) {
-	if (g95_resolve_expr(a->expr) == FAILURE) continue;
-
-	attr = g95_variable_attr(a->expr, NULL);
-
-	if (attr.pointer == 0 && attr.allocatable == 0)
-	  g95_error("Expression in DEALLOCATE statement at %L must be "
-		    "ALLOCATABLE or a POINTER", &a->expr->where);
-      }
+      for(a=code->ext.alloc_list; a; a=a->next)
+	resolve_deallocate_expr(a->expr);
 
       break;
 

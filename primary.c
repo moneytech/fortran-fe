@@ -1362,7 +1362,7 @@ check_substring:
  * We can have at most one full array reference. */
 
 symbol_attribute g95_variable_attr(g95_expr *expr, g95_typespec *ts) {
-int dimension, pointer, target, allocatable;
+int dimension, pointer, target;
 symbol_attribute attr;
 g95_ref *ref;
 
@@ -1374,7 +1374,6 @@ g95_ref *ref;
 
   dimension = attr.dimension;
   pointer = attr.pointer;
-  allocatable = attr.allocatable || attr.pointer;
 
   target = attr.target;
   if (pointer) target = 1;
@@ -1412,20 +1411,16 @@ g95_ref *ref;
       pointer = ref->u.c.component->pointer;
       if (pointer) target = 1;
 
-      allocatable = (ref->u.c.component->as != NULL &&
-		     ref->u.c.component->as->type == AS_DEFERRED);
       break;
 
     case REF_SUBSTRING:
       pointer = 0;
-      allocatable = 0;
       break;
     }
 
   attr.dimension = dimension;
   attr.pointer = pointer;
   attr.target = target;
-  attr.allocatable = allocatable;
 
   return attr;
 }
