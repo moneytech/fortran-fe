@@ -632,7 +632,15 @@ int i, n, limit;
 
 int g95_default_integer_kind(void)   { return g95_integer_kinds[0].kind; }
 
-int g95_default_real_kind(void)      { return g95_real_kinds[0].kind; }
+int g95_default_real_kind(void)      
+{ 
+  if ( g95_option.r8 == 1 ) {
+    return g95_real_kinds[1].kind; 
+  }
+  else {
+    return g95_real_kinds[0].kind; 
+  }
+}
 
 int g95_default_double_kind(void)    { return g95_real_kinds[1].kind; }
 

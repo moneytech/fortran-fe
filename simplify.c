@@ -2582,10 +2582,6 @@ g95_expr *g95_simplify_real(g95_expr *e, g95_expr *k) {
 g95_expr *result;
 int kind;
 
-/* Note: to adhere exactly to the standard, if the type of e is real, then
- * kind should be e->ts.kind and not default_real, but for now we allow only
- * this kind for complex */
-
   kind = get_kind(k, "REAL", g95_default_real_kind()); 
   if (kind == -1) return &g95_bad_expr;
 

@@ -390,7 +390,12 @@ done:
     break;
 
   default:
-    if (kind == -2) kind = g95_default_real_kind();
+    if (kind == -2) {
+      if ( g95_option.r8 == 1 ) 
+	kind = g95_default_double_kind();
+      else
+	kind = g95_default_real_kind();
+    }
 
     if (g95_validate_kind(BT_REAL, kind) == -1) {
       g95_error("Invalid real kind %d at %C", kind);

@@ -269,6 +269,7 @@ static void display_help(void) {
     "  -ffree-form             Assume that the source file is free form\n"
     "  -ffixed-form            Assume that the source file is fixed form\n"
     "  -fqkind=<n>             Set the kind for a real with the 'q' exponent\n"
+    "  -r8	               Set the real kind to be double precision\n"
     "  -pedantic               Warn about use of non-standard features\n"
     "  -r                      Run the resolution phase\n"
     "  -I[directory]           Append directory to the include/module\n"
@@ -348,6 +349,11 @@ int i;
     return 1;
   }
 
+  if (strcmp(option, "-r8") == 0) {
+    g95_option.r8 = 1;
+    return 1;
+  }
+
   if (option[0] == '-' && option[1] == 'I') {
     if (option[2] != '\0') {
       add_path(&g95_option.include_dirs, &option[2]);
@@ -414,6 +420,7 @@ static void init_options(void) {
   g95_option.fmode = 0;
   g95_option.form = FORM_UNKNOWN;
   g95_option.q_kind = g95_default_double_kind();
+  g95_option.r8 = 0;
 }
 
 
