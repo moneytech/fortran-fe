@@ -38,6 +38,8 @@ static mpz_t mpz_zero;
 
 g95_expr g95_bad_expr;
 
+static char temp_name[30];
+
 
 /* Note that 'simplification' is not just transforming expressions.
  * For functions that are not simplified at compile time,
@@ -905,10 +907,9 @@ g95_expr *result;
  * name of the appropriate dot_product intrinsic. */
 
 static char *dot_name(bt type, int kind) {
-static char buffer[25];
 
-  sprintf(buffer, "__dot_product_%c%d", g95_type_letter(type), kind);
-  return buffer;
+  sprintf(temp_name, "__dot_product_%c%d", g95_type_letter(type), kind);
+  return temp_name;
 }
 
 
@@ -1967,6 +1968,48 @@ int i;
 }
 
 
+static char *maxval_name(bt type, int kind) {
+
+  sprintf(temp_name, "__maxval_%c%d", g95_type_letter(type), kind);
+  return temp_name;
+}
+
+
+g95_expr *g95_simplify_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  g95_current_function->ts = array->ts;
+
+  g95_current_function->value.function.name =
+    g95_get_string(maxval_name(array->ts.type, array->ts.kind));
+
+  if (dim != NULL && array->rank != 1)
+    g95_current_function->rank = array->rank - 1;
+
+  return NULL;
+}
+
+
+static char *minval_name(bt type, int kind) {
+
+  sprintf(temp_name, "__minval_%c%d", g95_type_letter(type), kind);
+  return temp_name;
+}
+
+
+g95_expr *g95_simplify_minval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  g95_current_function->ts = array->ts;
+
+  g95_current_function->value.function.name =
+    g95_get_string(minval_name(array->ts.type, array->ts.kind));
+
+  if (dim != NULL && array->rank != 1)
+    g95_current_function->rank = array->rank - 1;
+
+  return NULL;
+}
+
+
 g95_expr *g95_simplify_mod(g95_expr *a, g95_expr *p) {
 g95_expr *result;
 mpf_t quot, iquot, term;
@@ -2632,10 +2675,9 @@ int i, p;
 
 
 static char *scale_name(int real_kind, int int_kind) {
-static char buffer[20];
 
-  sprintf(buffer, "__scale%d_%d", real_kind, int_kind);
-  return buffer;
+  sprintf(temp_name, "__scale%d_%d", real_kind, int_kind);
+  return temp_name;
 }
 
 
@@ -3140,10 +3182,9 @@ mpf_t ac, ad, s, t, w;
 
 
 static char *sum_name(bt type, int kind) {
-static char buffer[20];
 
-  sprintf(buffer, "__sum_%c%d", g95_type_letter(type), kind);
-  return buffer;
+  sprintf(temp_name, "__sum_%c%d", g95_type_letter(type), kind);
+  return temp_name;
 }
 
 
@@ -3343,7 +3384,7 @@ int i;
 
 
 void g95_simplify_init_1(void) {
-int i, j;
+int i, j, k;
 
   integer_zero = g95_convert_integer("0", g95_default_integer_kind(), 10);
   real_zero = g95_convert_real("0.0", g95_default_real_kind());
@@ -3359,12 +3400,29 @@ int i, j;
 
   g95_add_string(dot_name(BT_LOGICAL, g95_default_logical_kind()));
 
-  for(i=0; g95_integer_kinds[i].kind; i++)
-    g95_add_string(dot_name(BT_INTEGER, g95_integer_kinds[i].kind));
+  /* Names of integer subroutines */
 
-  for(i=0; g95_real_kinds[i].kind; i++) {
-    g95_add_string(dot_name(BT_REAL, g95_real_kinds[i].kind));
-    g95_add_string(dot_name(BT_COMPLEX, g95_real_kinds[i].kind));
+  for(i=0; g95_integer_kinds[i].kind; i++) {
+    k = g95_integer_kinds[i].kind;
+
+    g95_add_string(dot_name(BT_INTEGER, k));
+    g95_add_string(sum_name(BT_INTEGER, k));
+
+    g95_add_string(maxval_name(BT_INTEGER, k));
+    g95_add_string(minval_name(BT_INTEGER, k));
+  }
+
+  for(i=0; g95_real_kinds[i].kind; i++) { 
+    k = g95_integer_kinds[i].kind;
+
+    g95_add_string(dot_name(BT_REAL, k));
+    g95_add_string(dot_name(BT_COMPLEX, k));
+
+    g95_add_string(sum_name(BT_REAL, k));
+    g95_add_string(sum_name(BT_COMPLEX, k));
+
+    g95_add_string(maxval_name(BT_REAL, k));
+    g95_add_string(minval_name(BT_REAL, k));
   }
 
   /* Names of the various forms of the SCALE intrinsic */
@@ -3373,16 +3431,6 @@ int i, j;
     for(j=0; g95_integer_kinds[j].kind; j++)
       g95_add_string(scale_name(g95_real_kinds[i].kind,
 				g95_integer_kinds[j].kind));
-
-  /* Names of the SUM intrinsic */
-
-  for(i=0; g95_integer_kinds[i].kind; i++)
-    g95_add_string(sum_name(BT_INTEGER, g95_integer_kinds[i].kind));
-
-  for(i=0; g95_real_kinds[i].kind; i++) {
-    g95_add_string(sum_name(BT_REAL, g95_real_kinds[i].kind));
-    g95_add_string(sum_name(BT_COMPLEX, g95_real_kinds[i].kind));
-  }
 }
 
 

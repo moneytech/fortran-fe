@@ -1085,7 +1085,7 @@ static try check_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
     return FAILURE;
   }
 
-  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
+  if (check_arg_dim(array, dim, 1) == FAILURE) return FAILURE;
 
   if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
     return FAILURE;
@@ -1129,7 +1129,7 @@ static try check_minval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
     return FAILURE;
   }
 
-  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
+  if (check_arg_dim(array, dim, 1) == FAILURE) return FAILURE;
 
   if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
     return FAILURE;
@@ -2304,8 +2304,9 @@ int di, dr, dd, dl, dc, dz;
 	  ar, BT_REAL, dr, 0,   dm, BT_INTEGER, di, 1,
 	  msk, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("maxval", 1, 1, BT_REAL, dr, NULL, check_maxval, ar, BT_REAL, dr, 0,
-	  dm, BT_INTEGER, di, 1,   msk, BT_LOGICAL, dl, 1, NULL);
+  add_sym("maxval", 1, 1, BT_REAL, dr, g95_simplify_maxval, check_maxval,
+	  ar, BT_REAL, dr, 0,   dm, BT_INTEGER, di, 1,
+	  msk, BT_LOGICAL, dl, 1, NULL);
 
   add_sym("merge", 0, 1, BT_REAL, dr, NULL, check_merge, ts, BT_REAL, dr, 0,
 	  fs, BT_REAL, dr, 0,   msk, BT_LOGICAL, dl, 0, NULL);
@@ -2342,8 +2343,9 @@ int di, dr, dd, dl, dc, dz;
 	  ar, BT_REAL, dr, 0,   dm, BT_INTEGER, di, 1,
 	  msk, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("minval", 1, 1, BT_REAL, dr, NULL, check_minval, ar, BT_REAL, dr, 0,
-	  dm, BT_INTEGER, di, 1,   msk, BT_LOGICAL, dl, 1, NULL);
+  add_sym("minval", 1, 1, BT_REAL, dr, g95_simplify_minval, check_minval,
+	  ar, BT_REAL, dr, 0,	  dm, BT_INTEGER, di, 1,
+	  msk, BT_LOGICAL, dl, 1, NULL);
 
   add_sym("mod", 0, 1, BT_INTEGER, di, g95_simplify_mod, check_mod,
 	  a, BT_INTEGER, di, 0,   p, BT_INTEGER, di, 0, NULL);
