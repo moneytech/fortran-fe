@@ -159,12 +159,15 @@ g95_conv_ss_descriptor (g95_loopinfo * loop, g95_ss * ss)
   g95_add_stmt_to_pre (loop, se.pre, se.pre_tail);
   ss->data.info.descriptor = se.expr;
 
-  /* Also the data pointer.  */
-  field = g95_get_base_component (TREE_TYPE (se.expr));
+  if (! loop->array_parameter)
+    {
+      /* Also the data pointer.  */
+      field = g95_get_base_component (TREE_TYPE (se.expr));
 
-  se.expr = build (COMPONENT_REF, TREE_TYPE (field), se.expr, field);
-  ss->data.info.data =
-    g95_simple_fold (se.expr, &loop->pre, &loop->pre_tail, NULL);
+      se.expr = build (COMPONENT_REF, TREE_TYPE (field), se.expr, field);
+      ss->data.info.data =
+        g95_simple_fold (se.expr, &loop->pre, &loop->pre_tail, NULL);
+    }
 }
 
 /* Initialise a g95_loopinfo structure.  */
@@ -288,7 +291,11 @@ g95_conv_array_ubound (tree descriptor, int dim)
   return tmp;
 }
 
-/* Generates the actual loops for a scalarized expression.  */
+/* Generates the actual loops for a scalarized expression.  
+   There are several optimizations that could be done (eg. loop unrolling),
+   common expression extraction, however they are not beneficial in all cases,
+   so I'm leaving that to the backend.  If seems to make a fairly good job of
+   it.  */
 tree
 g95_trans_scalarizing_loops (g95_loopinfo * loop, tree body)
 {

@@ -277,16 +277,30 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
   /* Chain this decl to the pending declarations.  Don't do pushdecl()
      because this would add them to the current scope rather than the
      function scope.  */
-  saved_function_decls =
-    chainon (build_stmt (DECL_STMT, decl), saved_function_decls);
+  if (current_function_decl != NULL_TREE)
+  {
+    saved_function_decls =
+      chainon (build_stmt (DECL_STMT, decl), saved_function_decls);
+  }
 
+  /* If a variable is USE associated, it's always external.  */
+  if (sym->attr.use_assoc)
+    DECL_EXTERNAL (decl) = 1;
+  else if (sym->module[0])
+    {
+      assert (current_function_decl == NULL_TREE);
+      /* This is the declaration of a module variable.  */
+      TREE_PUBLIC (decl) = 1;
+      TREE_STATIC (decl) = 1;
+    }
+  
   if (sym->attr.save)
     TREE_STATIC (decl) = 1;
 }
 
 /* Get a temporary decl for a dummy array parameter.  */
 static tree
-g95_build_packed_array_decl (g95_symbol * sym)
+g95_build_dummy_array_decl (g95_symbol * sym)
 {
   tree decl;
   tree type;
@@ -306,8 +320,7 @@ g95_build_packed_array_decl (g95_symbol * sym)
   TREE_STATIC (decl) = 0;
   DECL_EXTERNAL (decl) = 0;
 
-  if (sym->as->type == AS_DEFERRED
-      && ! (sym->attr.pointer || sym->attr.dimension))
+  if (sym->as->type == AS_DEFERRED)
     internal_error("possible g95 frontend bug: deferred shape dummy array");
 
   if (! g95_option.no_repack_arrays)
@@ -351,11 +364,12 @@ g95_get_symbol_decl (g95_symbol * sym)
   if (sym->attr.dummy)
     {
       assert (sym->backend_decl);
+      /* Use a copy of the descriptor for dummy arrays.  */
       if (sym->attr.dimension
           && ! (sym->attr.pointer || sym->attr.allocatable)
           && TREE_CODE (sym->backend_decl) == PARM_DECL)
         {
-          return g95_build_packed_array_decl (sym);
+          return g95_build_dummy_array_decl (sym);
         }
       /* Dummy variables should already have been created.  */
       TREE_USED (sym->backend_decl) = 1;
@@ -379,14 +393,11 @@ g95_get_symbol_decl (g95_symbol * sym)
                      g95_sym_identifier (sym),
                      g95_sym_type (sym));
 
-  /* If a variable is USE associated, it's always external, and
-     its assembler name should be manged.  This is done here rather than in
-     g95_finish_var_decl because it is different for string lengths.  */
-  if (sym->attr.use_assoc)
-    {
-      DECL_EXTERNAL (decl) = 1;
-      SET_DECL_ASSEMBLER_NAME (decl, g95_sym_mangled_identifier (sym));
-    }
+  /* Symbold from modules have its assembler name should be manged.
+     This is done here rather than in g95_finish_var_decl because it
+     is different for string length variables.  */
+  if (sym->module[0])
+    SET_DECL_ASSEMBLER_NAME (decl, g95_sym_mangled_identifier (sym));
 
   if (sym->attr.dimension)
     {
@@ -430,9 +441,10 @@ g95_get_symbol_decl (g95_symbol * sym)
           length = build_decl (VAR_DECL, get_identifier(name),
                               g95_strlen_type_node);
 
-          if (sym->attr.use_assoc)
+          DECL_ARTIFICIAL (decl) = 1;
+          /* Also prefix the mangled name for symbols from modules.  */
+          if (sym->module[0])
             {
-              DECL_EXTERNAL (decl) = 1;
               strcpy (&name[1],
                      IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (length)));
               SET_DECL_ASSEMBLER_NAME (decl, get_identifier (name));

@@ -632,26 +632,34 @@ g95_get_array_type_bounds (tree type, int dimen, tree * lbound, tree * ubound)
   for (n = 0 ; n < dimen; n++)
     {
       G95_TYPE_DESCRIPTOR_STRIDE (fat_type, n) = stride;
-      if (lbound[n] != NULL_TREE)
+      lower = lbound[n];
+      if (lower != NULL_TREE)
         {
-          assert (INTEGER_CST_P (lbound[n]));
-          G95_TYPE_DESCRIPTOR_LBOUND (fat_type, n) = lbound[n];
+          if (INTEGER_CST_P (lower))
+            G95_TYPE_DESCRIPTOR_LBOUND (fat_type, n) = lower;
+          else
+            lower = NULL_TREE;
         }
 
-      if (ubound[n] != NULL_TREE)
+      upper = ubound[n];
+      if (upper != NULL_TREE)
         {
-          assert (INTEGER_CST_P (ubound[n]));
-          G95_TYPE_DESCRIPTOR_UBOUND (fat_type, n) = ubound[n];
+          if (INTEGER_CST_P (upper))
+            G95_TYPE_DESCRIPTOR_UBOUND (fat_type, n) = upper;
+          else
+            upper = NULL_TREE;
         }
 
-      if (ubound[n] != NULL_TREE && lbound[n] != NULL_TREE
+      if (upper != NULL_TREE && lower != NULL_TREE
           && stride != NULL_TREE)
         {
-          tmp = fold (build (MINUS_EXPR, g95_array_index_type, ubound[n],
-                            lbound[n]));
+          tmp = fold (build (MINUS_EXPR, g95_array_index_type, upper,
+                            lower));
           tmp = fold (build (PLUS_EXPR, g95_array_index_type, tmp,
                             integer_one_node));
           stride = fold (build (MULT_EXPR, g95_array_index_type, tmp, stride));
+          /* Check the folding worked.  */
+          assert (INTEGER_CST_P (stride));
         }
       else
         stride = NULL_TREE;
