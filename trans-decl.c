@@ -67,10 +67,11 @@ tree gfor_fndecl_pop_context;
 tree gfor_fndecl_internal_malloc;
 tree gfor_fndecl_internal_malloc64;
 tree gfor_fndecl_internal_free;
+tree library_stop_numeric;
+tree library_stop_string;
 tree gfor_fndecl_allocate;
 tree gfor_fndecl_allocate64;
 tree gfor_fndecl_deallocate;
-tree gfor_fndecl_stop;
 tree gfor_fndecl_runtime_error;
 tree gfor_fndecl_repack[G95_MAX_DIMENSIONS];
 
@@ -1080,6 +1081,19 @@ g95_build_builtin_function_decls (void)
             1,
             ppvoid_type_node);
 
+  library_stop_numeric = g95_build_library_function_decl(
+	    get_identifier(PREFIX "stop_numeric"),
+            void_type_node,
+            1,
+            g95_int4_type_node);
+
+  library_stop_string = g95_build_library_function_decl(
+	    get_identifier(PREFIX "stop_string"),
+            void_type_node,
+            2,
+	    pchar_type_node,
+            g95_int4_type_node);
+
   gfor_fndecl_push_context = g95_build_library_function_decl (
             get_identifier ("_gfor_push_context"),
             void_type_node,
@@ -1109,12 +1123,6 @@ g95_build_builtin_function_decls (void)
             void_type_node,
             1,
             ppvoid_type_node);
-
-  gfor_fndecl_stop = g95_build_library_function_decl (
-            get_identifier ("_gfor_stop"),
-            void_type_node,
-            1,
-            g95_int4_type_node);
 
   gfor_fndecl_runtime_error =
     g95_build_library_function_decl (get_identifier ("_gfor_runtime_error"),

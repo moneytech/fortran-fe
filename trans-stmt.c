@@ -104,36 +104,29 @@ g95_trans_return (g95_code *code ATTRIBUTE_UNUSED)
   return build_v (GOTO_EXPR, g95_get_return_label ());
 }
 
-tree
-g95_trans_stop (g95_code *code)
-{
-  g95_se se;
-  tree arg;
-  tree tmp;
 
-  g95_init_se (&se, NULL);
-  g95_start_block (&se.pre);
+tree g95_trans_stop(g95_code *code) {
+tree arg, tmp;
+g95_se se;
 
-  if (code->label != NULL)
-    {
-      if (code->expr != NULL)
-        {
-          g95_conv_expr_type (&se, code->expr, g95_int4_type_node);
-          arg = se.expr;
-        }
-      else
-        arg = build_int_2 (code->label->value, 0);
-    }
-  else
-    arg = integer_zero_node;
+  g95_init_se(&se, NULL);
+  g95_start_block(&se.pre);
 
-  arg = tree_cons (NULL_TREE, arg, NULL_TREE);
-  tmp = g95_build_function_call (gfor_fndecl_stop, arg);
-  g95_add_expr_to_block (&se.pre, tmp);
+  if (code->expr == NULL) {
+    arg = g95_chainon_list(NULL_TREE, build_int_2(code->ext.stop_code, 0));
+    tmp = g95_build_function_call(library_stop_numeric, arg);
+  } else {
+    g95_conv_expr_reference(&se, code->expr);
 
-  tmp = g95_finish_block (&se.pre);
+    arg = g95_chainon_list(NULL_TREE, se.expr);
+    arg = g95_chainon_list(arg, se.string_length);
+    tmp = g95_build_function_call(library_stop_string, arg);
+  }
 
-  return tmp;
+  g95_set_error_locus(&se.pre, &code->loc);
+
+  g95_add_expr_to_block(&se.pre, tmp);
+  return g95_finish_block(&se.pre);
 }
 
 

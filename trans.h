@@ -328,6 +328,8 @@ void g95_build_io_library_fndecls (void);
 tree g95_build_library_function_decl VPARAMS((tree name, tree rettype,
                                               int nargs, ...));
 
+void g95_set_error_locus(stmtblock_t *, locus *);
+
 /* somewhere! */
 tree pushdecl (tree);
 void pushlevel (int);
@@ -342,9 +344,10 @@ extern GTY(()) tree gfor_fndecl_internal_malloc;
 extern GTY(()) tree gfor_fndecl_internal_malloc64;
 extern GTY(()) tree gfor_fndecl_internal_free;
 extern GTY(()) tree gfor_fndecl_allocate;
+extern GTY(()) tree library_stop_numeric;
+extern GTY(()) tree library_stop_string;
 extern GTY(()) tree gfor_fndecl_allocate64;
 extern GTY(()) tree gfor_fndecl_deallocate;
-extern GTY(()) tree gfor_fndecl_stop;
 extern GTY(()) tree gfor_fndecl_runtime_error;
 extern GTY(()) tree gfor_fndecl_repack[G95_MAX_DIMENSIONS];
 

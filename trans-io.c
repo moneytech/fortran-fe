@@ -158,8 +158,6 @@ tree decl;
 }
 
 
-#define PREFIX "_g95_"
-
 #define ADD_FIELD(name, type) \
   ioparm_ ## name = add_field(ioparm_type, stringize(name), type)
 
@@ -428,11 +426,11 @@ tree tmp, rc;
 }
 
 
-/* set_runtime_locus()-- Store the current file and line number to
+/* g95_set_runtime_locus()-- Store the current file and line number to
  * variables so that if a library call goes awry, we can tell the user
  * where the problem is. */
 
-static void set_error_locus(stmtblock_t *block, locus *where) {
+void g95_set_error_locus(stmtblock_t *block, locus *where) {
 g95_file *f;
 tree tmp;
 int line;
@@ -458,7 +456,7 @@ tree tmp;
   g95_init_block(&block);
   g95_init_block(&post_block);
 
-  set_error_locus(&block, &code->loc);
+  g95_set_error_locus(&block, &code->loc);
   p = code->ext.open;
 
   if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
@@ -515,7 +513,7 @@ tree tmp;
   g95_init_block(&block);
   g95_init_block(&post_block);
 
-  set_error_locus(&block, &code->loc);
+  g95_set_error_locus(&block, &code->loc);
   p = code->ext.close;
 
   if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
@@ -548,7 +546,7 @@ tree tmp;
 
   g95_init_block(&block);
 
-  set_error_locus(&block, &code->loc);
+  g95_set_error_locus(&block, &code->loc);
 
   if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
 
@@ -598,7 +596,7 @@ tree tmp;
   g95_init_block(&block);
   g95_init_block(&post_block);
 
-  set_error_locus(&block, &code->loc);
+  g95_set_error_locus(&block, &code->loc);
   p = code->ext.inquire;
 
   if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
@@ -699,7 +697,7 @@ tree tmp;
   g95_init_block(&block); 
   g95_init_block(&post_block);
 
-  set_error_locus(&block, &code->loc);
+  g95_set_error_locus(&block, &code->loc);
   dt = code->ext.dt;
 
   if (dt->io_unit) set_parameter_value(&block, ioparm_unit, dt->io_unit);

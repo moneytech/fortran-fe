@@ -122,8 +122,7 @@ static void free_statement(g95_code *p) {
   case EXEC_RETURN:   case EXEC_IF:         case EXEC_STOP:  case EXEC_EXIT: 
   case EXEC_WHERE:    case EXEC_IOLENGTH:   case EXEC_POINTER_ASSIGN:
   case EXEC_DO_WHILE: case EXEC_CONTINUE:   case EXEC_TRANSFER:
-
-case EXEC_ARITHMETIC_IF:   
+  case EXEC_ARITHMETIC_IF:   
     break;
 
   case EXEC_CALL:
@@ -283,12 +282,10 @@ g95_dt *dt;
   case EXEC_STOP:
     g95_status("STOP ");
 
-    if (c->label != NULL) {
-      if (c->expr != NULL)
-	g95_show_expr(c->expr);
-      else
-	g95_status("%d", c->label->value);
-    }
+    if (c->expr != NULL)
+      g95_show_expr(c->expr);
+    else
+      g95_status("%d", c->ext.stop_code);
 
     break;
 

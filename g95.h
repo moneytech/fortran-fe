@@ -69,6 +69,8 @@ char *alloca ();
 
 #define MAX_ERROR_MESSAGE 1000  /* Maximum length of an error message */
 
+#define PREFIX "_g95_"
+
 
 #define free(x) Use_g95_free_instead_of_free()
 #define g95_is_whitespace(c) ((c==' ') || (c=='\t'))
@@ -882,6 +884,7 @@ typedef struct g95_code {
     g95_dt *dt;
     g95_forall_iterator *forall_iterator;
     struct g95_code *whichloop;
+    int stop_code;
   } ext;     /* Points to additional structures required by statement */
 
   /* Backend_decl is used for cycle and break labels in do loops, and

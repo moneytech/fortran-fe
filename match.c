@@ -1161,34 +1161,36 @@ got_match:
 }
 
 
-/* g95_match_stop()-- Match the STOP statement */
+/* g95_match_stop()-- Match the STOP statement.  We can't match a
+ * label here because labels can't be zero and a stop code can. */
 
 match g95_match_stop(void) {
-locus old_loc;
+int stop_code;
 g95_expr *e;
-g95_st_label *label;
 match m;
 
-  new_st.op = EXEC_STOP;
+  stop_code = -1;   /* blank stop */
+  e = NULL;
 
-  if (g95_match_eos() == MATCH_YES) return MATCH_YES;
+  if (g95_match_eos() != MATCH_YES) {
+    m = g95_match_small_literal_int(&stop_code);
+    if (m == MATCH_ERROR) goto cleanup;
 
-  old_loc = *g95_current_locus();
-  label = NULL;
-  m = g95_match(" %l %t", &label);
-  if (m == MATCH_YES)
-    new_st.label = label;
-  else {
-    g95_set_locus(&old_loc);
+    if (m == MATCH_YES && stop_code > 99999) {
+      g95_error("STOP code out of range at %C");
+      goto cleanup;
+    }
 
-    m = g95_match(" %e %t", &e);
+    if (m == MATCH_NO) {  /* Try a character constant */
+      m = g95_match_expr(&e);
+      if (m == MATCH_ERROR) goto cleanup;
+      if (m == MATCH_NO) goto syntax;
 
-    if (m == MATCH_ERROR
-        || e->ts.type != BT_CHARACTER
-        || e->expr_type != EXPR_CONSTANT)
-      goto syntax;
+      if (e->ts.type != BT_CHARACTER || e->expr_type != EXPR_CONSTANT)
+	goto syntax;
+    }
 
-    new_st.expr = e;
+    if (g95_match_eos() != MATCH_YES) goto syntax;
   }
 
   if (g95_pure(NULL)) {
@@ -1196,14 +1198,16 @@ match m;
     goto cleanup;
   }
 
+  new_st.op = EXEC_STOP;
+  new_st.expr = e;
+  new_st.ext.stop_code = stop_code;
+
   return MATCH_YES;
 
 syntax:
   g95_syntax_error(ST_STOP);
 
 cleanup:
-  if (label) g95_free_st_label(label);
-
   g95_free_expr(e);
   return MATCH_ERROR;
 }
