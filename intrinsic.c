@@ -37,7 +37,7 @@ extern g95_real_info g95_real_kinds[];
 
 int g95_intrinsic_extension;
 
-/* Pointers to a intrinsic function and it's argument names being checked.
+/* Pointers to a intrinsic function and its argument names being checked.
  * The mvbits() subroutine requires the most arguments-- five. */
 
 #define MAX_INTRINSIC_ARGS 5
@@ -334,6 +334,7 @@ va_list argp;
 
   for(;;) {
     name = va_arg(argp, char *);
+
     if (name == NULL) break;
 
     type = va_arg(argp, bt);
@@ -820,6 +821,10 @@ int di, dr, dd, dl, dc, dz;
 	  g95_check_iand, g95_simplify_iand, NULL,
 	  i, BT_INTEGER, di, 0,   j, BT_INTEGER, di, 0, NULL);
 
+  add_sym("iargc", 1, 1, BT_INTEGER, di,
+	  NULL, NULL, NULL, 
+	  NULL);   /* Extension, takes no arguments */
+
   add_sym("ibclr", 1, 1, BT_INTEGER, di,
 	  g95_check_ibclr, g95_simplify_ibclr, NULL,
 	  i, BT_INTEGER, di, 0,   pos, BT_INTEGER, di, 0, NULL);
@@ -1123,7 +1128,7 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("real", 1, 0, BT_REAL, dr,
 	  g95_check_real, g95_simplify_real, g95_resolve_real,
-	  a, BT_INTEGER, di, 0,   kind, BT_INTEGER, di, 1, NULL);
+	  a, BT_UNKNOWN, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("float", 1, 0, BT_REAL, dr,
 	  NULL, g95_simplify_float, NULL,
@@ -1336,6 +1341,11 @@ int di, dr, dc;
 	  g95_check_date_and_time, NULL, NULL,
 	  dt, BT_CHARACTER, dc, 1,   tm, BT_CHARACTER, dc, 1,
 	  zn, BT_CHARACTER, dc, 1,   vl, BT_INTEGER,   di, 1, NULL);
+
+  add_sym("getarg", 0, 1, BT_UNKNOWN, 0,
+	  NULL, NULL, NULL,
+	  c,  BT_INTEGER,   di, 0,   vl, BT_CHARACTER, dc, 0, NULL);
+                                                        /* Extension */
 
   add_sym("mvbits", 1, 1, BT_UNKNOWN, 0,
 	  g95_check_mvbits, g95_simplify_mvbits, NULL,
@@ -1560,6 +1570,9 @@ int i;
   f = formal;
   a = actual;
 
+  if ( f == NULL && a == NULL ) /* No arguments */
+    return SUCCESS;
+
   for(;;) {     /* Put the nonkeyword arguments in a 1:1 correspondence */
     if (f == NULL) break;
     if (a == NULL) goto optional;
@@ -1673,7 +1686,8 @@ static void resolve_intrinsic(intrinsic_sym *specific, g95_expr *e) {
 g95_expr *a1, *a2, *a3, *a4, *a5;
 g95_actual_arglist *arg;
 
-  if (specific->elemental) e->rank = e->value.function.actual->expr->rank;
+  if ( (e->value.function.actual != NULL) && specific->elemental) 
+    e->rank = e->value.function.actual->expr->rank;
 
   if (specific->resolve == NULL) {
     if (e->value.function.name == NULL)
@@ -1684,6 +1698,13 @@ g95_actual_arglist *arg;
   }
 
   arg = e->value.function.actual;
+
+/* At present only the iargc extension intrinsic takes no arguments,
+ * and it doesn't need a resolution function, but this is here for generality */
+  if ( arg == NULL ) {
+    (*specific->resolve)(e);
+    return;
+  }
 
   a1 = arg->expr;
   arg = arg->next;
