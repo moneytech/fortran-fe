@@ -1674,7 +1674,7 @@ g95_symtree *st;
   mio_rparen();
 
 /* Find out if all elements of the rename-list were found in the module */
-  for(u=g95_rename_list; u; u=g95_rename_list->next) {
+  for(u=g95_rename_list; u; u=u->next) {
     if(!u->found) {
       g95_error("Symbol %s referenced at %L not found in module %s",
 		u->use_name, &u->where, module_name);
