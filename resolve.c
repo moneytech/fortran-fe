@@ -291,6 +291,7 @@ g95_symbol *s;
     if (s != NULL) {
       expr->value.function.name = s->name;
       expr->ts = s->ts;
+      if (sym->as != NULL) expr->rank = sym->as->rank;
       return MATCH_YES;
     }
 
@@ -362,6 +363,8 @@ static match resolve_specific0(g95_symbol *sym, g95_expr *expr) {
 found:
   expr->ts = sym->ts;
   expr->value.function.name = sym->name;
+  if (sym->as != NULL) expr->rank = sym->as->rank;
+
   return MATCH_YES;
 }
 
@@ -417,6 +420,7 @@ g95_typespec ts;
 
   sym->attr.proc = PROC_EXTERNAL;
   expr->value.function.name = sym->name;
+  if (sym->as != NULL) expr->rank = sym->as->rank;
 
   /* Type of the expression is either the type of the symbol or the
    * default type of the symbol */
@@ -440,22 +444,98 @@ g95_typespec ts;
 }
 
 
+/* was_declared()-- Returns 0 if a symbol was not declared with a type
+ * or attriute declaration statement, nonzero otherwise. */
+
+static int was_declared(g95_symbol *sym) {
+symbol_attribute a;
+
+  a = sym->attr;
+
+  if (!a.implicit_type && sym->ts.type != BT_UNKNOWN) return 1;
+
+  if (a.allocatable || a.dimension || a.external || a.intrinsic ||
+      a.optional || a.pointer || a.save || a.target ||
+      a.access != ACCESS_UNKNOWN || a.intent != INTENT_UNKNOWN) return 1;
+
+  return 0;
+}
+
+
+/* resolve_actual_arglist()-- Resolve and actual argument list.  Most
+ * of the time, this is just resolving the expressions in the list.
+ * The exception is that we sometimes have to decide whether arguments
+ * that look like procedure arguments are really simple variable
+ * references. */
+
+static try resolve_actual_arglist(g95_actual_arglist *arg) {
+g95_symbol *parent_sym, *sym;
+g95_expr *e;
+
+  for(; arg; arg=arg->next) {
+
+    e = arg->expr;
+
+    if (e->ts.type != BT_PROCEDURE) {
+      if (g95_resolve_expr(e) != SUCCESS) return FAILURE;
+      continue;
+    }
+
+    /* See if the expression node should really be a variable reference */
+
+    sym = e->symbol;
+
+    if (sym->attr.flavor == FL_PROCEDURE || sym->attr.intrinsic ||
+	sym->attr.external) {
+
+      /* If the symbol is the function that names the current (or
+       * parent) scope, then we really have a variable reference */
+
+      if (sym->attr.function && sym->result == sym &&
+	  (sym->ns->proc_name == sym ||
+	   (sym->ns->parent != NULL && sym->ns->parent->proc_name == sym)))
+	goto got_variable;
+
+      continue;
+    } 
+
+    /* See if the name is a module procedure in a parent unit */
+
+    if (was_declared(sym) || sym->ns->parent == NULL) goto got_variable;
+
+    if (g95_find_symbol(sym->name, sym->ns->parent, 1, &parent_sym)) {
+      g95_error("Symbol '%s' at %L is ambiguous", sym->name, &e->where);
+      return FAILURE;
+    }
+
+    if (parent_sym == NULL) goto got_variable;
+
+    sym = parent_sym;
+    e->symbol = sym;    /* Point to the right thing */
+
+    if (sym->attr.flavor == FL_PROCEDURE || sym->attr.intrinsic ||
+	sym->attr.external) {
+      continue;
+    }
+
+  got_variable:
+    e->expr_type = EXPR_VARIABLE;
+    e->ts = sym->ts;
+    if (sym->as != NULL) e->rank = sym->as->rank;
+  }
+
+  return SUCCESS;
+}
+
+
 /* resolve_function()-- Resolve a function call, which means resolving
  * the arguments, then figuring out which entity the name refers to. */
 
 static try resolve_function(g95_expr *expr) {
-g95_actual_arglist *arg;
 try t;
 
-  arg = expr->value.function.actual;
-  t = SUCCESS;
-
-  while(arg) {
-    if (g95_resolve_expr(arg->expr) != SUCCESS) t = FAILURE;
-    arg = arg->next;
-  }
-
-  if (t == FAILURE) return FAILURE;
+  if (resolve_actual_arglist(expr->value.function.actual) == FAILURE)
+    return FAILURE;
 
 /* See if function is already resolved */
   if (expr->value.function.name != NULL) {
@@ -712,11 +792,11 @@ try t;
 }
 
 
-static void resolve_call(g95_symbol *sym, g95_actual_arglist **arg) {
-g95_actual_arglist *a;
+/* resolve_call()-- Resolve a subroutine call.  More here later. */
 
-  for(a=*arg; a; a=a->next)
-    g95_resolve_expr(a->expr);
+static try resolve_call(g95_symbol *sym, g95_actual_arglist *arg) {
+
+  return resolve_actual_arglist(arg);
 }
 
 
@@ -887,7 +967,7 @@ try t;
       break;
 
     case EXEC_CALL:
-      resolve_call(code->sym, (g95_actual_arglist **) &code->ext);
+      resolve_call(code->sym, code->ext.arglist);
       break;
 
     case EXEC_SELECT:

@@ -998,8 +998,11 @@ match m;
 
 
 /* match_actual_arg()-- match a single actual argument value.  An
- * actual argument is usually just an expression, but can also be a
- * procedure name. */
+ * actual argument is usually an expression, but can also be a
+ * procedure name.  If the argument is a single name, it is not always
+ * possible to tell whether the name is a dummy procedure or not.  We
+ * treat these cases by creating an argument that looks like a dummy
+ * procedure and fixing things later during resolution. */
 
 static match match_actual_arg(g95_expr **result) {
 char name[G95_MAX_SYMBOL_LEN+1];
@@ -1018,49 +1021,35 @@ int c;
     break;
 
   case MATCH_YES:
-    g95_find_symbol(name, NULL, 1, &sym);
+    w = *g95_current_locus();
+    g95_gobble_whitespace();
+    c = g95_next_char();
+    g95_set_locus(&w);
 
-    /* See if we have a function with no result clause */
-    if (sym != NULL && sym->result == sym) break;
+    if (c != ',' && c != ')') break;
 
-    if (sym == NULL ||
-	(!sym->attr.intrinsic && !sym->attr.external &&
-	 sym->attr.flavor != FL_PROCEDURE)) {
+    if (g95_find_symbol(name, NULL, 1, &sym)) break;
+    /* Handle error elsewhere */
 
-      /* No clue about what we've got.  If we're compiling a module,
-       * it still might be a procedure reference if the name is the
-       * only argument */
+    /* Eliminate a couple of common cases where we know we don't have
+     * a function argument. */
 
-      if (g95_find_state(COMP_MODULE) == FAILURE ||
-	  (sym != NULL && sym->attr.flavor != FL_UNKNOWN)) break;
+    if (sym == NULL)
+      g95_get_symbol(name, NULL, 0, &sym);
+    else {
+      if (sym->attr.flavor != FL_PROCEDURE && sym->attr.flavor != FL_UNKNOWN)
+	break;
 
-      w = *g95_current_locus();
-      g95_gobble_whitespace();
-      c = g95_next_char();
-      g95_set_locus(&w);
+      /* If the symbol is a function with itself as the result and is
+       * being defined, then we have a variable */
 
-      if (c != ',' && c != ')') break;
-
-      e = g95_get_expr();      /* Leave it unknown for now */
-
-      g95_findget_symbol(name, NULL, 1, &sym);
-      e->symbol = sym;
-      e->expr_type = EXPR_VARIABLE;
-      e->ts.type = BT_UNKNOWN;
-      e->where = where;
-      if (sym->as != NULL) e->rank = sym->as->rank;
-
-      *result = e;
-      return MATCH_YES;
+      if (sym->result == sym &&
+	  (g95_current_ns->proc_name == sym ||
+	   (g95_current_ns->parent != NULL &&
+	    g95_current_ns->parent->proc_name == sym))) break;
     }
 
-/* Symbol is a procedure.  Peek ahead yet again to see if the next
- * character is a left parenthesis.  If not, the actual argument is
- * the procedure. */
-
-    if (g95_match_char('(') == MATCH_YES) break;
-
-    e = g95_get_expr();
+    e = g95_get_expr();              /* Leave it unknown for now */
     e->symbol = sym;
     e->expr_type = EXPR_VARIABLE;
     e->ts.type = BT_PROCEDURE;
