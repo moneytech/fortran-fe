@@ -1155,7 +1155,7 @@ cleanup:
 /* match_varspec()-- Match any additional specifications associated
  * with the current variable like member references or substrings. */
 
-static match match_varspec(g95_expr *primary) {
+static match match_varspec(g95_expr *primary, int equiv_flag) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_ref *substring, *tail;
 g95_component *component;
@@ -1164,11 +1164,13 @@ match m;
 
   tail = NULL;
 
-  if (primary->symbol->attr.dimension) {
+  if (primary->symbol->attr.dimension ||
+      (equiv_flag && g95_peek_char() == '(')) {
+
     tail = extend_ref(primary, tail);
     tail->type = REF_ARRAY;
 
-    m = g95_match_array_ref(&tail->ar, primary->as);
+    m = g95_match_array_ref(&tail->ar, primary->as, equiv_flag);
     if (m != MATCH_YES) return m;
   }
 
@@ -1200,7 +1202,7 @@ match m;
       tail = extend_ref(primary, tail);
       tail->type = REF_ARRAY;
 
-      m = g95_match_array_ref(&tail->ar, component->as);
+      m = g95_match_array_ref(&tail->ar, component->as, equiv_flag);
       if (m != MATCH_YES) return m;
     }
 
@@ -1393,13 +1395,13 @@ match m;
     e->expr_type = EXPR_VARIABLE;
     e->symbol = sym;
 
-    m = match_varspec(e);
+    m = match_varspec(e, 0);
     break;
 
   case FL_PARAMETER:
     e = g95_copy_expr(sym->value);
     e->symbol = sym;
-    m = match_varspec(e);
+    m = match_varspec(e, 0);
     break;
 
   case FL_DERIVED:
@@ -1430,7 +1432,7 @@ match m;
       e->symbol = sym;
       e->expr_type = EXPR_VARIABLE;
       
-      m = match_varspec(e);
+      m = match_varspec(e, 0);
       break;
     }
 
@@ -1484,7 +1486,7 @@ match m;
       e = g95_get_expr();
       e->symbol = sym;
       e->expr_type = EXPR_VARIABLE;
-      m = match_varspec(e);
+      m = match_varspec(e, 0);
       break;
     }
 
@@ -1510,7 +1512,7 @@ match m;
       }
 
       e->ts = sym->ts;
-      m = match_varspec(e);
+      m = match_varspec(e, 0);
       break;
     }
 
@@ -1564,7 +1566,7 @@ match m;
     /* If our new function returns a character, array or structure
      * type, it might have subsequent references. */
 
-    m = match_varspec(e);
+    m = match_varspec(e, 0);
     if (m == MATCH_NO) m = MATCH_YES;
 
     break;
@@ -1605,7 +1607,7 @@ match m;
  * or an array reference.  It cannot be a function.  If the symbol has
  * not been previously seen, we assume it is a variable. */
 
-match g95_match_variable(g95_expr **result) {
+match g95_match_variable(g95_expr **result, int equiv_flag) {
 g95_state_data *st;
 g95_symbol *sym;
 g95_expr *expr;
@@ -1615,7 +1617,7 @@ match m;
 
   m = g95_match_symbol(&sym);
   if (m != MATCH_YES) return m;
-  where = *g95_current_locus(); 
+  where = *g95_current_locus();
 
   switch(sym->attr.flavor) {
   case FL_VARIABLE:
@@ -1651,7 +1653,7 @@ match m;
 
 /* Now see if we have to do more */
 
-  m = match_varspec(expr);
+  m = match_varspec(expr, equiv_flag);
   if (m != MATCH_YES) {
     g95_free_expr(expr);
     return m;

@@ -1171,7 +1171,7 @@ match g95_match_target(void);
 
 match g95_match_substring(g95_ref **);
 match g95_match_rvalue(g95_expr **);
-match g95_match_variable(g95_expr **);
+match g95_match_variable(g95_expr **, int);
 match g95_match_expr_type(bt, g95_expr **);
 match g95_match_scalar_expr(g95_expr **);
 match g95_match_actual_arglist(int, g95_actual_arglist **, g95_label_list **);
@@ -1235,7 +1235,7 @@ g95_array_spec *g95_copy_array_spec(g95_array_spec *);
 void g95_resolve_array_spec(g95_array_spec *);
 match g95_match_array_spec(g95_array_spec **);
 
-match g95_match_array_ref(g95_array_ref *, g95_array_spec *);
+match g95_match_array_ref(g95_array_ref *, g95_array_spec *, int);
 try g95_resolve_array_ref(g95_array_ref *, g95_array_spec *);
 int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
 

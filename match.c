@@ -506,7 +506,7 @@ loop:
 
     case 'v':
       vp = va_arg(argp, void **);
-      n = g95_match_variable((g95_expr **) vp);
+      n = g95_match_variable((g95_expr **) vp, 0);
       if (n != MATCH_YES) { m = n; goto not_yes; }
 
       matches++;
@@ -1832,8 +1832,6 @@ void g95_free_equiv(g95_equiv *eq) {
 
 match g95_match_equivalence(void) {
 g95_equiv *eq, *set, *tail;
-g95_array_ref ar;
-g95_expr *expr;
 g95_ref *ref;
 match m;
 
@@ -1851,29 +1849,16 @@ match m;
     set = eq;
 
     for(;;) {
-      m = g95_match_variable(&expr);
+      m = g95_match_variable(&set->expr, 1);
       if (m == MATCH_ERROR) goto cleanup;
       if (m == MATCH_NO) goto syntax;
 
-/* match_variable() and its callees only check to see if a variable
- * has an array reference only if the variable already has the
- * dimension attribute.  We have to check for an array reference prior
- * to declaring the variable as an array. */
-
-      if (expr->ref == NULL && expr->symbol->attr.dimension == 0 &&
-	  expr->symbol->ts.type != BT_DERIVED) {
-
-	m = g95_match_array_ref(&ar, NULL);
-	if (m == MATCH_ERROR) goto cleanup;
-
-	if (ar.type != AR_FULL) {
-	  expr->ref = ref = g95_get_ref();
-	  ref->type = REF_ARRAY;
-	  ref->ar = ar;
+      for(ref=set->expr->ref; ref; ref=ref->next)
+	if (ref->type == REF_ARRAY && ref->ar.type != AR_ELEMENT) {
+	  g95_error("Array reference in EQUIVALENCE at %C must be to a "
+		    "single element");
+	  goto cleanup;
 	}
-      }
-
-      set->expr = expr;
 
       if (g95_match(" )") == MATCH_YES) break;
       if (g95_match(" ,") != MATCH_YES) goto syntax;
@@ -2319,7 +2304,7 @@ match m;
 
   iter = g95_getmem(sizeof(g95_forall_iterator));
 
-  m = g95_match_variable(&iter->var); 
+  m = g95_match_variable(&iter->var, 0);
   if (m != MATCH_YES) goto cleanup;
 
   if (g95_match(" =") != MATCH_YES) {

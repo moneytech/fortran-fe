@@ -174,7 +174,7 @@ bound:
   return SUCCESS;
 
 oops:
-  g95_internal_error("match_subscript(): Bad integer conversion");
+  g95_internal_error("check_dimension(): Bad integer conversion");
   return FAILURE;
 }
 
@@ -211,7 +211,7 @@ int i;
  * modifications we've made to the ar structure are cleaned up by the
  * caller. */
 
-static match match_subscript(g95_array_ref *ar) {
+static match match_subscript(g95_array_ref *ar, int init) {
 g95_expr *e;
 match m;
 int i;
@@ -225,7 +225,11 @@ int i;
 
   /* Get start element */
 
-  m = g95_match(" %E", &ar->shape[i].start);
+  if (init)
+    m = g95_match_init_expr(&ar->shape[i].start);
+  else
+    m = g95_match_expr(&ar->shape[i].start);
+
   if (m == MATCH_NO) g95_error("Expected array subscript at %C");
   if (m != MATCH_YES) return MATCH_ERROR;
 
@@ -247,7 +251,11 @@ int i;
 end_element:
   ar->type = AR_SECTION;
 
-  m = g95_match(" %e", &ar->shape[i].end);
+  if (init)
+    m = g95_match_init_expr(&ar->shape[i].end);
+  else
+    m = g95_match_expr(&ar->shape[i].end);
+
   if (m == MATCH_ERROR) return MATCH_ERROR;
 
 // Build UBOUND expression
@@ -257,7 +265,11 @@ end_element:
   if (g95_match(" :") == MATCH_NO)
     ar->shape[i].stride = g95_int_expr(1);
   else {
-    m = g95_match(" %e", &ar->shape[i].stride);
+    if (init)
+      m = g95_match_init_expr(&ar->shape[i].stride);
+    else
+      m = g95_match_expr(&ar->shape[i].stride);
+
     if (m == MATCH_NO) g95_error("Expected array subscript stride at %C");
     if (m != MATCH_YES) return MATCH_ERROR;
   }
@@ -270,7 +282,7 @@ done:
 /* g95_match_array_ref()-- Match an array reference, whether it is the
  * whole array or a particular elements or a section. */
 
-match g95_match_array_ref(g95_array_ref *ar, g95_array_spec *as) {
+match g95_match_array_ref(g95_array_ref *ar, g95_array_spec *as, int init) {
 match m;
 
   memset(ar, '\0', sizeof(ar));
@@ -289,7 +301,7 @@ match m;
   ar->type = AR_ELEMENT;
 
   for(ar->rank=0; ar->rank<G95_MAX_DIMENSIONS; ar->rank++) {
-    m = match_subscript(ar);
+    m = match_subscript(ar, init);
     if (m == MATCH_ERROR) goto error;
 
     if (g95_match(" )") == MATCH_YES) goto matched;
