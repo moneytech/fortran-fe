@@ -1034,6 +1034,7 @@ int c;
       e->expr_type = EXPR_VARIABLE;
       e->ts.type = BT_UNKNOWN;
       e->where = where;
+      if (sym->as != NULL) e->rank = sym->as->rank;
 
       *result = e;
       return MATCH_YES;
