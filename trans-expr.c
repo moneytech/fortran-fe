@@ -345,7 +345,6 @@ g95_conv_variable (g95_se * se, g95_expr * expr)
         se->expr = TREE_OPERAND (se->expr, 0);
       else
         {
-          assert (is_simple_varname (se->expr));
           TREE_ADDRESSABLE (se->expr) = 1;
           se->expr = build1 (ADDR_EXPR,
                              build_pointer_type (TREE_TYPE (se->expr)),

@@ -391,8 +391,6 @@ g95_trans_code (g95_code * code)
           break;
 
         case EXEC_CONTINUE:
-          if (code->next != NULL)
-            warning ("CONTINUE statement is not last statement in block");
           res = NULL_TREE;
           break;
 

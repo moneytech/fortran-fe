@@ -475,9 +475,14 @@ g95_build_array_type (tree type, g95_array_spec * as)
           break;
 
         case AS_ASSUMED_SIZE:
-          assert (as->rank == 1);
-
-          /* Fall through...  */
+	  if (n < as->rank-1)
+	    {
+              lbound[n] = g95_conv_array_bound (as->lower[n]);
+              ubound[n] = g95_conv_array_bound (as->upper[n]);
+              break;
+	    }
+	  else
+          /* Fall through...  */;
 
         case AS_ASSUMED_SHAPE:
           if (as->lower[n] == NULL)
