@@ -1270,11 +1270,11 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0,   b, BT_REAL, dr, 0, NULL);
 
   add_sym("isign", 1, 1, BT_INTEGER, di,
-	  NULL, g95_simplify_sign, NULL,
+	  NULL, g95_simplify_sign, g95_resolve_sign,
 	  a, BT_INTEGER, di, 0,   b, BT_INTEGER, di, 0, NULL);
 
   add_sym("dsign", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_sign, NULL,
+	  NULL, g95_simplify_sign, g95_resolve_sign,
 	  a, BT_REAL, dd, 0,   b, BT_REAL, dd, 0, NULL);
 
   make_generic("sign");
@@ -1366,7 +1366,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("tan");
 
   add_sym("tanh", 1, 1, BT_REAL, dr,
-	  NULL, g95_simplify_tanh, g95_resolve_tan,
+	  NULL, g95_simplify_tanh, g95_resolve_tanh,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("dtanh", 1, 1, BT_REAL, dd,

@@ -573,21 +573,11 @@ g95_expr temp;
 }
 
 
-static char *max_name(bt type, int kind) {
-static char max0[] = "__max0", amax1[] = "__amax1", dmax1[] = "__dmax1";
-
-  if (type == BT_INTEGER && kind == g95_default_integer_kind()) return max0;
-  if (type == BT_REAL && kind == g95_default_real_kind()) return amax1;
-  if (type == BT_REAL && kind == g95_default_double_kind()) return dmax1;
-
-  return g95_get_string("__max_%c%d", g95_type_letter(type), kind);
-}
-
-
 void g95_resolve_max(g95_expr *f, g95_expr *a1) {
 
   f->ts = a1->ts;
-  f->value.function.name = g95_get_string(max_name(a1->ts.type, a1->ts.kind));
+  f->value.function.name =
+    g95_get_string("__max_%c%d", g95_type_letter(a1->ts.type), a1->ts.kind);
 }
 
 
@@ -630,21 +620,11 @@ void g95_resolve_merge(g95_expr *f, g95_expr *tsource, g95_expr *fsource,
 }
 
 
-static char *min_name(bt type, int kind) {
-static char min0[] = "__min0", amin1[] = "__amin1", dmin1[] = "__dmin1";
-
-  if (type == BT_INTEGER && kind == g95_default_integer_kind()) return min0;
-  if (type == BT_REAL && kind == g95_default_real_kind()) return amin1;
-  if (type == BT_REAL && kind == g95_default_double_kind()) return dmin1;
-
-  return g95_get_string("__min_%c%d", g95_type_letter(type), kind);
-}
-
-
 void g95_resolve_min(g95_expr *f, g95_expr *a1) {
 
   f->ts = a1->ts;
-  f->value.function.name = g95_get_string(min_name(a1->ts.type, a1->ts.kind));
+  f->value.function.name =
+    g95_get_string("__min_%c%d", g95_type_letter(a1->ts.type), a1->ts.kind);
 }
 
 
