@@ -1486,17 +1486,17 @@ static void insertFixup(g95_namespace *ns, g95_symtree *x) {
 }
 
 
-/* insert_node()-- Allocate a new red/black node and associate it with
- * the new symbol. */
+/* g95_new_symtree()-- Allocate a new red/black node and associate it
+ * with the new symbol. */
 
-static g95_symtree *insert_node(g95_namespace *ns, const char *name) {
+g95_symtree *g95_new_symtree(g95_namespace *ns, const char *name) {
 g95_symtree *current, *parent, *x;
 
   current = ns->root;     /* find future parent */
   parent = NULL;
   while (current != NIL) {
     if (CompEQ(name, current->name))
-      g95_internal_error("insert_node(): Node already in tree!");
+      g95_internal_error("g95_new_symtree(): Node already in tree!");
 
     parent = current;
     current = CompLT(name, current->name) ?
@@ -1642,10 +1642,10 @@ g95_symtree *x, *y, *z;
 }
 
 
-/* find_node()-- Given a namespace and a name, try to find the symbol
- * within the namespace.  Returns NULL if the symbol is not found. */
+/* g95_find_symtree()-- Given a namespace and a name, try to find the
+ * symbol within the namespace.  Returns NULL if the symbol is not found. */
 
-static g95_symtree *find_node(g95_namespace *ns, const char *name) {
+g95_symtree *g95_find_symtree(g95_namespace *ns, const char *name) {
 g95_symtree *current = ns->root;
 
   while(current != NIL) {
@@ -1665,13 +1665,13 @@ g95_symtree *current = ns->root;
 g95_symtree *g95_get_symtree(const char *name, int *newflag) {
 g95_symtree *p;
 
-  p = find_node(g95_current_ns, name);
+  p = g95_find_symtree(g95_current_ns, name);
 
   if (p != NULL)
     *newflag = 0;
   else {
     *newflag = 1;
-    p = insert_node(g95_current_ns, name);
+    p = g95_new_symtree(g95_current_ns, name);
   }
   
   return p;
@@ -1739,7 +1739,7 @@ g95_symtree *st;
   if (ns == NULL) ns = g95_current_ns;
 
   do {
-    st = find_node(ns, name);
+    st = g95_find_symtree(ns, name);
     if (st != NULL) {
       if (st->ambiguous) return 1;
 
@@ -1783,7 +1783,7 @@ static g95_symbol *mark_new_symbol(g95_symbol *p, const char *name,
     p->mark = 1;
     changed = p;
 
-    insert_node(ns, name)->sym = p;
+    g95_new_symtree(ns, name)->sym = p;
     p->refs++;
   }
 
@@ -1806,7 +1806,7 @@ g95_symbol *p;
   current_ns = ns;
 
   for(;;) {
-    st = find_node(current_ns, name);
+    st = g95_find_symtree(current_ns, name);
     if (st != NULL) break;
 
     if (current_ns->proc_name != NULL &&

@@ -1083,7 +1083,8 @@ void g95_define_st_label(int, locus *, int);
 try g95_reference_st_label(int, g95_sl_type);
 
 g95_namespace *g95_get_namespace(void);
-g95_symtree *g95_get_symtree(const char *, int *);
+g95_symtree *g95_new_symtree(g95_namespace *, const char *);
+g95_symtree *g95_find_symtree(g95_namespace *, const char *);
 void g95_free_symbol(g95_symbol *);
 g95_symbol *g95_new_symbol(const char *, g95_namespace *);
 int g95_find_symbol(const char *, g95_namespace *, int, g95_symbol **);

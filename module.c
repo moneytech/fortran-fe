@@ -19,7 +19,43 @@ along with GNU G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-/* module.c-- Handle modules, which amounts to loading and saving symbols */
+/* module.c-- Handle modules, which amounts to loading and saving
+ * symbols and their attendant structures.  */
+
+/* The syntax of g95 modules resembles that of lisp lists, ie a
+ * sequence of atoms, which can be left or right parenthesis, names,
+ * integers or strings.  Parenthesis are always matched which allows
+ * us to skip over sections at high speed without having to know
+ * anything about the internal structure of the lists.  A "name" is
+ * usually a fortran 95 identifier, but can also start with '@' in
+ * order to reference a hidden symbol.
+ *
+ * The first line of a module is a line warning people not to edit the
+ * module.  The rest of the module looks like:
+ *
+ * (
+ *   <Number of symbols>
+ *   ( <Symbol Number>
+ *     <True name of symbol>
+ *     <Module name of symbol>
+ *     ( <symbol information> )
+ *     ...
+ *   )
+ *   ( <Symtree name>
+ *     <Ambiguous flag>
+ *     <Symbol number>
+ *     ...
+ *   )
+ *   ( ( <Interface info for UPLUS> )
+ *     ( <Interface info for UMINUS> )
+ *     ...
+ *   )
+ * )
+ *
+ * In general, symbols refer to other symbols by their symbol number,
+ * which is the order (zero based) in which the symbols are saved
+ * within the module.  */
+
 
 #include <string.h>
 #include <stdio.h>
@@ -29,8 +65,29 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-
 #define MODULE_EXTENSION ".mod"
+
+
+/* Structure that descibes a position within a module file */
+
+typedef struct {
+  int column, line;
+  fpos_t pos;
+} module_locus;
+
+
+/* Structure for holding extra info needed for symbols being read */
+
+typedef struct {
+  char true_name[G95_MAX_SYMBOL_LEN+1], module[G95_MAX_SYMBOL_LEN+1];
+  g95_symbol *sym;
+  enum { UNUSED, NEEDED, USED } state;
+  int referenced;
+  module_locus where;
+} symbol_info;
+
+
+static symbol_info *sym_table;
 
 /* Lists of rename info for the USE statement */
 
@@ -53,7 +110,6 @@ static int module_line, module_column, sym_num, visible_num, only_flag;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
 
 static g95_use_rename *g95_rename_list;
-static g95_symbol **sym_table;
 
 
 /* g95_free_rename()-- Free the rename list left behind by a USE
@@ -273,14 +329,7 @@ typedef enum {
   ATOM_NAME, ATOM_LPAREN, ATOM_RPAREN, ATOM_INTEGER, ATOM_STRING
 } atom_type;
 
-
 static atom_type last_atom;
-
-
-typedef struct {
-  int column, line;
-  fpos_t pos;
-} module_locus;
 
 
 /* The name buffer must be at least as long as a symbol name.  Right
@@ -711,9 +760,9 @@ static void mio_internal_string(char *string) {
   else {
     require_atom(ATOM_STRING);
     strcpy(string, atom_string);
+    g95_free(atom_string);
   }
 }
-
 
 
 
@@ -890,13 +939,12 @@ g95_charlen *cl;
  * guaranteed to be unique within the namespace and corresponds to an
  * illegal fortran name */
 
-static g95_symtree *get_unique_symtree(void) {
+static g95_symtree *get_unique_symtree(g95_namespace *ns) {
 char name[G95_MAX_SYMBOL_LEN+1]; 
 static int serial=0;
-int dummy;
 
   sprintf(name, "@%d", serial++); 
-  return g95_get_symtree(name, &dummy);
+  return g95_new_symtree(ns, name);
 }
 
 
@@ -909,7 +957,6 @@ static int check_unique_name(const char *name) {
 
 
 static void mio_typespec(g95_typespec *ts) {
-g95_symtree *st;
 
   mio_lparen();
   
@@ -917,19 +964,8 @@ g95_symtree *st;
 
   if (ts->type != BT_DERIVED)
     mio_integer(&ts->kind);
-  else {
+  else
     mio_symbol_ref(&ts->derived);
-
-    /* Load derived type even if not explicitly USEd */
-
-    if (iomode == IO_INPUT && ts->derived && ts->derived->mark) {
-      st = get_unique_symtree();
-      st->sym = ts->derived;
-      st->sym->attr.use_assoc = 1;
-      st->sym->refs++;
-      st->sym->mark = 0;
-    }
-  }
 
   mio_charlen(&ts->cl);
 
@@ -1179,7 +1215,10 @@ int i;
     } else {
       require_atom(ATOM_INTEGER);
       if (atom_int >= sym_num) bad_module("Symbol number out of range");
-      *symp = sym_table[atom_int];
+      *symp = sym_table[atom_int].sym;
+
+      if (sym_table[atom_int].state == UNUSED)
+	sym_table[atom_int].state = NEEDED;
     }
   }
 }
@@ -1529,10 +1568,6 @@ g95_interface *head, *tail, *new;
  * symbol node is already fixed on input and the name/module has
  * already been filled in */
 
-static void read_namespace(g95_namespace *);
-static void write_namespace(g95_namespace *);
-
-
 static void mio_symbol(g95_symbol *sym) {
 
   mio_lparen();
@@ -1570,10 +1605,7 @@ static void mio_symbol(g95_symbol *sym) {
 
 /************************* Top level subroutines *************************/
 
-
-static char true_name[G95_MAX_SYMBOL_LEN+1],
-            true_module[G95_MAX_SYMBOL_LEN+1];
-
+static char *search_name, *search_module;
 static g95_symbol *search_result;
 
 static void find_true_name(g95_symtree *symtree) {
@@ -1581,8 +1613,8 @@ g95_symbol *sym;
 
   sym = symtree->sym;
 
-  if (strcmp(sym->name, true_name) == 0 &&
-      strcmp(sym->module, true_module) == 0) 
+  if (strcmp(sym->name, search_name) == 0 &&
+      strcmp(sym->module, search_module) == 0) 
     search_result = sym;
 }
 
@@ -1616,133 +1648,115 @@ int level;
 
 
 static void read_namespace(g95_namespace *ns) {
-int serial, ambiguous, i, new_flag, sym_save, visible_save;
-g95_symbol *sym, **sym_table_save;
+int i, flag, sym_save, ambiguous, symbol;
+symbol_info *sym_table_save, *info;
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_interface *head, *tail;
 g95_use_rename *u;
 g95_symtree *st;
 
   sym_table_save = sym_table; 
   sym_save = sym_num;
-  visible_save = visible_num;
 
-  mio_lparen(); 
+  mio_lparen();
 
-  require_atom(ATOM_INTEGER);
-  sym_num = atom_int;
+  mio_integer(&sym_num);
 
-  require_atom(ATOM_INTEGER);
-  visible_num = atom_int;
-
-  sym_table = g95_getmem(sym_num*sizeof(g95_symbol *));
+  sym_table = g95_getmem(sym_num*sizeof(symbol_info));
 
   mio_lparen();
 
   for(i=0; i<sym_num; i++) {
     require_atom(ATOM_INTEGER);
-    serial = atom_int;
+    if (atom_int < 0 || atom_int > sym_num)
+      bad_module("Symbol number out of range");
 
-    if (serial < 0 || serial >= sym_num)
-      bad_module("Symbol serial number out of range");
+    info = &sym_table[atom_int];
+    info->state = UNUSED;
 
-    require_atom(ATOM_NAME);
-    strcpy(true_module, atom_name);
+    mio_internal_string(info->true_name);
+    mio_internal_string(info->module);
 
-    require_atom(ATOM_NAME);
-    strcpy(true_name, atom_name);
+    get_module_locus(&info->where);
 
-    sym = NULL;
-    search_result = NULL;
+    skip_list();
 
-    if (check_module(true_module)) {  /* Search via brute force traversal */
+    /* See if the symbol has already been loaded by a previous module.
+     * If so, we reference the existing symbol and prevent it from
+     * being loaded again. */
+
+    if (check_module(info->module)) {  /* Search via brute force traversal */
+      search_name = info->true_name;
+      search_module = info->module;
+      search_result = NULL;
+
       g95_traverse_symtree(ns, find_true_name);
-      sym = search_result;
+
+      if (search_result != NULL) {
+	info->state = USED;
+	info->sym = search_result;
+	info->referenced = 1;
+	continue;
+      }
     }
 
-    if (sym == NULL) {
-      sym = g95_new_symbol(true_name, ns);
-      strcpy(sym->module, true_module);
-    }
-
-    sym_table[serial] = sym;
-    sym->mark = (search_result == NULL);
+    info->sym = g95_new_symbol(info->true_name, ns);
+    strcpy(info->sym->module, info->module);
   }
 
   mio_rparen();
 
-  /* Read the symtree definitions */
+  /* Parse the symtree lists.  This lets us mark which symbols need to
+   * be loaded.  Renaming is also done at this point by replacing the
+   * symtree name. */
 
   mio_lparen();
 
-  for(;;) {
-    if (peek_atom() == ATOM_RPAREN) break;
+  while(peek_atom() != ATOM_RPAREN) {
+    mio_internal_string(name);
+    mio_integer(&ambiguous);
+    mio_integer(&symbol);
 
-    mio_lparen();
+    info = sym_table + symbol;
 
-    require_atom(ATOM_NAME);
+    if (symbol < 0 || symbol >= sym_num)
+      bad_module("Symbol number out of range");
 
-    require_atom(ATOM_INTEGER);
-    serial = atom_int;
+    /* See what we need to do with this name */
 
-    require_atom(ATOM_INTEGER);
-    ambiguous = atom_int;
-
-    mio_rparen();
-
-/* Figure out what to do with this name */
-
-    u = find_use_name(atom_name);
-
+    u = find_use_name(name);
     if (u != NULL) u->found = 1;
 
     if (only_flag && u == NULL) continue;
 
     if (u != NULL && u->local_name[0] != '\0')
-      strcpy(atom_name, u->local_name);
+      strcpy(name, u->local_name);
 
-    st = g95_get_symtree(atom_name, &new_flag);
+    st = g95_find_symtree(ns, name);
 
-    if (!new_flag) {
-      if (st->sym != sym_table[serial]) st->ambiguous = 1;
+    if (st != NULL) {
+      if (st->sym != info->sym)
+	st->ambiguous = 1;
     } else {
-      st->sym = sym_table[serial];
+
+      st = check_unique_name(name) ? get_unique_symtree(ns) :
+	g95_new_symtree(ns, name);
+
+      st->sym = info->sym;
       st->ambiguous = ambiguous;
       st->sym->refs++;
-      st->sym->mark = 0;
+
+      if (info->state == UNUSED) info->state = NEEDED;
+      info->referenced = 1;
     }
   }
 
   mio_rparen();
 
-/* Get the symbol info */
+  /* Load intrinsic operator interfaces. */
 
   mio_lparen();
 
-  for(;;) {
-    if (peek_atom() == ATOM_RPAREN) break;
-
-    mio_integer(&i);
-
-    if (i >= visible_num) {       /* Load a hidden symbol */
-      mio_symbol(sym_table[i]);
-      sym_table[i]->attr.use_assoc = 1;
-
-      st = get_unique_symtree();
-      st->sym = sym_table[i];
-      st->sym->refs++;
-      st->sym->mark = 0;
-      continue;
-    }
-
-    mio_symbol(sym_table[i]);
-    sym_table[i]->attr.use_assoc = 1;
-  }
-
-  mio_rparen();
-
-  /* Load intrinsic operator interfaces */
-
-  mio_lparen();
   for(i=0; i<G95_INTRINSIC_OPS; i++) {
     if (only_flag) {
       u = find_use_operator(i);
@@ -1767,9 +1781,37 @@ g95_symtree *st;
     }
   }
 
-  mio_rparen();
+  mio_rparen();   /* Final right paren in the module */
 
-/* Find out if all elements of the rename-list were found in the module */
+  /* At this point, we read those symbols that are needed.  If one
+   * symbol requires another, the other gets marked as NEEDED if it's
+   * previous state was UNUSED. */
+
+  flag = 1;
+
+  while(flag) {
+    flag = 0;
+
+    for(i=0; i<sym_num; i++) {
+      info = sym_table + i;
+
+      if (info->state != NEEDED) continue;
+
+      flag = 1;
+      info->state = USED;
+
+      set_module_locus(&info->where);
+
+      strcpy(info->sym->name, info->true_name);
+      strcpy(info->sym->module, info->module);
+
+      mio_symbol(info->sym);
+
+      info->sym->attr.use_assoc = 1;
+    }
+  }
+
+/* Make sure all elements of the rename-list were found in the module */
 
   for(u=g95_rename_list; u; u=u->next) {
     if (u->found) continue;
@@ -1790,18 +1832,33 @@ g95_symtree *st;
 	      "'%s'", g95_op2string(u->operator), &u->where, module_name);
   }
 
-/* Clean up symbol nodes that were never loaded */
+/* Clean up symbol nodes that were never loaded, create references to
+ * hidden symbols. */
 
-  for(i=0; i<sym_num; i++)
-    if (sym_table[i]->mark) g95_free(sym_table[i]);
+  for(i=0; i<sym_num; i++) {
+    info = sym_table + i;
+
+    switch(info->state) {
+    case UNUSED:
+      g95_free(info->sym);  /* Nothing was ever loaded into the symbol */
+      break;
+
+    case USED:
+      if (info->referenced) break;
+
+      st = get_unique_symtree(ns);
+      st->sym = info->sym;
+      break;
+
+    default:
+      bad_module("read_namespace(): Symbol in bad state");
+    }
+  }
 
   g95_free(sym_table);
 
   sym_table = sym_table_save;
   sym_num = sym_save;
-  visible_num = visible_save;
-
-  mio_rparen();
 }
 
 
@@ -1893,6 +1950,8 @@ static void find_writables(g95_symbol *sym) {
 
   sym->serial = -1;
 
+  if (sym->module[0] == '\0') strcpy(sym->module, module_name);
+
   if (check_unique_name(sym->name)) return;
 
   switch(sym->attr.flavor) {
@@ -1904,8 +1963,10 @@ static void find_writables(g95_symbol *sym) {
   case FL_PROCEDURE:    case FL_DERIVED:     case FL_NAMELIST:
     if (sym->attr.access == ACCESS_PUBLIC ||
 	(g95_current_ns->default_access != ACCESS_PRIVATE &&
-	 sym->attr.access == ACCESS_UNKNOWN))
+	 sym->attr.access == ACCESS_UNKNOWN)) {
+      sym->attr.access = ACCESS_PUBLIC;
       sym->serial = sym_num++;
+    }
 
     break;
   }
@@ -1922,6 +1983,19 @@ static void write_symbol(g95_symbol *sym) {
 
   if (sym->serial == -1) return;
 
+  mio_integer(&sym->serial);
+  mio_internal_string(sym->name);
+  mio_internal_string(sym->module);
+  mio_symbol(sym);
+}
+
+
+static void write_symtree(g95_symtree *st) {
+g95_symbol *sym;
+
+  sym = st->sym;
+  if (sym->serial == -1 || sym->attr.access != ACCESS_PUBLIC) return;
+
   switch(sym->attr.flavor) {
   case FL_DERIVED:
     if (phase == 1) break;
@@ -1933,49 +2007,18 @@ static void write_symbol(g95_symbol *sym) {
     return;
 
   default:
-    g95_internal_error("write_symbol(): Bad symbol class");
+    g95_internal_error("write_symtree(): Bad symbol class");
   }
 
+  mio_internal_string(st->name);
+  mio_integer(&st->ambiguous);
   mio_integer(&sym->serial);
-  mio_symbol(sym);
-}
-
-
-/* write_true_name()-- Given a symbol, write it's true name.  For
- * symbols that don't have a module name, we give it the name of the
- * current module. */
-
-static void write_true_name(g95_symbol *sym) {
-
-  if (sym->serial == -1) return;
-
-  if (sym->module[0] == '\0') strcpy(sym->module, g95_state_stack->sym->name);
-
-  write_atom(ATOM_INTEGER, &sym->serial);
-  write_atom(ATOM_NAME, sym->module);
-  write_atom(ATOM_NAME, sym->name);
-}
-
-
-/* write_symtree()-- Write a symtree node that points to a symbol that
- * we are going to save */
-
-static void write_symtree(g95_symtree *st) {
-
-  if (st->sym->serial == -1 || st->sym->serial >= visible_num ||
-      check_unique_name(st->name)) return;
-
-  mio_lparen();
-  write_atom(ATOM_NAME, st->name);
-  write_atom(ATOM_INTEGER, &st->sym->serial);
-  write_atom(ATOM_INTEGER, &st->ambiguous);
-  mio_rparen();
 }
 
 
 static void write_namespace(g95_namespace *ns) {
 int i, sym_save, visible_save;
-g95_symbol **sym_table_save;
+symbol_info *sym_table_save;
 
   sym_table_save = sym_table; 
   sym_save = sym_num;
@@ -1993,27 +2036,21 @@ g95_symbol **sym_table_save;
 
   g95_traverse_ns(ns, find_invisibles);
 
-  write_atom(ATOM_INTEGER, &sym_num);
-  write_atom(ATOM_INTEGER, &visible_num);
+  mio_integer(&sym_num);
 
   mio_lparen();
-  g95_traverse_ns(ns, write_true_name);
+  g95_traverse_ns(ns, write_symbol);    /* Write symbols. */
   mio_rparen();
 
-  mio_lparen();
-  g95_traverse_symtree(ns, write_symtree);
-  mio_rparen();
-
-/* Write symbols.  The only ordering issue I can think of at the
- * moment is that structure definitions have to be written first in
- * order to reconstruct a component reference in a g95_ref list.  It
- * appears to be OK to write the structure references themselves in
- * any order */
+/* Write symtree structures.  The only ordering issue I can think of
+ * at the moment is that structure definitions have to be written
+ * first in order to reconstruct a component reference in a g95_ref
+ * list. */
 
   mio_lparen();
 
   for(phase=1; phase<=2; phase++)
-    g95_traverse_ns(ns, write_symbol);
+    g95_traverse_symtree(ns, write_symtree);
 
   mio_rparen();
 
