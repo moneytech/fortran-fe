@@ -206,8 +206,6 @@ tree *ridpointers = NULL;
 
 /* static tree shadowed_labels=NULL; */
 
-tree listify (tree chain);
-
 static struct stmt_tree_s g95_stmt_tree;
 
 static GTY (()) tree g95_scope_stmt_stack;
@@ -375,7 +373,8 @@ expand_function_body (tree fndecl, int nested)
      gone wrong.*/
   if (is_simple_stmt (DECL_SAVED_TREE (fndecl)))
     {
-      if (flag_tree_ssa)
+      /* Invoke the SSA tree optimizer */
+      if (optimize >= 1)
         optimize_function_tree (fndecl);
       if (! is_simple_stmt (DECL_SAVED_TREE (fndecl)))
         warning ("Function tree not simple after optimization");

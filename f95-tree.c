@@ -32,6 +32,34 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "trans.h"
 
+/*  Given a tree, try to return a useful variable name that we can use
+    to prefix a temporary that is being assigned the value of the tree.
+    I.E. given  <temp> = &A, return A.  */
+
+const char *
+get_name (t)
+     tree t;
+{
+  tree stripped_decl;
+
+  stripped_decl = t;
+  STRIP_NOPS (stripped_decl);
+  if (DECL_P (stripped_decl) && DECL_NAME (stripped_decl))
+    return IDENTIFIER_POINTER (DECL_NAME (stripped_decl));
+  else
+    {
+      switch (TREE_CODE (stripped_decl))
+	{
+	case ADDR_EXPR:
+	  return get_name (TREE_OPERAND (stripped_decl, 0));
+	  break;
+	default:
+	  return NULL;
+	}
+    }
+}
+
+
 /*  Replaces T; by a COMPOUND_STMT containing {T;}.  */
 
 void

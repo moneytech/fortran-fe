@@ -1,3 +1,13 @@
+2002-09-24  Paul Brook  <paul@nowt.org>
+
+	* f95-lang.c (listify): Remove declaration.
+	(expand_function_body): Use optimize >=1 instead of flag_tree_saa.
+	(listify)
+	* f95-tree.c (get_name): New function.
+	* trans.c (module_namespace): Remove.
+	* trans-decl.c: Use g95_chainon_list rather than chainon(listify()).
+	* trans-types.c: Ditto.
+
 2002-09-19  Paul Brook  <paul@nowt.org>
 	
 	* trans-array.c (g95_get_array_cons_size): New Function.

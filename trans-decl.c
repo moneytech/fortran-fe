@@ -906,13 +906,13 @@ g95_build_library_function_decl VPARAMS((tree name, tree rettype, int nargs, ...
   for (arglist = NULL_TREE, n = abs (nargs); n > 0; n--)
     {
       argtype = va_arg (p, tree);
-      arglist = chainon (arglist, listify (argtype));
+      arglist = g95_chainon_list (arglist, argtype);
     }
 
   if (nargs >= 0)
     {
       /* Terminate the list.  */
-      arglist = chainon (arglist, listify (void_type_node));
+      arglist = g95_chainon_list (arglist, void_type_node);
     }
 
   /* Build the function type and decl.  */

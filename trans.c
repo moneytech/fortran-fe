@@ -53,9 +53,6 @@ Boston, MA 02111-1307, USA.  */
 
 static g95_file *g95_current_backend_file;
 
-/* The namespace of the module we're currently generating.  */
-static g95_namespace *module_namespace;
-
 /* Advance along TREE_CHAIN n times.  */
 tree
 g95_advance_chain (tree t, int n)
@@ -68,7 +65,7 @@ g95_advance_chain (tree t, int n)
   return t;
 }
 
-/* Like chainon(list, listify(add)) except it ignores TREE_CHAIN(add).  */
+/* Wrap a node in a list node and add it th the end of a list.  */
 tree
 g95_chainon_list (tree list, tree add)
 {
@@ -169,7 +166,7 @@ g95_simple_fold_tmp(tree expr, tree * phead, tree * ptail, tree * tmpvar)
     var = TREE_OPERAND (tmp, 0);
   else
     var = tmp;
-  
+
   if (is_simple_val (tmp)
       && (is_simple_const (tmp)
           || (tmpvar && var == *tmpvar)

@@ -265,7 +265,7 @@ g95_trans_arithmetic_if (g95_code *code ATTRIBUTE_UNUSED)
   tree zero;
 
   g95_start_stmt ();
-  
+
   g95_init_se (&se, NULL);
   g95_conv_simple_val (&se, code->expr);
 
@@ -277,7 +277,7 @@ g95_trans_arithmetic_if (g95_code *code ATTRIBUTE_UNUSED)
   branch2 = build_stmt (GOTO_STMT, g95_get_label_decl (code->label3));
   tmp = build (LE_EXPR, boolean_type_node, se.expr, zero);
   branch1 = build_stmt (IF_STMT, tmp, branch1, branch2);
-  
+
   g95_add_stmt_to_pre (&se, branch1, branch1);
 
   return g95_finish_stmt (se.pre, se.pre_tail);

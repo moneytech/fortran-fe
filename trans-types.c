@@ -894,7 +894,7 @@ g95_get_function_type (g95_symbol * sym)
       else
         arg = sym;
       type = build_reference_type (g95_sym_type (arg));
-      typelist = chainon (typelist, listify (type));
+      typelist = g95_chainon_list (typelist, type);
     }
   /* Build the argument types for the function */
   for (f = sym->formal; f; f = f->next)
@@ -926,12 +926,12 @@ g95_get_function_type (g95_symbol * sym)
              actual parameters for a dummy procedure.
            */
           if (arg->ts.type == BT_CHARACTER)
-            typelist = chainon (typelist, listify (g95_strlen_type_node));
-          typelist = chainon (typelist, listify (type));
+            typelist = g95_chainon_list (typelist, g95_strlen_type_node);
+          typelist = g95_chainon_list (typelist, type);
         }
     }
 
-  typelist = chainon (typelist, listify (void_type_node));
+  typelist = g95_chainon_list (typelist, void_type_node);
 
   if (sym->attr.subroutine || g95_return_by_reference (sym))
     type=void_type_node;
