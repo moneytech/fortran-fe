@@ -648,6 +648,7 @@ typedef struct g95_intrinsic_sym {
   try (*check)();
   void (*resolve)();
   struct g95_intrinsic_sym *specific_head, *next;
+  int generic_id;
 
 } g95_intrinsic_sym;
 
