@@ -416,6 +416,8 @@ typedef struct g95_st_label {
   int length;
   locus where;
 
+  tree backend_decl;
+
   struct g95_st_label *next;
 } g95_st_label;
 
