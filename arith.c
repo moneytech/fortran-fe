@@ -582,7 +582,7 @@ int i, n, limit;
 
     mpz_init(int_info->min_int);
     mpz_neg(int_info->min_int, int_info->huge);
-    mpz_sub_ui(int_info->min_int, int_info->min_int, 1);
+    /* No -1 here, because the representation is symmetric */
 
     mpz_init(int_info->max_int);
     mpz_add(int_info->max_int, int_info->huge, int_info->huge); 

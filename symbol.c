@@ -30,7 +30,9 @@ Boston, MA 02111-1307, USA.  */
 
 g95_namespace *g95_current_ns;
 
-static g95_symbol *changed = NULL;
+static g95_symbol *changed_syms = NULL;
+static g95_symtree *changed_st = NULL;
+
 
 /*********** IMPLICIT NONE and IMPLICIT statement handlers ***********/
 
@@ -308,13 +310,6 @@ try t;
   if (sym->attr.intent == INTENT_IN) {
     g95_error("Can't assign to INTENT(IN) variable '%s' at %L",
 	      sym->name, &lvalue->where);
-    return FAILURE;
-  }
-
-  if (lvalue->ts.type == BT_DERIVED && rvalue->ts.type == BT_DERIVED &&
-      lvalue->ts.derived != rvalue->ts.derived) {
-    g95_error("Incompatible derived types in assignment at %L",
-	      &lvalue->where);
     return FAILURE;
   }
 
@@ -1164,7 +1159,7 @@ g95_component *p, *tail;
 static void switch_types(g95_symtree *st, g95_symbol *from, g95_symbol *to) {
 g95_symbol *sym;
 
-  if (st == NIL) return;
+  if (st == NULL) return;
 
   sym = st->n.sym;
   if (sym->ts.type == BT_DERIVED && sym->ts.derived == from)
@@ -1225,10 +1220,10 @@ int i;
 
   /* Unlink from list of modified symbols */
 
-  if (changed == sym)
-    changed = sym->tlink;
+  if (changed_syms == sym)
+    changed_syms = sym->tlink;
   else
-    for(p=changed; p; p=p->tlink)
+    for(p=changed_syms; p; p=p->tlink)
       if (p->tlink == sym) {
 	p->tlink = sym->tlink;
 	break;
@@ -1495,12 +1490,6 @@ done:
  * the internal subprograms must be read before we can start
  * generating code for the host.
  * 
- * Each namespace consists of symbol nodes linked together by red-black
- * trees adapted from an implementation by Thomas Niemann.  The
- * original is available on his algorithm collection at
- * http://members.xoom.com/thomasn/s_man.htm and was not subject to
- * copyright restrictions.  Thanks Thomas!
- *
  * Given the tricky nature of the fortran grammar, we must be able to
  * undo changes made to a symbol table if the current interpretation
  * of a statement is found to be incorrect.  Whenever a symbol is
@@ -1512,12 +1501,6 @@ done:
  * this case, that symbol has been used as a host associated variable
  * at some previous time.  */
 
-g95_symtree g95_st_sentinel = { { '\0' }, 0, { NULL }, NIL, NIL, NIL, BLACK };
-
-#define CompLT(a,b) (strcmp(a,b) < 0)
-#define CompEQ(a,b) (strcmp(a,b) == 0)
-
-
 /* g95_get_namespace()-- Allocate a new namespace structure.  */
 
 g95_namespace *g95_get_namespace(void) {
@@ -1526,8 +1509,8 @@ g95_typespec *ts;
 int i;
  
   ns = g95_getmem(sizeof(g95_namespace));
-  ns->sym_root = NIL;
-  ns->uop_root = NIL;
+  ns->sym_root = NULL;
+  ns->uop_root = NULL;
   ns->default_access = ACCESS_UNKNOWN;
 
   for(i=0; i<G95_INTRINSIC_OPS; i++)
@@ -1562,281 +1545,51 @@ int i;
 }
 
 
-/* rotateLeft()-- rotate node x to left */
+/* g95_compare_symtree()-- Comparison function for symtree nodes. */
 
-static void rotateLeft(g95_symtree **root, g95_symtree *x) {
-g95_symtree *y = x->right;
-  
-  x->right = y->left;    /* establish x->right link */
-  if (y->left != NIL) y->left->parent = x;
+int g95_compare_symtree(g95_symtree *st1, g95_symtree *st2) {
 
-  /* establish y->parent link */
-  if (y != NIL) y->parent = x->parent;
-  if (x->parent) {
-    if (x == x->parent->left)
-      x->parent->left = y;
-    else
-      x->parent->right = y;
-  } else {
-    *root = y;
-  }
-
-  /* link x and y */
-  y->left = x;
-  if (x != NIL) x->parent = y;
+  return strcmp(st1->name, st2->name);
 }
 
 
-/* rotateRight()-- rotate node x to right */
-
-static void rotateRight(g95_symtree **root, g95_symtree *x) {
-g95_symtree *y = x->left;
-
-  /* establish x->left link */
-  x->left = y->right;
-  if (y->right != NIL) y->right->parent = x;
-
-  /* establish y->parent link */
-  if (y != NIL) y->parent = x->parent;
-  if (x->parent) {
-    if (x == x->parent->right)
-      x->parent->right = y;
-    else
-      x->parent->left = y;
-  } else {
-    *root = y;
-  }
-
-  /* link x and y */
-  y->right = x;
-  if (x != NIL) x->parent = y;
-}
-
-
-/* insertFixup()-- maintain Red-Black tree balance after inserting node x */
-
-static void insertFixup(g95_symtree **root, g95_symtree *x) {
-
-  /* check Red-Black properties */
-
-  while (x != *root && x->parent->color == RED) {  /* we have a violation */
-    if (x->parent == x->parent->parent->left) {
-      g95_symtree *y = x->parent->parent->right;
-      if (y->color == RED) {
-
-	/* uncle is RED */
-	x->parent->color = BLACK;
-	y->color = BLACK;
-	x->parent->parent->color = RED;
-	x = x->parent->parent;
-      } else {
-
-	/* uncle is BLACK */
-	if (x == x->parent->right) {
-	  /* make x a left child */
-	  x = x->parent;
-	  rotateLeft(root, x);
-	}
-
-	/* recolor and rotate */
-	x->parent->color = BLACK;
-	x->parent->parent->color = RED;
-	rotateRight(root, x->parent->parent);
-      }
-    } else {
-
-      /* mirror image of above code */
-      g95_symtree *y = x->parent->parent->left;
-      if (y->color == RED) {
-
-	/* uncle is RED */
-	x->parent->color = BLACK;
-	y->color = BLACK;
-	x->parent->parent->color = RED;
-	x = x->parent->parent;
-      } else {
-
-	/* uncle is BLACK */
-	if (x == x->parent->left) {
-	  x = x->parent;
-	  rotateRight(root, x);
-	}
-	x->parent->color = BLACK;
-	x->parent->parent->color = RED;
-	rotateLeft(root, x->parent->parent);
-      }
-    }
-  }
-  (*root)->color = BLACK;
-}
-
-
-/* g95_new_symtree()-- Allocate a new red/black node and associate it
+/* g95_new_symtree()-- Allocate a new symtree node and associate it
  * with the new symbol. */
 
 g95_symtree *g95_new_symtree(g95_symtree **root, char *name) {
-g95_symtree *current, *parent, *x;
+g95_symtree *st;
 
-  current = *root;     /* find future parent */
-  parent = NULL;
-  while (current != NIL) {
-    if (CompEQ(name, current->name))
-      g95_internal_error("g95_new_symtree(): Node already in tree!");
+  st = g95_getmem(sizeof(g95_symtree));
+  strcpy(st->name, name);
 
-    parent = current;
-    current = CompLT(name, current->name) ?
-      current->left : current->right;
-  }
-
-  /* setup new node */
-
-  x = g95_getmem(sizeof(g95_symtree));
-
-  x->parent = parent;
-  x->left = NIL;
-  x->right = NIL;
-  x->color = RED;
-  strcpy(x->name, name);
-
-    /* insert node in tree */
-  if (parent) {
-    if (CompLT(name, parent->name))
-      parent->left = x;
-    else
-      parent->right = x;
-  } else {
-    *root = x;
-  }
-
-  insertFixup(root, x);
-
-  return x;
+  g95_insert_bbt(root, st, g95_compare_symtree);
+  return st;
 }
 
 
-/* deleteFixup()-- maintain Red-Black tree balance after deleting node x */
-
-static void deleteFixup(g95_symtree **root, g95_symtree *x) {
-
-  while (x != *root && x->color == BLACK) {
-    if (x == x->parent->left) {
-      g95_symtree *w = x->parent->right;
-
-      if (w->color == RED) {
-	w->color = BLACK;
-	x->parent->color = RED;
-	rotateLeft(root, x->parent);
-	w = x->parent->right;
-      }
-      if (w->left->color == BLACK && w->right->color == BLACK) {
-	w->color = RED;
-	x = x->parent;
-      } else {
-	if (w->right->color == BLACK) {
-	  w->left->color = BLACK;
-	  w->color = RED;
-	  rotateRight(root, w);
-	  w = x->parent->right;
-	}
-	w->color = x->parent->color;
-	x->parent->color = BLACK;
-	w->right->color = BLACK;
-	rotateLeft(root, x->parent);
-	x = *root;
-      }
-    } else {
-      g95_symtree *w = x->parent->left;
-      if (w->color == RED) {
-	w->color = BLACK;
-	x->parent->color = RED;
-	rotateRight(root, x->parent);
-	w = x->parent->left;
-      }
-      if (w->right->color == BLACK && w->left->color == BLACK) {
-	w->color = RED;
-	x = x->parent;
-      } else {
-	if (w->left->color == BLACK) {
-	  w->right->color = BLACK;
-	  w->color = RED;
-	  rotateLeft(root, w);
-	  w = x->parent->left;
-	}
-	w->color = x->parent->color;
-	x->parent->color = BLACK;
-	w->left->color = BLACK;
-	rotateRight(root, x->parent);
-	x = *root;
-      }
-    }
-  }
-
-  x->color = BLACK;
-}
-
-
-/* delete_node()-- delete a symbol from the tree.  Does not free the
+/* delete_symtree()-- delete a symbol from the tree.  Does not free the
  * symbol itself! */
 
-static void delete_node(g95_symtree **root, char *name) {
-g95_symtree *x, *y, *z;
+static void delete_symtree(g95_symtree **root, char *name) {
+g95_symtree st;
 
-  /* find node in tree */
-  z = *root;
-  while(z != NIL) {
-    if (CompEQ(name, z->name)) break;
-    z = CompLT(name, z->name) ? z->left : z->right;
-  }
+  strcpy(st.name, name);
 
-  if (z == NIL) g95_internal_error("delete_node(): node not found!");
-
-  if (z->left == NIL || z->right == NIL) { /* y has a NIL node as a child */
-    y = z;
-  } else {  /* find tree successor with a NIL node as a child */
-    y = z->right;
-    while (y->left != NIL) y = y->left;
-  }
-
-  /* x is y's only child */
-
-  if (y->left != NIL)
-    x = y->left;
-  else
-    x = y->right;
-
-  /* remove y from the parent chain */
-  x->parent = y->parent;
-  if (y->parent)
-    if (y == y->parent->left)
-      y->parent->left = x;
-    else
-      y->parent->right = x;
-  else
-    *root = x;
-
-  if (y != z) {  /* Copy non red/black information */
-    z->n = y->n;
-    z->ambiguous = y->ambiguous;
-    strcpy(z->name, y->name);
-  }
-
-  if (y->color == BLACK) deleteFixup(root, x);
-
-  g95_free(y);
+  g95_delete_bbt(root, &st, g95_compare_symtree);
 }
 
 
 /* g95_find_symtree()-- Given a namespace and a name, try to find the
  * symbol within the namespace.  Returns NULL if the symbol is not found. */
 
-g95_symtree *g95_find_symtree(g95_symtree *root, char *name) {
-g95_symtree *current = root;
+g95_symtree *g95_find_symtree(g95_symtree *st, char *name) {
+int c;
 
-  while(current != NIL) {
-    if (CompEQ(name, current->name)) return current;
+  while(st != NULL) {
+    c = strcmp(name, st->name);
+    if (c == 0) return st;
 
-    current = CompLT(name, current->name) ?
-      current->left : current->right;
+    st = (c < 0) ? st->left : st->right;
   }
 
   return NULL;
@@ -1920,10 +1673,6 @@ g95_symbol *p;
     g95_internal_error("new_symbol(): Symbol name too long");
 
   strcpy(p->name, name);
-
-  p->serial = -1;
-  p->written = 0;
-
   return p;
 }
 
@@ -1958,6 +1707,21 @@ g95_symtree *st;
 }
 
 
+/* save_symbol_data()-- Save symbol with the information necessary to
+ * back it out. */
+
+static void save_symbol_data(g95_symbol *sym) {
+
+  if (sym->new || sym->old_symbol != NULL) return;
+
+  sym->old_symbol = g95_getmem(sizeof(g95_symbol));
+  *(sym->old_symbol) = *sym;
+
+  sym->tlink = changed_syms;
+  changed_syms = sym;
+}
+
+
 /* g95_get_symbol()-- Given a name, find a symbol.  The parent_flag
  * indicates if we try host association after a local search fails.
  * If this flag is not set and a host-associated symbol is found, an
@@ -1970,31 +1734,25 @@ g95_symtree *st;
  *
  * If nonzero, then an error was issued.  */
 
-int g95_get_symbol(char *name, g95_namespace *ns, int parent_flag,
-		   g95_symbol **result) {
-g95_namespace *current_ns;
+int g95_get_symbol(char *name, g95_namespace *ns, g95_symbol **result) {
 g95_symtree *st;
 g95_symbol *p;
 
   if (ns == NULL) ns = g95_current_ns;
 
-  st = NULL;
-
-  for(current_ns=ns; current_ns; current_ns=current_ns->parent) {
-    st = g95_find_symtree(current_ns->sym_root, name);
-    if (st != NULL || !parent_flag) break;
-  }
+  st = g95_find_symtree(ns->sym_root, name);
 
   if (st == NULL) {     /* Create new symbol */
-    p = g95_new_symbol(name, ns);
+    p = g95_new_symbol(name, ns); 
 
     p->old_symbol = NULL;   /* Add to the list of tentative symbols. */
-    p->tlink = changed;
+    p->tlink = changed_syms;
     p->mark = 1;
     p->new = 1;
-    changed = p;
+    changed_syms = p;
 
-    g95_new_symtree(&ns->sym_root, name)->n.sym = p;
+    st = g95_new_symtree(&ns->sym_root, name);
+    st->n.sym = p;
     p->refs++;
 
   } else {    /* Make sure the existing symbol is OK */
@@ -2014,29 +1772,14 @@ g95_symbol *p;
     p = st->n.sym;
 
     if (p->ns != ns && (!p->attr.function || ns->proc_name != p)) {
-           /* Symbol is from another namespace */
-      if (!parent_flag) {
-	g95_error("Symbol '%s' at %C has already been host associated", name);
-	return 2;
-      }
-
-      if (current_ns != ns) {  /* Was found in a parent namespace */
-	g95_new_symtree(&ns->sym_root, name)->n.sym = p;
-	p->refs++;
-      }
+      /* Symbol is from another namespace */
+      g95_error("Symbol '%s' at %C has already been host associated", name);
+      return 2;
     }
 
     p->mark = 1;
 
-    /* Copy in case this symbol is changed */
-
-    if (!p->new && p->old_symbol == NULL) {
-      p->old_symbol = g95_getmem(sizeof(g95_symbol));
-      *(p->old_symbol) = *p;
-
-      p->tlink = changed;
-      changed = p;
-    }
+    save_symbol_data(p);      /* Copy in case this symbol is changed */
   }
 
   *result = p;
@@ -2044,19 +1787,33 @@ g95_symbol *p;
 }
 
 
-/* g95_findget_symbol()-- Subroutine that first does a find on the
- * symbol, then a get if it doesn't exit.  This prevents us from
- * generating a host association error that g95_get_symbol() generates
- * if the symbol already exists.  */
+/* g95_get_ha_symbol()-- Subroutine that searches for a symbol,
+ * creating it if it doesn't exist, but tries to host-associate the
+ * symbol if possible. */
 
-int g95_findget_symbol(char *name, g95_namespace *ns, int parent_flag,
-		       g95_symbol **result) {
-  
-  if (g95_find_symbol(name, ns, parent_flag, result)) return 1;
+int g95_get_ha_symbol(char *name, g95_symbol **result) {
+g95_symbol *sym;
+int i;
 
-  if (*result != NULL) return 0;
+  i = g95_find_symbol(name, g95_current_ns, 0, &sym);
+  if (sym != NULL) {
+    save_symbol_data(sym);
 
-  return g95_get_symbol(name, ns, parent_flag, result);
+    *result = sym;
+    return i;
+  }
+
+  if (g95_current_ns->parent != NULL) {
+    i = g95_find_symbol(name, g95_current_ns->parent, 1, &sym);
+    if (i) return i;
+
+    if (sym != NULL) {
+      *result = sym;
+      return 0;
+    }
+  }
+
+  return g95_get_symbol(name, g95_current_ns, result);
 }
 
 
@@ -2066,15 +1823,16 @@ int g95_findget_symbol(char *name, g95_namespace *ns, int parent_flag,
 
 void g95_undo_symbols(void) {
 g95_symbol *p, *q, *old;
+g95_symtree *v, *w;
 
-/* if (changed != NULL) g95_status("Undoing symbols\n"); */
+/* if (changed_syms != NULL) g95_status("Undoing symbols\n"); */
 
-  for(p=changed; p; p=q) {
+  for(p=changed_syms; p; p=q) {
     q = p->tlink;
-    /*    g95_status("Undoing %s\n", p->name); */
+    /* g95_status("Undoing %s\n", p->name); */
 
     if (p->new) {  /* Symbol was new */
-      delete_node(&p->ns->sym_root, p->name);
+      delete_symtree(&p->ns->sym_root, p->name);
 
       p->refs--;
       if (p->refs < 0) g95_internal_error("g95_undo_symbols(): Negative refs");
@@ -2128,7 +1886,17 @@ g95_symbol *p, *q, *old;
     p->tlink = NULL;
   }
 
-  changed = NULL;
+  changed_syms = NULL;
+
+  /* Unlink host associated symtrees */
+
+  for(v=changed_st; v; v=w) {
+    w = v->link;
+
+    g95_delete_bbt(&g95_current_ns->sym_root, v, g95_compare_symtree);
+  }
+
+  changed_st = NULL;
 }
 
 
@@ -2137,12 +1905,13 @@ g95_symbol *p, *q, *old;
 
 void g95_commit_symbols(void) {
 g95_symbol *p, *q;
+g95_symtree *v, *w;
 
 #if 0
-  if (changed != NULL) g95_status("Committing symbols\n");
+  if (changed_syms != NULL) g95_status("Committing symbols\n");
 #endif
 
-  for(p=changed; p; p=q) {
+  for(p=changed_syms; p; p=q) {
     q = p->tlink;
     p->tlink = NULL;
     p->mark = 0;
@@ -2154,7 +1923,14 @@ g95_symbol *p, *q;
     }
   }
 
-  changed = NULL;
+  changed_syms = NULL;
+
+  for(v=changed_st; v; v=w) {
+    w = v->link;
+    v->link = NULL;
+  }
+
+  changed_st = NULL;
 }
 
 
@@ -2163,7 +1939,7 @@ g95_symbol *p, *q;
 
 static void free_uop_tree(g95_symtree *rb) {
 
-  if (rb == NIL) return;
+  if (rb == NULL) return;
 
   free_uop_tree(rb->left);
   free_uop_tree(rb->right);
@@ -2182,7 +1958,7 @@ static void free_sym_tree(g95_symtree *rb) {
 g95_namespace *ns;
 g95_symbol *sym;
 
-  if (rb == NIL) return;
+  if (rb == NULL) return;
 
   free_sym_tree(rb->left);
   free_sym_tree(rb->right);
@@ -2381,7 +2157,7 @@ static void clear_sym_mark(g95_symtree *st) {
 
 static void traverse_symtree(g95_symtree *st, void (*func)(g95_symtree *)) {
 
-  if (st != NIL) {
+  if (st != NULL) {
     (*func)(st);
 
     traverse_symtree(st->left, func);
@@ -2400,7 +2176,7 @@ void g95_traverse_symtree(g95_namespace *ns, void (*func)(g95_symtree *)) {
 
 static void traverse_ns(g95_symtree *st, void (*func)(g95_symbol *)) {
 
-  if (st == NIL) return;
+  if (st == NULL) return;
 
   if (st->n.sym->mark == 0) (*func)(st->n.sym);
   st->n.sym->mark = 1;
@@ -2426,7 +2202,7 @@ void g95_traverse_ns(g95_namespace *ns, void (*func)(g95_symbol *)) {
 
 static void traverse_uop(g95_symtree *st, void (*func)(g95_user_op *)) {
 
-  if (st == NIL) return;
+  if (st == NULL) return;
 
   (*func)(st->n.uop);
 
@@ -2542,7 +2318,7 @@ int i;
 
 void g95_symbol_state(void) {
 
-  if (changed != NULL)
+  if (changed_syms != NULL)
     g95_internal_error("Symbol changes still pending");
 }
 

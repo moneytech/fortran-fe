@@ -201,7 +201,7 @@ match m;
   m = g95_match(" %n :", name);
   if (m != MATCH_YES) return m;
 
-  if (g95_findget_symbol(name, NULL, 0, &g95_new_block)) {
+  if (g95_get_symbol(name, NULL, &g95_new_block)) {
     g95_error("Label name '%s' at %C is ambiguous", name);
     return MATCH_ERROR;
   }
@@ -337,15 +337,20 @@ int i, c;
 /* g95_match_symbol()-- Match a symbol on the input.  Modifies the
  * pointer to the symbol pointer if successful. */
 
-match g95_match_symbol(g95_symbol **matched_symbol) {
+match g95_match_symbol(g95_symbol **matched_symbol, int host_assoc) {
 char buffer[G95_MAX_SYMBOL_LEN+1];
 match m;
 
   m = g95_match_name(buffer);
-  if (m == MATCH_YES && g95_get_symbol(buffer, NULL, 1, matched_symbol))
-    m = MATCH_ERROR;
+  if (m != MATCH_YES) return m;
 
-  return m;
+  if (host_assoc)
+    return (g95_get_ha_symbol(buffer, matched_symbol))
+      ? MATCH_ERROR : MATCH_YES;
+
+  if (g95_get_symbol(buffer, NULL, matched_symbol)) return MATCH_ERROR;
+
+  return MATCH_YES;
 }
 
 
@@ -561,7 +566,7 @@ loop:
 
     case 's':
       vp = va_arg(argp, void **);
-      n = g95_match_symbol((g95_symbol **) vp);
+      n = g95_match_symbol((g95_symbol **) vp, 0);
       if (n != MATCH_YES) { m = n; goto not_yes; }
 
       matches++;
@@ -1616,10 +1621,7 @@ int i;
   if (m == MATCH_NO) goto syntax;
   if (m != MATCH_YES) return m;
 
-  if (g95_findget_symbol(name, NULL, 0, &sym)) {
-    g95_error("Procedure name '%s' at %C is ambiguous", name);
-    return MATCH_ERROR;
-  }
+  if (g95_get_ha_symbol(name, &sym)) return MATCH_ERROR;
 
   if (!sym->attr.generic &&
       !sym->attr.subroutine &&
@@ -1696,7 +1698,7 @@ match m;
     return MATCH_YES;
   }
 
-  m = g95_match_symbol(sym);
+  m = g95_match_symbol(sym, 0);
 
   if (m == MATCH_ERROR) return MATCH_ERROR;
   if (m == MATCH_YES && g95_match_char('/') == MATCH_YES) return MATCH_YES;
@@ -1749,7 +1751,7 @@ match m;
 /* Grab the list of symbols */
 
     for(;;) {
-      m = g95_match_symbol(&sym);
+      m = g95_match_symbol(&sym, 0);
       if (m == MATCH_ERROR) goto cleanup;
       if (m == MATCH_NO) goto syntax;
 
@@ -1837,7 +1839,7 @@ match m;
   m = g95_match(" %n%t", name);
   if (m != MATCH_YES) return MATCH_ERROR;
 
-  if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+  if (g95_get_symbol(name, NULL, &sym)) return MATCH_ERROR;
 
   if (g95_add_flavor(&sym->attr, FL_BLOCK_DATA, NULL) == FAILURE)
     return MATCH_ERROR;
@@ -1877,7 +1879,7 @@ match m, m2;
       return MATCH_ERROR;
 
     for(;;) {
-      m = g95_match_symbol(&sym);
+      m = g95_match_symbol(&sym, 1);
       if (m == MATCH_NO) goto syntax;
       if (m == MATCH_ERROR) goto error;
 
@@ -2022,7 +2024,7 @@ g95_symbol *sym;
 g95_expr *expr;
 match m;
 
-  m = g95_match_symbol(&sym);
+  m = g95_match_symbol(&sym, 0);
   if (m != MATCH_YES) return m;
 
   g95_push_error(&old_error);
@@ -2189,6 +2191,7 @@ syntax:
 
 
 static match match_data_constant(g95_expr **result) {
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 g95_expr *expr;
 match m;
@@ -2204,8 +2207,10 @@ match m;
   m = g95_match_null(result);
   if (m != MATCH_NO) return m;
 
-  m = g95_match_symbol(&sym);
+  m = g95_match_name(name);
   if (m != MATCH_YES) return m;
+
+  if (g95_find_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
   if (sym->attr.flavor != FL_PARAMETER) {
     g95_error("Symbol '%s' must be a PARAMETER in DATA statement at %C",

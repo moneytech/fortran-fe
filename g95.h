@@ -238,6 +238,8 @@ typedef struct {
 
   unsigned sequence:1, elemental:1, pure:1, recursive:1;
 
+  unsigned unmaskable:1, masked:1;
+
 /* Mutually exclusive multibit attributes */
 
   g95_access access:2;
@@ -481,8 +483,8 @@ typedef struct g95_symbol {
  * the old symbol. */
 
   struct g95_symbol *old_symbol, *tlink;
-  unsigned mark:1, written:1, new:1;
-  int serial, refs;
+  unsigned mark:1, new:1;
+  int refs;
   struct g95_namespace *ns;    /* namespace containing this symbol */
 
   tree backend_decl;
@@ -491,25 +493,15 @@ typedef struct g95_symbol {
 
 
 /* Within a namespace, symbols are pointed to by symtree nodes that
- * are linked together in a Red-Black balanced binary tree.  The tree
- * information is not stored within a symbol structure because like
- * many other binary tree implementations, deleting a node can cause
- * other nodes to be moved around.  Since symbols can have lots of
- * things pointing to them, they can't be moved.  Because the only
- * pointers to red-black nodes are other red-black nodes, its OK if
- * they are moved.
- *
- * Besides the many-to-one relationship between symbol nodes and
- * symtree nodes, this is also why there is no pointer from symbol
- * nodes to symtree nodes.  If it turns out this is needed, the
- * delete_node() subroutine must be modified to update such a pointer
- * when nodes are moved.
- *
- * The "key" of the red-black structures points to the symbol node
- * which contain the symbol name, which is the actual key used to
- * balance the tree.  The red-black code is due to Thomas Niemann. */
+ * are linked together in a balanced binary tree.  There can be
+ * several symtrees pointing to the same symbol node via USE
+ * statements. */
+
+#define BBT_HEADER(self) int priority; struct self *left, *right;
 
 typedef struct g95_symtree {
+  BBT_HEADER(g95_symtree)
+
   char name[G95_MAX_SYMBOL_LEN+1];
   int ambiguous;
   union {
@@ -517,12 +509,9 @@ typedef struct g95_symtree {
     g95_user_op *uop;
   } n;
 
-  struct g95_symtree *left, *right, *parent;
-  enum { BLACK, RED } color;   /* node color (BLACK, RED) */
-} g95_symtree;
+  struct g95_symtree *link;
 
-extern g95_symtree g95_st_sentinel;
-#define NIL &g95_st_sentinel
+} g95_symtree;
 
 
 typedef struct g95_namespace {
@@ -571,13 +560,11 @@ typedef struct g95_state_data {
   g95_symbol *sym;            /* Block name associated with this level */
   struct g95_code *head, *tail;
   struct g95_state_data *previous;
-/* This is for block-specific state data. There used to be a g95_data
- * and a g95_select structure, and I put their members in a union as
- * extra member in the state data struct. I later eliminated g95_select
- * completely, but I guess we can use the union anyway. Just sanitize
- * parse.c :-)  */
+
+/* Block-specific state data. */
+
   union {
-    g95_st_label * end_do_label;
+    g95_st_label *end_do_label; 
   } ext;
 } g95_state_data;
 
@@ -1221,6 +1208,7 @@ void g95_define_st_label(g95_st_label *, g95_sl_type, locus *);
 try g95_reference_st_label(g95_st_label *, g95_sl_type);
 
 g95_namespace *g95_get_namespace(void);
+int g95_compare_symtree(g95_symtree *, g95_symtree *);
 g95_symtree *g95_new_symtree(g95_symtree **, char *);
 g95_symtree *g95_find_symtree(g95_symtree *, char *);
 g95_user_op *g95_get_uop(char *);
@@ -1228,8 +1216,8 @@ g95_user_op *g95_find_uop(char *, g95_namespace *);
 void g95_free_symbol(g95_symbol *);
 g95_symbol *g95_new_symbol(char *, g95_namespace *);
 int g95_find_symbol(char *, g95_namespace *, int, g95_symbol **);
-int g95_get_symbol(char *, g95_namespace *, int, g95_symbol **);
-int g95_findget_symbol(char *, g95_namespace *, int, g95_symbol **);
+int g95_get_symbol(char *, g95_namespace *, g95_symbol **);
+int g95_get_ha_symbol(char *, g95_symbol **);
 
 void g95_undo_symbols(void);
 void g95_commit_symbols(void);
@@ -1279,7 +1267,7 @@ match g95_match_label(void);
 match g95_match_small_int(int *);
 int g95_match_strings(mstring *);
 match g95_match_name(char *);
-match g95_match_symbol(g95_symbol **);
+match g95_match_symbol(g95_symbol **, int);
 match g95_match_intrinsic_op(g95_intrinsic_op *);
 char *g95_op2string(int);
 match g95_match_char(char);
@@ -1517,7 +1505,6 @@ match g95_match_expr(g95_expr **);
 void g95_module_init_2(void);
 void g95_module_done_2(void);
 match g95_match_module(void);
-void g95_free_rename(void);
 match g95_match_use(void);
 void g95_dump_module(char *, int);
 void g95_use_module(void);
@@ -1529,3 +1516,7 @@ void g95_generate_code(g95_namespace *);
 void g95_generate_module_code(g95_namespace *);
 #endif
 
+/* bbt.c */
+
+void g95_insert_bbt(void *, void *, int (*)());
+void g95_delete_bbt(void *, void *, int (*)());

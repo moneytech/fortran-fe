@@ -81,18 +81,51 @@ typedef struct {
 } module_locus;
 
 
-/* Structure for holding extra info needed for symbols being read */
+typedef enum { P_UNKNOWN=0, P_OTHER, P_SYMBOL } pointer_t;
 
-typedef struct {
-  char true_name[G95_MAX_SYMBOL_LEN+1], module[G95_MAX_SYMBOL_LEN+1];
-  g95_symbol *sym;
-  enum { UNUSED, NEEDED, USED } state;
-  int referenced;
-  module_locus where;
-} symbol_info;
+/* The fixup structure lists pointers to pointers that have to be
+ * updated when a pointer value becomes known. */
+
+typedef struct fixup_t {
+  char **pointer;
+  struct fixup_t *next;
+} fixup_t;
 
 
-static symbol_info *sym_table;
+/* Structure for holding extra info needed for pointers being read */
+
+typedef struct pointer_info {
+  BBT_HEADER(pointer_info)
+
+  int integer;
+  pointer_t type;
+
+  /* The first component of each member of the union is the pointer
+   * being stored */
+
+  fixup_t *fixup;
+
+  union {
+    char *pointer;         /* Member for doing pointer searches */
+
+    struct {
+      g95_symbol *sym;
+      char true_name[G95_MAX_SYMBOL_LEN+1], module[G95_MAX_SYMBOL_LEN+1];
+      enum { UNUSED, NEEDED, USED } state;
+      int ns, referenced;
+      module_locus where;
+    } rsym;
+
+    struct {
+      g95_symbol *sym;
+      enum { UNREFERENCED=0, NEEDS_WRITE, WRITTEN } state;
+    } wsym;
+  } u;
+
+} pointer_info;
+
+#define g95_get_pointer_info() g95_getmem(sizeof(pointer_info))
+
 
 /* Lists of rename info for the USE statement */
 
@@ -105,30 +138,225 @@ typedef struct g95_use_rename {
 
 #define g95_get_use_rename() g95_getmem(sizeof(g95_use_rename))
 
-/* Stack for storing lists of symbols that need to be written */
-
-typedef struct sym_stack {
-  g95_symbol *sym;
-  struct sym_stack *next;
-} sym_stack;
-
-
 /* Local variables */
 
 static FILE *module_fp;
 
 static char module_name[G95_MAX_SYMBOL_LEN+1];
-static int module_line, module_column, sym_num, only_flag;
+static int module_line, module_column, only_flag;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
 
 static g95_use_rename *g95_rename_list;
-static sym_stack *write_stack;
+static pointer_info *pi_root;
+static int symbol_number;         /* Counter for assigning symbol numbers */
 
 
-/* g95_free_rename()-- Free the rename list left behind by a USE
+
+/*****************************************************************/
+
+/* Pointer/integer conversion.  Pointers between structures are stored
+ * as integers in the module file.  The next couple of subroutines
+ * handle this translation for reading and writing. */
+
+/* free_pi_tree()-- Recursively free the tree of pointer structures */
+
+static void free_pi_tree(pointer_info *p) {
+
+  if (p == NULL) return;
+
+  free_pi_tree(p->left);
+  free_pi_tree(p->right);
+
+  g95_free(p);
+}
+
+
+/* compare_pointers()-- Compare pointers when searching by pointer.
+ * Used when writing a module. */
+
+static int compare_pointers(pointer_info *sn1, pointer_info *sn2) {
+
+  if (sn1->u.pointer < sn2->u.pointer) return -1;
+  if (sn1->u.pointer > sn2->u.pointer) return 1;
+
+  return 0;
+}
+
+
+/* compare_integers()-- Compare integers when searching by integer.
+ * Used when reading a module. */
+
+static int compare_integers(pointer_info *sn1, pointer_info *sn2) {
+
+  if (sn1->integer < sn2->integer) return -1;
+  if (sn1->integer > sn2->integer) return 1;
+
+  return 0;
+}
+
+
+/* init_pi_tree()-- Initialize the pointer_info tree. */
+
+static void init_pi_tree(void) {
+int (*compare)(pointer_info *, pointer_info *);
+pointer_info *p;
+
+  pi_root = NULL;
+  compare = (iomode == IO_INPUT) ? compare_integers : compare_pointers;
+
+  /* Pointer 0 is the NULL pointer */
+
+  p = g95_get_pointer_info();
+  p->u.pointer = NULL;
+  p->integer = 0;
+  p->type = P_OTHER;
+
+  g95_insert_bbt(&pi_root, p, compare);
+
+  /* Pointer 1 is the current namespace */
+
+  p = g95_get_pointer_info();
+  p->u.pointer = (char *) g95_current_ns;
+  p->integer = 1;
+  p->type = P_OTHER;
+
+  g95_insert_bbt(&pi_root, p, compare);
+
+  symbol_number = 2;
+}
+
+
+/* pointer_to_int()-- During module writing, call here with a pointer
+ * to something, returning the pointer_info node. */
+
+static pointer_info *find_pointer(void *gp) {
+pointer_info *p;
+char *cp;
+
+  cp = (char *) gp;
+  
+  p = pi_root;
+  while(p != NULL) {
+    if (p->u.pointer == cp) break;
+    p = (cp < p->u.pointer) ? p->left : p->right;
+  }
+
+  return p;
+}
+
+
+/* get_pointer()-- Given a pointer while writing, returns the
+ * pointer_info tree node, creating it if it doesn't exist. */
+
+static pointer_info *get_pointer(void *gp) {
+pointer_info *p;
+
+  p = find_pointer(gp); 
+  if (p != NULL) return p;
+
+  /* Pointer doesn't have an integer.  Give it one. */
+
+  p = g95_get_pointer_info();
+
+  p->u.pointer = gp;
+  p->integer = symbol_number++;
+
+  g95_insert_bbt(&pi_root, p, compare_pointers);
+
+  return p;
+}
+
+
+/* get_integer()-- Given an integer during reading, find it in the
+ * pointer_info tree, creating the node if not found. */
+
+static pointer_info *get_integer(int integer) {
+pointer_info *p, t;
+int c;
+
+  t.integer = integer;
+
+  p = pi_root;
+  while(p != NULL) {
+    c = compare_integers(&t, p);
+    if (c == 0) break;
+
+    p = (c < 0) ? p->left : p->right;
+  }
+
+  if (p != NULL) return p;
+
+  p = g95_get_pointer_info();
+  p->integer = integer;
+  p->u.pointer = NULL;
+
+  g95_insert_bbt(&pi_root, p, compare_integers);
+
+  return p;
+}
+
+
+/* associate_integer_pointer()-- Call here during module reading when
+ * we know what pointer to associate with an integer.  Any fixups that
+ * exist are resolved at this time. */
+
+static void associate_integer_pointer(pointer_info *p, void *gp) {
+fixup_t *f, *g;
+
+  if (p->u.pointer != NULL)
+    g95_internal_error("associate_integer_pointer(): Already associated");
+
+  p->u.pointer = gp;
+
+  for(f=p->fixup; f; f=g) {
+    g = f->next;
+
+    *(f->pointer) = gp;
+    g95_free(f);
+  }
+
+  p->fixup = NULL;
+}
+
+
+/* add_fixup()-- During module reading, given an integer and a pointer
+ * to a pointer, either store the pointer from an already-known value
+ * or create a fixup structure in order to store things later.
+ * Returns zero if the reference has been actually stored, or nonzero
+ * if the reference must be fixed later (ie associate_integer_pointer
+ * must be called sometime later.  Returns the pointer_info structure. */
+
+static pointer_info *add_fixup(int integer, void *gp) {
+pointer_info *p;
+fixup_t *f;
+char **cp;
+
+  p = get_integer(integer);
+
+  if (p->u.pointer != NULL) {
+    cp = gp;
+    *cp = p->u.pointer;
+  } else {
+    f = g95_getmem(sizeof(fixup_t));
+
+    f->next = p->fixup;
+    p->fixup = f;
+
+    f->pointer = gp;
+  }
+
+  return p;
+}
+
+
+/*****************************************************************/
+
+/* Parser related subroutines */
+
+/* free_rename()-- Free the rename list left behind by a USE
  * statement. */
 
-void g95_free_rename(void) {
+static void free_rename(void) {
 g95_use_rename *next;
 
   for(;g95_rename_list; g95_rename_list=next) {
@@ -150,7 +378,7 @@ match m;
   m = g95_match_name(module_name);
   if (m != MATCH_YES) return m;
 
-  g95_free_rename();
+  free_rename();
   only_flag = 0;
 
   if (g95_match_eos() == MATCH_YES) return MATCH_YES;
@@ -226,7 +454,7 @@ syntax:
   g95_syntax_error(ST_USE);
 
 cleanup:
-  g95_free_rename();
+  free_rename();
   return MATCH_ERROR;
 }
 
@@ -262,79 +490,112 @@ g95_use_rename *u;
 
 /*****************************************************************/
 
-/* The next couple of subroutines keep track of which modules have
- * been loaded in the current program unit.  Modules that haven't been
- * seen before can be loaded much faster the first time. */
+/* The next couple of subroutines maintain a tree used to avoid a
+ * brute-force search for a combination of true name and module name.
+ * While symtree names, the name that a particular symbol is known by
+ * can changed with USE statements, we still have to keep track of the
+ * true names to generate the correct reference, and also avoid
+ * loading the same real symbol twice in a program unit.
+ *
+ * When we start reading, the true name tree is built and maintained
+ * as symbols are read.  The tree is searched as we load new symbols
+ * to see if it already exists someplace in the namespace. */
 
-typedef struct g95_module {
-  char name[G95_MAX_SYMBOL_LEN+1];
-  struct g95_module *next;
-} g95_module;
+typedef struct true_name {
+  BBT_HEADER(true_name) 
 
-static g95_module *loaded_modules, *new_modules;
+  g95_symbol *sym;
+} true_name;
+
+static true_name *true_name_root;
 
 
-/* find_module()-- See if a module can be found in a list of modules.
- * Returns zero if not, nonzero if so. */
+/* compare_true_names()-- Compare two true_name structures. */
 
-static int find_module(g95_module *m, char *name) {
+static int compare_true_names(true_name *t1, true_name *t2) {
+int c;
 
-  for(; m; m=m->next)
-    if (strcmp(name, m->name) == 0) return 1;
+  c = strcmp(t1->sym->module, t2->sym->module);
+  if (c != 0) return c;
 
-  return 0;
+  return strcmp(t1->sym->name, t2->sym->name);
 }
 
 
-/* check_module()-- See if a we've seen a particular module name
- * before.  Returns zero if not, nonzero if we have.  As a side
- * effect, not-seen before modules are placed in the new_modules list. */
+/* find_true_name()-- Given a true name, search the true name tree to
+ * see if it exists within the main namespace. */
 
-static int check_module(char *name) {
-g95_module *m;
+static g95_symbol *find_true_name(char *name, char *module) {
+true_name t, *p;
+g95_symbol sym;
+int c;
 
-  if (find_module(loaded_modules, name)) return 1;
+  strcpy(sym.name, name);
+  strcpy(sym.module, module);
+  t.sym = &sym;
 
-  if (!find_module(new_modules, name)) {
-    m = g95_getmem(sizeof(g95_module));
+  p = true_name_root;
+  while(p != NULL) {
+    c = compare_true_names(&t, p);
+    if (c == 0) return p->sym;
 
-    strcpy(m->name, name);
-    m->next = new_modules;
-
-    new_modules = m;
+    p = (c < 0) ? p->left : p->right;
   }
 
-  return 0;
+  return NULL;
 }
 
 
-/* save_module_names()-- Concatenate the new_modules list with the
- * loaded_modules lists.  Called after a USE is complete. */
+/* add_true_name()-- Given a g95_symbol pointer that is not in the
+ * true name tree, add it. */
 
-static void save_module_names(void) {
-g95_module *m;
+static void add_true_name(g95_symbol *sym) {
+true_name *t;
 
-  if (new_modules == NULL) return; 
+  t = g95_getmem(sizeof(true_name));
+  t->sym = sym;
 
-  m = new_modules;
-  while(m->next != NULL)
-    m = m->next;
-
-  m->next = loaded_modules;
-
-  loaded_modules = new_modules;
-  new_modules = NULL;
+  g95_insert_bbt(&true_name_root, t, compare_true_names);
 }
 
 
-static void free_module_list(g95_module *m) {
-g95_module *next;
+/* build_tnt()-- Recursive function to build the initial true name
+ * tree by recursively traversing the current namespace. */
 
-  for(;m; m=next) {
-    next = m->next;
-    g95_free(m);
-  }
+static void build_tnt(g95_symtree *st) {
+
+  if (st == NULL) return;
+
+  build_tnt(st->left);
+  build_tnt(st->right);
+
+  if (find_true_name(st->n.sym->name, st->n.sym->module) != NULL) return;
+
+  add_true_name(st->n.sym);
 }
+
+
+/* init_true_name_tree()-- Initialize the true name tree with the
+ * current namespace. */
+
+static void init_true_name_tree(void) {
+  true_name_root = NULL;
+
+  build_tnt(g95_current_ns->sym_root);
+}
+
+
+/* free_true_name()-- Recursively free a true name tree node. */
+
+static void free_true_name(true_name *t) {
+
+  if (t == NULL) return;
+  free_true_name(t->left);
+  free_true_name(t->right);
+
+  g95_free(t);
+}
+
 
 /*****************************************************************/
 
@@ -357,7 +618,6 @@ static atom_type last_atom;
 
 static int atom_int;
 static char *atom_string, atom_name[MAX_ATOM_SIZE];
-
 
 
 /* bad_module()-- Report problems with a module.  Error reporting is
@@ -1153,8 +1413,6 @@ g95_component *c, *tail;
       c = g95_get_component();
       mio_component(c);
 
-      if (c->ts.type == BT_DERIVED) c->ts.derived->mark = 0;
-
       if (tail == NULL)
 	*cp = c;
       else
@@ -1239,49 +1497,38 @@ g95_formal_arglist *f, *tail;
 }
 
 
-/* mio_symbol_ref()-- Saves a *reference* to a symbol.  Symbols are
- * identified by symbol numbers stored in the 'serial' member of
- * symbol nodes that start at zero.  During writing, if we are
- * referencing a symbol without a number (ie sym->serial == -1), we
- * give it one.  This forces it to be written later if it hasn't
- * already been written. */
+/* mio_pointer_ref()-- Saves or restores a pointer.  The pointer is
+ * converted back and forth from an integer.  We return the
+ * pointer_info pointer so that the caller can take additional action
+ * based on the pointer type. */
 
-static void mio_symbol_ref(g95_symbol **symp) {
-sym_stack *p;
-int i;
+static pointer_info *mio_pointer_ref(void *gp) {
+pointer_info *p;
 
   if (iomode == IO_OUTPUT) {
-    if (*symp != NULL) {
-      i = (*symp)->serial;
-
-      if (i == -1) {   /* Assign new number, save on the stack */
-	(*symp)->serial = i = sym_num++;
-	p = g95_getmem(sizeof(sym_stack));
-	p->sym = *symp;
-	p->next = write_stack;
-	write_stack = p;
-      }
-
-      if (i < 0 || i >= sym_num) bad_module("Symbol number out of range");
-
-      write_atom(ATOM_INTEGER, &i);
-    } else {
-      mio_lparen();
-      mio_rparen();
-    }
+    p = get_pointer(*((char **) gp));
+    write_atom(ATOM_INTEGER, &p->integer);
   } else {
-    if (peek_atom() == ATOM_LPAREN) {
-      mio_lparen();
-      mio_rparen();
-      *symp = NULL;
-    } else {
-      require_atom(ATOM_INTEGER);
-      if (atom_int >= sym_num) bad_module("Symbol number out of range");
-      *symp = sym_table[atom_int].sym;
+    require_atom(ATOM_INTEGER);
+    p = add_fixup(atom_int, gp);
+  }
 
-      if (sym_table[atom_int].state == UNUSED)
-	sym_table[atom_int].state = NEEDED;
-    }
+  return p;
+}
+
+
+/* mio_symbol_ref()-- Save or restore a reference to a symbol node */
+
+void mio_symbol_ref(g95_symbol **symp) {
+pointer_info *p;
+
+  p = mio_pointer_ref(symp);
+  if (p->type == P_UNKNOWN) p->type = P_SYMBOL;
+
+  if (iomode == IO_OUTPUT) {
+    if (p->u.wsym.state == UNREFERENCED) p->u.wsym.state = NEEDS_WRITE;
+  } else {
+    if (p->u.rsym.state == UNUSED) p->u.rsym.state = NEEDED;
   }
 }
 
@@ -1714,6 +1961,8 @@ static void mio_symbol(g95_symbol *sym) {
   mio_symbol_attribute(&sym->attr);
   mio_typespec(&sym->ts);
 
+  mio_pointer_ref(&sym->formal_ns);
+
   mio_symbol_ref(&sym->common_head);  /* Save/restore common block links */
   mio_symbol_ref(&sym->common_next);
 
@@ -1766,50 +2015,6 @@ int level;
       break;
     }
   } while(level > 0);
-}
-
-
-
-/* bf_search()-- Recursive function to search a namespace for a symbol
- * by name and module.  Returns a pointer to the symbol node if found,
- * NULL if not found. */
-
-static g95_symbol *bf_search(g95_symtree *st, symbol_info *info) {
-g95_symbol *result;
-
-  if (st == NIL) return NULL;
-
-  result = st->n.sym;
-
-  if (strcmp(result->name, info->true_name) == 0 &&
-      strcmp(result->module, info->module) == 0)
-    return result;
-
-  result = bf_search(st->left, info);
-  if (result != NULL) return result;
-
-  return bf_search(st->right, info);
-}
-
-
-/* bf_sym_search()-- Given a sym_info pointer, search the current and
- * parent namespaces for the symbol's true name.  Because of renaming,
- * the symbol might be named something different or be inaccessible,
- * so a brute-force traversal is required.  Returns a pointer to the
- * symbol, or NULL if not found. */
-
-static g95_symbol *bf_sym_search(symbol_info *info) {
-g95_symbol *result;
-g95_namespace *ns;
-
-  if (!check_module(info->module)) return NULL; /* Module not loaded */
-
-  for(ns=g95_current_ns; ns; ns=ns->parent) {
-    result = bf_search(ns->sym_root, info);
-    if (result != NULL) return result;
-  }
-
-  return NULL;
 }
 
 
@@ -1870,7 +2075,7 @@ g95_symbol *sym;
     }
 
     if (sym == NULL) {
-      g95_get_symbol(p, NULL, 0, &sym);
+      g95_get_symbol(p, NULL, &sym);
 
       sym->attr.flavor = FL_PROCEDURE;
       sym->attr.generic = 1;
@@ -1884,11 +2089,83 @@ g95_symbol *sym;
 }
 
 
-static void read_namespace(g95_namespace *ns) {
-module_locus operator_interfaces, user_operators, symbols;
+/* load_needed()-- Recursive function to traverse the pointer_info
+ * tree and load a needed symbol.  We return nonzero if we load a
+ * symbol and stop the traversal, because the act of loading can alter
+ * the tree. */
+
+static int load_needed(pointer_info *p) {
+g95_namespace *ns;
+pointer_info *q;
+g95_symbol *sym;
+
+  if (p == NULL) return 0;
+  if (load_needed(p->left)) return 1;
+  if (load_needed(p->right)) return 1;
+
+  if (p->type != P_SYMBOL || p->u.rsym.state != NEEDED) return 0;
+
+  p->u.rsym.state = USED;
+
+  set_module_locus(&p->u.rsym.where);
+
+  sym = p->u.rsym.sym;
+  if (sym == NULL) {
+    q = get_integer(p->u.rsym.ns);
+
+    ns = (g95_namespace *) q->u.pointer;
+    if (ns == NULL) {   /* Create an interface namespace if necessary */
+      ns = g95_get_namespace();
+      associate_integer_pointer(q, ns);
+    }
+
+    sym = g95_new_symbol(p->u.rsym.true_name, ns);
+    strcpy(sym->module, p->u.rsym.module);
+
+    associate_integer_pointer(p, sym);
+  }
+
+  mio_symbol(sym);
+  sym->attr.use_assoc = 1;
+
+  return 1;
+}
+
+
+/* read_cleanup()-- Recursive function for cleaning up things after a
+ * module has been read. */
+
+static void read_cleanup(pointer_info *p) {
+g95_symtree *st;
+pointer_info *q;
+
+  if (p == NULL) return;
+
+  read_cleanup(p->left);
+  read_cleanup(p->right);
+
+  if (p->type == P_SYMBOL && p->u.rsym.state == USED &&
+      !p->u.rsym.referenced) {
+
+    q = get_integer(p->u.rsym.ns);
+    st = get_unique_symtree((g95_namespace *) q->u.pointer);
+
+    st->n.sym = p->u.rsym.sym;
+    st->n.sym->refs++;
+  }
+
+  if (p->type == P_SYMBOL && p->u.rsym.state == UNREFERENCED)
+    g95_free_symbol(p->u.rsym.sym);
+}
+
+
+/* read_module()-- Read a module file */
+
+static void read_module(void) {
+module_locus operator_interfaces, user_operators;
 char *p, name[G95_MAX_SYMBOL_LEN+1];
-int i, flag, ambiguous, symbol;
-symbol_info *info;
+int i, ambiguous, symbol;
+pointer_info *info;
 g95_use_rename *u;
 g95_symtree *st;
 g95_symbol *sym;
@@ -1900,60 +2177,34 @@ g95_symbol *sym;
   skip_list();
   skip_list();
 
-  /* Figure out what the largest symbol number is */
-
   mio_lparen();
 
-  get_module_locus(&symbols);
-
-  sym_num = 0;
-
   while(peek_atom()!=ATOM_RPAREN) {
     require_atom(ATOM_INTEGER);
-    if (atom_int > sym_num) sym_num = atom_int;
+    info = get_integer(atom_int);
 
-    require_atom(ATOM_STRING);
-    g95_free(atom_string);
+    info->type = P_SYMBOL;
+    info->u.rsym.state = UNUSED;
 
-    require_atom(ATOM_STRING);
-    g95_free(atom_string);
+    mio_internal_string(info->u.rsym.true_name);
+    mio_internal_string(info->u.rsym.module);
 
-    skip_list();
-  }
-
-  sym_num++;
-  sym_table = g95_getmem(sym_num*sizeof(symbol_info));
-
-  set_module_locus(&symbols);
-
-  while(peek_atom()!=ATOM_RPAREN) {
     require_atom(ATOM_INTEGER);
-    if (atom_int < 0 || atom_int > sym_num)
-      bad_module("Symbol number out of range");
+    info->u.rsym.ns = atom_int;
 
-    info = sym_table + atom_int;
-    info->state = UNUSED;
-
-    mio_internal_string(info->true_name);
-    mio_internal_string(info->module);
-
-    get_module_locus(&info->where);
+    get_module_locus(&info->u.rsym.where);
     skip_list();
 
     /* See if the symbol has already been loaded by a previous module.
      * If so, we reference the existing symbol and prevent it from
      * being loaded again. */
 
-    sym = bf_sym_search(info);
+    sym = find_true_name(info->u.rsym.true_name, info->u.rsym.module);
+    if (sym == NULL) continue;
 
-    if (sym != NULL) {
-      info->state = USED;
-      info->sym = sym;
-      info->referenced = 1;
-    } else {
-      info->sym = g95_new_symbol(info->true_name, ns);
-      strcpy(info->sym->module, info->module);
-    }
+    info->u.rsym.state = USED;
+    info->u.rsym.referenced = 1;
+    info->u.rsym.sym = sym;
   }
 
   mio_rparen();
@@ -1969,30 +2220,37 @@ g95_symbol *sym;
     mio_integer(&ambiguous);
     mio_integer(&symbol);
 
-    info = sym_table + symbol;
-
-    if (symbol < 0 || symbol >= sym_num)
-      bad_module("Symbol number out of range");
+    info = get_integer(symbol);
 
     /* See what we need to do with this name. */
 
     p = find_use_name(name);
     if (p == NULL) continue;
 
-    st = g95_find_symtree(ns->sym_root, p);
+    st = g95_find_symtree(g95_current_ns->sym_root, p);
 
     if (st != NULL) {
-      if (st->n.sym != info->sym) st->ambiguous = 1;
+      if (st->n.sym != info->u.rsym.sym) st->ambiguous = 1;
     } else {
-      st = check_unique_name(p) ? get_unique_symtree(ns) :
-	g95_new_symtree(&ns->sym_root, p);
+      st = check_unique_name(p) ? get_unique_symtree(g95_current_ns) :
+	g95_new_symtree(&g95_current_ns->sym_root, p);
 
-      st->n.sym = info->sym;
       st->ambiguous = ambiguous;
+
+      sym = info->u.rsym.sym;
+
+      if (sym == NULL) {
+	sym = info->u.rsym.sym =
+	  g95_new_symbol(info->u.rsym.true_name, g95_current_ns);
+
+	strcpy(sym->module, info->u.rsym.module);
+      }
+
+      st->n.sym = sym;
       st->n.sym->refs++;
 
-      if (info->state == UNUSED) info->state = NEEDED;
-      info->referenced = 1;
+      if (info->u.rsym.state == UNUSED) info->u.rsym.state = NEEDED;
+      info->u.rsym.referenced = 1;
     }
   }
 
@@ -2017,7 +2275,7 @@ g95_symbol *sym;
       u->found = 1;
     }
 
-    mio_interface(&ns->operator[i]);
+    mio_interface(&g95_current_ns->operator[i]);
   }
 
   mio_rparen();
@@ -2033,31 +2291,9 @@ g95_symbol *sym;
 
   /* At this point, we read those symbols that are needed but haven't
    * been loaded yet.  If one symbol requires another, the other gets
-   * marked as NEEDED if it's previous state was UNUSED. */
+   * marked as NEEDED if its previous state was UNUSED. */
 
-  flag = 1;
-
-  while(flag) {
-    flag = 0;
-
-    for(i=0; i<sym_num; i++) {
-      info = sym_table + i;
-
-      if (info->state != NEEDED) continue;
-
-      flag = 1;
-      info->state = USED;
-
-      set_module_locus(&info->where);
-
-      strcpy(info->sym->name, info->true_name);
-      strcpy(info->sym->module, info->module);
-
-      mio_symbol(info->sym);
-
-      info->sym->attr.use_assoc = 1;
-    }
-  }
+  while(load_needed(pi_root));
 
 /* Make sure all elements of the rename-list were found in the module */
 
@@ -2085,28 +2321,7 @@ g95_symbol *sym;
 /* Clean up symbol nodes that were never loaded, create references to
  * hidden symbols. */
 
-  for(i=0; i<sym_num; i++) {
-    info = sym_table + i;
-
-    switch(info->state) {
-    case UNUSED:
-      g95_free(info->sym);  /* Nothing was ever loaded into the symbol */
-      break;
-
-    case USED:
-      if (info->referenced) break;
-
-      st = get_unique_symtree(ns);
-      st->n.sym = info->sym;
-      info->sym->refs++;
-      break;
-
-    default:
-      bad_module("read_namespace(): Symbol in bad state");
-    }
-  }
-
-  g95_free(sym_table);
+  read_cleanup(pi_root);
 }
 
 
@@ -2118,54 +2333,91 @@ static int check_access(g95_access specific_access,
 			g95_access default_access) {
 
   if (specific_access == ACCESS_PUBLIC) return 1;
+  if (specific_access == ACCESS_PRIVATE) return 0;
 
-  if (specific_access != ACCESS_PRIVATE) {
-    if (g95_option.module_access_private == 1) {
-      if (default_access == ACCESS_PUBLIC) return 1;
-    } else {
-      if (default_access != ACCESS_PRIVATE) return 1;
-    }
+  if (g95_option.module_access_private) {
+    if (default_access == ACCESS_PUBLIC) return 1;
+  } else {
+    if (default_access != ACCESS_PRIVATE) return 1;
   }
+
   return 0;
 }
 
 
 /* write_symbol()-- Write a symbol to the module. */
 
-static void write_symbol(g95_symbol *sym) {
+static void write_symbol(int n, g95_symbol *sym) {
 
   if (sym->attr.flavor == FL_UNKNOWN || sym->attr.flavor == FL_LABEL)
     g95_internal_error("write_symbol(): bad module symbol '%s'", sym->name);
 
-  if (sym->written) return;
-  sym->written = 1;
-
-  mio_integer(&sym->serial);
+  mio_integer(&n);
   mio_internal_string(sym->name);
 
   if (sym->module[0] == '\0') strcpy(sym->module, module_name);
+
   mio_internal_string(sym->module);
+  mio_pointer_ref(&sym->ns);
 
   mio_symbol(sym);
   write_char('\n');
 }
 
 
-/* write_symbol0()-- Function called by recursive traversal to write
- * the initial set of symbols to the module.  We check to see if the
- * symbol should be written according to the access specification. */
+/* write_symbol0()-- Recursive traversal function to write the initial
+ * set of symbols to the module.  We check to see if the symbol should
+ * be written according to the access specification. */
 
-static void write_symbol0(g95_symbol *sym) {
+static void write_symbol0(g95_symtree *st) {
+g95_symbol *sym;
+pointer_info *p;
+
+  if (st == NULL) return;
+
+  write_symbol0(st->left);
+  write_symbol0(st->right);
+
+  sym = st->n.sym;
 
   if (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic &&
       !sym->attr.subroutine && !sym->attr.function) return;
 
-  if (sym->serial == -1) {
-    if (!check_access(sym->attr.access, sym->ns->default_access)) return;
-    sym->serial = sym_num++;
-  }
+  if (!check_access(sym->attr.access, sym->ns->default_access)) return;
+ 
+  p = get_pointer(sym);
+  if (p->type == P_UNKNOWN) p->type = P_SYMBOL;
 
-  write_symbol(sym);
+  if (p->u.wsym.state == WRITTEN) return;
+
+  write_symbol(p->integer, sym);
+  p->u.wsym.state = WRITTEN;
+
+  return;
+}
+
+
+/* write_symbol1()-- Recursive traversal function to write the
+ * secondary set of symbols to the module file.  These are symbols
+ * that were not public yet are needed by the public symbols or
+ * another dependent symbol.  The act of writing a symbol can modify
+ * the pointer_info tree, so we cease traversal if we find a symbol to
+ * write.  We return nonzero if a symbol was written and pass that
+ * information upwards. */
+
+static int write_symbol1(pointer_info *p) {
+
+  if (p == NULL) return 0;
+
+  if (write_symbol1(p->left)) return 1;
+  if (write_symbol1(p->right)) return 1;
+
+  if (p->type != P_SYMBOL || p->u.wsym.state != NEEDS_WRITE) return 0;
+
+  p->u.wsym.state = WRITTEN;
+  write_symbol(p->integer, p->u.wsym.sym);
+
+  return 1;
 }
 
 
@@ -2194,30 +2446,26 @@ static void write_generic(g95_symbol *sym) {
 
 static void write_symtree(g95_symtree *st) {
 g95_symbol *sym;
+pointer_info *p;
 
   sym = st->n.sym;
   if (!check_access(sym->attr.access, sym->ns->default_access) ||
       (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic &&
        !sym->attr.subroutine && !sym->attr.function)) return;
 
-  if (sym->serial == -1)
-    g95_internal_error("write_symtree(): Symbol not written");
-
   if (check_unique_name(st->name)) return;
+
+  p = find_pointer(sym);
+  if (p == NULL) g95_internal_error("write_symtree(): Symbol not written");
 
   mio_internal_string(st->name);
   mio_integer(&st->ambiguous);
-  mio_integer(&sym->serial);
+  mio_integer(&p->integer);
 }
 
 
-static void write_namespace(g95_namespace *ns) {
-g95_symbol *sym;
-sym_stack *p;
+static void write_module(void) {
 int i;
-
-  sym_num = 0;     /* Counter for new symbol numbers */
-  write_stack = NULL;
 
   /* Write the operator interfaces */
 
@@ -2226,20 +2474,21 @@ int i;
   for(i=0; i<G95_INTRINSIC_OPS; i++) {
     if (i == INTRINSIC_USER) continue;
 
-    mio_interface(check_access(ns->operator_access[i], ns->default_access)
-		  ? &ns->operator[i] : NULL);
+    mio_interface(check_access(g95_current_ns->operator_access[i],
+			       g95_current_ns->default_access)
+		  ? &g95_current_ns->operator[i] : NULL);
   }
 
   mio_rparen();
   write_char('\n');  write_char('\n');
 
   mio_lparen();
-  g95_traverse_user_op(ns, write_operator);
+  g95_traverse_user_op(g95_current_ns, write_operator);
   mio_rparen();
   write_char('\n');  write_char('\n');
 
   mio_lparen();
-  g95_traverse_ns(ns, write_generic);
+  g95_traverse_ns(g95_current_ns, write_generic);
   mio_rparen();
   write_char('\n');  write_char('\n');
 
@@ -2252,23 +2501,15 @@ int i;
 
   mio_lparen();
 
-  g95_traverse_ns(ns, write_symbol0);
-
-  while(write_stack != NULL) {
-    sym = write_stack->sym;
-    p = write_stack;
-    write_stack = write_stack->next;
-    g95_free(p);
-
-    write_symbol(sym);
-  }
+  write_symbol0(g95_current_ns->sym_root);
+  while(write_symbol1(pi_root));
 
   mio_rparen();
 
   write_char('\n');  write_char('\n');
 
   mio_lparen();
-  g95_traverse_symtree(ns, write_symtree);
+  g95_traverse_symtree(g95_current_ns, write_symtree);
   mio_rparen();
 }
 
@@ -2314,7 +2555,12 @@ time_t now;
   iomode = IO_OUTPUT;
   strcpy(module_name, name);
 
-  write_namespace(g95_current_ns);
+  init_pi_tree();
+
+  write_module();
+
+  free_pi_tree(pi_root);
+  pi_root = NULL;
 
   write_char('\n');
 
@@ -2358,18 +2604,22 @@ int c, line;
     if (p->state == COMP_MODULE && strcmp(p->sym->name, module_name) == 0)
       g95_fatal_error("Can't USE the same module we're building!");
 
-  read_namespace(g95_current_ns);
+  init_pi_tree();
+  init_true_name_tree();
+
+  read_module();
+
+  free_true_name(true_name_root);
+  true_name_root = NULL;
+
+  free_pi_tree(pi_root);
+  pi_root = NULL;
 
   fclose(module_fp);
-
-  save_module_names();
 }
 
 
 void g95_module_init_2(void) {
-
-  loaded_modules = NULL;
-  new_modules = NULL;
 
   last_atom = ATOM_LPAREN;
 }
@@ -2377,8 +2627,5 @@ void g95_module_init_2(void) {
 
 void g95_module_done_2(void) {
 
-  free_module_list(loaded_modules);
-  free_module_list(new_modules);
-
-  g95_free_rename();
+  free_rename();
 }

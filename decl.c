@@ -138,7 +138,7 @@ g95_state_data *s;
   }
 
 normal:
-  return g95_get_symbol(name, NULL, 0, result);
+  return g95_get_symbol(name, NULL, result);
 }
 
 
@@ -155,9 +155,9 @@ g95_symbol *sym;
 int rc;
 
   if (g95_current_ns->parent == NULL)
-    return g95_get_symbol(name, NULL, 0, result);    
+    return g95_get_symbol(name, NULL, result);    
 
-  rc = g95_get_symbol(name, g95_current_ns->parent, 0, result);
+  rc = g95_get_symbol(name, g95_current_ns->parent, result);
   if (*result == NULL) return rc;
 
   /* Deal with ENTRY problem */
@@ -297,7 +297,7 @@ match m;
 
   /* The NULL symbol now has to be/become an intrinsic function */
 
-  if (g95_findget_symbol("null", NULL, 0, &sym)) {
+  if (g95_get_symbol("null", NULL, &sym)) {
     g95_error("NULL() initialization at %C is ambiguous");
     return MATCH_ERROR;
   }
@@ -733,7 +733,7 @@ match m;
 
   /* Search for the name but allow the components to be defined later. */
 
-  if (g95_findget_symbol(name, NULL, 0, &sym)) {
+  if (g95_get_ha_symbol(name, &sym)) {
     g95_error("Type name '%s' at %C is ambiguous", name);
     return MATCH_ERROR;
   }
@@ -1136,7 +1136,7 @@ match m;
       m = g95_match_name(name);
       if (m != MATCH_YES) goto cleanup;
 
-      if (g95_get_symbol(name, NULL, 0, &sym)) goto cleanup;
+      if (g95_get_symbol(name, NULL, &sym)) goto cleanup;
     }
 
     p = g95_get_formal_arglist();
@@ -1219,7 +1219,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  if (g95_get_symbol(name, NULL, 0, &r)) return MATCH_ERROR;
+  if (g95_get_symbol(name, NULL, &r)) return MATCH_ERROR;
 
   if (g95_add_flavor(&r->attr, FL_VARIABLE, NULL) == FAILURE ||
       g95_add_result(&r->attr, NULL) == FAILURE) return MATCH_ERROR;
@@ -1786,7 +1786,7 @@ match m;
       goto syntax;
 
     case INTERFACE_GENERIC:
-      if (g95_get_symbol(name, NULL, 0, &sym)) goto done;
+      if (g95_get_symbol(name, NULL, &sym)) goto done;
 
       if (g95_add_access(&sym->attr,
 			 (st == ST_PUBLIC) ? ACCESS_PUBLIC : ACCESS_PRIVATE,
@@ -1883,7 +1883,7 @@ g95_symbol *sym;
 g95_expr *init;
 match m;
 
-  m = g95_match_symbol(&sym);
+  m = g95_match_symbol(&sym, 0);
   if (m == MATCH_NO)
     g95_error("Expected variable name at %C in PARAMETER statement");
 
@@ -1971,7 +1971,7 @@ match m;
   g95_match(" ::");
 
   for(;;) { 
-    m = g95_match_symbol(&sym);
+    m = g95_match_symbol(&sym, 0);
     switch(m) {
     case MATCH_YES:
       if (g95_add_save(&sym->attr, g95_current_locus()) == FAILURE)
@@ -2027,7 +2027,7 @@ match m;
     if (m == MATCH_NO) goto syntax;
     if (m != MATCH_YES) return MATCH_ERROR;
 
-    if (g95_get_symbol(name, g95_current_ns->parent, 0, &sym))
+    if (g95_get_symbol(name, g95_current_ns->parent, &sym))
       return MATCH_ERROR;
 
     if (sym->attr.proc != PROC_MODULE &&
@@ -2105,7 +2105,7 @@ loop:
     return MATCH_ERROR;
   }
 
-  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
+  if (g95_get_symbol(name, NULL, &sym)) return MATCH_ERROR;
 
 /* The symbol may already have the derived attribute without the
  * components.  The ways this can happen is via a function definition,

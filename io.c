@@ -621,6 +621,7 @@ g95_namelist *p;
 /* match_dt_element()-- Match a single data transfer element */
 
 static match match_dt_element(io_kind k, g95_dt *dt) {
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 match m;
 
@@ -634,11 +635,13 @@ match m;
     if (m != MATCH_NO) return m;
   }
 
-  if (g95_match(" nml = %s", &sym) == MATCH_YES) {
+  if (g95_match(" nml = %n", name) == MATCH_YES) {
     if (dt->namelist != NULL) {
       g95_error("Duplicate NML specification at %C");
       return MATCH_ERROR;
     }
+
+    if (g95_find_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
     if (sym->attr.flavor != FL_NAMELIST) {
       g95_error("Symbol '%s' at %C must be a NAMELIST group name", sym->name);
@@ -1047,6 +1050,7 @@ g95_code *term;
 /* match_io()-- Match a READ, WRITE or PRINT statement. */
 
 static match match_io(io_kind k) {
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_code *io_code;
 g95_symbol *sym;
 g95_expr *expr;
@@ -1090,7 +1094,9 @@ match m;
 
   where = *g95_current_locus();
 
-  if (g95_match_symbol(&sym) == MATCH_YES && sym->attr.flavor == FL_NAMELIST) {
+  if (g95_match_name(name) == MATCH_YES &&
+      !g95_find_symbol(name, NULL, 1, &sym) &&
+      sym->attr.flavor == FL_NAMELIST) {
     dt->namelist = sym;
     if (k == M_READ && check_namelist(sym)) goto cleanup;
     goto next;

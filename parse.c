@@ -1657,7 +1657,7 @@ g95_symbol *sym;
        * parent namespace */
 
       if (!module) {
-	if (g95_get_symbol(g95_new_block->name, parent_ns, 0, &sym))
+	if (g95_get_symbol(g95_new_block->name, parent_ns, &sym))
 	  g95_error("Contained procedure '%s' at %C is already ambiguous",
 		    g95_new_block->name);
 	else {

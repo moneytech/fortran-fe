@@ -186,7 +186,7 @@ match m;
 
   switch(type) {
   case INTERFACE_GENERIC:
-    if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+    if (g95_get_symbol(name, NULL, &sym)) return MATCH_ERROR;
 
     if (!sym->attr.generic && g95_add_generic(&sym->attr, NULL) == FAILURE)
       return MATCH_ERROR;

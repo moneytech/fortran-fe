@@ -1086,7 +1086,7 @@ int c;
      * a function argument. */
 
     if (sym == NULL)
-      g95_get_symbol(name, NULL, 0, &sym);
+      g95_get_symbol(name, NULL, &sym);
     else {
       if (sym->attr.flavor != FL_PROCEDURE && sym->attr.flavor != FL_UNKNOWN)
 	break;
@@ -1519,16 +1519,20 @@ g95_actual_arglist *actual_arglist;
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_state_data *st;
 g95_symbol *sym;
-int parent_flag;
 locus where;
 g95_expr *e;
 match m;
+int i;
 
   m = g95_match_name(name); 
   if (m != MATCH_YES) return m;
 
-  parent_flag = g95_find_state(COMP_INTERFACE) == FAILURE;
-  if (g95_findget_symbol(name, NULL, parent_flag, &sym)) return MATCH_ERROR;
+  if (g95_find_state(COMP_INTERFACE) == SUCCESS)
+    i = g95_get_symbol(name, NULL, &sym);
+  else
+    i = g95_get_ha_symbol(name, &sym);
+
+  if (i) return MATCH_ERROR;
 
   e = NULL;
   where = *g95_current_locus();
@@ -1629,7 +1633,7 @@ match m;
       break;
     }
 
-    g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
+    g95_get_symbol(name, NULL, &sym);   /* Can't fail */
 
     e = g95_get_expr();
     e->symbol = sym;
@@ -1728,7 +1732,7 @@ match m;
 
 /* Give up, assume we have a function */
 
-    g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
+    g95_get_symbol(name, NULL, &sym);   /* Can't fail */
     e->expr_type = EXPR_FUNCTION;
 
     if (!sym->attr.function && g95_add_function(&sym->attr, NULL) == FAILURE) {
@@ -1756,7 +1760,7 @@ match m;
     break;
 
   generic_function:
-    g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
+    g95_get_symbol(name, NULL, &sym);   /* Can't fail */
 
     e = g95_get_expr();
     e->symbol = sym;
@@ -1792,7 +1796,7 @@ g95_expr *expr;
 locus where;
 match m;
 
-  m = g95_match_symbol(&sym);
+  m = g95_match_symbol(&sym, 1);
   if (m != MATCH_YES) return m;
   where = *g95_current_locus();
 

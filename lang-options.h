@@ -33,7 +33,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
 { "-std=F",
       N_("Parse an F program") },
 { "-d8",
-      N_("Set the default real and integer kinds to double precision") },
+      N_("Set the default real and integer kinds to double\n\
+                          precision") },
 { "-ffixed-line-length-80",
       N_("80 character line width in fixed mode") },
 { "-ffixed-line-length-132",
@@ -48,7 +49,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
       N_("Specify that no implicit typing is allowed, unless overridden by "
 	 "explicit IMPLICIT statements") },
 { "-fmodule-private",
-      N_("Set default accessibility of module entities to PRIVATE") },
+      N_("Set default accessibility of module entities to\n\
+                          PRIVATE") },
 { "-fqkind=<n>",
       N_("Set the kind for a real with the 'q' exponent to 'n'") },
 { "-fpack-derived",
