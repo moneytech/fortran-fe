@@ -226,15 +226,11 @@ g95_inquire *i;
 g95_dt *dt;
 int label = 0;
 
-  if (c->op != EXEC_NOP)
-    code_indent(level, c->here); 
-
-  if (c->next && (c->next->op == EXEC_NOP))
-    label = c->next->here;
+  code_indent(level, c->here); 
 
   switch(c->op) {
-
   case EXEC_NOP:
+    g95_status("NOP");
     break;
 
   case EXEC_CONTINUE:
@@ -342,13 +338,6 @@ int label = 0;
 
   case EXEC_WHERE:
     g95_status("WHERE ");
-
-    if (c->expr != NULL) {
-      g95_show_expr(c->expr);
-      g95_status_char('\n');
-      g95_show_code(level+1, c->block);
-      break;
-    }
 
     d = c->block;
     g95_show_expr(d->expr);
@@ -560,9 +549,6 @@ int label = 0;
   case EXEC_IOLENGTH:
     g95_status("IOLENGTH ");
     g95_show_expr(c->expr);
-    g95_status_char('\n');
-
-    g95_show_code(level+1, c->block);
     break;
 
   case EXEC_READ:
@@ -596,8 +582,7 @@ int label = 0;
     g95_internal_error("g95_show_code_node(): Bad statement code");
   }
 
-  if (c->op != EXEC_NOP)
-    g95_status_char('\n');
+  g95_status_char('\n');
 }
 
 

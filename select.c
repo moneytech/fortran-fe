@@ -482,19 +482,10 @@ try t;
   overlap = 0;
  
   for(body=code->block; body; body=body->block) {
-    g95_push_code(body->next);
-    g95_resolve_code(body->next,ns);
-    g95_pop_code();
-
     if (t == FAILURE) continue;
 
     for(cp=body->ext.case_list; cp; cp=cp->next) {
       if (cp->low != NULL) {
-	if (g95_resolve_expr(cp->low) == FAILURE) {
-	  t = FAILURE;
-	  break;
-	}
-
 	if (check_case_expr(cp->low, type) == FAILURE) {
 	  t = FAILURE;
 	  break;
@@ -509,11 +500,6 @@ try t;
       }
 
       if (cp->high != NULL) {
-	if (g95_resolve_expr(cp->high) == FAILURE) {
-	  t = FAILURE;
-	  break;
-	}
-
 	if (check_case_expr(cp->high, type) == FAILURE) {
 	  t = FAILURE;
 	  break;

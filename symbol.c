@@ -1350,27 +1350,6 @@ g95_st_label *l2;
 }
 
 
-/* g95_check_st_labels()-- Check statement labels within a namespace
- * to make sure that referenced labels are defined and warn if defined
- * labels are never referenced. */
-
-void g95_check_st_labels(g95_namespace *ns) {
-g95_st_label *p;
-
-  for(p=ns->st_labels; p; p=p->next) {
-    if (p->defined == ST_LABEL_UNKNOWN)
-      g95_error("Label %d referenced at %L is never defined", p->label,
-		&p->where);
-
-#if 0
-    if (p->referenced == ST_LABEL_UNKNOWN)
-      g95_warning("Label %d defined at %L is never referenced", p->label,
-		  &p->where);
-#endif
-  }
-}
-
-
 /* get_st_label()-- Given a label number, search for and return a
  * pointer to the label structure, creating it if it does not exist. */
 

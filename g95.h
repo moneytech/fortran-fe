@@ -418,18 +418,6 @@ typedef struct g95_st_label {
 #define g95_get_st_label() g95_getmem(sizeof(g95_st_label))
 
 
-/* Stack of block entry points for validating GOTO statements.
-   The idea here is to keep a stack of all the labels that are
-   in the back path of the parse tree in the current namespace.
-   See resolve_goto() in resolve.c for details. */
-
-typedef struct g95_code_stack {
-  struct g95_code *code;
-  struct g95_code_stack *prev;
-} g95_code_stack;
-
-#define g95_get_code_stack() g95_getmem(sizeof(g95_code_stack))
-
 /* g95_interface()-- Interfaces are lists of symbols strung together */
 
 typedef struct g95_interface {
@@ -1210,7 +1198,6 @@ g95_symbol *g95_use_derived(g95_symbol *);
 g95_component *g95_find_component(g95_symbol *, const char *);
 void g95_show_components(g95_symbol *);
 
-void g95_check_st_labels(g95_namespace *);
 int g95_new_internal_label();
 void g95_define_st_label(int, locus *, g95_sl_type);
 try g95_reference_st_label(int, g95_sl_type);
@@ -1405,14 +1392,11 @@ void g95_show_code(int, g95_code *);
 /* resolve.c */
 
 try g95_resolve_expr(g95_expr *);
-void g95_resolve_code(g95_code *, g95_namespace *);
 void g95_resolve(g95_namespace *);
 int g95_impure_variable(g95_symbol *);
 int g95_pure(g95_symbol *);
 int g95_elemental(g95_symbol *);
 try g95_resolve_iterator(g95_iterator *);
-void g95_push_code(g95_code *);  /* I'd rather not have these here, but */
-void g95_pop_code();             /* we need them in select.c            */
 
 /* array.c */
 

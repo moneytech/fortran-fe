@@ -25,9 +25,14 @@ Boston, MA 02111-1307, USA.  */
 
 
 /* Stack to push the current if we descend into a block during
-   resolution.  See resolve_goto() and g95_resovle_code().  */
+ * resolution.  See resolve_branch() and resolve_code().  */
 
-static g95_code_stack *code_stack = NULL;
+typedef struct code_stack {
+  struct g95_code *head, *current;
+  struct code_stack *prev;
+} code_stack;
+
+static code_stack *cs_base = NULL;
 
 
 /* namespace_kind()-- Given a namespace, figure out what kind it is.
@@ -1567,57 +1572,60 @@ g95_component *c;
 }
 
 
-/* resolve_goto()-- Given a namespace, a block of code, figure out if
-   a GOTO statement is conforming.  */
+/* resolve_branch()-- Given a branch to a label and a namespace, if
+ * the branch is conforming.  The code node described where the branch
+ * is located. */
 
-void g95_resolve_goto(g95_code *code, g95_namespace *ns) {
-g95_code_stack *stack;
+static void resolve_branch(int label, g95_code *code, g95_namespace *ns) {
 g95_code *block, *found;
+code_stack *stack;
 g95_st_label *lp;
 
+  if (label == 0) return;
+
   /* Step one: find the label in this namespace */
+
   for(lp=ns->st_labels; lp; lp=lp->next)
-    if (lp->label == code->label) break; /* always in list */
+    if (lp->label == label) break; /* always in list */
 
   /* Step two: is this a valid branching target? */
-  if ((lp->defined == ST_LABEL_BAD_TARGET) ||
-      (lp->defined == ST_LABEL_UNKNOWN)) return; /* don't waste effort */
 
-  if (lp->defined != ST_LABEL_TARGET) {
-    g95_error("Statement at %L is not a valid branch target statement "
-	      "for the GOTO statement at %L", &lp->where, &code->loc);
+  if (lp->defined == ST_LABEL_UNKNOWN) {
+    g95_error("Label %d referenced at %L is never defined", lp->label,
+	      &lp->where);
     return;
   }
 
-  /* Step three: make sure this GOTO is not a GOTO to itself ;-) */
-  if (code->here == code->label) {
-    g95_warning("GOTO at %L causes an infinite loop",&code->loc);
+  if (lp->defined != ST_LABEL_TARGET) {
+    g95_error("Statement at %L is not a valid branch target statement "
+	      "for the branch statement at %L", &lp->where, &code->loc);
+    return;
+  }
+
+  /* Step three: make sure this branch is not a branch to itself ;-) */
+
+  if (code->here == label) {
+    g95_warning("Branch at %L causes an infinite loop", &code->loc);
     return;
   }
 
   /* Step four: Try to find the label in the parse tree. To do this,
-     we traverse the tree block-by-block: first the block that
-     contains this GOTO, then the block that it is nested in, etc.  We
-     can ignore other blocks because branching into another block is
-     not allowed.  */
+   * we traverse the tree block-by-block: first the block that
+   * contains this GOTO, then the block that it is nested in, etc.  We
+   * can ignore other blocks because branching into another block is
+   * not allowed.  */
+
   found = NULL;
 
-  for(stack=code_stack; stack; stack=stack->prev) {
-    for(block=stack->code; block; block=block->next) {
-      if (block->here == code->label) {
+  for(stack=cs_base; stack; stack=stack->prev) {
+    for(block=stack->head; block; block=block->next) {
+      if (block->here == label) {
         found = block;
         break;
       }
     }
-  }
 
-  if (found == NULL) {
-    for(block = ns->code; block; block=block->next) {
-      if (block->here == code->label) {
-        found = block;
-        break;
-      }
-    }
+    if (found) break;
   }
 
   if (found == NULL) {    /* still nothing, so illegal.  */
@@ -1627,83 +1635,87 @@ g95_st_label *lp;
   }
 
   /* Step five: Make sure that the branching target is legal if
-     the statement is an END {SELECT,DO,IF}. */
+   * the statement is an END {SELECT,DO,IF}. */
+
   if (found->op == EXEC_NOP) {
-    for (stack = code_stack; stack; stack = stack->prev) {
-      if (stack->code->next == found) break;
-    }
-    if (stack == NULL) {
+    for(stack=cs_base; stack; stack=stack->prev)
+      if (stack->current->next == found) break;
+
+    if (stack == NULL)
       g95_error("GOTO at %L cannot jump to END of construct at %L",
                 &found->loc, &code->loc);
-    }
   }
 } 
 
 
-/* g95_push_code()-- Put a g95_code on the block stack. Used in
-   g95_resolve_code() and g95_resolve_select() to store the start of a
-   block.  */
-void g95_push_code(g95_code *code) {
-  if (code_stack != NULL) {
-    g95_code_stack *tmp = g95_get_code_stack(); 
-    tmp->prev = code_stack;
-    code_stack = tmp;
-  } else code_stack = g95_get_code_stack();
-  code_stack->code = code;
-}
+/* resolve_blocks()-- Resolve lists of blocks found in IF, SELECT CASE,
+ * WHERE, FORALL and DO code nodes. */
 
+static void resolve_code(g95_code *, g95_namespace *);
 
-/* g95_pop_code()-- because you should always pop what you push...  */
-void g95_pop_code() {
-  if (code_stack != NULL) {
-    g95_code_stack *tmp = code_stack;
-    code_stack = tmp->prev;
-    g95_free(tmp);
-  } else g95_internal_error("g95_pop_block(): Code stack empty");
-}
+static void resolve_blocks(g95_code *b, g95_namespace *ns) {
+try t;
 
+  for(; b; b=b->block) {
+    t = g95_resolve_expr(b->expr);
+    if (g95_resolve_expr(b->expr2) == FAILURE) t = FAILURE;
 
-/* g95_resolve_constuct_blocks()-- Resolve all blocks in a construct
-   top-down, given a pointer to the top of the construct. There's a 
-   special resolution routine for the SELECT CASE construct... */
+    switch(b->op) {
+    case EXEC_IF:
+      if (t == SUCCESS && b->expr != NULL &&
+	  b->expr->ts.type != BT_LOGICAL)
+	g95_error("ELSE IF clause at %L requires a LOGICAL expression",
+		  &b->expr->where);
+      break;
 
-void g95_resolve_construct_blocks(g95_code *construct, g95_namespace *ns) {
-g95_code *block;
+    case EXEC_WHERE:
+      if (t == SUCCESS && b->expr != NULL &&
+	  (b->expr->ts.type != BT_LOGICAL || b->expr->rank == 0))
+	g95_error("WHERE/ELSEWHERE clause at %L requires a LOGICAL array",
+		  &b->expr->where);
+      break;
 
-  for (block=construct->block; block; block=block->block) {
-     g95_push_code(block->next);
-     g95_resolve_code(block->next,ns);
-     g95_pop_code();
+    case EXEC_SELECT:  case EXEC_FORALL:  case EXEC_DO:  case EXEC_DO_WHILE:
+      break;
+
+    default:
+      g95_internal_error("resolve_block(): Bad block type");
+    }
+
+    resolve_code(b->next, ns);
   }
 }
 
 
-/* g95_resolve_code()-- Given a block of code, recursively resolve
+/* resolve_code()-- Given a block of code, recursively resolve
  * everything pointed to by this code block */
 
-void g95_resolve_code(g95_code *code, g95_namespace *ns) {
+void resolve_code(g95_code *code, g95_namespace *ns) {
+code_stack frame;
 g95_alloc *a;
 try t;
 
-  for(; code; code=code->next) {
+  frame.prev = cs_base;
+  frame.head = code;
+  cs_base = &frame;
 
-    if (code->op != EXEC_SELECT && code->block != NULL) {
-      g95_push_code(code);
-      g95_resolve_construct_blocks(code,ns);
-      g95_pop_code();
-    }
+  for(; code; code=code->next) {
+    frame.current = code; 
+
+    if (code->op != EXEC_WHERE || code->expr != NULL)
+      resolve_blocks(code->block, ns);
 
     t = g95_resolve_expr(code->expr);
     if (g95_resolve_expr(code->expr2) == FAILURE) t = FAILURE;
 
     switch(code->op) {
-    case EXEC_NOP:  case EXEC_CYCLE:  case EXEC_IOLENGTH:
-    case EXEC_STOP: case EXEC_NULLIFY: case EXEC_EXIT:
-    case EXEC_CONTINUE:
+    case EXEC_NOP:       case EXEC_CYCLE:     case EXEC_IOLENGTH:
+    case EXEC_STOP:      case EXEC_NULLIFY:   case EXEC_EXIT:
+    case EXEC_CONTINUE:  case EXEC_WHERE:
       break;
 
     case EXEC_GOTO:
-      g95_resolve_goto(code,ns);
+      resolve_branch(code->label, code, ns);
       break;
 
     case EXEC_RETURN:
@@ -1747,19 +1759,16 @@ try t;
 	  code->expr->ts.type != BT_REAL)
 	g95_error("Arithmetic IF statement at %L requires a numeric "
 		  "expression", &code->expr->where);
+
+      resolve_branch(code->label, code, ns);
+      resolve_branch(code->label2, code, ns);
+      resolve_branch(code->label3, code, ns);
       break;
 
     case EXEC_IF:
       if (t == SUCCESS && code->expr != NULL &&
 	  code->expr->ts.type != BT_LOGICAL)
-	g95_error("IF/ELSE IF clause at %L requires a LOGICAL expression",
-		  &code->expr->where);
-      break;
-
-    case EXEC_WHERE:
-      if (t == SUCCESS && code->expr != NULL &&
-	  (code->expr->ts.type != BT_LOGICAL || code->expr->rank == 0))
-	g95_error("WHERE/ELSEWHERE clause at %L requires a LOGICAL array",
+	g95_error("IF clause at %L requires a LOGICAL expression",
 		  &code->expr->where);
       break;
 
@@ -1768,9 +1777,7 @@ try t;
       break;
 
     case EXEC_SELECT:
-      g95_push_code(code);
       g95_resolve_select(code, ns);      /* Select is complicated */
-      g95_pop_code();
       break;
 
     case EXEC_DO:
@@ -1792,6 +1799,7 @@ try t;
 
       for(a=code->ext.alloc_list; a; a=a->next)
 	g95_resolve_expr(a->expr);
+
       break;
 
     case EXEC_DEALLOCATE:
@@ -1802,29 +1810,42 @@ try t;
 
       for(a=code->ext.alloc_list; a; a=a->next)
 	g95_resolve_expr(a->expr);
+
       break;
 
     case EXEC_OPEN:
-      g95_resolve_open(code->ext.open);
+      if (g95_resolve_open(code->ext.open) == FAILURE) break;
+
+      resolve_branch(code->ext.open->err, code, ns);
       break;
 
     case EXEC_CLOSE:
-      g95_resolve_close(code->ext.close);
+      if (g95_resolve_close(code->ext.close) == FAILURE) break;
+
+      resolve_branch(code->ext.close->err, code, ns);
       break;
 
     case EXEC_BACKSPACE:
     case EXEC_ENDFILE:
     case EXEC_REWIND:
-      g95_resolve_filepos(code->ext.filepos);
+      if (g95_resolve_filepos(code->ext.filepos) == FAILURE) break;
+
+      resolve_branch(code->ext.filepos->err, code, ns);
       break;
 
     case EXEC_INQUIRE:
-      g95_resolve_inquire(code->ext.inquire);
+      if (g95_resolve_inquire(code->ext.inquire) == FAILURE) break;
+
+      resolve_branch(code->ext.inquire->err, code, ns);
       break;
 
     case EXEC_READ:
     case EXEC_WRITE:
-      g95_resolve_dt(code->ext.dt);
+      if (g95_resolve_dt(code->ext.dt) == FAILURE) break;
+
+      resolve_branch(code->ext.dt->err, code, ns);
+      resolve_branch(code->ext.dt->end, code, ns);
+      resolve_branch(code->ext.dt->eor, code, ns);
       break;
 
     case EXEC_FORALL:
@@ -1836,9 +1857,11 @@ try t;
       break;
 
     default:    
-      g95_internal_error("g95_resolve_code(): Bad statement code");
+      g95_internal_error("resolve_code(): Bad statement code");
     }
   }
+
+  cs_base = frame.prev;
 }
 
 
@@ -2170,9 +2193,8 @@ g95_data *d;
   for(d=ns->data; d; d=d->next)
     resolve_data(d);
 
-  g95_resolve_code(ns->code, ns);
-
-  g95_check_st_labels(ns);
+  cs_base = NULL;
+  resolve_code(ns->code, ns);
 
   g95_current_ns = old_ns;
 }

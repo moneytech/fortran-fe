@@ -701,6 +701,7 @@ static void accept_statement(g95_statement st) {
   case ST_ENDDO:
   case ST_END_SELECT:
     if (g95_statement_label == 0) break;
+
     new_st.op = EXEC_NOP;
     /* Fall through */
  

@@ -890,7 +890,6 @@ int g95_symbol_rank(g95_symbol *sym) {
  * nonzero if the same, zero if different.  */
 
 static int compare_parameter(g95_symbol *formal, g95_expr *actual) {
-g95_ref *ref;
 
   if (actual->ts.type == BT_PROCEDURE) {
     if (formal->attr.flavor != FL_PROCEDURE) return 0;

@@ -1022,10 +1022,25 @@ cleanup:
 }
 
 
+/* terminate_io()-- Generate a call that ends this I/O statement and
+ * append it to the current list.  */
+
+static void terminate_io(g95_code **io_code) {
+g95_code *term;
+
+  term = g95_build_call("_io_done", NULL);
+
+  if (*io_code == NULL)
+    *io_code = term;
+  else
+    g95_append_code(*io_code, term);
+}
+
+
 /* match_io()-- Match a READ, WRITE or PRINT statement. */
 
 static match match_io(io_kind k) {
-g95_code *io_code, *term;
+g95_code *io_code;
 g95_symbol *sym;
 g95_expr *expr;
 int comma_flag;
@@ -1107,12 +1122,7 @@ get_io_list:
     if (m == MATCH_NO) goto syntax;
   }
 
-  term = g95_build_call("_io_done", NULL);
-
-  if (io_code == NULL)
-    io_code = term;
-  else
-    g95_append_code(io_code, term);
+  terminate_io(&io_code);
 
 /* A full IO statement has been matched */
 
@@ -1276,16 +1286,19 @@ match m;
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
+    terminate_io(&code);
+
     new_st.op = EXEC_IOLENGTH;
     new_st.expr = inquire->iolength;
     g95_free(inquire);
 
     if (g95_pure(NULL)) {
+      g95_free_statements(code);
       g95_error("INQUIRE statement not allowed in PURE procedure at %C");
       return MATCH_ERROR;
     }
 
-    new_st.block = code;
+    new_st.next = code;
     return MATCH_YES;
   }
 

@@ -2298,12 +2298,15 @@ g95_code *c;
 
   *st = ST_WHERE;
   c = g95_get_code();
-  *c = new_st;
 
+  c->op = EXEC_WHERE;
+  c->expr = expr;
+  c->next = g95_get_code();
+
+  *c->next = new_st;
   g95_clear_new_st();
 
   new_st.op = EXEC_WHERE;
-  new_st.expr = expr;
   new_st.block = c;
 
   return MATCH_YES;
