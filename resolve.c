@@ -552,6 +552,8 @@ g95_typespec *ts;
 
   sym->attr.proc = PROC_EXTERNAL;
   expr->value.function.name = sym->name;
+  expr->value.function.esym = sym;
+
   if (sym->as != NULL) expr->rank = sym->as->rank;
 
   g95_procedure_use(sym, &expr->value.function.actual, &expr->where);
