@@ -194,6 +194,57 @@ g95_expr *result;
 
 /***** Check functions *****/
 
+
+static try check_all_any(g95_expr *mask, g95_expr *dim) {
+
+  if (mask->ts.type != BT_LOGICAL || mask->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_allocated(g95_expr *array) {
+
+  if (array->expr_type != EXPR_VARIABLE) return FAILURE;
+
+  if (array->ref != NULL) return FAILURE;
+
+  return (array->symbol->attr.allocatable) ? SUCCESS : FAILURE;
+}
+
+
+static try check_associated(g95_expr *pointer, g95_expr *target) {
+g95_ref *ref;
+
+  if (pointer->ref == NULL) {
+    if (pointer->symbol->attr.pointer == 0) return FAILURE;
+  } else {
+    for(ref=pointer->ref; ref->next;)
+      ref = ref->next;
+
+    if (ref->component == NULL || ref->component->pointer == 0) return FAILURE;
+  }
+
+  if (target == NULL) return SUCCESS;
+
+  /* Target argument is optional */
+
+  if (target->ref == NULL) {
+    if (target->symbol->attr.pointer == 0) return FAILURE;
+  } else {
+    for(ref=target->ref; ref->next;)
+      ref = ref->next;
+
+    if (ref->component == NULL || ref->component->pointer == 0) return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
 /* Abs family */
 
 static try check_dabs(g95_expr *x) {
@@ -278,6 +329,34 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
 }
 
 
+static try check_count(g95_expr *mask, g95_expr *dim) {
+
+  if (mask->ts.type != BT_LOGICAL || mask->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_cshift(g95_expr *array, g95_expr *shift, g95_expr *dim) {
+
+  if (array->as == NULL) return FAILURE;
+
+  if (array->as->rank == 1) {
+    if (shift->as != NULL) return FAILURE;
+  } else {
+    /* TODO: more requirements on shift parameter */
+  }
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_dble(g95_expr *x) {
 
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
@@ -306,11 +385,50 @@ static try check_dim(g95_expr *x, g95_expr *y) {
 }
 
 
+static try check_dot_product(g95_expr *vector_a, g95_expr *vector_b) {
+
+  if ((vector_a->ts.type != BT_LOGICAL || vector_b->ts.type != BT_LOGICAL) &&
+      (!g95_numeric_ts(&vector_a->ts) || !g95_numeric_ts(&vector_b->ts)))
+    return FAILURE;
+
+  if (vector_a->as == NULL || vector_a->as->rank != 1) return FAILURE;
+  if (vector_b->as == NULL || vector_b->as->rank != 1) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_epsilon(g95_expr *x) {
 
   if (x->ts.type != BT_REAL) return FAILURE;
 
   type_match = 0;
+
+  return SUCCESS;
+}
+
+
+static try check_eoshift(g95_expr *array, g95_expr *shift, g95_expr *boundary,
+			 g95_expr *dim) {
+
+  if (array->as == NULL) return FAILURE;
+
+  if (shift->ts.type != BT_INTEGER) return FAILURE;
+
+  if (array->as->rank == 1) {
+    if (shift->as != NULL) return FAILURE;
+  } else {
+    /* TODO: more weird restrictions on shift */
+  }
+
+  if (boundary != NULL) {
+    if (!g95_compare_types(&array->ts, &boundary->ts)) return FAILURE;
+
+    /* TODO: more restrictions on boundary */
+  }
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -363,6 +481,17 @@ static try check_kind(g95_expr *x) {
   if (x->ts.type == BT_DERIVED) return FAILURE;
 
   type_match = 0;
+
+  return SUCCESS;
+}
+
+
+static try check_lbound(g95_expr *array, g95_expr *dim) {
+
+  if (array->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -464,6 +593,91 @@ static try check_min_max_exponent(g95_expr *x) {
 }
 
 
+static try check_matmul(g95_expr *matrix_a, g95_expr *matrix_b) {
+
+  if ((matrix_a->ts.type != BT_LOGICAL || matrix_b->ts.type != BT_LOGICAL) &&
+      (!g95_numeric_ts(&matrix_a->ts) || !g95_numeric_ts(&matrix_b->ts)))
+    return FAILURE;
+
+  if (matrix_a->as == NULL || matrix_b->as == NULL) return FAILURE;
+
+  if ((matrix_a->as->rank != 1 || matrix_b->as->rank != 2) &&
+      (matrix_a->as->rank != 2 || matrix_b->as->rank != 1)) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_maxloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL)
+    return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
+
+  if (mask != NULL && (mask->as != NULL || mask->ts.type != BT_LOGICAL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  if (array->ts.type != BT_INTEGER || array->ts.type != BT_REAL ||
+      array->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as == NULL))
+    return FAILURE;
+
+  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->as == NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_merge(g95_expr *tsource, g95_expr *fsource, g95_expr *mask) {
+
+  if (!g95_compare_types(&tsource->ts, &fsource->ts)) return FAILURE;
+
+  if (mask->ts.type != BT_LOGICAL) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_minloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL)
+    return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
+
+  if (mask != NULL && (mask->as != NULL || mask->ts.type != BT_LOGICAL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_minval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  if (array->ts.type != BT_INTEGER || array->ts.type != BT_REAL ||
+      array->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as == NULL))
+    return FAILURE;
+
+  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->as == NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_mod(g95_expr *a, g95_expr *p) {
 
   if ((a->ts.type != BT_INTEGER && a->ts.type != BT_REAL) ||
@@ -494,11 +708,75 @@ static try check_nint(g95_expr *x, g95_expr *kind) {
 }
 
 
+static try check_null(g95_expr *mold) {
+g95_ref *ref;
+
+  if (mold == NULL) return SUCCESS;
+
+  if (mold->ref == NULL) {
+    if (mold->symbol->attr.pointer == 0) return FAILURE;
+  } else {
+    for(ref=mold->ref; ref->next;)
+      ref = ref->next;
+
+    if (ref->component == NULL || ref->component->pointer == 0) return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
+static try check_pack(g95_expr *array, g95_expr *mask, g95_expr *vector) {
+
+  if (array->as == NULL) return FAILURE;
+
+  if (mask->as == NULL || mask->ts.type != BT_INTEGER) return FAILURE;
+
+  if (vector != NULL) {
+
+    if (!g95_compare_types(&array->ts, &vector->ts)) return FAILURE;
+
+    if (vector->as == NULL || vector->as->rank != 1) return FAILURE;
+
+    /* TODO: More constraints here */
+  }
+
+  return SUCCESS;
+}
+
+
 static try check_precision(g95_expr *x) {
 
   if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) return FAILURE;
 
   type_match = 0;
+
+  return SUCCESS;
+}
+
+
+static try check_present(g95_expr *a) {
+
+  if (a->expr_type != EXPR_VARIABLE) return FAILURE;
+
+  if (a->ref != NULL) return FAILURE;
+
+  if (a->symbol->attr.dummy == 0 || a->symbol->attr.optional == 0)
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_product(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  if (!g95_numeric_ts(&array->ts) || array->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
+
+  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->as == NULL))
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -559,6 +837,7 @@ static try check_reshape(g95_expr *source, g95_expr *shape,
   return SUCCESS;
 }
 
+
 static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
 
   if ((p == NULL && r == NULL) ||
@@ -566,6 +845,23 @@ static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
       (r != NULL && r->ts.type != BT_INTEGER)) return FAILURE;
 
   type_match = 0;
+
+  return SUCCESS;
+}
+
+
+static try check_shape(g95_expr *source) {
+
+  return SUCCESS;
+}
+
+
+static try check_size(g95_expr *array, g95_expr *dim) {
+
+  if (array->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -581,9 +877,53 @@ static try check_sign(g95_expr *a, g95_expr *b) {
 }
 
 
+static try check_spread(g95_expr *source, g95_expr *dim, g95_expr *ncopies) {
+
+  if (source->as != NULL && source->as->rank >= G95_MAX_DIMENSIONS)
+    return FAILURE;
+
+  if (dim->ts.type != BT_INTEGER || dim->as != NULL) return FAILURE;
+
+  if (ncopies->ts.type != BT_INTEGER || ncopies->as != NULL) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_sqrt(g95_expr *x) {
 
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
+
+  if (!g95_numeric_ts(&array->ts) || array->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
+
+  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->as == NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_transfer(g95_expr *source, g95_expr *mold, g95_expr *size) {
+
+  if (size != NULL && (size->ts.type != BT_INTEGER || size->as == NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_transpose(g95_expr *matrix) {
+
+  if (matrix->as == NULL || matrix->as->rank != 2) return FAILURE;
 
   return SUCCESS;
 }
@@ -599,6 +939,33 @@ static try check_tiny(g95_expr *x) {
 }
 
 
+static try check_ubound(g95_expr *array, g95_expr *dim) {
+
+  if (array->as == NULL) return FAILURE;
+
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_unpack(g95_expr *vector, g95_expr *mask, g95_expr *field) {
+
+  if (vector->as == NULL || vector->as->rank != 1) return FAILURE;
+
+  if (mask->as == NULL || mask->ts.type != BT_LOGICAL) return FAILURE;
+
+  if (!g95_compare_types(&vector->ts, &field->ts)) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+
+
+
+
 /* do_check()-- Interface to the check functions.  We break apart an
  * argument list and call the proper check function rather than
  * forcing each function to manipulate the argument list */
@@ -607,12 +974,13 @@ static try do_check(intrinsic_sym *specific, g95_actual_arglist *arg) {
 g95_expr *a1, *a2, *a3, *a4;
 try t;
 
-/* Max and min require special handling due to the variable number of args */
-  if ( strcmp(specific->name,"min")  ==0 || strcmp(specific->name,"max")  ==0||
-       strcmp(specific->name,"min0") ==0 || strcmp(specific->name,"max0") ==0||
-       strcmp(specific->name,"min1") ==0 || strcmp(specific->name,"max1") ==0||
-       strcmp(specific->name,"amin0")==0 || strcmp(specific->name,"amax0")==0||
-       strcmp(specific->name,"amin1")==0 || strcmp(specific->name,"amax1")==0) {
+/* max and min require special handling due to the variable number of args */
+
+  if (strcmp(specific->name,"min")  ==0 || strcmp(specific->name,"max")  ==0||
+      strcmp(specific->name,"min0") ==0 || strcmp(specific->name,"max0") ==0||
+      strcmp(specific->name,"min1") ==0 || strcmp(specific->name,"max1") ==0||
+      strcmp(specific->name,"amin0")==0 || strcmp(specific->name,"amax0")==0||
+      strcmp(specific->name,"amin1")==0 || strcmp(specific->name,"amax1")==0) {
     t = (*specific->check_function)(arg);
     return t;
   }
@@ -641,7 +1009,7 @@ try t;
 	if (arg == NULL)
 	  t = (*specific->check_function)(a1, a2, a3, a4);
 	else {
-	  g95_internal_error("do_check(): Too many args");
+	  g95_internal_error("do_check(): too many args");
 	}
       }
     }
@@ -655,19 +1023,19 @@ try t;
 
 /* add_sym()-- Add a single intrinsic symbol to the current list. 
  * Argument list:
- *    char *    Name of function
- *    int       Whether function is elemental (1=Non-elemental, 0=elemental)
- *    bt        Return type of function
- *    int       Kind of return type of function
+ *    char *    name of function
+ *    int       whether function is elemental (1=non-elemental, 0=elemental)
+ *    bt        return type of function
+ *    int       kind of return type of function
  *    simplify
  *    cfunction
- * optional arguments come in multiples of four:
- *    char *    Name of argument
- *    bt        Type of argument
- *    int       Kind of argument
- *    int       Arg optional flag (1=Optional, 0=Required)
+ * Optional arguments come in multiples of four:
+ *    char *    name of argument
+ *    bt        type of argument
+ *    int       kind of argument
+ *    int       arg optional flag (1=optional, 0=required)
  *
- * The sequence is terminated by a NULL name. */
+ * the sequence is terminated by a NULL name. */
 
 static void add_sym(char *name, int elemental, bt type, int kind,
 		    g95_expr *(*simplify)(),
@@ -799,18 +1167,12 @@ intrinsic_sym *generic;
  * required arguments has already been established, and the argument
  * list has NULL arguments in the correct places.  */
 
-static try not_ready(g95_actual_arglist *dummy) {
-
-  g95_warning("Intrinsic checker not ready");
-  return FAILURE;
-} 
-
-
 /* add_functions()-- Add intrinsic functions */
 
 static void add_functions(void) {
 
 /* Argument names as in the standard (to be used as argument keywords) */
+
 char   a[] = "a",  f[] = "field",     pt[] = "pointer",   tg[] = "target",
        b[] = "b",  m[] = "matrix",    ma[] = "matrix_a",  mb[] = "matrix_b",
        c[] = "c",  n[] = "ncopies",  pos[] = "pos",      bck[] = "back",
@@ -867,13 +1229,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dint", 0, BT_REAL, dd, g95_simplify_dint, NULL, a,
 	  BT_REAL, dd, 0, NULL);
 
-/* KAH Takes logical array input */
-  add_sym("all", 1, BT_LOGICAL, dl, NULL, not_ready,
+  add_sym("all", 1, BT_LOGICAL, dl, NULL, check_all_any,
 	  msk, BT_LOGICAL, dl, 0, dm, BT_INTEGER, di, 1, NULL);
 
-/* KAH Takes an allocatable array argument */
-  add_sym("allocated", 1, BT_LOGICAL, dl, NULL, not_ready,
-	  ar, BT_REAL, dr, 0, NULL);
+  add_sym("allocated", 1, BT_LOGICAL, dl, NULL, check_allocated,
+	  ar, BT_UNKNOWN, 0, 0, NULL);
 
   add_sym("anint", 0, BT_REAL, dr, g95_simplify_anint, check_anint,
 	  a, BT_REAL, dr, 0,  knd, BT_INTEGER, di, 1, NULL);
@@ -881,8 +1241,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dnint", 0, BT_REAL, dd, g95_simplify_dnint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
 
-/* KAH Takes logical array input */
-  add_sym("any", 1, BT_LOGICAL, dl, NULL, not_ready,
+  add_sym("any", 1, BT_LOGICAL, dl, NULL, NULL, check_all_any,
 	  msk, BT_LOGICAL, dl, 0, dm, BT_INTEGER, di, 1, NULL);
 
   add_sym("asin",  0, BT_REAL, dr, g95_simplify_asin, NULL,
@@ -891,9 +1250,8 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dd, 0, NULL);
   make_generic("asin");
 
-/* KAH Takes pointer and target types-- BT_INTEGER used as a placeholder */
-  add_sym("associated", 1, BT_LOGICAL, dl, NULL, not_ready,
-	  pt, BT_INTEGER, di, 0, tg, BT_INTEGER, di, 1, NULL);
+  add_sym("associated", 1, BT_LOGICAL, dl, NULL, check_associated,
+	  pt, BT_UNKNOWN, 0, 0, tg, BT_INTEGER, di, 1, NULL);
 
   add_sym("atan",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
   add_sym("datan", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
@@ -936,12 +1294,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dcosh", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("cosh");
 
-/* KAH Takes logical array input */
-  add_sym("count", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("count", 1, BT_INTEGER, di, NULL, check_count,
 	  msk, BT_LOGICAL, dl, 0, dm, BT_INTEGER, di, 1, NULL);
 
-/* KAH Takes an array argument of any type and returns an array */
-  add_sym("cshift", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
+  add_sym("cshift", 1, BT_REAL, dr, NULL, check_cshift, ar, BT_REAL, dr, 0,
 	  sh, BT_INTEGER, di, 0, dm, BT_INTEGER, di, 1, NULL);
 
   add_sym("dble", 0, BT_REAL, dd, g95_simplify_dble, check_dble,
@@ -958,16 +1314,13 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL,    dd, 0, y, BT_REAL,    dd, 0, NULL);
   make_generic("dim");
 
-/* KAH Takes vector input, returns scalar.  Vectors can be integer,
- * real, complex, or logical */
-  add_sym("dot_product", 1, BT_REAL, dr, NULL, not_ready,
+  add_sym("dot_product", 1, BT_REAL, dr, NULL, check_dot_product,
 	  va, BT_REAL, dr, 0, vb, BT_REAL, dr, 0, NULL);
 
   add_sym("dprod", 0, BT_REAL, dd, g95_simplify_dprod, NULL,
 	  x, BT_REAL, dr, 0, y, BT_REAL, dr, 0, NULL);
 
-/* KAH Takes array argument */
-  add_sym("eoshift", 1, BT_REAL, dr, NULL, not_ready,
+  add_sym("eoshift", 1, BT_REAL, dr, NULL, check_eoshift,
 	  ar, BT_REAL, dr, 0, sh, BT_INTEGER, di, 0,
 	  bd, BT_REAL, dr, 1, dm, BT_INTEGER, di, 1, NULL);
 
@@ -1040,8 +1393,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("kind", 1, BT_INTEGER, di, g95_simplify_kind, check_kind,
 	  x, BT_REAL, dr, 0, NULL);
 
-/* KAH Array input, output can be an array */
-  add_sym("lbound", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("lbound", 1, BT_INTEGER, di, NULL, check_lbound,
 	  ar, BT_REAL, dr, 0, dm, BT_INTEGER, di, 1, NULL);
 
   add_sym("len", 1, BT_INTEGER, di, g95_simplify_len, NULL,
@@ -1083,12 +1435,12 @@ int di, dr, dd, dl, dc, dz;
   add_sym("logical", 0, BT_LOGICAL, dl, g95_simplify_logical, NULL,
 	  l, BT_LOGICAL, dl, 0,	  knd, BT_INTEGER, di, 1, NULL);
 
-/* KAH Takes and returns arrays of any numeric or logical type */
-  add_sym("matmul", 1, BT_REAL, dr, NULL, not_ready,
+  add_sym("matmul", 1, BT_REAL, dr, NULL, check_matmul,
 	  ma, BT_REAL, dr, 0, mb, BT_REAL, dr, 0, NULL);
 
 /* Note: amax0 is equivalent to real(max), max1 is equivalent to int(max) 
- * Max function must take at least two arguments                        */
+ * max function must take at least two arguments                        */
+
   add_sym("max",   0, BT_REAL,    dr, g95_simplify_max, check_min_max,
 	  a1, BT_UNKNOWN,    dr, 0, a2, BT_UNKNOWN,    dr, 0, NULL);
   add_sym("max0",  0, BT_INTEGER, di, g95_simplify_max, check_min0_max0,
@@ -1105,23 +1457,19 @@ int di, dr, dd, dl, dc, dz;
   add_sym("maxexponent", 1, BT_INTEGER, di, g95_simplify_maxexponent,
 	  check_min_max_exponent, x, BT_UNKNOWN, dr, 0, NULL);
 
-/* KAH Takes array argument of type integer or real.  The type of the
- * second argument must be checked to decide if it's dm or msk if called
- * with two arguments. */
-  add_sym("maxloc", 1, BT_INTEGER, di, NULL, not_ready, ar, BT_REAL, dr, 0,
+  add_sym("maxloc", 1, BT_INTEGER, di, NULL, check_maxloc, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
-/* KAH Takes array argument of type integer or real, returns same type.
- * The type of the second argument must be checked to decide if it's dm
- * or msk if called with two arguments. */
-  add_sym("maxval", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
+  add_sym("maxval", 1, BT_REAL, dr, NULL, check_maxval, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
 /* KAH Takes any type for ts and fs */
-  add_sym("merge", 0, BT_REAL, dr, NULL, not_ready, ts, BT_REAL, dr, 0,
+
+  add_sym("merge", 0, BT_REAL, dr, NULL, check_merge, ts, BT_REAL, dr, 0,
 	  fs, BT_REAL, dr, 0, msk, BT_LOGICAL, dl, 0, NULL);
 
 /* Note: amin0 is equivalent to real(min), min1 is equivalent to int(min) */
+
   add_sym("min",   0, BT_REAL,    dr, g95_simplify_min, check_min_max,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
   add_sym("min0",  0, BT_INTEGER, di, g95_simplify_min, check_min0_max0,
@@ -1138,16 +1486,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym("minexponent", 1, BT_INTEGER, di, g95_simplify_minexponent,
 	  check_min_max_exponent, x, BT_UNKNOWN, dr, 0, NULL);
 
-/* KAH Takes array argument of type integer or real.  The type of the
- * second argument must be checked to decide if it's dm or msk if called
- * with two arguments. */
-  add_sym("minloc", 1, BT_INTEGER, di, NULL, not_ready, ar, BT_REAL, dr, 0,
+  add_sym("minloc", 1, BT_INTEGER, di, NULL, check_minloc, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
-/* KAH Takes array argument of type integer or real, returns same type.
- * The type of the second argument must be checked to decide if it's dm
- * or msk if called with two arguments. */
-  add_sym("minval", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
+  add_sym("minval", 1, BT_REAL, dr, NULL, check_minval, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
   add_sym("mod",  0, BT_INTEGER, di, g95_simplify_mod, check_mod,
@@ -1174,21 +1516,22 @@ int di, dr, dd, dl, dc, dz;
 	  i, BT_INTEGER, di, 0, NULL);
 
 /* KAH Takes and returns pointers-- using BT_INTEGER as a placeholder */
-  add_sym("null", 1, BT_INTEGER, di, NULL, not_ready,
+
+  add_sym("NULL", 1, BT_INTEGER, di, NULL, check_null,
 	  mo, BT_INTEGER, di, 1, NULL);
 
 /* KAH Takes arrays and an optional vector and returns a vector */
-  add_sym("pack", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
+
+  add_sym("pack", 1, BT_REAL, dr, NULL, check_pack, ar, BT_REAL, dr, 0,
 	  msk, BT_LOGICAL, dl, 0, v, BT_REAL, dr, 1, NULL);
 
   add_sym("precision",1, BT_INTEGER, di, g95_simplify_precision,
 	  check_precision,  x, BT_UNKNOWN, 0, 0, NULL);
 
-/* KAH Takes any type, including pointer */
-  add_sym("present", 1, BT_LOGICAL, dl, NULL, not_ready,
+  add_sym("present", 1, BT_LOGICAL, dl, NULL, check_present,
 	  a, BT_REAL, dr, 0, NULL);
 
-  add_sym("product", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
+  add_sym("product", 1, BT_REAL, dr, NULL, check_product, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
   add_sym("radix", 1, BT_INTEGER, di, g95_simplify_radix, check_radix,
@@ -1209,7 +1552,6 @@ int di, dr, dd, dl, dc, dz;
   add_sym("repeat", 1, BT_CHARACTER, dc, g95_simplify_repeat, NULL,
 	  stg, BT_CHARACTER, dc, 0, n, BT_INTEGER, di, 0, NULL);
 
-/* KAH Takes any type array, integer arrays, returns array */
   add_sym("reshape", 1, BT_REAL, dr, g95_simplify_reshape, check_reshape,
 	  src, BT_REAL, dr, 0, shp, BT_INTEGER, di, 0,
 	  pad, BT_REAL, dr, 1, ord, BT_INTEGER, di, 1, NULL);
@@ -1235,8 +1577,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("set_exponent", 0, BT_REAL, dr, g95_simplify_set_exponent, NULL,
 	  x, BT_REAL, dr, 0, i, BT_INTEGER, di, 0, NULL);
 
-/* KAH Takes array of any type, returns integer array */
-  add_sym("shape", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("shape", 1, BT_INTEGER, di, NULL, check_shape,
 	  src, BT_REAL, dr, 0, NULL);
 
   add_sym("sign",  0, BT_REAL,    dr, g95_simplify_sign, check_sign,
@@ -1256,15 +1597,13 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dsinh", 1, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("sinh");
 
-/* KAH Takes array of any type */
-  add_sym("size", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("size", 1, BT_INTEGER, di, NULL, check_size,
 	  ar, BT_REAL, dr, 0, dm, BT_INTEGER, di, 1, NULL);
 
   add_sym("spacing", 0, BT_REAL, dr, g95_simplify_spacing, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
-/* KAH Takes array of any type, returns array */
-  add_sym("spread", 1, BT_REAL, dr, NULL, not_ready, src, BT_REAL, dr, 0,
+  add_sym("spread", 1, BT_REAL, dr, NULL, check_spread, src, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 0, n, BT_INTEGER, di, 0, NULL);
 
   add_sym("sqrt",  1, BT_REAL,    dr, g95_simplify_sqrt, check_sqrt,
@@ -1275,10 +1614,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_COMPLEX, dz, 0, NULL);
   make_generic("sqrt");
 
-/* KAH Takes array argument of type integer or real, returns array of
- * same type.  The type of the second argument must be checked to decide
- * if it's dm or msk if called with two arguments. */
-  add_sym("sum", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
+  add_sym("sum", 1, BT_REAL, dr, NULL, check_sum, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
   add_sym("tan",  1, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0,
@@ -1294,28 +1630,87 @@ int di, dr, dd, dl, dc, dz;
   add_sym("tiny", 0, BT_REAL, dr, g95_simplify_tiny, check_tiny,
 	  x, BT_REAL, dr, 0, NULL);
 
-/* KAH Array function */
-  add_sym("transfer", 0, BT_REAL, dr, NULL, not_ready, src, BT_REAL, dr, 0,
-	  mo, BT_REAL, dr, 0, sz, BT_INTEGER, di, 1, NULL);
+  add_sym("transfer", 0, BT_REAL, dr, NULL, check_transfer,
+	  src, BT_REAL, dr, 0,    mo, BT_REAL, dr, 0,
+	  sz, BT_INTEGER, di, 1,  NULL);
 
-/* KAH Array function */
-  add_sym("transpose", 0, BT_REAL, dr, NULL, not_ready,
+  add_sym("transpose", 0, BT_REAL, dr, NULL, check_transpose,
 	  m, BT_REAL, dr, 0, NULL);
 
   add_sym("trim", 1, BT_CHARACTER, dc, g95_simplify_trim, NULL,
 	  stg, BT_CHARACTER, dc, 0, NULL);
 
-/* KAH Array function */
-  add_sym("ubound", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("ubound", 1, BT_INTEGER, di, NULL, check_ubound,
 	  ar, BT_REAL, dr, 0, dm, BT_INTEGER, di, 1, NULL);
 
-/* KAH Takes a vector and an array and returns a vector */
-  add_sym("unpack", 1, BT_REAL, dr, NULL, not_ready, v, BT_REAL, dr, 0,
+  add_sym("unpack", 1, BT_REAL, dr, NULL, check_unpack, v, BT_REAL, dr, 0,
 	  msk, BT_LOGICAL, dl, 0, f, BT_REAL, dr, 0, NULL);
 
   add_sym("verify", 0, BT_INTEGER, di, g95_simplify_verify, NULL,
 	  stg, BT_CHARACTER, dc, 0,  set, BT_CHARACTER, dc, 0,
 	  bck, BT_LOGICAL, dl, 1, NULL);
+}
+
+
+
+/************* Check functions for intrinsic subroutines *************/
+
+
+static try check_date_and_time(g95_expr *date, g95_expr *time,
+			       g95_expr *zone, g95_expr *values) {
+
+  if (date != NULL && (date->ts.type != BT_CHARACTER || date->as != NULL))
+    return FAILURE;
+
+  if (time != NULL && (time->ts.type != BT_CHARACTER || time->as != NULL))
+    return FAILURE;
+
+  if (zone != NULL && (zone->ts.type != BT_CHARACTER || zone->as != NULL))
+    return FAILURE;
+
+  if (values != NULL && (values->ts.type != BT_INTEGER || values->as == NULL))
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_mvbits(g95_expr *from, g95_expr *frompos, g95_expr *len,
+			g95_expr *to, g95_expr *topos) {
+
+  if (from->ts.type != BT_INTEGER) return FAILURE;
+  if (frompos->ts.type != BT_INTEGER) return FAILURE;
+
+  if (len->ts.type != BT_INTEGER) return FAILURE;
+  if (to->ts.type != BT_INTEGER || to->ts.kind != from->ts.kind)
+    return FAILURE;
+
+  if (topos->ts.type != BT_INTEGER) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_random_number(g95_expr *size, g95_expr *put, g95_expr *get) {
+
+  if (size->as != NULL || size->ts.type != BT_INTEGER ||
+      size->ts.kind != g95_default_integer_kind()) return FAILURE;
+
+  if (put->as == NULL || put->ts.type != BT_INTEGER ||
+      put->ts.kind != g95_default_integer_kind()) return FAILURE;
+
+  if (get->as == NULL || get->ts.type != BT_INTEGER ||
+      get->ts.kind != g95_default_integer_kind()) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+static try check_random_seed(g95_expr *harvest) {
+
+  if (harvest->ts.type != BT_REAL) return FAILURE;
+
+  return SUCCESS;
 }
 
 
@@ -1338,22 +1733,22 @@ int di, dr, dc;
   add_sym("cpu_time", 1, BT_UNKNOWN, 0, NULL, NULL, tm, BT_REAL, dr, 0, NULL);
 
 /* KAH Last argument is a vector */
-  add_sym("date_and_time", 1, BT_UNKNOWN, 0, NULL, not_ready,
+  add_sym("date_and_time", 1, BT_UNKNOWN, 0, NULL, check_date_and_time,
 	  dt, BT_CHARACTER, dc, 1, tm, BT_CHARACTER, dc, 1,
 	  zn, BT_CHARACTER, dc, 1, vl, BT_INTEGER,   di, 1, NULL);
 
 /* KAH j, ln and pt must be non-negative. i and t must have same kind
  * parameter. */
-  add_sym("mvbits", 0, BT_UNKNOWN, 0, g95_simplify_mvbits, not_ready,
+  add_sym("mvbits", 0, BT_UNKNOWN, 0, g95_simplify_mvbits, check_mvbits,
 	  f, BT_INTEGER, di, 0, fp, BT_INTEGER, di, 0, ln, BT_INTEGER, di, 0,
 	  t, BT_INTEGER, di, 0, tp, BT_INTEGER, di, 0, NULL);
 
 /* KAH Can take an array */
-  add_sym("random_number", 1, BT_UNKNOWN, 0, NULL, not_ready,
+  add_sym("random_number", 1, BT_UNKNOWN, 0, NULL, check_random_number,
 	  h, BT_REAL, dr, 0, NULL);
 
 /* KAH Second two possible arguments are integer arrays */
-  add_sym("random_seed", 1, BT_UNKNOWN, 0, NULL, not_ready,
+  add_sym("random_seed", 1, BT_UNKNOWN, 0, NULL, check_random_seed,
 	  sz, BT_INTEGER, di, 1, pt, BT_INTEGER, di, 1,
 	  gt, BT_INTEGER, di, 1, NULL);
 
@@ -1492,7 +1887,7 @@ void g95_intrinsic_done_1(void) {
 
 
 /* g95_remove_nullargs()-- Given a formal argument list, remove any
- * null arguments that may have been left behind by a sort against
+ * NULL arguments that may have been left behind by a sort against
  * some formal argument list. */
 
 static void g95_remove_nullargs(g95_actual_arglist **ap) {
