@@ -786,6 +786,11 @@ try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
   return check_conflict(attr, loc);
 }
 
+
+/* g95_add_flavor()-- Flavors are special because some flavors are not
+ * what fortran considers attributes and can be reaffirmed multiple
+ * times. */
+
 try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 
   if ((f == FL_PROGRAM || f == FL_BLOCK_DATA || f == FL_MODULE ||
@@ -796,6 +801,8 @@ try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
     attr->flavor = FL_GENERIC;
     return check_conflict(attr, loc);
   }
+
+  if (attr->flavor == f && f == FL_VARIABLE) return SUCCESS;
 
   if (attr->flavor != FL_UNKNOWN) {
     if (loc == NULL) loc = g95_current_locus();
