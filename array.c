@@ -572,7 +572,8 @@ g95_constructor *c;
     while(c->next)
       c=c->next;
 
-    c->next = c = g95_get_constructor();
+    c->next = g95_get_constructor();
+    c = c->next;
   }
 
   c->expr = new;
