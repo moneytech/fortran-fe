@@ -38,6 +38,9 @@ g95_expr *e;
   e->op1 = NULL;
   e->op2 = NULL;
   e->shape = NULL;
+  e->ref = NULL;
+  e->symbol = NULL;
+  e->uop = NULL;
 
   return e;
 }
