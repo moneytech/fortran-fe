@@ -784,7 +784,11 @@ g95_expr *op1, *op2, *result;
   default: g95_internal_error("simplify_intrinsic_op(): Bad operator"); 
   }
 
-  if (result == NULL) return FAILURE;
+  if (result == NULL) {
+    g95_free_expr(op1);
+    g95_free_expr(op2);
+    return FAILURE;
+  }
 
   g95_replace_expr(p, result);
 
