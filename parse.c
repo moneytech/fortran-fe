@@ -1911,8 +1911,11 @@ loop:
   if (s.state == COMP_MODULE) {
     g95_get_errors(NULL, &errors);
     g95_dump_module(s.sym->name, errors_before == errors);
+#ifdef IN_GCC
+    f95_generate_module_code(g95_current_ns);
   } else {
-    /* generate_code(g95_current_ns); */
+    f95_generate_code(g95_current_ns); 
+#endif
   }
 
   if (g95_option.verbose) g95_show_namespace(g95_current_ns);

@@ -47,9 +47,13 @@ char *alloca ();
 #endif /* not __GNUC__ */
 
 #include <stdio.h> /* need FILE * here */
+#ifndef BACKEND_CODE /* Defined only if included by backend code. */
 #include "config.h"
+#endif
 
 /* Major control parameters */
+
+#define G95_VERSION "0.18"
 
 #define G95_MAX_SYMBOL_LEN 31
 
@@ -428,6 +432,9 @@ typedef struct g95_interface {
 
 #define g95_get_interface() g95_getmem(sizeof(g95_interface))
 
+#ifndef IN_GCC
+typedef void * tree; /* Just a dummy place holder. */
+#endif
 
 /* User operator nodes.  These are like stripped down symbols */
 
@@ -484,6 +491,8 @@ typedef struct g95_symbol {
   unsigned mark:1, written:1, new:1;
   int serial, refs;
   struct g95_namespace *ns;    /* namespace containing this symbol */
+
+  tree backend_decl;
 
 } g95_symbol;
 
@@ -1016,6 +1025,9 @@ __attribute__ ((format (printf, 1, 2)))
 void g95_iresolve_init_1(void);
 void g95_iresolve_done_1(void);
 
+int g95_parse_arg(int argc, char *argv[]);
+void g95_init_options(void);
+
 /* error.c */
 
 void g95_error_init_1(void);
@@ -1518,3 +1530,11 @@ void g95_free_rename(void);
 match g95_match_use(void);
 void g95_dump_module(const char *, int);
 void g95_use_module(void);
+
+#ifdef IN_GCC
+/* code.c */
+
+void f95_generate_code(g95_namespace *);
+void f95_generate_module_code(g95_namespace *);
+#endif
+

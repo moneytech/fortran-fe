@@ -16,9 +16,7 @@ This file is part of GNU Fortran.
 #ifdef __STDC__	/* To be consistent with lang-specs.h.  Maybe avoid
 		           overflowing some old compiler's tables, etc. */
 
-#define N_(I18N_TEXT) I18N_TEXT
-
-/*  DEFINE_LANG_NAME ("GNU Fortran 95") # remove when we are part of GCC */
+DEFINE_LANG_NAME ("GNU Fortran 95")
 
 { "--help", 
       N_("Display this information") },

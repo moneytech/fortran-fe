@@ -36,11 +36,15 @@ static struct
   const char *option;
   const char *description;
 }
+
+#define N_(msg) (msg)
+#define DEFINE_LANG_NAME(x)
 lang_options[] = {
 #include "lang-options.h"
     { " ", " " } /* Ugly hack to avoid compile error. Will be moved
                     to driver executable anyway */
 };
+#undef DEFINE_LANG_NAME
 
 
 g95_option_t g95_option;
@@ -337,7 +341,7 @@ void g95_done_2(void) {
 static void display_help(void) {
 int i;
 
-  g95_status("GNU Fortran 95 Compiler " VERSION
+  g95_status("GNU Fortran 95 Compiler " G95_VERSION
     " (C) 2000-2001 Free Software Foundation\n"
     "Compiled " __DATE__ " " __TIME__ "\n\n"
     "Usage: g95 [options] file\n"
@@ -355,9 +359,9 @@ int i;
 }
 
 
-/* parse_arg()-- Parse an argument on the command line. */
+/* g95_parse_arg()-- Parse an argument on the command line. */
 
-static int parse_arg(int argc, char *argv[]) {
+int g95_parse_arg(int argc, char *argv[]) {
 char *option;
 int i;
 
@@ -487,6 +491,9 @@ int i;
     }
   }
 
+#ifdef IN_GCC
+  return(0); /* Pass option to GCC */
+#else
   if (option[0] == '-') {
     g95_status("g95: Unrecognised option '%s'\n", option);
     exit(3);
@@ -499,12 +506,13 @@ int i;
 
   g95_option.source = option;
   return 1;
+#endif
 }
 
 
 /* init_options()-- Initialize the options structure */
 
-static void init_options(void) {
+void g95_init_options(void) {
 
   g95_option.source = NULL;
   g95_option.include_dirs = NULL;
@@ -540,6 +548,7 @@ g95_directorylist *p;
 }
 
 
+#ifndef IN_GCC
 /* main()-- Compile a fortran program */
 
 int main(int argc, char *argv[]) {
@@ -551,12 +560,12 @@ int errors, warnings, i;
   mtrace();
 #endif
 
-  init_options();
+  g95_init_options();
 
   argv++;
 
   while(argc > 1) {
-    i = parse_arg(argc, argv);
+    i = g95_parse_arg(argc, argv);
 
     argc -= i;
     argv += i;
@@ -582,3 +591,5 @@ int errors, warnings, i;
   if (warnings > 0) return 1;
   return 0;
 }
+#endif
+
