@@ -347,9 +347,6 @@ g95_get_stack_array_type (tree size)
       array *base;
       index rank;
       struct descriptor_dimension dimension[N_DIM];
-      index stride[N_DIM];
-      index lbound[N_DIM];
-      index ubound[N_DIM];
     }
 
     struct descriptor_dimension
