@@ -1975,9 +1975,19 @@ g95_expr *e;
 
 /******* Simplification of intrinsic functions with constant arguments *****/
 
-#define ARITH_CONVERT_ERROR(rc, from, to, where)                 \
-  g95_error("%s converting %s to %s at %L", g95_arith_error(rc), \
-	    g95_typename(&from), g95_typename(&to), &where);
+
+/* arith_error()-- Deal with an arithmetic error. */
+
+static void arith_error(arith rc, g95_typespec *from, g95_typespec *to,
+			locus *where) {
+
+  g95_error("%s converting %s to %s at %L", g95_arith_error(rc),
+	    g95_typename(from), g95_typename(to), where);
+
+  /* TODO: Do something about the error, ie underflow rounds to 0,
+   * throw exception, return NaN, etc. */
+
+}
 
 /* g95_int2int()-- Convert integers to integers */
 
@@ -1990,8 +2000,9 @@ arith rc;
 
   mpz_set(result->value.integer, src->value.integer);
 
-  if ((rc = g95_check_integer_range(result->value.integer, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR(rc, src->ts, result->ts, src->where);
+  if ((rc = g95_check_integer_range(result->value.integer, kind))
+      != ARITH_OK) {
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
@@ -2012,7 +2023,7 @@ arith rc;
   mpf_set_z(result->value.real, src->value.integer);
 
   if ((rc = g95_check_real_range(result->value.real, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR(rc, src->ts, result->ts, src->where);
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
@@ -2034,7 +2045,7 @@ arith rc;
   mpf_set_ui(result->value.complex.i, 0);
 
   if ((rc = g95_check_real_range(result->value.complex.i, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR(rc, src->ts, result->ts, src->where);
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
@@ -2054,8 +2065,9 @@ arith rc;
 
   mpz_set_f(result->value.integer, src->value.real);
 
-  if ((rc = g95_check_integer_range(result->value.integer, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR(rc, src->ts, result->ts, src->where);
+  if ((rc = g95_check_integer_range(result->value.integer, kind))
+      != ARITH_OK) {
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
@@ -2076,7 +2088,7 @@ arith rc;
   mpf_set(result->value.real, src->value.real);
 
   if ((rc = g95_check_real_range(result->value.real, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR(rc, src->ts, result->ts, src->where);
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
@@ -2098,7 +2110,7 @@ arith rc;
   mpf_set_ui(result->value.complex.i, 0);
 
   if ((rc = g95_check_real_range(result->value.complex.i, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR(rc, src->ts, result->ts, src->where);
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
@@ -2118,8 +2130,9 @@ arith rc;
 
   mpz_set_f(result->value.integer, src->value.complex.r);
 
-  if ((rc = g95_check_integer_range(result->value.integer, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR(rc, src->ts, result->ts, src->where);
+  if ((rc = g95_check_integer_range(result->value.integer, kind))
+      != ARITH_OK) {
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
@@ -2140,7 +2153,7 @@ arith rc;
   mpf_set(result->value.real, src->value.complex.r);
 
   if ((rc = g95_check_real_range(result->value.real, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR(rc, src->ts, result->ts, src->where);
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
@@ -2153,7 +2166,7 @@ arith rc;
 
 g95_expr *g95_complex2complex(g95_expr *src, int kind) {
 g95_expr *result;
-arith rc1, rc2;
+arith rc;
 
   result = g95_constant_result(BT_COMPLEX, kind);
   result->where = src->where;
@@ -2161,15 +2174,12 @@ arith rc1, rc2;
   mpf_set(result->value.complex.r, src->value.complex.r);
   mpf_set(result->value.complex.i, src->value.complex.i);
 
-  if ((rc1 = g95_check_real_range(result->value.complex.r, kind)) != ARITH_OK ||
-      (rc2 = g95_check_real_range(result->value.complex.i, kind)) != ARITH_OK) {
-    ARITH_CONVERT_ERROR((rc1 != ARITH_OK ? rc1 : rc2) , src->ts, result->ts, src->where);
+  if ((rc = g95_check_real_range(result->value.complex.r, kind)) != ARITH_OK ||
+      (rc = g95_check_real_range(result->value.complex.i, kind)) != ARITH_OK) {
+    arith_error(rc, &src->ts, &result->ts, &src->where);
     g95_free_expr(result);
     return NULL;
   }
 
   return result;
 }
-
-#undef ARITH_CONVERT_ERROR
-
