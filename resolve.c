@@ -305,7 +305,7 @@ char *name;
 
 
 /* was_declared()-- Returns 0 if a symbol was not declared with a type
- * or attriute declaration statement, nonzero otherwise. */
+ * or attribute declaration statement, nonzero otherwise. */
 
 static int was_declared(g95_symbol *sym) {
 symbol_attribute a;
