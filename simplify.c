@@ -2265,7 +2265,11 @@ g95_expr *g95_simplify_real(g95_expr *e, g95_expr *k) {
 g95_expr *result;
 int kind;
 
-  kind = get_kind(BT_REAL, k, "REAL", g95_default_real_kind());
+  if (e->ts.type == BT_COMPLEX) 
+      kind = get_kind(BT_REAL, k, "REAL", e->ts.kind);
+  else
+      kind = get_kind(BT_REAL, k, "REAL", g95_default_real_kind());
+
   if (kind == -1) return &g95_bad_expr;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
