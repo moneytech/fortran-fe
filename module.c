@@ -393,6 +393,7 @@ int len;
     if (++len > G95_MAX_SYMBOL_LEN) bad_module("Name too long");
   }
 
+  *p = '\0';
   set_module_locus(&m);
 }
 
@@ -1489,7 +1490,7 @@ g95_symtree *st;
 
     st = g95_get_symtree(atom_name, &new_flag);
 
-    if (new_flag) {
+    if (!new_flag) {
       if (st->sym != sym_table[serial]) st->ambiguous = 1;
     } else {
       st->sym = sym_table[serial];
@@ -1514,6 +1515,9 @@ g95_symtree *st;
     else {
       memset(&new, '\0', sizeof(g95_symbol));
       mio_symbol(&new);
+
+      strcpy(new.name, sym_table[i]->name);
+      strcpy(new.module, sym_table[i]->module);
 
       new.mark = 0;
       *sym_table[i] = new;
