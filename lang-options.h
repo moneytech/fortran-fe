@@ -25,8 +25,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
 { "-Wline-truncation",
       N_("Warn about truncated source lines") },
 { "-Wimplicit",
-      N_("Warn whenever a variable, array, or function is implicitly "
-	 "declared") },
+      N_("Specify that no implicit typing is allowed, unless overridden by "
+	 "explicit IMPLICIT statements") },
 { "-Wsurprising",
       N_("Warn about \"suspicious\" constructs") },
 { "-F",
