@@ -1790,9 +1790,14 @@ g95_symbol *p;
 
   if (st == NULL) return 0;
 
-  if (st->ambiguous)
-    g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
-	      "from module '%s'", name, st->sym->name, st->sym->module);
+  if (st->ambiguous) {
+    if (st->sym->module[0])
+      g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
+		"from module '%s'", name, st->sym->name, st->sym->module);
+    else
+      g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
+		"from current program unit", name, st->sym->name);
+  }
 
   return st->ambiguous;
 }
