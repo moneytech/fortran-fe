@@ -33,23 +33,21 @@ Boston, MA 02111-1307, USA.  */
  * The first line of a module is a line warning people not to edit the
  * module.  The rest of the module looks like:
  *
- * (
- *   <Number of symbols>
- *   ( <Symbol Number>
- *     <True name of symbol>
- *     <Module name of symbol>
- *     ( <symbol information> )
- *     ...
- *   )
- *   ( <Symtree name>
- *     <Ambiguous flag>
- *     <Symbol number>
- *     ...
- *   )
- *   ( ( <Interface info for UPLUS> )
- *     ( <Interface info for UMINUS> )
- *     ...
- *   )
+ * <Maximum number of symbols>
+ * ( ( <Interface info for UPLUS> )
+ *   ( <Interface info for UMINUS> )
+ *   ...
+ * )
+ * ( <Symbol Number (not in order)>
+ *   <True name of symbol>
+ *   <Module name of symbol>
+ *   ( <symbol information> )
+ *   ...
+ * )
+ * ( <Symtree name>
+ *   <Ambiguous flag>
+ *   <Symbol number>
+ *   ...
  * )
  *
  * In general, symbols refer to other symbols by their symbol number,
@@ -106,7 +104,7 @@ typedef struct g95_use_rename {
 static FILE *module_fp;
 
 static char module_name[G95_MAX_SYMBOL_LEN+1];
-static int module_line, module_column, sym_num, visible_num, only_flag;
+static int module_line, module_column, sym_num, only_flag;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
 
 static g95_use_rename *g95_rename_list;
@@ -318,10 +316,7 @@ g95_module *next;
   }
 }
 
-
-
 /*****************************************************************/
-
 
 /* Module reading and writing */
 
@@ -650,7 +645,7 @@ int i, len;
       write_char('\n');
     else {
 
-      if (last_atom != ATOM_LPAREN)
+      if (last_atom != ATOM_LPAREN && module_column != 1)
 	write_char(' ');
     }
   }
@@ -1120,7 +1115,6 @@ g95_component *c, *tail;
 }
 
 
-
 static void mio_actual_arg(g95_actual_arglist *a) {
 
   mio_lparen();
@@ -1162,27 +1156,113 @@ g95_actual_arglist *a, *tail;
 }
 
 
-#if 0
-/* mio_namespace()-- Read and write namespaces.  This subroutine is
- * for reading and writing namespaces that contain formal parameters,
- * not top-level module namespaces */
 
-static void mio_namespace(g95_namespace *ns) {
+/* mio_formal_namespace()-- Read and write a namespace associated with
+ * a formal argument list.  These generally won't be that large.  We
+ * save symbols that are type definitions and dummy parameters.  Dummy
+ * parameters that reference host associated names are saved and
+ * restored as such.  */
+
+static void mio_formal_namespace(g95_symbol *sym) {
+
+  if (iomode == IO_OUTPUT) {
+
+
+  } else {
+
+
+  }
+}
+
+
+
+/* mio_formal_ns_name()-- Read and write a list of names within the
+ * namespace.  This is necessary because derived type symbols can
+ * point to themselves. */
+
+static void mio_formal_ns_names(g95_symbol *sym) {
+
+#if 0
+  if (iomode == IO_OUTPUT) {
+    g95_traverse_ns(sym->formal_ns) 
+  }
+#endif
+
+}
+
+
+
+/* mio_formal_arglist()-- Read and write formal argument lists.
+ * Symbols associated with formal argument lists are never part of the
+ * namespace being saved or loaded, so we can't just reference them as
+ * symbol numbers like other symbols.  Rather, we have to expand such
+ * symbols.
+ *
+ * The real difficuly is with derived types.  If an argument type is
+ * defined by host association, we have to retain the association on
+ * reloading the module.  If not, we have to actually expand the type
+ * definition so that correct matching can occur if the type is a
+ * SEQUENCE type.
+ *
+ * If there is nothing to be saved or loaded, we just have "()".  The
+ * formal list contains three lists-- a list containing the symbol
+ * names, a list containing the information for each symbols stored in
+ * the namespace, followed by a third list containing the names in the
+ * argument list.  This function is mutually recursive with
+ * mio_formal_namespace(). */
+
+static void mio_formal_arglist(g95_symbol *sym) {
+g95_formal_arglist *f, *tail;
+g95_symbol *s;
 
   mio_lparen();
 
+  if (iomode == IO_OUTPUT) {
+    if (sym->formal == NULL) goto done;
 
+    mio_formal_ns_names(sym);
+    mio_formal_namespace(sym);
+
+    mio_lparen();
+    for(f=sym->formal; f; f=f->next)
+      write_atom(ATOM_STRING, f->sym->name);
+    mio_rparen();
+
+  } else {
+    if (peek_atom() != ATOM_LPAREN) goto done;
+
+    mio_formal_namespace(sym);
+    tail = NULL;
+
+    mio_lparen();
+    
+    while(peek_atom() != ATOM_RPAREN) {
+      require_atom(ATOM_STRING);
+
+      if (g95_find_symbol(atom_string, sym->formal_ns, 0, &s))
+	bad_module("mio_formal_arglist(): Formal argument not found");
+
+      f = g95_get_formal_arglist();
+      f->sym = s;
+
+      if (sym->formal == NULL)
+	sym->formal = tail = f;
+      else
+	tail->next = f;
+    }
+  }
+
+ done:
   mio_rparen();
 }
-#endif
 
 
-
-/* mio_symbol_ref()-- Saves a *reference* to a symbol.  An entity's
- * real name is its address in memory, which is guaranteed to be
- * unique when it needs to be and the same for multiply named things.
- * During writing, we spit out the address.  During reading, this
- * address is matched definition of the entity */
+/* mio_symbol_ref()-- Saves a *reference* to a symbol.  Symbols are
+ * identified by symbol numbers stored in the 'serial' member of
+ * symbol nodes that start at zero.  During writing, if we are
+ * referencing a symbol without a number (ie sym->serial == -1), we
+ * give it one.  This forces it to be written later if it hasn't
+ * already been written. */
 
 static void mio_symbol_ref(g95_symbol **symp) {
 int i;
@@ -1190,15 +1270,16 @@ int i;
   if (iomode == IO_OUTPUT) {
     if (*symp != NULL) {
       i = (*symp)->serial;
-      if (i < 0 || i >= sym_num) bad_module("Symbol number out of range");
-      write_atom(ATOM_INTEGER, &i);
 
+      if (i == -1) (*symp)->serial = i = sym_num++;
+      if (i < 0 || i >= sym_num) bad_module("Symbol number out of range");
+
+      write_atom(ATOM_INTEGER, &i);
     } else {
       mio_lparen();
       mio_rparen();
     }
   } else {
-
     if (peek_atom() == ATOM_LPAREN) {
       mio_lparen();
       mio_rparen();
@@ -1213,7 +1294,6 @@ int i;
     }
   }
 }
-
 
 
 static void mio_iterator(g95_iterator **ip) {
@@ -1571,6 +1651,7 @@ static void mio_symbol(g95_symbol *sym) {
 
   mio_symbol_ref(&sym->common_head);  /* Save/restore common block links */
   mio_symbol_ref(&sym->common_next);
+  mio_formal_arglist(sym);
 
   mio_expr(&sym->value);
   mio_array_spec(&sym->as);
@@ -1641,6 +1722,7 @@ int level;
 static void read_namespace(g95_namespace *ns) {
 int i, flag, sym_save, ambiguous, symbol;
 symbol_info *sym_table_save, *info;
+module_locus operator_interfaces;
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_interface *head, *tail;
 g95_use_rename *u;
@@ -1649,15 +1731,16 @@ g95_symtree *st;
   sym_table_save = sym_table; 
   sym_save = sym_num;
 
-  mio_lparen();
-
   mio_integer(&sym_num);
+
+  get_module_locus(&operator_interfaces);  /* Skip these for now */
+  skip_list();
 
   sym_table = g95_getmem(sym_num*sizeof(symbol_info));
 
   mio_lparen();
 
-  for(i=0; i<sym_num; i++) {
+  for(i=0; peek_atom()!=ATOM_RPAREN; i++) {
     require_atom(ATOM_INTEGER);
     if (atom_int < 0 || atom_int > sym_num)
       bad_module("Symbol number out of range");
@@ -1746,6 +1829,7 @@ g95_symtree *st;
 
   /* Load intrinsic operator interfaces. */
 
+  set_module_locus(&operator_interfaces);
   mio_lparen();
 
   for(i=0; i<G95_INTRINSIC_OPS; i++) {
@@ -1772,11 +1856,9 @@ g95_symtree *st;
     }
   }
 
-  mio_rparen();   /* Final right paren in the module */
-
-  /* At this point, we read those symbols that are needed.  If one
-   * symbol requires another, the other gets marked as NEEDED if it's
-   * previous state was UNUSED. */
+  /* At this point, we read those symbols that are needed but haven't
+   * been loaded yet.  If one symbol requires another, the other gets
+   * marked as NEEDED if it's previous state was UNUSED. */
 
   flag = 1;
 
@@ -1853,153 +1935,58 @@ g95_symtree *st;
 }
 
 
-/* mark_intrinsic_ops()-- Given a namespace, mark the symbols
- * associated with intrinsic operator interfaces for writing to the
- * module. */
+/* check_access()-- Given an access type that is specific to an entity
+ * and the default access, return nonzero if we should write the
+ * entity. */
 
-static void mark_intrinsic_ops(g95_namespace *ns) {
-g95_interface *intr;
-int i;
+static int check_access(g95_access specific_access,
+			g95_access default_access) {
 
-  for(i=0; i<G95_INTRINSIC_OPS; i++)
-    if (ns->operator_access[i] == ACCESS_PUBLIC ||
-	(ns->default_access != ACCESS_PRIVATE &&
-	 ns->operator_access[i] != ACCESS_PRIVATE)) 
-      for(intr=ns->operator[i]; intr; intr=intr->next)
-	if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
+  if (specific_access == ACCESS_PUBLIC) return 1;
+
+  if (default_access != ACCESS_PRIVATE &&
+      specific_access != ACCESS_PRIVATE) return 1;
+
+  return 0;
 }
 
 
-/* save_derived()-- Save a derived type as a hidden symbol.  This
- * function recurses into any subtypes */
+/* write_symbol()-- Write a symbol to the module.  If the symbol is
+ * unreferenced, we check the access settings to see if we should
+ * write it. */
 
-static void save_derived(g95_component *c) {
-g95_symbol *sym;
-
-  for(; c; c=c->next) {
-    if (c->ts.type != BT_DERIVED) continue;
-
-    sym = c->ts.derived;
-    if (sym->serial != -1) continue;
-    sym->serial = sym_num++;
-
-    save_derived(sym->components);
-  }
-}
-
-
-/* find_invisibles()-- Worker function called by g95_traverse_ns to
- * find those symbols that aren't scheduled to be written, but need to
- * be written as invisible symbols. */
-
-static void find_invisibles(g95_symbol *sym) {
-g95_interface *intr;
-
-  if (sym->serial == -1) return;
-
-  for(intr=sym->operator; intr; intr=intr->next)
-    if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
-
-  for(intr=sym->generic; intr; intr=intr->next)
-    if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
-
-/* Save components if this is a derived type.  If the symbol is of a
- * derived type, save that type. */
-
-  switch(sym->attr.flavor) {
-  case FL_DERIVED:
-    save_derived(sym->components);
-    break;
-
-  case FL_PROCEDURE:
-    if (sym->attr.proc != PROC_ST_FUNCTION &&
-	sym->attr.proc != PROC_MODULE) break;
-
-    /* Fall through */
-
-  case FL_VARIABLE:
-  case FL_PARAMETER:
-    if (sym->ts.type != BT_DERIVED || sym->ts.derived->serial != -1) break;
-
-    sym->ts.derived->serial = sym_num++;
-    save_derived(sym->ts.derived->components);
-
-    break;
-
-  default:
-    break;
-  }
-}
-
-
-/* find_writables()-- Worker function called by g95_traverse_ns to
- * find those symbols that should be written to the module file and
- * assign a number to them.  Symbols that should not be written are
- * assigned a number of -1.  */
-
-static void find_writables(g95_symbol *sym) {
-
-  sym->serial = -1;
-
-  if (sym->module[0] == '\0') strcpy(sym->module, module_name);
-
-  if (check_unique_name(sym->name)) return;
-
-  switch(sym->attr.flavor) {
-  case FL_UNKNOWN:      case FL_PROGRAM:     case FL_BLOCK_DATA:
-  case FL_MODULE:       case FL_LABEL:
-    break;
-
-  case FL_VARIABLE:     case FL_PARAMETER:
-  case FL_PROCEDURE:    case FL_DERIVED:     case FL_NAMELIST:
-    if (sym->attr.access == ACCESS_PUBLIC ||
-	(g95_current_ns->default_access != ACCESS_PRIVATE &&
-	 sym->attr.access == ACCESS_UNKNOWN)) {
-      sym->attr.access = ACCESS_PUBLIC;
-      sym->serial = sym_num++;
-    }
-
-    break;
-  }
-}
-
-
-/* write_symbol()-- Write a symbol to the module.  Different symbol
- * classes are written at different times in order to be able to
- * always reconstruct things. */
-
-static int phase;
+static int *symbol_written;    /* Array of flags */
 
 static void write_symbol(g95_symbol *sym) {
 
-  if (sym->serial == -1) return;
+  if (sym->attr.flavor == FL_UNKNOWN || sym->attr.flavor == FL_LABEL)
+    g95_internal_error("write_symbol(): bad module symbol '%s'", sym->name);
+
+  if (sym->serial == -1) {
+    if (!check_access(sym->attr.access, sym->ns->default_access)) return;
+    sym->serial = sym_num++;
+  }
+
+  if (symbol_written[sym->serial]) return;
+  symbol_written[sym->serial] = 1;
 
   mio_integer(&sym->serial);
   mio_internal_string(sym->name);
   mio_internal_string(sym->module);
   mio_symbol(sym);
+  write_char('\n');
 }
+
 
 
 static void write_symtree(g95_symtree *st) {
 g95_symbol *sym;
 
   sym = st->sym;
-  if (sym->serial == -1 || sym->attr.access != ACCESS_PUBLIC) return;
+  if (!check_access(sym->attr.access, sym->ns->default_access)) return;
 
-  switch(sym->attr.flavor) {
-  case FL_DERIVED:
-    if (phase == 1) break;
-    return;
-
-  case FL_VARIABLE:     case FL_PARAMETER:
-  case FL_PROCEDURE:    case FL_NAMELIST:
-    if (phase == 2) break;
-    return;
-
-  default:
-    g95_internal_error("write_symtree(): Bad symbol class");
-  }
+  if (sym->serial == -1)
+    g95_internal_error("write_symtree(): Symbol not written");
 
   mio_internal_string(st->name);
   mio_integer(&st->ambiguous);
@@ -2007,63 +1994,72 @@ g95_symbol *sym;
 }
 
 
+/* count_symbols()-- Work function to count symbols and initialize the
+ * serial number and possibly module name. */
+
+static void count_symbols(g95_symbol *sym) {
+
+  sym_num++;
+  sym->serial = -1;
+  if (sym->module[0] == '\0') strcpy(sym->module, module_name);
+}
+
+
 static void write_namespace(g95_namespace *ns) {
-int i, sym_save, visible_save;
-symbol_info *sym_table_save;
-
-  sym_table_save = sym_table; 
-  sym_save = sym_num;
-  visible_save = visible_num;
-
-  mio_lparen();
+module_locus m1, m2;
+int i;
 
   sym_num = 0;
-
-  g95_traverse_ns(ns, find_writables);
-
-  visible_num = sym_num;  /* Symbols marked for saving after here are hidden */
-
-  mark_intrinsic_ops(g95_current_ns);
-
-  g95_traverse_ns(ns, find_invisibles);
+  g95_traverse_ns(ns, count_symbols);
 
   mio_integer(&sym_num);
 
+  symbol_written = g95_getmem(sym_num * sizeof(int));
+
+  for(i=0; i<sym_num; i++)
+    symbol_written[i] = 0;
+
+  write_char('\n');  write_char('\n');
+
+  sym_num = 0;     /* This is now the counter for new symbol numbers */
+
+  /* Write the operator interfaces */
+
   mio_lparen();
-  g95_traverse_ns(ns, write_symbol);    /* Write symbols. */
+
+  for(i=0; i<G95_INTRINSIC_OPS; i++)
+    mio_interface(check_access(ns->operator_access[i], ns->default_access)
+		  ? &ns->operator[i] : NULL);
+
   mio_rparen();
 
-/* Write symtree structures.  The only ordering issue I can think of
- * at the moment is that structure definitions have to be written
- * first in order to reconstruct a component reference in a g95_ref
- * list. */
+  write_char('\n');  write_char('\n');
+
+  /* Write symbol information.  We do a loop that traverses the
+   * namespace writing symbols that need to be written.  Sometimes
+   * writing one symbol will cause another to need to be written, so
+   * we keep looping until we do a full traversal without writing any
+   * symbols.  The reading algorithm doesn't care what order the
+   * symbol appear in. */
 
   mio_lparen();
+  get_module_locus(&m1);
 
-  for(phase=1; phase<=2; phase++)
-    g95_traverse_symtree(ns, write_symtree);
+  for(;;) {
+    g95_traverse_ns(ns, write_symbol);
 
-  mio_rparen();
-
-/* Write the heads of operator interfaces */
-
-  mio_lparen();
-
-  for(i=0; i<G95_INTRINSIC_OPS; i++) {
-    if (ns->operator_access[i] == ACCESS_PUBLIC ||
-	(ns->default_access != ACCESS_PRIVATE &&
-	 ns->operator_access[i] != ACCESS_PRIVATE))
-      mio_interface(&ns->operator[i]);
-    else
-      mio_interface(NULL);
+    get_module_locus(&m2);
+    if (m1.pos == m2.pos) break;
+    m1 = m2;
   }
 
   mio_rparen();
+  g95_free(symbol_written);
 
-  sym_table = sym_table_save;
-  sym_num = sym_save;
-  visible_num = visible_save;
+  write_char('\n');  write_char('\n');
 
+  mio_lparen();
+  g95_traverse_symtree(ns, write_symtree);
   mio_rparen();
 }
 
