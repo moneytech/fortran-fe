@@ -1159,7 +1159,7 @@ g95_expr *expr;
   return MATCH_NO;
 
 got_match:
-  g95_error("The PAUSE statement at %C is not allowed in Fortran 95.");
+  g95_error("The PAUSE statement at %C is not allowed in Fortran 95");
   return MATCH_ERROR;
 }
 
@@ -1239,7 +1239,7 @@ int label;
 
   if (g95_match(" %l to %v%t", &label, &expr) == MATCH_YES) {
     g95_free_expr(expr);
-    g95_error("The ASSIGN statement at %C is not allowed in Fortran 95.");
+    g95_error("The ASSIGN statement at %C is not allowed in Fortran 95");
     return MATCH_ERROR;
   }
 
@@ -1273,7 +1273,7 @@ match m;
   if (g95_match(" %v", &expr) == MATCH_YES) {
     g95_free_expr(expr);
     g95_error("The assigned GO TO statement at %C is not allowed in "
-	      "Fortran 95.");
+	      "Fortran 95");
     return MATCH_ERROR;
   }
 

@@ -208,28 +208,28 @@ try t;
 
   if (g95_resolve_expr(iter->var) == SUCCESS &&
       iter->var->ts.type != BT_INTEGER) {
-    g95_error("Iteration variable at %L must be INTEGER",
+    g95_error("Loop variable at %L must be INTEGER in Fortran 95",
 	      &iter->var->where);
     t = FAILURE;
   }
 
   if (g95_resolve_expr(iter->start) == SUCCESS &&
       iter->start->ts.type != BT_INTEGER) {
-    g95_error("Start expression in DO loop at %L must be INTEGER",
+    g95_error("Start expression in DO loop at %L must be INTEGER in Fortran 95",
 	      &iter->start->where);
     t = FAILURE;
   }
 
   if (g95_resolve_expr(iter->end) == SUCCESS &&
       iter->end->ts.type != BT_INTEGER) {
-    g95_error("End expression in DO loop at %L must be INTEGER",
+    g95_error("End expression in DO loop at %L must be INTEGER in Fortran 95",
 	      &iter->end->where);
     t = FAILURE;
   }
 
   if (g95_resolve_expr(iter->step) == SUCCESS &&
       iter->step->ts.type != BT_INTEGER) {
-    g95_error("Step expression in DO loop at %L must be INTEGER",
+    g95_error("Step expression in DO loop at %L must be INTEGER in Fortran 95",
 	      &iter->step->where);
     t = FAILURE;
   }
