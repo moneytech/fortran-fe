@@ -72,9 +72,9 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
 { "-r8",
       N_("Set the default real kind to double precision") },
 { "-I[directory]",
-      N_("Append directory to the include file search path") },
+      N_("Append 'directory' to the include and module files search path") },
 { "-M[directory]",
-      N_("put and search module files in directory") },
+      N_("Put module files in 'directory'") },
 
 #endif
 
