@@ -1236,16 +1236,15 @@ int k, pos;
     return &g95_bad_expr;
   }
 
+  k = g95_validate_kind(x->ts.type, x->ts.kind);
+  if ( k == -1 ) g95_internal_error("In g95_simplify_ibclr: bad kind");
+
   if (pos > g95_integer_kinds[k].bit_size) {
     g95_error("Second argument of IBCLR exceeds bit size at %L", &y->where);
     return &g95_bad_expr;
   }
 
-  k = g95_validate_kind(x->ts.type, x->ts.kind);
-  if ( k == -1 ) g95_internal_error("In g95_simplify_ibclr: bad kind");
-
-  result = g95_constant_result(x->ts.type, x->ts.kind);
-  result->where = x->where;
+  result=g95_copy_expr(x);
 
   mpz_clrbit(result->value.integer,pos);
   return range_check(result,"IBCLR");
@@ -1321,16 +1320,15 @@ int k, pos;
     return &g95_bad_expr;
   }
 
+  k = g95_validate_kind(x->ts.type, x->ts.kind);
+  if ( k == -1 ) g95_internal_error("In g95_simplify_ibset: bad kind");
+
   if (pos > g95_integer_kinds[k].bit_size) {
     g95_error("Second argument of IBSET exceeds bit size at %L", &y->where);
     return &g95_bad_expr;
   }
 
-  k = g95_validate_kind(x->ts.type, x->ts.kind);
-  if ( k == -1 ) g95_internal_error("In g95_simplify_ibset: bad kind");
-
-  result = g95_constant_result(x->ts.type, x->ts.kind);
-  result->where = x->where;
+  result = g95_copy_expr(x);
 
   mpz_setbit(result->value.integer, pos);
   return range_check(result,"IBSET");
@@ -1537,16 +1535,12 @@ g95_expr *rtrunc, *result;
 
 g95_expr *g95_simplify_idint(g95_expr *e) {
 g95_expr *rtrunc, *result;
-int kind;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  kind = g95_validate_kind(e->ts.type, e->ts.kind);
-  if ( kind == -1 ) g95_internal_error("In g95_simplify_int: bad kind");
-
   rtrunc = g95_copy_expr(e);
   mpf_trunc(rtrunc->value.real, e->value.real);
-  result = g95_real2int(rtrunc, kind);
+  result = g95_real2int(rtrunc, g95_default_integer_kind());
 
   g95_free_expr(rtrunc);
   return range_check(result,"IDINT");
@@ -1626,6 +1620,9 @@ int i, *bits;
     return &g95_bad_expr;
   }
 
+  k = g95_validate_kind(e->ts.type, e->ts.kind);
+  if ( k == -1 ) g95_internal_error("In g95_simplify_ishftc: bad kind");
+
   if (sz !=NULL) {
     if (g95_extract_int(sz, &isize) != NULL || isize < 0) {
       g95_error("Invalid third argument of ISHFTC at %L", &sz->where);
@@ -1638,9 +1635,6 @@ int i, *bits;
     g95_error("Second argument of ISHFTC exceeds bit size at %L", &s->where);
     return &g95_bad_expr;
   }
-
-  k = g95_validate_kind(e->ts.type, e->ts.kind);
-  if ( k == -1 ) g95_internal_error("In g95_simplify_ishftc: bad kind");
 
   result = g95_constant_result(e->ts.type, e->ts.kind);
   result->where = e->where;
@@ -2433,7 +2427,7 @@ int i;
     }
   }
 
-  return range_check(result,"NOT");
+  return range_check(result,"NOT"); 
 }
 
 
