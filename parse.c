@@ -46,6 +46,7 @@ int g95_new_block_no;
 
 g95_state_data *g95_state_stack;
 
+static void check_statement_label(g95_statement);
 
 /* match_word()-- A sort of half-matching function.  We try to match
  * the word on the input with the passed string.  If this succeeds, we
@@ -439,6 +440,9 @@ g95_statement st;
   }
 
   g95_buffer_error(0);
+
+  if (st != ST_NONE) check_statement_label(st);
+
   return st;
 }
 
@@ -510,6 +514,39 @@ g95_state_data *p;
     if (p->state == state) break;
 
   return (p == NULL) ? FAILURE : SUCCESS;
+}
+
+
+/* check_statement_label()-- If the current statement has a statement
+ * label, make sure that it is allowed to have one. */
+
+static void check_statement_label(g95_statement st) {
+g95_sl_type type;
+
+  if (g95_statement_label == 0) return;
+
+  switch(st) {
+  case ST_ENDDO:  case ST_ENDIF:  case ST_END_SELECT:
+  case_executable:
+  case_exec_markers:
+  new_st.here = g95_statement_label;
+  type = ST_LABEL_TARGET;
+  break;
+
+  case ST_FORMAT:
+    new_st.here = g95_statement_label;
+    type = ST_LABEL_FORMAT;
+    break;
+
+  default:
+    g95_error("Statement label not allowed in %s statement at %C",
+	      g95_ascii_statement(st));
+    type = ST_LABEL_BAD_TARGET;
+    break;
+  }
+
+  g95_define_st_label(g95_statement_label, &label_locus,
+		      g95_state_stack->this_block_no, type);
 }
 
 
@@ -653,32 +690,6 @@ const char *p;
  * statement */
 
 static void accept_statement(g95_statement st) {
-g95_sl_type type;
-
-  if (g95_statement_label != 0) {
-    switch(st) {
-    case ST_ENDDO:  case ST_ENDIF:  case ST_END_SELECT:
-    case_executable:
-    case_exec_markers:
-      new_st.here = g95_statement_label;
-      type = ST_LABEL_TARGET;
-      break;
-
-    case ST_FORMAT:
-      new_st.here = g95_statement_label;
-      type = ST_LABEL_FORMAT;
-      break;
-
-    default:
-      g95_error("Statement label not allowed in %s statement at %C",
-		g95_ascii_statement(st));
-      type = ST_LABEL_BAD_TARGET;
-      break;
-    }
-
-    g95_define_st_label(g95_statement_label, &label_locus,
-			g95_state_stack->this_block_no, type);
-  }
 
   switch(st) {
   case ST_USE:
