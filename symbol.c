@@ -1052,30 +1052,44 @@ g95_component *tail, *new;
 }
 
 
-/* g95_find_component()-- Given a derived type node and a component
- * name, try to locate the component structure.  Returns the NULL
- * pointer if the component is not found or the components are private.
+/* check_components()-- If the component has no components and is not
+ * use-associated, we search for a derived type of the same name in
+ * parent and grandparent program units.  If found, we copy the
+ * component list, in effect defining an identical type.
  *
- * If the component has no components and is not use-associated, we
- * search for a derived type of the same name in parent program units.
- * If found, we copy the component list, in effect defining an
- * identical type. */
+ * This is how the local type is taken from the host type.  If there
+ * is some way for a derived type member to be used before the type is
+ * defined this mechanism won't work. */
 
-g95_component *g95_find_component(g95_symbol *sym, const char *name) {
+static void check_components(g95_symbol *sym) {
 g95_namespace *ns;
-g95_component *p;
 g95_symbol *s;
 
-  if (sym->components == NULL && !sym->attr.use_assoc) {
-    ns = sym->ns->parent;
-    if (ns == NULL) return NULL;
+  if (sym->components != NULL || sym->attr.use_assoc) return;
 
-    if (g95_find_symbol(sym->name, ns, 1, &s)) return NULL;
+  ns = sym->ns->parent;
 
-    if (s->attr.flavor != FL_DERIVED) return NULL;
+  if (ns == NULL) return;
 
-    copy_components(sym, s->components);
-  }
+  if (g95_find_symbol(sym->name, ns, 0, &s) ||
+      s->attr.flavor != FL_DERIVED) return;
+
+  check_components(s); /* The real definition might be another level up */
+
+  copy_components(sym, s->components);
+}
+
+
+
+/* g95_find_component()-- Given a derived type node and a component
+ * name, try to locate the component structure.  Returns the NULL
+ * pointer if the component is not found or the components are
+ * private. */
+ 
+g95_component *g95_find_component(g95_symbol *sym, const char *name) {
+g95_component *p;
+
+  check_components(sym);
 
   if (name == NULL) return NULL;
 
@@ -1694,8 +1708,9 @@ g95_symbol *p;
 
 
 /* g95_find_symbol()-- search for a symbol starting in the current
- * namespace, restorting to any parent namespaces if necessary.
- * Returns nonzero if the symbol is ambiguous. */
+ * namespace, resorting to any parent namespaces if requested by a
+ * nonzero parent_flag.  Returns nonzero if the symbol is
+ * ambiguous. */
 
 int g95_find_symbol(const char *name, g95_namespace *ns, int parent_flag,
 		    g95_symbol **result) {
