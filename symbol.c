@@ -1502,6 +1502,7 @@ g95_symtree g95_st_sentinel = { { '\0' }, 0, { NULL }, NIL, NIL, NIL, BLACK };
 
 g95_namespace *g95_get_namespace(void) {
 g95_namespace *ns;
+g95_typespec *ts;
 int i;
  
   ns = g95_getmem(sizeof(g95_namespace));
@@ -1516,21 +1517,24 @@ int i;
 
   for(i='a'; i<='z'; i++) {
     ns->set_flag[i - 'a'] = 0;
+    ts = &ns->default_type[i - 'a'];
 
-    if (ns->parent != NULL)     /* Copy previous settings */
-      ns->default_type[i - 'a'] = ns->parent->default_type[i - 'a'];
-    else {
-      if (g95_option.implicit_none != 0) {
-	g95_clear_ts(&ns->default_type[i - 'a']);
-      } else {
-	if ('i' <= i && i <= 'n') {
-	  ns->default_type[i - 'a'].type = BT_INTEGER;
-	  ns->default_type[i - 'a'].kind = g95_default_integer_kind();
-	} else {
-	  ns->default_type[i - 'a'].type = BT_REAL;
-	  ns->default_type[i - 'a'].kind = g95_default_real_kind();
-	}
-      }
+    if (ns->parent != NULL) {    /* Copy parent settings */
+      *ts = ns->parent->default_type[i - 'a'];
+      continue;
+    }
+
+    if (g95_option.implicit_none != 0) {
+      g95_clear_ts(ts);
+      continue;
+    }
+
+    if ('i' <= i && i <= 'n') {
+      ts->type = BT_INTEGER;
+      ts->kind = g95_default_integer_kind();
+    } else {
+      ts->type = BT_REAL;
+      ts->kind = g95_default_real_kind();
     }
   }
 
