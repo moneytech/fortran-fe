@@ -20,8 +20,12 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-/* check.c-- check that actual arguments are consistent with an
- * intrinsic interface. */
+/* check.c-- These functions check to see if an argument list is
+ * compatible with a particular intrinsic function or subroutine.
+ * Presence of required arguments has already been established, the
+ * argument list has been sorted into the right order and has NULL
+ * arguments in the correct places for missing optional arguments.  */
+
 
 #include <stdlib.h>
 #include <stdarg.h>
@@ -142,7 +146,7 @@ static try array_check(g95_expr *e, int n) {
 
 static try scalar_check(g95_expr *e, int n) {
 
-  if (e->rank != 0) return SUCCESS;
+  if (e->rank == 0) return SUCCESS;
 
   must_be(e, n, "a scalar");
 
