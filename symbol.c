@@ -1034,7 +1034,7 @@ g95_component *tail, *new;
     new = g95_get_component();
 
     *new = *src;
-    g95_copy_array_spec(&new->as, src->as);
+    new->as = g95_copy_array_spec(src->as);
     new->initializer = g95_copy_expr(src->initializer);
 
     if (tail == NULL)

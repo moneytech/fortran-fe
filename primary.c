@@ -561,7 +561,6 @@ got_delim:
   e = g95_get_expr();
 
   e->expr_type = EXPR_CONSTANT;
-  e->rank = 0;
   e->ref = NULL;
   e->ts.type = BT_CHARACTER;
   e->ts.kind = kind;
@@ -618,7 +617,6 @@ int i, kind;
   e = g95_get_expr();
 
   e->expr_type = EXPR_CONSTANT;
-  e->rank = 0;
   e->value.logical = i;
   e->ts.type = BT_LOGICAL;
   e->ts.kind = kind;
@@ -650,7 +648,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  if (sym->value->rank != 0) {
+  if (sym->value->as != NULL) {
     g95_error("Scalar PARAMETER required in complex constant at %C");
     return MATCH_ERROR;
   }
@@ -1597,6 +1595,7 @@ match g95_match_variable(g95_expr **result) {
 g95_state_data *st;
 g95_symbol *sym;
 g95_expr *expr;
+g95_ref *ref;
 locus where;
 match m;
 
@@ -1644,9 +1643,17 @@ match m;
     return m;
   }
 
-  expr->rank = 0;
+/* Follow the reference list to see if there is an array at the end of
+ * it all */
+
+  for(ref=expr->ref; ref; ref=ref->next)
+    if (ref->type == REF_ARRAY) break;
+
+  if (ref != NULL) { /* Convert array ref to an array spec */
+    
+
+  }
 
   *result = expr;
   return MATCH_YES;
 }
-

@@ -579,10 +579,9 @@ typedef struct g95_ref {
 typedef struct g95_expr {
   expr_t expr_type;
 
-  g95_typespec ts;         /* These three refer to the overall expression   */
-  int rank;                /* Duplicates ar->rank, but present for ar==NULL */
+  g95_typespec ts;         /* These two refer to the overall expression   */
 
-  g95_array_ref *ar;       /* Nonnull if the expression is array-valued */
+  g95_array_spec *as;      /* Nonnull if the expression is array-valued */
 
   intrinsic_op operator;
   g95_symbol *symbol;   /* Nonnull for functions and structure constructors */
@@ -1230,7 +1229,7 @@ void g95_show_array_ref(g95_array_ref *);
 g95_array_ref *g95_copy_array_ref(g95_array_ref *);
 
 try g95_set_array_spec(g95_symbol *, g95_array_spec *, locus *);
-void g95_copy_array_spec(g95_array_spec **, g95_array_spec *);
+g95_array_spec *g95_copy_array_spec(g95_array_spec *);
 void g95_resolve_array_spec(g95_array_spec *);
 match g95_match_array_spec(g95_array_spec **);
 

@@ -158,7 +158,6 @@ g95_expr *new;
 
   new = g95_get_expr();
   new->expr_type = EXPR_OP;
-  new->rank = 0;
   new->operator = operator;
   new->where = *where;
   

@@ -230,8 +230,8 @@ int i;
   if (m != MATCH_YES) return MATCH_ERROR;
 
   e = ar->shape[i].start;
-  if (e->ar != NULL) {
-    if (e->ar->rank != 1) {
+  if (e->as != NULL) {
+    if (e->as->rank != 1) {
       g95_error("Vector subscript at %C must have rank of one");
       return MATCH_ERROR;
     }
@@ -591,16 +591,13 @@ try g95_set_array_spec(g95_symbol *sym, g95_array_spec *as, locus *error_loc) {
 
 /* copy_array_spec()-- Copy an array specification. */
 
-void g95_copy_array_spec(g95_array_spec **destp, g95_array_spec *src) {
+g95_array_spec *g95_copy_array_spec(g95_array_spec *src) {
 g95_array_spec *dest;
 int i;
 
-  if (src == NULL) {
-    *destp = NULL;
-    return;
-  }
+  if (src == NULL) return NULL;
 
-  dest = *destp = g95_get_array_spec();
+  dest = g95_get_array_spec();
 
   *dest = *src;
 
@@ -608,6 +605,8 @@ int i;
     dest->shape[i].lower = g95_copy_expr(dest->shape[i].lower);
     dest->shape[i].upper = g95_copy_expr(dest->shape[i].upper);
   }
+
+  return dest;
 }
 
 
@@ -910,7 +909,7 @@ empty:
   expr = g95_get_expr();
 
   expr->expr_type = EXPR_ARRAY;
-  expr->rank = 1;
+
   expr->value.constructor = head;
   expr->where = where;
 

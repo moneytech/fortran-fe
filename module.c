@@ -1273,7 +1273,7 @@ g95_expr *e;
   }
 
   mio_typespec(&e->ts);
-  mio_integer(&e->rank);
+  mio_array_spec(&e->as);
 
   switch(e->expr_type) {
   case EXPR_OP:

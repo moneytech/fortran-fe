@@ -263,7 +263,7 @@ char *s;
   q = g95_get_expr();
   *q = *p;
 
-  if (p->ar != NULL) q->ar = g95_copy_array_ref(p->ar);
+  q->as = g95_copy_array_spec(p->as);
 
   switch(q->expr_type) {
   case EXPR_SUBSTRING:
@@ -372,7 +372,6 @@ g95_expr *p;
   p = g95_get_expr();
 
   p->expr_type = EXPR_CONSTANT;
-  p->rank = 0;
   p->ts.type = BT_INTEGER;
   p->ts.kind = g95_default_integer_kind();
 
@@ -392,7 +391,6 @@ g95_expr *p;
   p = g95_get_expr();
 
   p->expr_type = EXPR_CONSTANT;
-  p->rank = 0;
   p->ts.type = BT_LOGICAL;
   p->ts.kind = g95_default_logical_kind();
 
@@ -1059,19 +1057,27 @@ try t;
   case INTRINSIC_NEQV:    case INTRINSIC_EQ:     case INTRINSIC_NE:
   case INTRINSIC_GT:      case INTRINSIC_GE:     case INTRINSIC_LT:
   case INTRINSIC_LE:
-    if (op1->ar == NULL && op2->ar == NULL) e->ar = NULL;
-    if (op1->ar != NULL && op2->ar == NULL) e->ar = op1->ar;
-    if (op1->ar == NULL && op2->ar != NULL) e->ar = op2->ar;
+    if (op1->as == NULL && op2->as == NULL) e->as = NULL;
+    if (op1->as != NULL && op2->as == NULL)
+      e->as = g95_copy_array_spec(op1->as);
+    if (op1->as == NULL && op2->as != NULL)
+      e->as = g95_copy_array_spec(op2->as);
 
 /* TODO: we should really be comparing array refs where possible */
-    if (op1->ar != NULL && op2->ar != NULL) e->ar = op1->ar;
+
+    if (op1->as != NULL && op2->as != NULL) {
+
+      // g95_check_conformability(op1->as, op2->as);
+
+      e->as = g95_copy_array_spec(op1->as);
+    }
 
     break;
 
   case INTRINSIC_NOT:
   case INTRINSIC_UPLUS:
   case INTRINSIC_UMINUS:
-    e->ar = op1->ar;
+    e->as = g95_copy_array_spec(op1->as);
     break;           /* Simply copy arrayness attribute */
 
   default:
@@ -1124,7 +1130,7 @@ match m;
   m = g95_match_expr(&e);
   if (m != MATCH_YES) return m;
 
-  if (e->ar != NULL) {
+  if (e->as != NULL) {
     g95_error("Expression at %C must be scalar valued, not array valued");
     g95_free_expr(e);
     return MATCH_ERROR;
@@ -1133,10 +1139,6 @@ match m;
   *result = e;
   return MATCH_YES;
 }
-
-
-
-
 
 
 
