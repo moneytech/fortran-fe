@@ -1030,23 +1030,22 @@ g95_expr *result;
 
 
 g95_expr *g95_simplify_floor(g95_expr *e, g95_expr *k) {
-g95_expr *floor, *result;
+g95_expr *result;
+mpf_t floor;
 int kind;
 
   kind = get_kind(k, "FLOOR", g95_default_integer_kind());
   if (kind == -1) g95_internal_error("g95_simplify_floor(): Bad kind");
 
-  if (e->ts.type != EXPR_CONSTANT) return NULL;
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   result = g95_constant_result(BT_INTEGER, kind);
   result->where = e->where;
-  
-  floor = g95_copy_expr(e);
-  
-  mpf_floor(floor->value.real, e->value.real);
-  mpz_set_f(result->value.integer,floor->value.real);
 
-  g95_free_expr(floor);
+  mpf_init(floor);
+  mpf_floor(floor, e->value.real);
+  mpz_set_f(result->value.integer, floor);
+  mpf_clear(floor);
 
   return range_check(result, "FLOOR");
 }
