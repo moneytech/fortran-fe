@@ -1565,9 +1565,7 @@ arith rc;
   if (op->expr_type == EXPR_CONSTANT) return eval(op, result);
 
   rc = ARITH_OK;
-
-  head = op->value.constructor.head;
-  op->value.constructor.head = NULL;   /* Reuse the constructor */
+  head = g95_copy_constructor(op->value.constructor.head);
 
   for(c=head; c; c=c->next) {
     rc = eval(c->expr, &r);
