@@ -270,6 +270,7 @@ int i;
     g95_internal_error("g95_set_default_type(): symbol already has a type");
 
   sym->ts = g95_current_ns->default_type[i];
+  sym->attr.implicit_type = 1;
 
   return SUCCESS;
 }
@@ -418,32 +419,33 @@ void g95_show_attr(symbol_attribute *attr) {
 	     g95_code2string(scopes, attr->scope),
 	     g95_code2string(accessibility, attr->access));
 
-  if (attr->allocatable)  g95_status(" ALLOCATABLE");
-  if (attr->dimension)    g95_status(" DIMENSION");
-  if (attr->external)     g95_status(" EXTERNAL");
-  if (attr->intrinsic)    g95_status(" INTRINSIC");
-  if (attr->optional)     g95_status(" OPTIONAL");
-  if (attr->pointer)      g95_status(" POINTER");
-  if (attr->save)         g95_status(" SAVE");
-  if (attr->target)       g95_status(" TARGET");
-  if (attr->dummy)        g95_status(" DUMMY");
-  if (attr->common)       g95_status(" COMMON");
-  if (attr->result)       g95_status(" RESULT");
-  if (attr->entry)        g95_status(" ENTRY");
+  if (attr->allocatable)    g95_status(" ALLOCATABLE");
+  if (attr->dimension)      g95_status(" DIMENSION");
+  if (attr->external)       g95_status(" EXTERNAL");
+  if (attr->intrinsic)      g95_status(" INTRINSIC");
+  if (attr->optional)       g95_status(" OPTIONAL");
+  if (attr->pointer)        g95_status(" POINTER");
+  if (attr->save)           g95_status(" SAVE");
+  if (attr->target)         g95_status(" TARGET");
+  if (attr->dummy)          g95_status(" DUMMY");
+  if (attr->common)         g95_status(" COMMON");
+  if (attr->result)         g95_status(" RESULT");
+  if (attr->entry)          g95_status(" ENTRY");
 
-  if (attr->data)         g95_status(" DATA");
-  if (attr->use_assoc)    g95_status(" USE-ASSOC");
-  if (attr->in_namelist)  g95_status(" IN-NAMELIST");
-  if (attr->in_common)    g95_status(" IN-COMMON");
-  if (attr->saved_common) g95_status(" SAVED-COMMON");
+  if (attr->data)           g95_status(" DATA");
+  if (attr->use_assoc)      g95_status(" USE-ASSOC");
+  if (attr->in_namelist)    g95_status(" IN-NAMELIST");
+  if (attr->in_common)      g95_status(" IN-COMMON");
+  if (attr->saved_common)   g95_status(" SAVED-COMMON");
 
-  if (attr->function)     g95_status(" FUNCTION");
-  if (attr->subroutine)   g95_status(" SUBROUTINE");
+  if (attr->function)       g95_status(" FUNCTION");
+  if (attr->subroutine)     g95_status(" SUBROUTINE");
+  if (attr->implicit_type)  g95_status(" IMPLICIT-TYPE");
 
-  if (attr->sequence)     g95_status(" SEQUENCE");
-  if (attr->elemental)    g95_status(" ELEMENTAL");
-  if (attr->pure)         g95_status(" PURE");
-  if (attr->recursive)    g95_status(" RECURSIVE");
+  if (attr->sequence)       g95_status(" SEQUENCE");
+  if (attr->elemental)      g95_status(" ELEMENTAL");
+  if (attr->pure)           g95_status(" PURE");
+  if (attr->recursive)      g95_status(" RECURSIVE");
 
   g95_status(")");
 }
@@ -901,6 +903,7 @@ void g95_clear_attr(symbol_attribute *attr) {
   attr->saved_common = 0;
   attr->function = 0;
   attr->subroutine = 0;
+  attr->implicit_type = 0;
   attr->sequence = 0;
   attr->elemental = 0;
   attr->pure = 0;

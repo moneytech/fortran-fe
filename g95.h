@@ -201,6 +201,7 @@ typedef struct {
 
   unsigned in_namelist:1, in_common:1, saved_common:1;
   unsigned function:1, subroutine:1;
+  unsigned implicit_type:1;    /* Type defined via implicit rules */
 
 /* Function/subroutine attributes */
 
@@ -1253,6 +1254,7 @@ match g95_match_interface(void);
 match g95_match_end_interface(void);
 void g95_start_interface(void);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
+int g95_compare_types(g95_typespec *, g95_typespec *);
 try g95_check_interface(g95_interface *, g95_symbol *);
 try g95_extend_expr(g95_expr *);
 void g95_add_interface(g95_symbol *sym);

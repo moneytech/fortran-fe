@@ -171,14 +171,17 @@ g95_expr *init;
 
 /* Start updating the symbol table.  Add basic type attribute if present */
 
-  if (current_ts.type != BT_UNKNOWN) {
-    if (sym->ts.type != BT_UNKNOWN) {
+  if (current_ts.type != BT_UNKNOWN &&
+      (sym->attr.implicit_type == 0 ||
+       !g95_compare_types(&sym->ts, &current_ts))) {
+
+    if (sym->ts.type == BT_UNKNOWN)
+      sym->ts = current_ts;
+    else {
       g95_error("Symbol at %L already has basic type of %s", var_locus,
 		g95_typename(sym->ts.type));
       return FAILURE;
     }
-
-    sym->ts = current_ts;
   }
 
   if (sym->ts.type == BT_CHARACTER) sym->ts.cl = cl;
