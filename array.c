@@ -171,7 +171,7 @@ g95_expr *e;
 
 bound:
   g95_warning("Array reference at %L is out of bounds", &ar->shape[i].where);
-  return FAILURE;
+  return SUCCESS;
 
 oops:
   g95_internal_error("match_subscript(): Bad integer conversion");
