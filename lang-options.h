@@ -26,6 +26,9 @@ This file is part of GNU Fortran.
       N_("Output namespace and code structures") },
 { "-Wline-truncation",
       N_("Warn about truncated source lines") },
+{ "-Wimplicit",
+      N_("Warn whenever a variable, array, or function is implicitly "
+	 "declared") },
 { "-F",
       N_("Parse an F program") },
 { "-d8",

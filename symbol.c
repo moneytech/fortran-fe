@@ -1520,12 +1520,16 @@ int i;
     if (ns->parent != NULL)     /* Copy previous settings */
       ns->default_type[i - 'a'] = ns->parent->default_type[i - 'a'];
     else {
-      if ('i' <= i && i <= 'n') {
-	ns->default_type[i - 'a'].type = BT_INTEGER;
-	ns->default_type[i - 'a'].kind = g95_default_integer_kind();
+      if (g95_option.implicit_none != 0) {
+	g95_clear_ts(&ns->default_type[i - 'a']);
       } else {
-	ns->default_type[i - 'a'].type = BT_REAL;
-	ns->default_type[i - 'a'].kind = g95_default_real_kind();
+	if ('i' <= i && i <= 'n') {
+	  ns->default_type[i - 'a'].type = BT_INTEGER;
+	  ns->default_type[i - 'a'].kind = g95_default_integer_kind();
+	} else {
+	  ns->default_type[i - 'a'].type = BT_REAL;
+	  ns->default_type[i - 'a'].kind = g95_default_real_kind();
+	}
       }
     }
   }
