@@ -1437,7 +1437,8 @@ match m;
   }
 
   if (expr->expr_type == EXPR_ARRAY &&
-      g95_expand_constructor(&expr->value.constructor) == FAILURE) {
+      (g95_check_constructor_type(expr) == FAILURE ||
+       g95_expand_constructor(&expr->value.constructor) == FAILURE)) {
     g95_free_expr(expr);
     return MATCH_ERROR;
   }

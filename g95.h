@@ -1244,8 +1244,10 @@ match g95_match_array_constructor(g95_expr **);
 void g95_simplify_iterator_var(g95_expr *);
 try g95_expand_constructor(g95_constructor **);
 try g95_resolve_array_constructor(g95_expr *);
-g95_constructor *g95_copy_constructor(g95_constructor *src);
+try g95_check_constructor_type(g95_expr *);
 try g95_check_constructor(g95_expr *, int, try (*)(g95_expr *));
+g95_constructor *g95_copy_constructor(g95_constructor *src);
+
 
 
 /* interface.c */

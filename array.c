@@ -801,64 +801,6 @@ cleanup:
 }
 
 
-/* check_constructor_type()-- Given an expression, compare it's type
- * with the type of the constructor.  Returns nonzero if an error was
- * issued.  The cons_state variable keeps track of whether the type of
- * the constructor being read or resolved is known to be good, bad or
- * just starting out. */
-
-static g95_typespec constructor_ts;
-static enum { CONS_START, CONS_GOOD, CONS_BAD } cons_state;
-
-static int check_constructor_type(g95_expr *expr) {
-
-  if (cons_state == CONS_BAD) return 0;  /* Supress further errors */
-
-  if (cons_state == CONS_START) {
-    if (expr->ts.type == BT_UNKNOWN)
-      cons_state = CONS_BAD;
-    else {
-      cons_state = CONS_GOOD;
-      constructor_ts = expr->ts;
-    }
-
-    return 0;
-  }
-
-  if (constructor_ts.type != expr->ts.type) {
-    g95_error("Element in %s array constructor at %L is %s",
-	      g95_typename(constructor_ts.type), &expr->where,
-	      g95_typename(expr->ts.type));
-
-    cons_state = CONS_BAD;
-    return 1;
-  }
-
-  if (constructor_ts.type == BT_DERIVED) {
-    if (constructor_ts.derived == expr->ts.derived) return 0;
-
-    g95_error("Element in DERIVED %s array constructor at %L is "
-	      "DERIVED %s", constructor_ts.derived->name, &expr->where,
-	      expr->ts.derived->name);
-
-    cons_state = CONS_BAD;
-    return 1;
-  }
-
-  if (constructor_ts.kind != expr->ts.kind) {
-    g95_error("Element in %s kind %d array constructor at %L is "
-	      "%s kind %d", g95_typename(constructor_ts.type),
-	      constructor_ts.kind, &expr->where,
-	      g95_typename(expr->ts.type), expr->ts.kind);
-
-    cons_state = CONS_BAD;
-    return 1;
-  }
-
-  return 0;
-}
-
-
 /* match_array_cons_element()-- match a single element of an array
  * constructor, which can be a single expression or a list of
  * elements. */
@@ -935,13 +877,160 @@ cleanup:
 }
 
 
+
+/************** Check array constructors for correctness **************/
+
+/* check_element_type()-- Given an expression, compare it's type with
+ * the type of the current constructor.  Returns nonzero if an error
+ * was issued.  The cons_state variable keeps track of whether the
+ * type of the constructor being read or resolved is known to be good,
+ * bad or just starting out. */
+
+static g95_typespec constructor_ts;
+static enum { CONS_START, CONS_GOOD, CONS_BAD } cons_state;
+
+static int check_element_type(g95_expr *expr) {
+
+  if (cons_state == CONS_BAD) return 0;  /* Supress further errors */
+
+  if (cons_state == CONS_START) {
+    if (expr->ts.type == BT_UNKNOWN)
+      cons_state = CONS_BAD;
+    else {
+      cons_state = CONS_GOOD;
+      constructor_ts = expr->ts;
+    }
+
+    return 0;
+  }
+
+  if (constructor_ts.type != expr->ts.type) {
+    g95_error("Element in %s array constructor at %L is %s",
+	      g95_typename(constructor_ts.type), &expr->where,
+	      g95_typename(expr->ts.type));
+
+    cons_state = CONS_BAD;
+    return 1;
+  }
+
+  if (constructor_ts.type == BT_DERIVED) {
+    if (constructor_ts.derived == expr->ts.derived) return 0;
+
+    g95_error("Element in DERIVED %s array constructor at %L is "
+	      "DERIVED %s", constructor_ts.derived->name, &expr->where,
+	      expr->ts.derived->name);
+
+    cons_state = CONS_BAD;
+    return 1;
+  }
+
+  if (constructor_ts.kind != expr->ts.kind) {
+    g95_error("Element in %s kind %d array constructor at %L is "
+	      "%s kind %d", g95_typename(constructor_ts.type),
+	      constructor_ts.kind, &expr->where,
+	      g95_typename(expr->ts.type), expr->ts.kind);
+
+    cons_state = CONS_BAD;
+    return 1;
+  }
+
+  return 0;
+}
+
+
+/* check_constructor_type()-- Recursive work function for
+ * g95_check_constructor_type(). */
+
+static try check_constructor_type(g95_constructor *c) {
+
+  for(; c; c=c->next) {
+    if (c->expr != NULL && check_element_type(c->expr) == FAILURE)
+      return FAILURE;
+
+    if (check_constructor_type(c->child) == FAILURE) return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
+/* g95_check_constructor_type()-- Check that all elements of an array
+ * constructor are the same type.  On FAILURE, an error has been
+ * generated. */
+
+try g95_check_constructor_type(g95_expr *e) {
+try t;
+
+  cons_state = CONS_START;
+  g95_clear_ts(&constructor_ts);
+
+  t = check_constructor_type(e->value.constructor);
+  if (t == SUCCESS && e->ts.type == BT_UNKNOWN) e->ts = constructor_ts;
+
+  return t;
+}
+
+
 typedef struct cons_stack {
   g95_iterator *iterator;
   struct cons_stack *previous;
 } cons_stack;
 
 static cons_stack *base;
-static int array_constructor_flag;
+
+static try check_constructor(g95_constructor *, match (*)(g95_expr *));
+
+/* check_iter_expr()-- Check an expression in a constructor to make
+ * sure that only iteration variables are present in an expression. */
+
+static try check_iter_expr(g95_expr *expr,
+			   match (*check_function)(g95_expr *)) {
+g95_actual_arglist *ap;
+g95_symbol *sym;
+cons_stack *c;
+
+  if (expr == NULL) return SUCCESS;
+
+  switch(expr->expr_type) {
+  case EXPR_SUBSTRING:
+  case EXPR_OP:
+    if (check_iter_expr(expr->op1, check_function) == FAILURE ||
+	check_iter_expr(expr->op2, check_function) == FAILURE) return FAILURE;
+
+    break;
+
+  case EXPR_FUNCTION:
+    for(ap=expr->value.function.actual; ap; ap=ap->next)
+      if (check_iter_expr(ap->expr, check_function) == FAILURE) return FAILURE;
+
+    break;
+
+  case EXPR_CONSTANT:
+    break;
+
+  case EXPR_VARIABLE:
+    sym = expr->symbol;
+
+    for(c=base; c; c=c->previous)
+      if (sym == c->iterator->var->symbol) break;
+
+    if (c == NULL) {
+      g95_error("Variable '%s' at %L isn't an implied DO-iterator.  ",
+		sym->name, &expr->where);
+
+      return FAILURE;
+    }
+
+  case EXPR_STRUCTURE:
+  case EXPR_ARRAY:
+    if (check_constructor(expr->value.constructor, check_function) == FAILURE)
+      return FAILURE;
+
+    break;
+  }
+
+  return SUCCESS;
+}
 
 
 /* check_constructor()-- Recursive work function for
@@ -951,38 +1040,24 @@ static int array_constructor_flag;
 
 static try check_constructor(g95_constructor *cons,
 			     match (*check_function)(g95_expr *)) {
-cons_stack *c, element;
-g95_symbol *sym;
+cons_stack element;
+try t;
 
   for(; cons; cons=cons->next) {
-    if (cons->expr != NULL) {
-      if (cons->expr->expr_type == EXPR_VARIABLE) {
-	sym = cons->expr->symbol;
+    if (cons->expr != NULL &&
+	(check_iter_expr(cons->expr, check_function) == FAILURE ||
+	 (*check_function)(cons->expr) == FAILURE)) return FAILURE;
 
-	for(c=base; c; c=c->previous)
-	  if (sym == c->iterator->var->symbol) goto ok;
-
-	g95_error("Variable '%s' at %L isn't an implied DO-iterator.  "
-		  "Constructor is not constant", sym->name, &cons->where);
-
-	return FAILURE;
-      }
-
-      if ((*check_function)(cons->expr) == FAILURE) return FAILURE;
-
-      if (array_constructor_flag && check_constructor_type(cons->expr))
-	return FAILURE;
-    }
-
-  ok:
     if (cons->iterator == NULL) continue;
 
     element.previous = base;
     element.iterator = cons->iterator;
 
     base = &element;
-    check_constructor(cons->child, check_function);
+    t = check_constructor(cons->child, check_function);
     base = element.previous;
+
+    if (t == FAILURE) return FAILURE;
   }
 
 /* Nothing went wrong, so all OK */
@@ -998,24 +1073,13 @@ g95_symbol *sym;
 try g95_check_constructor(g95_expr *expr, int array_constructor,
 			  match (*check_function)(g95_expr *)) {
 cons_stack *base_save;
-int old_flag;
 try t;
 
   base_save = base;
   base = NULL;
 
-  old_flag = array_constructor_flag;
-  array_constructor_flag = array_constructor;
-
-  cons_state = CONS_START;
-
   t = check_constructor(expr->value.constructor, check_function);
-
-  if (array_constructor && t == SUCCESS && expr->ts.type == BT_UNKNOWN)
-    expr->ts = constructor_ts;
-
   base = base_save;
-  array_constructor_flag = old_flag;
 
   return t;
 }
@@ -1195,6 +1259,8 @@ try g95_expand_constructor(g95_constructor **cp) {
 }
 
 
+/************** Calculate size of array constructors **************/
+
 /* count_elements()-- Recursive functions to count the number of
  * elements in a constructor.  If we hit an iterator, we give up and
  * return -1.  */
@@ -1255,6 +1321,8 @@ int size;
 }
 
 
+/*************** Type resolution of array constructors ***************/
+
 /* resolve_array_list()-- Recursive array list resolution function.
  * All of the elements must be of the same type. */
 
@@ -1274,8 +1342,6 @@ try t;
       t = FAILURE;
       continue;
     }
-
-    if (check_constructor_type(p->expr)) t = FAILURE;
   }
 
   return t;
@@ -1288,12 +1354,8 @@ try t;
 try g95_resolve_array_constructor(g95_expr *expr) {
 try t;
 
-  g95_clear_ts(&constructor_ts); 
-
   t = resolve_array_list(expr->value.constructor);
-
-  if (cons_state == CONS_GOOD) expr->ts = constructor_ts;
-  expr->expr_type = EXPR_ARRAY;
+  if (t == SUCCESS) t = g95_check_constructor_type(expr);
 
   return t;
 }

@@ -365,8 +365,6 @@ int failure;
 try g95_check_assign_symbol(g95_symbol *sym, g95_expr *rvalue) {
 g95_expr lvalue;
 
-  if (rvalue->expr_type == EXPR_ARRAY) return SUCCESS;
-
   memset(&lvalue, '\0', sizeof(g95_expr));
 
   lvalue.expr_type = EXPR_VARIABLE;
