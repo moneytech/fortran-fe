@@ -231,4 +231,4 @@ void g95_resolve_scale(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_shape(g95_expr *, g95_expr *);
 void g95_resolve_spacing(g95_expr *, g95_expr *);
 void g95_resolve_sum(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
-
+void g95_resolve_transpose(g95_expr *, g95_expr *);

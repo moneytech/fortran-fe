@@ -1237,7 +1237,7 @@ int di, dr, dd, dl, dc, dz;
 	  sz, BT_INTEGER, di, 1,  NULL);
 
   add_sym("transpose", 0, 1, BT_REAL, dr,
-	  g95_check_transpose, NULL, NULL,
+	  g95_check_transpose, NULL, g95_resolve_transpose,
 	  m, BT_REAL, dr, 0, NULL);
 
   add_sym("trim", 0, 1, BT_CHARACTER, dc,

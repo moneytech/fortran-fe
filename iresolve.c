@@ -373,6 +373,16 @@ void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
 }
 
 
+void g95_resolve_transpose(g95_expr *f, g95_expr *matrix) {
+
+  f->ts = matrix->ts;
+  f->rank = 2;
+
+  f->value.function.name =
+    get_string("__transpose_%c%d", g95_type_letter(matrix->ts.type),
+	       matrix->ts.kind);
+}
+
 
 void g95_iresolve_init_1(void) {
 int i;
