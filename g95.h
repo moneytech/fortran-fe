@@ -893,8 +893,6 @@ typedef struct g95_code {
 
 } g95_code;
 
-#define g95_get_code() g95_getmem(sizeof(g95_code))
-
 
 /* Storage for DATA statements */
 
@@ -1389,6 +1387,7 @@ int g95_kind_max(g95_expr *, g95_expr *);
 extern g95_code new_st;
 
 void g95_clear_new_st(void);
+g95_code *g95_get_code(void);
 g95_code *g95_new_level(g95_code *);
 g95_code *g95_add_statement(void);
 g95_code *g95_append_code(g95_code *, g95_code *);

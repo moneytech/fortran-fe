@@ -38,6 +38,17 @@ void g95_clear_new_st(void) {
 }
 
 
+/* g95_get_code()-- Get a g95_code structure */
+
+g95_code *g95_get_code(void) {
+g95_code *c;
+
+  c = g95_getmem(sizeof(g95_code)); 
+  c->loc = *g95_current_locus();
+  return c;
+}
+
+
 /* g95_add_statement()-- Takes the current new_st code structure and
  * adds it to the current program unit.  As a side-effect, it zeroes
  * the new_st. */

@@ -699,20 +699,30 @@ static void accept_statement(g95_statement st) {
     g95_current_ns->proc_name = g95_new_block;
     break;
 
-  case ST_END_PROGRAM:
-  case ST_END_FUNCTION:
-  case ST_END_SUBROUTINE:
-  case ST_ENDIF:
-  case ST_ENDDO:
-  case ST_END_SELECT:
-    /* These are all branch targets. If the end statement has
-     * a label, we fake the statement with a labeled EXEC_NOP. */
+    /* If the statement is the end of a block, lay down a special code
+     * that allows a branch to the end of the block from within the
+     * construct. */
 
-    if (g95_statement_label == 0) break;
-    new_st.op = EXEC_NOP;
+  case ST_ENDIF:  case ST_ENDDO:  case ST_END_SELECT:
+    if (g95_statement_label != 0) {
+      new_st.op = EXEC_NOP;
+      g95_add_statement();
+    }
 
-    /* Fall through */
- 
+    break;
+
+    /* The end-of-program unit statements do not get the special
+     * marker and require a statement of some sort if they are a
+     * branch target. */
+
+  case ST_END_PROGRAM:  case ST_END_FUNCTION:  case ST_END_SUBROUTINE:
+    if (g95_statement_label != 0) {
+      new_st.op = EXEC_RETURN;
+      g95_add_statement();
+    }
+
+    break;
+
   case_executable:
   case_exec_markers:
     g95_add_statement();
