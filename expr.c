@@ -915,7 +915,8 @@ char *name;
   if (sym->attr.interface || sym->attr.proc == PROC_MODULE ||
       sym->attr.proc == PROC_INTERNAL || sym->attr.proc == PROC_ST_FUNCTION ||
       (sym->attr.intrinsic && g95_specific_intrinsic(name)) ||
-      sym->attr.external) return PTYPE_GENERIC;
+      sym->attr.external)
+    return PTYPE_SPECIFIC;
 
   /* Check parent scopes */
 
@@ -924,7 +925,7 @@ char *name;
 		    s->attr.proc == PROC_ST_FUNCTION ||
 		    (s->attr.intrinsic && g95_specific_intrinsic(name)) ||
 		    s->attr.external))
-      return PTYPE_GENERIC;
+    return PTYPE_SPECIFIC;
 
   return PTYPE_UNKNOWN;
 }
