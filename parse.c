@@ -23,6 +23,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include <ctype.h>
 #include <string.h>
+#include <setjmp.h>
 
 #include "g95.h"
 
@@ -32,6 +33,7 @@ Boston, MA 02111-1307, USA.  */
 
 int g95_statement_label;
 static locus label_locus;
+static jmp_buf eof;
 
 g95_state_data *g95_state_stack;
 
@@ -818,9 +820,20 @@ order:
 }
 
 
+/* unexpected_eof()-- Handle an unexpected end of file.  This is a
+ * show-stopper... */
+
+static void unexpected_eof(void) {
+
+  g95_error("Unexpected end of file in '%s'", g95_current_file->filename);
+
+  longjmp(eof, 1);
+}
+
+
 /* parse_derived()-- Parse a derived type */
 
-static try parse_derived(void) {
+static void parse_derived(void) {
 int compiling_type, seen_private, seen_sequence, seen_component, error_flag;
 g95_statement st;
 g95_component *c;
@@ -841,8 +854,7 @@ g95_state_data s;
     st = next_statement();
     switch(st) {
     case ST_NONE:
-      g95_error("Unexpected end of file in TYPE block at %C");
-      return FAILURE;
+      unexpected_eof();
 
     case ST_DATA_DECL:
       accept_statement(st);
@@ -922,13 +934,12 @@ g95_state_data s;
     }
 
   pop_state();
-  return SUCCESS;
 }
 
 /* parse_interface()-- Parse an interface.  We must be able to deal
  * with the possibility of recursive interfaces. */
 
-static try parse_interface(void) {
+static void parse_interface(void) {
 int seen_body, seen_implicit, seen_decl;
 g95_symbol *progname, *sym;
 g95_interface *base, *ip;
@@ -955,8 +966,7 @@ loop:
     st = next_statement();
     switch(st) {
     case ST_NONE:
-      g95_error("Unexpected end of file in INTERFACE block at %C");
-      return FAILURE;
+      unexpected_eof();
 
     case ST_SUBROUTINE:
       push_state(&s2, COMP_SUBROUTINE, g95_new_block);
@@ -995,7 +1005,7 @@ loop:
     st = next_statement();
     switch(st) {
     case ST_NONE:
-      return FAILURE;
+      unexpected_eof();
 
     case ST_USE:
       if (seen_implicit) {
@@ -1038,12 +1048,12 @@ loop:
 
     case ST_DERIVED_DECL:
       seen_decl = 1;
-      if (parse_derived() == FAILURE) return FAILURE;
+      parse_derived();
       break;
 
     case ST_INTERFACE:
       seen_decl = 1;
-      if (parse_interface() == FAILURE) return FAILURE;
+      parse_interface();
       current_interface = save;
       break;
 
@@ -1115,8 +1125,6 @@ done:
   g95_current_ns = current_interface.parent_ns;
 
   pop_state();
-
-  return SUCCESS;
 }
 
 
@@ -1132,9 +1140,7 @@ st_state ss;
 loop:
   switch(st) {
   case ST_NONE:
-    g95_error("Unexpected end of file %s", g95_current_file->filename);
-    st = ST_NONE;
-    break;
+    unexpected_eof();
 
   case ST_USE:
   case ST_IMPLICIT_NONE:     case ST_IMPLICIT:
@@ -1151,17 +1157,11 @@ loop:
 
     switch(st) {
     case ST_INTERFACE:
-      if (parse_interface() == FAILURE) {
-	st = ST_NONE;
-	goto done;
-      }
+      parse_interface();
       break;
 
     case ST_DERIVED_DECL:
-      if (parse_derived() == FAILURE) {
-	st = ST_NONE;
-	goto done;
-      }
+      parse_derived();
       break;
 
     case ST_PUBLIC:  case ST_PRIVATE:
@@ -1185,14 +1185,13 @@ loop:
     break;
   }
 
-done:
   return st;
 }
 
 
 /* parse_where_block()-- Parse a WHERE block, (not a simple WHERE statement) */
 
-static try parse_where_block(void) {
+static void parse_where_block(void) {
 int seen_empty_else;
 g95_code *top, *d;
 g95_state_data s;
@@ -1216,11 +1215,10 @@ g95_statement st;
     st = next_statement();
     switch(st) {
     case ST_NONE:
-      g95_error("Unexpected end of file in WHERE block at %C");
-      return FAILURE;
+      unexpected_eof();
 
     case ST_WHERE_BLOCK:
-      if (parse_where_block() == FAILURE) return FAILURE;
+      parse_where_block();
       /* Fall through */
 
     case ST_ASSIGNMENT:
@@ -1256,14 +1254,13 @@ g95_statement st;
   } while(st != ST_END_WHERE);
 
   pop_state();
-  return SUCCESS;
 }
 
 
 /* parse_forall_block()-- Parse a FORALL block (not a simple FORALL
  * statement) */
 
-static try parse_forall_block(void) {
+static void parse_forall_block(void) {
 g95_code *top, *d;
 g95_state_data s;
 g95_statement st;
@@ -1289,19 +1286,18 @@ g95_statement st;
       break;
 
     case ST_WHERE_BLOCK:
-      if (parse_where_block() == FAILURE) return FAILURE;
+      parse_where_block();
       break;
 
     case ST_FORALL_BLOCK:
-      if (parse_forall_block() == FAILURE) return FAILURE;
+      parse_forall_block();
       break;
 
     case ST_END_FORALL:
       break;
 
     case ST_NONE:
-      g95_error("Unexpected end of file in FORALL block at %C");
-      return FAILURE;
+      unexpected_eof();
 
     default:
       g95_error("Unexpected %s statement in FORALL block at %C",
@@ -1311,7 +1307,6 @@ g95_statement st;
   } while(st != ST_END_FORALL);
 
   pop_state();
-  return SUCCESS;
 }
 
 
@@ -1320,7 +1315,7 @@ static g95_statement parse_executable(g95_statement);
 /* parse_if_block()-- parse the statements of an IF-THEN-ELSEIF-ELSE-ENDIF
  * block.  */
 
-static try parse_if_block(void) {
+static void parse_if_block(void) {
 g95_code *top, *d;
 g95_statement st;
 locus else_locus;
@@ -1345,8 +1340,7 @@ int seen_else;
 
     switch(st) {
     case ST_NONE:
-      g95_error("Unexpected end of file in IF block at %C");
-      return FAILURE;
+      unexpected_eof();
 
     case ST_ELSEIF:
       if (seen_else) {
@@ -1390,14 +1384,12 @@ int seen_else;
   } while(st != ST_ENDIF);
 
   pop_state();
-
-  return SUCCESS;
 }
 
 
 /* parse_select_block()-- Parse a SELECT block */
 
-static try parse_select_block(void) {
+static void parse_select_block(void) {
 int seen_default;
 g95_statement st;
 g95_expr *expr;
@@ -1419,10 +1411,7 @@ g95_select s;
   for(;;) {
     st = next_statement();
 
-    if (st == ST_NONE) {
-      g95_error("Unexpected end of file in WHERE block at %C");
-      return FAILURE;
-    }
+    if (st == ST_NONE) unexpected_eof();
 
     if (st == ST_CASE || st == ST_END_SELECT) break;
 
@@ -1446,8 +1435,7 @@ g95_select s;
     st = parse_executable(ST_NONE);
     switch(st) {
     case ST_NONE:
-      g95_error("Unexpected end of file in WHERE block at %C");
-      return FAILURE;
+      unexpected_eof();
 
     case ST_CASE:
       cp = g95_new_level(g95_state_stack->head);
@@ -1469,7 +1457,6 @@ g95_select s;
 
 done:
   pop_state();
-  return SUCCESS;
 }
 
 
@@ -1513,7 +1500,7 @@ g95_state_data *p;
  * ST_BLOCK statements are handled inside of parse_executable(),
  * because they aren't really loop statements. */
 
-static try parse_do_block(void) {
+static void parse_do_block(void) {
 g95_statement st;
 g95_code *top;
 g95_do s;
@@ -1532,8 +1519,7 @@ loop:
 
   switch(st) {
   case ST_NONE:
-    g95_error("Unexpected end of file in DO block at %C");
-    return FAILURE;
+    unexpected_eof();
 
   case ST_ENDDO:
     if (s.label != 0 && s.label != g95_statement_label)
@@ -1549,8 +1535,6 @@ loop:
   }
 
   pop_state();
-
-  return SUCCESS;
 }
 
 
@@ -1584,7 +1568,7 @@ int close_flag;
 
     switch(st) {
     case ST_NONE:
-      break;
+      unexpected_eof();
 
     case ST_FORMAT:    case ST_DATA:    case ST_ENTRY:
     case_executable:
@@ -1593,32 +1577,25 @@ int close_flag;
       continue;
 
     case ST_IF_BLOCK:
-      if (parse_if_block() == SUCCESS) continue;
-      st = ST_NONE;
-      break;
+      parse_if_block();
+      continue;
 
     case ST_SELECT_CASE:
-      if (parse_select_block() == SUCCESS) continue;
-      st = ST_NONE;
-      break;
+      parse_select_block();
+      continue;
 
     case ST_DO:
-      if (parse_do_block() == SUCCESS) {
-	if (check_do_closure() == 1) return ST_IMPLIED_ENDDO;
-	continue;
-      }
-      st = ST_NONE;
-      break;
+      parse_do_block();
+      if (check_do_closure() == 1) return ST_IMPLIED_ENDDO;
+      continue;
 
     case ST_WHERE_BLOCK:
-      if (parse_where_block() == SUCCESS) continue;
-      st = ST_NONE;
-      break;
+      parse_where_block();
+      continue;
 
     case ST_FORALL_BLOCK:
-      if (parse_forall_block() == SUCCESS) continue;
-      st = ST_NONE;
-      break;
+      parse_forall_block();
+      continue;
 
     default:
       break;
@@ -1633,9 +1610,9 @@ int close_flag;
 
 /* parse_contained()-- Parse a series of contained program units */
 
-static try parse_progunit(g95_statement);
+static void parse_progunit(g95_statement);
 
-try parse_contained(void) {
+void parse_contained(void) {
 g95_namespace *parent_ns;
 g95_state_data s1, s2;
 g95_statement st;
@@ -1654,7 +1631,7 @@ g95_statement st;
 
     switch(st) {
     case ST_NONE:
-      return FAILURE;
+      unexpected_eof();
 
     case ST_FUNCTION:
     case ST_SUBROUTINE:
@@ -1667,7 +1644,7 @@ g95_statement st;
       push_state(&s2, (st == ST_FUNCTION) ? COMP_FUNCTION : COMP_SUBROUTINE,
 		 g95_new_block);
 
-      if (parse_progunit(ST_NONE) == FAILURE) return FAILURE;
+      parse_progunit(ST_NONE);
 
       g95_current_ns->code = s2.head;
       g95_current_ns = g95_current_ns->parent;
@@ -1691,20 +1668,19 @@ g95_statement st;
 	  st != ST_END_MODULE   && st != ST_END_PROGRAM);
 
   pop_state();
-  return SUCCESS;
 }
 
 
 /* parse_progunit()-- Parse a PROGRAM, SUBROUTINE or FUNCTION unit */
 
-static try parse_progunit(g95_statement st) {
+static void parse_progunit(g95_statement st) {
 g95_state_data *p;
 int n;
 
   st = parse_spec(st);
   switch(st) {
   case ST_NONE:
-    return FAILURE;
+    unexpected_eof();
 
   case ST_CONTAINS:
     goto contains;
@@ -1722,8 +1698,7 @@ loop:
 
     switch(st) {
     case ST_NONE:
-      g95_error("Unexpected end of file %s", g95_current_file->filename);
-      return FAILURE;
+      unexpected_eof();
 
     case ST_CONTAINS:
       goto contains;
@@ -1755,17 +1730,16 @@ contains:
     goto loop;
   }
 
-  if (parse_contained() == FAILURE) return FAILURE;
+  parse_contained();
 
 done:
   g95_current_ns->code = g95_state_stack->head;
-  return SUCCESS;
 }
 
 
 /* parse_block_data()-- Parse a block data program unit */
 
-try parse_block_data(void) {
+static void parse_block_data(void) {
 g95_statement st;
 
   st = parse_spec(ST_NONE);
@@ -1777,14 +1751,12 @@ g95_statement st;
 
     st = next_statement();
   }
-
-  return SUCCESS;
 }
 
 
 /* parse_module()-- Parse a module subprogram */
 
-static try parse_module(void) {
+static void parse_module(void) {
 g95_statement st;
 
   st = parse_spec(ST_NONE);
@@ -1792,11 +1764,11 @@ g95_statement st;
 loop:
   switch(st) {
   case ST_NONE:
-    return FAILURE;
+    unexpected_eof();
 
   case ST_CONTAINS:
     accept_statement(st);
-    if (parse_contained() == FAILURE) return FAILURE;
+    parse_contained();
     break;
 
   case ST_END_MODULE:
@@ -1810,8 +1782,6 @@ loop:
     st = next_statement();
     goto loop;
   }
-
-  return SUCCESS;
 }
 
 
@@ -1822,7 +1792,6 @@ g95_state_data top, s;
 int seen_program;
 g95_statement st;
 locus prog_locus;
-try t;
 
   g95_clear_new_st();
 
@@ -1835,6 +1804,8 @@ try t;
 
   g95_statement_label = 0;
   seen_program = 0;
+
+  if (setjmp(eof)) return FAILURE;   /* Come here on unexpected EOF */
 
 loop:
   g95_init_2();
@@ -1851,31 +1822,31 @@ loop:
 
     push_state(&s, COMP_PROGRAM, g95_new_block);
     accept_statement(st);
-    t = parse_progunit(ST_NONE);
+    parse_progunit(ST_NONE);
     break;
 
   case ST_SUBROUTINE:
     push_state(&s, COMP_SUBROUTINE, g95_new_block);
     accept_statement(st);
-    t = parse_progunit(ST_NONE);
+    parse_progunit(ST_NONE);
     break;
 
   case ST_FUNCTION:
     push_state(&s, COMP_FUNCTION, g95_new_block);
     accept_statement(st);
-    t = parse_progunit(ST_NONE);
+    parse_progunit(ST_NONE);
     break;
 
   case ST_BLOCK_DATA:
     push_state(&s, COMP_BLOCK_DATA, g95_new_block);
     accept_statement(st);
-    t = parse_block_data();
+    parse_block_data();
     break;
 
   case ST_MODULE:
     push_state(&s, COMP_MODULE, g95_new_block);
     accept_statement(st);
-    t = parse_module();
+    parse_module();
     break;
 
 /* Anything else starts a nameless main program block */
@@ -1886,17 +1857,15 @@ loop:
     prog_locus = *g95_current_locus();
 
     push_state(&s, COMP_PROGRAM, g95_new_block);
-    t = parse_progunit(st);
+    parse_progunit(st);
     break;
   }
-
-  if (t == FAILURE) return FAILURE;
 
   g95_current_ns->code = s.head;
 
   if (g95_option.resolve) g95_resolve(g95_current_ns);
 
-/*  generate_code(g95_current_ns); */
+/* generate_code(g95_current_ns); */
 
   if (g95_option.verbose) g95_show_namespace(g95_current_ns);
 
