@@ -418,6 +418,8 @@ restart:
     old_loc = g95_current_file->loc;
 
     c = next_char();
+    while(g95_is_whitespace(c))
+      c = next_char();
 
 /* Character constants to be continued cannot have commentary after the '&' */
 
@@ -426,9 +428,6 @@ restart:
       c = '&';
       goto done;
     }
-
-    while(g95_is_whitespace(c))
-      c = next_char();
 
     if (c != '!' && c != '\n') {
       g95_set_locus(&old_loc);
