@@ -117,26 +117,77 @@ g95_init_constants ()
     g95_build_string_const (strlen (g95_option.source)+1, g95_option.source);
 }
 
-/*TODO: Maybe get values > 2^31 working.  */
+#define BITS_PER_HOST_WIDE_INT (8 * sizeof (HOST_WIDE_INT))
+/* Converts a GMP integer into a backend tree node.  */
 tree
 g95_conv_mpz_to_tree (mpz_t i, int kind)
 {
   int val;
   tree res;
+  HOST_WIDE_INT high;
+  unsigned HOST_WIDE_INT low;
+  int negate;
+  char buff[10];
+  char *p;
+  char *q;
+  int n;
 
-  if (!mpz_fits_slong_p (i))
-    g95_todo_error ("integer constant does not fit in a signed int");
-  val = mpz_get_si (i);
-  res = build_int_2 (val, (val < 0) ? -1 : 0);
+  if (mpz_fits_slong_p (i))
+    {
+      val = mpz_get_si (i);
+      res = build_int_2 (val, (val < 0) ? -1 : 0);
+      TREE_TYPE (res) = g95_get_int_type (kind);
+      return (res);
+    }
+
+  n = mpz_sizeinbase (i, 16);
+  if (n > 8)
+    q = g95_getmem (n + 2);
+  else
+    q = buff;
+
+  low = 0;
+  high = 0;
+  p = mpz_get_str (q, 16, i);
+  if (p[0] == '-')
+    {
+      negate = 1;
+      p++;
+    }
+  else
+    negate = 0;
+
+  while (*p)
+    {
+      n = *(p++);
+      if (n >= '0' && n <= '9')
+        n = n - '0';
+      else if (n >= 'a' && n <= 'z')
+        n = n + 10 - 'a';
+      else if (n >= 'A' && n <= 'Z')
+        n = n + 10 - 'A';
+      else
+        abort ();
+
+      assert (n >= 0 && n < 16);
+      high = (high << 4) + (low >> (BITS_PER_HOST_WIDE_INT - 4));
+      low = (low << 4) + n;
+    }
+  res = build_int_2 (high, low);
   TREE_TYPE (res) = g95_get_int_type (kind);
-  return (res);
+  if (negate)
+    res = fold (build1 (NEGATE_EXPR, TREE_TYPE (res), res));
+
+  if (q != buff)
+    g95_free (buff);
+
+  return res;
 }
 
-#define foo
 /* Converts a real constant into backend form.  Uses an intermediate string
    representation.  */
-static tree
-convert_mpf_to_tree (mpf_t f, int kind)
+tree
+g95_conv_mpf_to_tree (mpf_t f, int kind)
 {
   tree res;
   tree type;
@@ -225,7 +276,7 @@ g95_conv_constant (g95_se * se, g95_expr * expr)
       break;
 
     case BT_REAL:
-      se->expr = convert_mpf_to_tree (expr->value.real, expr->ts.kind);
+      se->expr = g95_conv_mpf_to_tree (expr->value.real, expr->ts.kind);
       break;
 
     case BT_LOGICAL:
@@ -233,8 +284,8 @@ g95_conv_constant (g95_se * se, g95_expr * expr)
       break;
 
     case BT_COMPLEX:
-      real = convert_mpf_to_tree (expr->value.complex.r, expr->ts.kind);
-      imag = convert_mpf_to_tree (expr->value.complex.i, expr->ts.kind);
+      real = g95_conv_mpf_to_tree (expr->value.complex.r, expr->ts.kind);
+      imag = g95_conv_mpf_to_tree (expr->value.complex.i, expr->ts.kind);
       se->expr = build_complex (NULL_TREE, real, imag);
       break;
 

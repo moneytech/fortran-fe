@@ -66,7 +66,7 @@ F95_OBJS = $(F95_PARSER_OBJS) \
     f95/trans-stmt.o f95/trans-io.o f95/trans-array.o f95/trans-intrinsic.o \
     f95/f95-tree.o
 
-F95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o \
+F95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o c-dump.o \
 	tree-cfg.o tree-dfa.o tree-optimize.o tree-simple.o \
 	tree-ssa.o tree-ssa-pre.o tree-ssa-ccp.o disjoint-set.o \
 	tree-alias-ecr.o tree-alias-type.o tree-alias-steen.o \

@@ -492,7 +492,8 @@ g95_conv_simple_cond (g95_se * se, g95_expr * expr)
   tree  assign;
   tree  type;
 
-  assert (! se->ss);
+/* This _should_ work ok with scalarized expressions.
+  assert (! se->ss);*/
 
   g95_conv_simple_rhs (se, expr);
 

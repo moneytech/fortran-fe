@@ -119,6 +119,7 @@ static void g95_be_parse_file (void *);
 #undef LANG_HOOKS_FINISH
 #undef LANG_HOOKS_INIT_OPTIONS
 #undef LANG_HOOKS_DECODE_OPTION
+#undef LANG_HOOKS_TREE_DUMP_DUMP_TREE_FN
 #undef LANG_HOOKS_PRINT_IDENTIFIER
 #undef LANG_HOOKS_PARSE_FILE
 #undef LANG_HOOKS_TRUTHVALUE_CONVERSION
@@ -135,6 +136,7 @@ static void g95_be_parse_file (void *);
 #define LANG_HOOKS_FINISH               g95_finish
 #define LANG_HOOKS_INIT_OPTIONS         g95_init_options
 #define LANG_HOOKS_DECODE_OPTION        g95_parse_arg
+#define LANG_HOOKS_TREE_DUMP_DUMP_TREE_FN c_dump_tree
 #define LANG_HOOKS_PRINT_IDENTIFIER     g95_print_identifier
 #define LANG_HOOKS_PARSE_FILE           g95_be_parse_file
 #define LANG_HOOKS_TRUTHVALUE_CONVERSION   g95_truthvalue_conversion

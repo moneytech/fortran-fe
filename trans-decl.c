@@ -1307,26 +1307,25 @@ g95_generate_function_code (g95_namespace * ns)
   /* Output the SIMPLE tree.  */
   {
     FILE *dump_file;
-    static int dump_flags = 0;
-    /* TODO: make tree dumping a commandline switch.  */
-#if 1
-    static int first = 0;
-    if (! first)
-      {
-        dump_switch_p ("dump-tree-simple");
-        first = 1;
-      }
-#endif
+    int dump_flags = 0;
+    tree fnbody;
+
+    fnbody = DECL_SAVED_TREE (fndecl);
+    if (fnbody != NULL_TREE)
+      fnbody = COMPOUND_BODY (fnbody);
 
     dump_file = dump_begin (TDI_simple, &dump_flags);
     if (dump_file)
       {
-        fprintf (dump_file, "dumping %s\n", ns->proc_name->name);
-        if (DECL_SAVED_TREE (fndecl) != NULL_TREE)
+        fprintf (dump_file, "%s()\n", ns->proc_name->name);
+        if (fnbody)
           {
-            print_c_tree (dump_file, DECL_SAVED_TREE (fndecl));
-            dump_node (DECL_SAVED_TREE (fndecl), dump_flags, dump_file);
+            if (dump_flags & TDF_RAW)
+              dump_node (fnbody, TDF_SLIM | dump_flags, dump_file);
+            else
+              print_c_tree (dump_file, fnbody);
           }
+        fprintf (dump_file, "\n");
         dump_end (TDI_simple, dump_file);
       }
   }

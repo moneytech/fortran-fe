@@ -20,7 +20,9 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 /* Returns an INT_CST.  */
-tree g95_conv_mpz_to_tree (mpz_t i, int kind);
+tree g95_conv_mpz_to_tree (mpz_t, int);
+/* Returns a REAL_CST.  */
+tree g95_conv_mpf_to_tree (mpf_t, int);
 
 /* only really for use by g95_trans_simple_expr */
 void g95_conv_constant (g95_se *, g95_expr *);
