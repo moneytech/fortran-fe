@@ -1884,6 +1884,7 @@ static int check_access(g95_access specific_access,
 static int *symbol_written;    /* Array of flags */
 
 static void write_symbol(g95_symbol *sym) {
+g95_formal_arglist *f;
 
   if (sym->attr.flavor == FL_UNKNOWN || sym->attr.flavor == FL_LABEL)
     g95_internal_error("write_symbol(): bad module symbol '%s'", sym->name);
@@ -1907,7 +1908,14 @@ static void write_symbol(g95_symbol *sym) {
    * to be marked as referenced.  If they are in another namespace, we
    * recurse there to write them. */
 
-  if (sym->formal_ns != NULL) g95_traverse_ns(sym->formal_ns, write_symbol);
+  if (sym->formal_ns != NULL)
+    g95_traverse_ns(sym->formal_ns, write_symbol);
+  else {
+    for(f=sym->formal; f; f=f->next) {
+      if (f->sym->ns == sym->ns) break;
+      write_symbol(f->sym);
+    }
+  }
 }
 
 
@@ -1930,12 +1938,25 @@ g95_symbol *sym;
  * serial number and possibly module name. */
 
 static void count_symbols(g95_symbol *sym) {
+g95_formal_arglist *f;
 
   sym_num++;
   sym->serial = -1;
   if (sym->module[0] == '\0') strcpy(sym->module, module_name);
 
-  if (sym->formal_ns != NULL) g95_traverse_ns(sym->formal_ns, count_symbols);
+  /* If there is a formal argument list, the symbols can be in another
+   * namespace and need to be marked.  If there is a namespace from an
+   * interface block, we write everything.  Otherwise we just mark the
+   * symbols, treating them as if they were in the module namespace */
+
+  if (sym->formal_ns != NULL)
+    g95_traverse_ns(sym->formal_ns, count_symbols);
+  else {
+    for(f=sym->formal; f; f=f->next) {
+      if (f->sym->ns == sym->ns) break;
+      count_symbols(f->sym);
+    }
+  }
 }
 
 
