@@ -565,7 +565,6 @@ char c, delim;
 
 done:
   if (c == '\n') g95_advance_line();
-  return;
 }
 
 
