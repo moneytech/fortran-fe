@@ -2056,6 +2056,8 @@ static void resolve_values(g95_symbol *sym) {
  * variable.  This sort of thing commonly happens for symbols in module. */
 
 static void resolve_symbol(g95_symbol *sym) {
+static int formal_ns_flag = 1; /* Zero if we are checking a formal namespace */
+int formal_ns_save;
 
   if (sym->attr.flavor == FL_UNKNOWN) {
     if (sym->attr.external == 0 && sym->attr.intrinsic == 0)
@@ -2156,6 +2158,15 @@ static void resolve_symbol(g95_symbol *sym) {
   }
 
   g95_resolve_array_spec(sym->as);
+
+  /* Resolve formal namespaces. */
+
+  if (formal_ns_flag && sym != NULL && sym->formal_ns != NULL) {
+    formal_ns_save = formal_ns_flag;
+    formal_ns_flag = 0;
+    g95_resolve(sym->formal_ns);
+    formal_ns_flag = formal_ns_save;
+  }
 }
 
 
