@@ -61,11 +61,11 @@ typedef struct intrinsic_sym {
   char name[G95_MAX_SYMBOL_LEN+1], lib_name[G95_MAX_SYMBOL_LEN+1];
   intrinsic_arg *arg;
   g95_typespec ts;
-  int elemental, generic, actual_ok;
+  int elemental, generic, specific, actual_ok;
 
   g95_expr *(*simplify)();
   try (*check_function)();
-  struct intrinsic_sym *specific, *next;
+  struct intrinsic_sym *specific_head, *next;
 
 } intrinsic_sym;
 
@@ -324,7 +324,7 @@ static try check_anint(g95_expr *a, g95_expr *kind) {
 
 static try check_atan2(g95_expr *y, g95_expr *x) {
 
-    if (x == NULL) {
+  if (x == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
@@ -349,7 +349,7 @@ static try check_atan2(g95_expr *y, g95_expr *x) {
 
 static try check_datan2(g95_expr *y, g95_expr *x) {
 
-    if (x == NULL) {
+  if (x == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
@@ -373,7 +373,7 @@ static try check_datan2(g95_expr *y, g95_expr *x) {
 
 static try check_ceiling(g95_expr *a, g95_expr *kind) {
 
-  if ( a->ts.type != BT_REAL ) {
+  if (a->ts.type != BT_REAL) {
     type_error(a);
     return FAILURE;
   }
@@ -390,7 +390,7 @@ static try check_ceiling(g95_expr *a, g95_expr *kind) {
 
 static try check_char(g95_expr *a, g95_expr *kind) {
 
-  if ( a->ts.type != BT_INTEGER ) {
+  if (a->ts.type != BT_INTEGER) {
     type_error(a);
     return FAILURE;
   }
@@ -434,7 +434,7 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
 
 static try check_cos(g95_expr *x) {
 
-  if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
+  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
     type_error(x);
     return FAILURE;
   }
@@ -530,12 +530,12 @@ static try check_dim(g95_expr *x, g95_expr *y) {
 
 static try check_dot_product(g95_expr *vector_a, g95_expr *vector_b) {
 
-  if ( (vector_a->ts.type != BT_LOGICAL) && !g95_numeric_ts(&vector_a->ts) ) {
+  if ((vector_a->ts.type != BT_LOGICAL) && !g95_numeric_ts(&vector_a->ts)) {
     type_error(vector_a);
     return FAILURE; 
   }
 
-  if ( (vector_b->ts.type != BT_LOGICAL) && !g95_numeric_ts(&vector_b->ts) ) {
+  if ((vector_b->ts.type != BT_LOGICAL) && !g95_numeric_ts(&vector_b->ts)) {
     type_error(vector_b);
     return FAILURE;
   }
@@ -549,17 +549,17 @@ static try check_dot_product(g95_expr *vector_a, g95_expr *vector_b) {
 
 static try check_dprod(g95_expr *x, g95_expr *y) {
 
-    if (y == NULL) {
+  if (y == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (x->ts.type != BT_REAL ) {
+  if (x->ts.type != BT_REAL) {
     type_error(x);
     return FAILURE;
   }
 
-  if (y->ts.type != BT_REAL ) {
+  if (y->ts.type != BT_REAL) {
     type_error(y);
     return FAILURE;
   }
@@ -571,7 +571,6 @@ static try check_dprod(g95_expr *x, g95_expr *y) {
   }
 
   return SUCCESS;
-
 }
 
 
@@ -617,7 +616,7 @@ static try check_eoshift(g95_expr *array, g95_expr *shift, g95_expr *boundary,
 
 static try check_exp(g95_expr *x) {
 
-  if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
+  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
     type_error(x);
     return FAILURE;
   }
@@ -658,17 +657,17 @@ static try check_huge(g95_expr *x) {
 
 static try check_iand(g95_expr *i, g95_expr *j) {
 
-    if (j == NULL) {
+  if (j == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (i->ts.type != BT_INTEGER ) {
+  if (i->ts.type != BT_INTEGER) {
     type_error(i);
     return FAILURE;
   }
 
-  if (j->ts.type != BT_INTEGER ) {
+  if (j->ts.type != BT_INTEGER) {
     type_error(j);
     return FAILURE;
   }
@@ -685,93 +684,90 @@ static try check_iand(g95_expr *i, g95_expr *j) {
 
 static try check_ibclr(g95_expr *i, g95_expr *j) {
 
-    if (j == NULL) {
+  if (j == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (i->ts.type != BT_INTEGER ) {
+  if (i->ts.type != BT_INTEGER) {
     type_error(i);
     return FAILURE;
   }
 
-  if (j->ts.type != BT_INTEGER ) {
+  if (j->ts.type != BT_INTEGER) {
     type_error(j);
     return FAILURE;
   }
 
   return SUCCESS;
-
 }
 
 
 static try check_ibits(g95_expr *i, g95_expr *j, g95_expr *k) {
 
-    if (j == NULL) {
+  if (j == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-    if (k == NULL) {
+  if (k == NULL) {
     intrinsic_error("Third argument missing at %%L");
     return FAILURE;
   }
 
-  if (i->ts.type != BT_INTEGER ) {
+  if (i->ts.type != BT_INTEGER) {
     type_error(i);
     return FAILURE;
   }
 
-  if (j->ts.type != BT_INTEGER ) {
+  if (j->ts.type != BT_INTEGER) {
     type_error(j);
     return FAILURE;
   }
 
-  if (k->ts.type != BT_INTEGER ) {
+  if (k->ts.type != BT_INTEGER) {
     type_error(k);
     return FAILURE;
   }
 
   return SUCCESS;
-
 }
 
 
 static try check_ibset(g95_expr *i, g95_expr *j) {
 
-    if (j == NULL) {
+  if (j == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (i->ts.type != BT_INTEGER ) {
+  if (i->ts.type != BT_INTEGER) {
     type_error(i);
     return FAILURE;
   }
 
-  if (j->ts.type != BT_INTEGER ) {
+  if (j->ts.type != BT_INTEGER) {
     type_error(j);
     return FAILURE;
   }
 
   return SUCCESS;
-
 }
 
 
 static try check_ieor(g95_expr *i, g95_expr *j) {
 
-    if (j == NULL) {
+  if (j == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (i->ts.type != BT_INTEGER ) {
+  if (i->ts.type != BT_INTEGER) {
     type_error(i);
     return FAILURE;
   }
 
-  if (j->ts.type != BT_INTEGER ) {
+  if (j->ts.type != BT_INTEGER) {
     type_error(j);
     return FAILURE;
   }
@@ -782,28 +778,27 @@ static try check_ieor(g95_expr *i, g95_expr *j) {
   }
 
   return SUCCESS;
-
 }
 
 
 static try check_index(g95_expr *i, g95_expr *j, g95_expr *k) {
 
-    if (j == NULL) {
+  if (j == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (i->ts.type != BT_CHARACTER ) {
+  if (i->ts.type != BT_CHARACTER) {
     type_error(i);
     return FAILURE;
   }
 
-  if (j->ts.type != BT_CHARACTER ) {
+  if (j->ts.type != BT_CHARACTER) {
     type_error(j);
     return FAILURE;
   }
 
-  if ( k!=NULL && k->ts.type != BT_LOGICAL ) {
+  if (k!=NULL && k->ts.type != BT_LOGICAL) {
     type_error(k);
     return FAILURE;
   }
@@ -814,8 +809,8 @@ static try check_index(g95_expr *i, g95_expr *j, g95_expr *k) {
   }
 
   return SUCCESS;
-
 }
+
 
 static try check_int(g95_expr *x, g95_expr *kind) {
 
@@ -836,17 +831,17 @@ static try check_int(g95_expr *x, g95_expr *kind) {
 
 static try check_ior(g95_expr *i, g95_expr *j) {
 
-    if (j == NULL) {
+  if (j == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (i->ts.type != BT_INTEGER ) {
+  if (i->ts.type != BT_INTEGER) {
     type_error(i);
     return FAILURE;
   }
 
-  if (j->ts.type != BT_INTEGER ) {
+  if (j->ts.type != BT_INTEGER) {
     type_error(j);
     return FAILURE;
   }
@@ -857,7 +852,6 @@ static try check_ior(g95_expr *i, g95_expr *j) {
   }
 
   return SUCCESS;
-
 }
 
 
@@ -886,8 +880,8 @@ static try check_lbound(g95_expr *array, g95_expr *dim) {
 static try check_log(g95_expr *x) {
 
   if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-   type_error(x);
-   return FAILURE;
+    type_error(x);
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -897,8 +891,8 @@ static try check_log(g95_expr *x) {
 static try check_log10(g95_expr *x) {
 
   if (x->ts.type != BT_REAL) {
-   type_error(x);
-   return FAILURE;
+    type_error(x);
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -1060,8 +1054,8 @@ static try check_dmax1(g95_actual_arglist *arg) {
 static try check_min_max_exponent(g95_expr *x) {
 
   if (x->ts.type != BT_REAL) {
-   type_error(x);
-   return FAILURE;
+    type_error(x);
+    return FAILURE;
   }
 
   intrinsic_extension = 0;
@@ -1190,13 +1184,13 @@ static try check_mod(g95_expr *a, g95_expr *p) {
   }
 
   if (a->ts.type != p->ts.type) {
-   intrinsic_error("Types of arguments to intrinsic at %%L must agree"); 
-   return FAILURE;
+    intrinsic_error("Types of arguments to intrinsic at %%L must agree"); 
+    return FAILURE;
   }
   
   if (a->ts.kind != p->ts.kind) {
-   intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
-   return FAILURE;
+    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -1211,8 +1205,8 @@ static try check_modulo(g95_expr *a, g95_expr *p) {
   }
 
   if (a->ts.type != p->ts.type) {
-   intrinsic_error("Types of arguments to intrinsic at %%L must agree");
-   return FAILURE;
+    intrinsic_error("Types of arguments to intrinsic at %%L must agree");
+    return FAILURE;
   }
 
   if (a->ts.kind != p->ts.kind) {
@@ -1313,8 +1307,8 @@ static try check_pack(g95_expr *array, g95_expr *mask, g95_expr *vector) {
 static try check_precision(g95_expr *x) {
 
   if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-   type_error(x);
-   return FAILURE;
+    type_error(x);
+    return FAILURE;
   }
 
   intrinsic_extension = 0;
@@ -1361,8 +1355,8 @@ static try check_product(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 static try check_radix(g95_expr *x) {
 
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) {
-   type_error(x);
-   return FAILURE;
+    type_error(x);
+    return FAILURE;
   }
 
   intrinsic_extension = 0;
@@ -1374,8 +1368,8 @@ static try check_radix(g95_expr *x) {
 static try check_range(g95_expr *x) {
 
   if (!g95_numeric_ts(&x->ts)) {
-   type_error(x);
-   return FAILURE;
+    type_error(x);
+    return FAILURE;
   }
 
   intrinsic_extension = 0;
@@ -1387,8 +1381,8 @@ static try check_range(g95_expr *x) {
 static try check_real(g95_expr *a, g95_expr *kind) {
 
   if (!g95_numeric_ts(&a->ts)) {
-   type_error(a);
-   return FAILURE;
+    type_error(a);
+    return FAILURE;
   }
 
   if (kind != NULL && (kind->ts.type != BT_INTEGER ||
@@ -1403,17 +1397,17 @@ static try check_real(g95_expr *a, g95_expr *kind) {
 
 static try check_repeat(g95_expr *x, g95_expr *y) {
 
-    if (y == NULL) {
+  if (y == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (x->ts.type != BT_CHARACTER ) {
+  if (x->ts.type != BT_CHARACTER) {
     type_error(x);
     return FAILURE;
   }
 
-  if (y->ts.type != BT_INTEGER ) {
+  if (y->ts.type != BT_INTEGER) {
     type_error(y);
     return FAILURE;
   }
@@ -1469,22 +1463,22 @@ static try check_reshape(g95_expr *source, g95_expr *shape,
 
 static try check_scan(g95_expr *x, g95_expr *y, g95_expr *z) {
 
-    if (y == NULL) {
+  if (y == NULL) {
     intrinsic_error("Second argument missing at %%L");
     return FAILURE;
   }
 
-  if (x->ts.type != BT_CHARACTER ) {
+  if (x->ts.type != BT_CHARACTER) {
     type_error(x);
     return FAILURE;
   }
 
-  if (y->ts.type != BT_CHARACTER ) {
+  if (y->ts.type != BT_CHARACTER) {
     type_error(y);
     return FAILURE;
   }
 
-  if (z!=NULL && z->ts.type != BT_LOGICAL ) {
+  if (z!=NULL && z->ts.type != BT_LOGICAL) {
     type_error(z);
     return FAILURE;
   }
@@ -1503,6 +1497,7 @@ static try check_selected_real_kind(g95_expr *p, g95_expr *r) {
   if (p == NULL && r == NULL) {
     return FAILURE;
   }
+
   if (p != NULL && p->ts.type != BT_INTEGER) {
     type_error(p);
     return FAILURE;
@@ -1527,7 +1522,7 @@ static try check_shape(g95_expr *source) {
 
 static try check_sin(g95_expr *x) {
 
-  if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
+  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
     type_error(x);
     return FAILURE;
   }
@@ -1556,7 +1551,8 @@ static try check_sign(g95_expr *a, g95_expr *b) {
     type_error(b);
     return FAILURE;
   }
-  if ( a->ts.type != b->ts.type ) {
+
+  if (a->ts.type != b->ts.type) {
     intrinsic_error("Types of arguments to intrinsic at %%L must agree");
     return FAILURE;
   }  
@@ -1587,8 +1583,8 @@ static try check_spread(g95_expr *source, g95_expr *dim, g95_expr *ncopies) {
 static try check_sqrt(g95_expr *x) {
 
   if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
-   type_error(x);
-   return FAILURE;
+    type_error(x);
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -1597,7 +1593,7 @@ static try check_sqrt(g95_expr *x) {
 
 static try check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
-  if ( array->shape == NULL) {
+  if (array->shape == NULL) {
     return FAILURE;
   }
 
@@ -1620,7 +1616,7 @@ static try check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
 static try check_tan(g95_expr *x) {
 
-  if ( x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX ) {
+  if (x->ts.type != BT_REAL && x->ts.type != BT_COMPLEX) {
     type_error(x);
     return FAILURE;
   }
@@ -1831,6 +1827,7 @@ va_list argp;
     next_sym->ts.kind = kind;
     next_sym->simplify = simplify;
     next_sym->check_function = check;
+    next_sym->specific = 0;
     next_sym->generic = 0;
   }
 
@@ -1919,6 +1916,17 @@ intrinsic_sym *sym;
 }
 
 
+/* g95_specific_intrinsic()-- Given a string, figure out if it is the
+ * name of a specific intrinsic function or not. */
+
+int g95_specific_intrinsic(char *name) {
+intrinsic_sym *sym;
+
+  sym = find_function(name);
+  return sym->specific;
+}
+
+
 /* make_generic()-- Collect a set of intrinsic functions into a
  * generic collection.  The first argument is the name of the generic
  * function, which is also the name of a specific function.  The rest
@@ -1926,25 +1934,27 @@ intrinsic_sym *sym;
  * specific functions associated with that generic.  */
 
 static void make_generic(const char *name) {
-intrinsic_sym *generic;
+intrinsic_sym *g;
 
   if (sizing) return; 
 
-  generic = find_function(name);
-  if (generic == NULL)
+  g = find_function(name);
+  if (g == NULL)
     g95_internal_error("make_generic(): Can't find generic symbol '%s'", name);
 
-  generic->generic = 1;
-  generic->specific = generic + 1;
-  generic++;
+  g->generic = 1;
+  g->specific = 1;
+  g->specific_head = g + 1;
+  g++;
   
-  while(generic->name[0] != '\0') {
-    generic->next = generic + 1;
-    generic++;
+  while(g->name[0] != '\0') {
+    g->next = g + 1;
+    g->specific = 1;
+    g++;
   }
 
-  generic--;
-  generic->next = NULL;
+  g--;
+  g->next = NULL;
 }
 
 
@@ -3138,8 +3148,8 @@ int flag;
  * If the generic name is also a specific, we check that name last, so
  * that any error message will correspond to the specific */
 
-  if (isym->specific != NULL) {
-    for(specific=isym->specific; specific; specific=specific->next) {
+  if (isym->specific_head != NULL) {
+    for(specific=isym->specific_head; specific; specific=specific->next) {
       if (specific == isym) continue;
       if (check_specific(specific, expr) == SUCCESS) goto got_specific;
     }
@@ -3182,28 +3192,6 @@ char *name;
   if (isym->check_function != NULL) return do_check(isym, *argp);
 
   return check_arglist(argp, isym);
-}
-
-
-/* g95_check_intrinsic()-- Given a name, search for it in the proper
- * table and return the following values:
- *
- *    0   Name not found
- *    1   Name is a generic intrinsic name
- *    2   Name is a specific intrinsic name
- */
-
-int g95_check_intrinsic(const char *name, int sub_flag) {
-intrinsic_sym *sym;
-
-  if (sub_flag)
-    sym = find_function(name);
-  else
-    sym = find_subroutine(name);
-
-  if (sym == NULL) return 0;
-
-  return (sym->specific != NULL) ? 1 : 2;
 }
 
 
