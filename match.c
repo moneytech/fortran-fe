@@ -1048,9 +1048,11 @@ match m;
   new_st.op = EXEC_DO;
 
 done:
+  if (label != NULL &&
+      g95_reference_st_label(label, ST_LABEL_TARGET) == FAILURE)
+    goto cleanup;
+
   new_st.label = label;
-  if (label != NULL)
-    g95_reference_st_label(label, ST_LABEL_TARGET);
 
   if (new_st.op == EXEC_DO_WHILE)
     new_st.expr = iter.end;
@@ -1647,6 +1649,10 @@ int i;
     i = 0;
     for(a=arglist; a; a=a->next) {
       if (a->expr != NULL) continue;
+
+      if (g95_reference_st_label(a->label, ST_LABEL_TARGET) == FAILURE)
+        continue;
+
       i++;
 
       c->block = g95_get_code();
@@ -1660,8 +1666,6 @@ int i;
       c->next = g95_get_code();
       c->next->op = EXEC_GOTO;
       c->next->label = a->label;
-
-      g95_reference_st_label(a->label, ST_LABEL_TARGET);
     }
   }
 
