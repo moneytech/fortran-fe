@@ -1392,15 +1392,8 @@ g95_st_label *lp;
 
   lp = get_st_label(label);
 
-  if (lp->defined == ST_LABEL_FORMAT || lp->defined == ST_LABEL_TARGET) {
-    g95_error("Statement label %d at %C has already been defined at %L",
-	      label, &lp->where);
-    return;
-  }
-
-  if (lp->defined == ST_LABEL_BAD_TARGET) {
-    g95_error("A bad definition of label %d at %C has already been "
-	      "rejected at %L", label, &lp->where);
+  if (lp->defined != ST_LABEL_UNKNOWN) {
+    g95_error("Duplicate statement label %d at %L and %C", label, &lp->where);
     return;
   }
 

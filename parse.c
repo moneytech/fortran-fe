@@ -528,9 +528,11 @@ g95_sl_type type;
     type = ST_LABEL_FORMAT;
     break;
 
+/* Statement labels are not restricted from appearing on a particular
+ * line.  However, there are plenty of situations where the resulting
+ * label can't be referenced. */
+
   default:
-    g95_error("Statement label not allowed in %s statement at %C",
-	      g95_ascii_statement(st));
     type = ST_LABEL_BAD_TARGET;
     break;
   }
