@@ -1851,8 +1851,8 @@ int di, dr, dd, dl, dc, dz;
 	     x, BT_COMPLEX, dz, 0, NULL);
   make_generic("cos");
 
-  add_sym_f1("cosh",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dcosh", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("cosh",  0, BT_REAL, dr, g95_simplify_cosh, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym_f1("dcosh", 0, BT_REAL, dd, g95_simplify_cosh, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("cosh");
 
   add_sym_f2("count", 1, BT_INTEGER, di, NULL, check_count,
@@ -2160,8 +2160,8 @@ int di, dr, dd, dl, dc, dz;
 	     x, BT_COMPLEX, dz, 0, NULL);
   make_generic("sin");
 
-  add_sym_f1("sinh",  1, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dsinh", 1, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("sinh",  1, BT_REAL, dr, g95_simplify_sinh, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym_f1("dsinh", 1, BT_REAL, dd, g95_simplify_sinh, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("sinh");
 
   add_sym_f2("size", 1, BT_INTEGER, di, NULL, check_size,
@@ -2188,8 +2188,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("dtan", 1, BT_REAL, dd, g95_simplify_tan, check_dtan, x, BT_REAL, dd, 0, NULL);
   make_generic("tan");
 
-  add_sym_f1("tanh",  1, BT_REAL, dr, NULL, NULL,  x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dtanh", 1, BT_REAL, dd, NULL, NULL,  x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("tanh",  1, BT_REAL, dr, g95_simplify_tanh, NULL,  x, BT_REAL, dr, 0, NULL);
+  add_sym_f1("dtanh", 1, BT_REAL, dd, g95_simplify_tanh, NULL,  x, BT_REAL, dd, 0, NULL);
   make_generic("tanh");
 
   add_sym_f1("tiny", 0, BT_REAL, dr, g95_simplify_tiny, check_tiny,

@@ -885,10 +885,31 @@ int i;
 }
 
 
-g95_expr *g95_simplify_cosh(g95_expr *e) {
-  /* Ditto */
+g95_expr *g95_simplify_cosh(g95_expr *x) {
+g95_expr *result;
+mpf_t xp, xq;
+int i;
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_cosh(): Bad kind");
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  mpf_init(xp);
+  mpf_init(xq);
+
+  exponential(&x->value.real,&xp);
+  hypersine(&x->value.real,&xq);
+  mpf_sub(result->value.real,xp,xq);
+
+  mpf_clear(xp);
+  mpf_clear(xq);
+
+  return range_check(result, "COSH");
+
 }
 
 
@@ -3265,10 +3286,22 @@ int i;
 }
 
 
-g95_expr *g95_simplify_sinh(g95_expr *e) {
-  /* Ditto */
+g95_expr *g95_simplify_sinh(g95_expr *x) {
+g95_expr *result;
+int i;
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_sinh(): Bad kind");
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  hypersine(&x->value.real,&result->value.real);
+
+  return range_check(result, "SINH");
+
 }
 
 
@@ -3540,10 +3573,39 @@ int i;
 }
 
 
-g95_expr *g95_simplify_tanh(g95_expr *e) {
-  /* Ditto */
+g95_expr *g95_simplify_tanh(g95_expr *x) {
+g95_expr *result;
+mpf_t neg, xp, xq;
+int i;
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_tanh(): Bad kind");
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  mpf_init(neg);
+  mpf_init(xp);
+  mpf_init(xq);
+
+  mpf_neg(neg,x->value.real);
+
+  exponential(&x->value.real,&xq);
+  exponential(&neg,&xp);
+  mpf_add(xp,xp,xq);
+  mpf_div_ui(xp,xp,2);
+
+  hypersine(&x->value.real,&xq);
+
+  mpf_div(result->value.real,xq,xp);
+
+  mpf_clear(xp);
+  mpf_clear(xq);
+
+  return range_check(result, "TANH");
+
 }
 
 
