@@ -301,7 +301,7 @@ char *s;
   q = g95_get_expr();
   *q = *p;
 
-  q->shape = g95_copy_array_shape(p->shape);
+  if (p->shape != NULL) q->shape = g95_copy_array_shape(p->shape);
 
   switch(q->expr_type) {
   case EXPR_SUBSTRING:
@@ -1183,7 +1183,7 @@ try t;
   case INTRINSIC_NOT:
   case INTRINSIC_UPLUS:
   case INTRINSIC_UMINUS:
-    e->shape = g95_copy_array_shape(op1->shape);
+    if (op1->shape != NULL) e->shape = g95_copy_array_shape(op1->shape);
     break;           /* Simply copy arrayness attribute */
 
   default:
