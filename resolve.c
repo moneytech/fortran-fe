@@ -1163,20 +1163,24 @@ int i;
 
 /* resolve_index()-- Resolve one part of an array index */
 
-static try resolve_index(g95_expr *index) {
+static try resolve_index(g95_expr *index, int check_scalar) {
 g95_typespec ts;
 
   if (index == NULL) return SUCCESS;
 
   if (g95_resolve_expr(index) == FAILURE) return FAILURE;
 
-  if (!g95_numeric_ts(&index->ts)) {
-    g95_error("Array index at %L must be of numeric type", &index->where);
+  if (index->ts.type != BT_INTEGER) {
+    g95_error("Array index at %L must be of INTEGER type", &index->where);
     return FAILURE;
   }
 
-  if (index->ts.type != BT_INTEGER ||
-      index->ts.kind != g95_default_integer_kind()) {
+  if (check_scalar && index->rank != 0) {
+    g95_error("Array index at %L must be scalar", &index->where);
+    return FAILURE;
+  }
+
+  if (index->ts.kind != g95_default_integer_kind()) {
     ts.type = BT_INTEGER;
     ts.kind = g95_default_integer_kind();
 
@@ -1241,12 +1245,14 @@ g95_ref *ref;
 /* resolve_array_ref()-- Resolve an array reference */
 
 static try resolve_array_ref(g95_array_ref *ar) {
-int i;
+int i, check_scalar;
 
   for(i=0; i<ar->dimen; i++) {
-    if (resolve_index(ar->start[i]) == FAILURE) return FAILURE;
-    if (resolve_index(ar->end[i]) == FAILURE) return FAILURE;
-    if (resolve_index(ar->stride[i]) == FAILURE) return FAILURE;
+    check_scalar = ar->dimen_type[i] == DIMEN_RANGE;
+
+    if (resolve_index(ar->start[i],  check_scalar) == FAILURE) return FAILURE;
+    if (resolve_index(ar->end[i],    check_scalar) == FAILURE) return FAILURE;
+    if (resolve_index(ar->stride[i], check_scalar) == FAILURE) return FAILURE;
 
     if (ar->dimen_type[i] == DIMEN_UNKNOWN)
       switch(ar->start[i]->rank) {

@@ -111,6 +111,10 @@ int i;
     }
     break;
 
+  case AR_UNKNOWN:
+    g95_status("UNKNOWN");
+    break;
+
   default:
     g95_internal_error("g95_show_array_ref(): Unknown array reference");
   }
