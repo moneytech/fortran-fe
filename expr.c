@@ -868,7 +868,8 @@ g95_actual_arglist *ap;
     if (simplify_constructor(p->value.constructor, type) == FAILURE)
       return FAILURE;
 
-    if (type == 1 && g95_expand_constructor(p) == FAILURE)
+    if (type == 1 && p->expr_type == EXPR_ARRAY &&
+	g95_expand_constructor(p) == FAILURE)
       return FAILURE;
 
     break;

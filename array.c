@@ -1280,7 +1280,7 @@ g95_expr *e;
 
 
 /* g95_expand_constructor()-- Top level subroutine for expanding
- * constructors. */
+ * constructors.  TODO: Check handling of recursive expansions. */
 
 try g95_expand_constructor(g95_expr *e) {
 
