@@ -68,6 +68,7 @@ the program unit name.
 
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "g95.h"
 
