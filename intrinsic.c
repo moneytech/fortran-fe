@@ -454,13 +454,6 @@ static void make_alias(const char *name) {
 }
 
 
-/******* Check functions ********/
-
-/* These functions check to see if an argument list is compatible with
- * a particular intrinsic function or subroutine.  Presence of
- * required arguments has already been established, and the argument
- * list has NULL arguments in the correct places.  */
-
 /* add_functions()-- Add intrinsic functions */
 
 static void add_functions(void) {
@@ -1443,10 +1436,14 @@ void g95_intrinsic_done_1(void) {
 }
 
 
+/* g95_intrinsic_symbol()-- Given a symbol that we have decided is
+ * intrinsic, mark it as such by placing it into a special module that
+ * is otherwise impossible to read or write. */
 
+void g95_intrinsic_symbol(g95_symbol *sym) {
 
-
-
+  strcpy(sym->module, "(intrinsic)");
+}
 
 
 /******** Subroutines to check intrinsic interfaces ***********/
@@ -1885,6 +1882,7 @@ int flag;
 
 got_specific:
   expr->value.function.isym = specific;
+  g95_intrinsic_symbol(expr->symbol);
 
   if (do_simplify(specific, expr) == FAILURE) {
     g95_suppress_error = 0;

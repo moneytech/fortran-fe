@@ -280,6 +280,8 @@ match m;
     return MATCH_ERROR;
   }
 
+  g95_intrinsic_symbol(sym);
+
   if (sym->attr.proc != PROC_INTRINSIC &&
       (g95_add_procedure(&sym->attr, PROC_INTRINSIC, NULL) == FAILURE ||
        g95_add_function(&sym->attr, NULL) == FAILURE))

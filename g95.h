@@ -19,11 +19,12 @@ along with GNU G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-/* g95.h-- It's probably insane to have just one header file, but it
- * seemed like everything had to be recompiled anyway when a change
- * was made to a header file, and there were ordering issues with
- * multiple header files.  Besides, Microsoft's winnt.h was 250k last
- * time I looked, so by comparison this is perfectly reasonable. */
+/* g95.h-- It's probably insane to have this large of a header file,
+ * but it seemed like everything had to be recompiled anyway when a
+ * change was made to a header file, and there were ordering issues
+ * with multiple header files.  Besides, Microsoft's winnt.h was 250k
+ * last time I looked, so by comparison this is perfectly
+ * reasonable. */
 
 
 /* The following ifdefs are recommended by the autoconf documentation
@@ -1174,6 +1175,7 @@ void g95_symbol_state(void);
 
 void g95_intrinsic_init_1(void);
 void g95_intrinsic_done_1(void);
+void g95_intrinsic_symbol(g95_symbol *sym);
 
 char g95_type_letter(bt);
 try g95_convert_type(g95_expr *, g95_typespec *, int);
