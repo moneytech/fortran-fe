@@ -290,6 +290,7 @@ g95_ref *dest;
     break;
 
   case REF_SUBSTRING:
+    dest->u.ss = src->u.ss;
     dest->u.ss.start = g95_copy_expr(src->u.ss.start);
     dest->u.ss.end = g95_copy_expr(src->u.ss.end);
     break;
