@@ -19,6 +19,9 @@ along with GNU G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
+/* Expression returned when simplification fails */
+
+extern g95_expr g95_bad_expr;
 
 /* Prototypes for the simplification functions */
 

@@ -36,7 +36,6 @@ static char *lib_name;                /* Override a library name */
 
 extern g95_integer_info g95_integer_kinds[];
 extern g95_real_info g95_real_kinds[];
-extern g95_expr g95_bad_expr;
 
 static int intrinsic_extension;
 
