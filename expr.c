@@ -1390,6 +1390,12 @@ try t;
     break;
 
   case EXPR_VARIABLE:
+    t = SUCCESS;
+
+    if (g95_check_iter_variable(e) == SUCCESS) break;
+
+    /* TODO: constant references to subobjects */
+
     g95_error("Variable '%s' at %L cannot appear in an initialization "
 	      "expression", e->symbol->name, &e->where);
     t = FAILURE;

@@ -980,54 +980,22 @@ static cons_stack *base;
 
 static try check_constructor(g95_constructor *, match (*)(g95_expr *));
 
-/* check_iter_expr()-- Check an expression in a constructor to make
- * sure that only iteration variables are present in an expression. */
 
-static try check_iter_expr(g95_expr *expr,
-			   match (*check_function)(g95_expr *)) {
-g95_actual_arglist *ap;
+/* g95_check_iter_variable()-- Check an EXPR_VARIABLE expression in a
+ * constructor to make sure that that variable is an iteration
+ * variables. */
+
+try g95_check_iter_variable(g95_expr *expr) {
+
 g95_symbol *sym;
 cons_stack *c;
 
-  if (expr == NULL) return SUCCESS;
+  sym = expr->symbol;
 
-  switch(expr->expr_type) {
-  case EXPR_SUBSTRING:
-  case EXPR_OP:
-    if (check_iter_expr(expr->op1, check_function) == FAILURE ||
-	check_iter_expr(expr->op2, check_function) == FAILURE) return FAILURE;
+  for(c=base; c; c=c->previous)
+    if (sym == c->iterator->var->symbol) break;
 
-    break;
-
-  case EXPR_FUNCTION:
-    for(ap=expr->value.function.actual; ap; ap=ap->next)
-      if (check_iter_expr(ap->expr, check_function) == FAILURE) return FAILURE;
-
-    break;
-
-  case EXPR_CONSTANT:
-    break;
-
-  case EXPR_VARIABLE:
-    sym = expr->symbol;
-
-    for(c=base; c; c=c->previous)
-      if (sym == c->iterator->var->symbol) break;
-
-    if (c == NULL) {
-      g95_error("Variable '%s' at %L isn't an implied DO-iterator.  ",
-		sym->name, &expr->where);
-
-      return FAILURE;
-    }
-
-  case EXPR_STRUCTURE:
-  case EXPR_ARRAY:
-    if (check_constructor(expr->value.constructor, check_function) == FAILURE)
-      return FAILURE;
-
-    break;
-  }
+  if (c == NULL) return FAILURE;
 
   return SUCCESS;
 }
@@ -1045,8 +1013,7 @@ try t;
 
   for(; cons; cons=cons->next) {
     if (cons->expr != NULL &&
-	(check_iter_expr(cons->expr, check_function) == FAILURE ||
-	 (*check_function)(cons->expr) == FAILURE)) return FAILURE;
+	(*check_function)(cons->expr) == FAILURE) return FAILURE;
 
     if (cons->iterator == NULL) continue;
 
