@@ -415,6 +415,7 @@ g95_statement st;
 
     if (g95_at_eof() && g95_current_file->included_by != NULL) {
       g95_current_file = g95_current_file->included_by;
+      g95_advance_line();
       continue;
     }
 

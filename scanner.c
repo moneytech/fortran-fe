@@ -266,7 +266,6 @@ int i;
 /* At this point, we've got a filename to be included.  The rest of
  * the include line is ignored */
 
-  g95_advance_line();
   g95_new_file(path, g95_current_file->form);
   return 1;
 
@@ -718,14 +717,12 @@ int len;
 
   strcpy(fp->filename, filename);
 
-  if (g95_current_file == NULL) {
+  if (g95_current_file == NULL)
     input = fopen(filename, "r");
-  } else {
+  else
     input = g95_open_included_file(filename);
-  }
 
   if (input == NULL) {
-
     if (g95_current_file == NULL) 
       g95_error_now("Can't open file '%s'", filename);
     else
