@@ -35,12 +35,14 @@ Boston, MA 02111-1307, USA.  */
 
 match g95_match_space(void) {
 locus old_loc;
+int c;
 
   if (g95_current_file->form == FORM_FIXED) return MATCH_YES;
 
   old_loc = *g95_current_locus();
 
-  if (!g95_is_whitespace(g95_next_char())) {
+  c = g95_next_char();
+  if (!g95_is_whitespace(c)) {
     g95_set_locus(&old_loc);
     return MATCH_NO;
   }
