@@ -255,7 +255,7 @@ end_element:
 /* See if we have an optional stride */
 
   if (g95_match(" :") == MATCH_NO)
-    ar->shape[i].stride = g95_constant_expr(BT_INTEGER, 1, NULL);
+    ar->shape[i].stride = g95_int_expr(1);
   else {
     m = g95_match(" %e", &ar->shape[i].stride);
     if (m == MATCH_NO) g95_error("Expected array subscript stride at %C");
@@ -429,7 +429,7 @@ match m;
   upper = &as->shape[as->rank - 1].upper;
 
   if (g95_match(" *") == MATCH_YES) {
-    *lower = g95_constant_expr(BT_INTEGER, 1, NULL);
+    *lower = g95_int_expr(1);
     return AS_ASSUMED_SIZE;
   }
 
@@ -441,7 +441,7 @@ match m;
   if (m != MATCH_YES) return AS_UNKNOWN;
 
   if (g95_match(" :") == MATCH_NO) {
-    *lower = g95_constant_expr(BT_INTEGER, 1, NULL);
+    *lower = g95_int_expr(1);
     return AS_EXPLICIT;
   }
 
@@ -552,7 +552,7 @@ int i;
   if (as->type == AS_ASSUMED_SHAPE) {
     for(i=0; i<as->rank; i++) {
       if (as->shape[i].lower == NULL)
-	as->shape[i].lower = g95_constant_expr(BT_INTEGER, 1, NULL);
+	as->shape[i].lower = g95_int_expr(1);
     }
   }
 

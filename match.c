@@ -462,7 +462,7 @@ match m;
   if (m == MATCH_ERROR) goto cleanup;
 
   if (g95_match(" ,") != MATCH_YES) {
-    e3 = g95_constant_expr(BT_INTEGER, 1, NULL);
+    e3 = g95_int_expr(1);
     goto done;
   }
 
@@ -1283,7 +1283,7 @@ match m;
     tail->op = EXEC_SELECT;
 
     cp = g95_getmem(sizeof(g95_case));
-    cp->low = cp->high = g95_constant_expr(BT_INTEGER, i++, NULL);
+    cp->low = cp->high = g95_int_expr(i++);
     tail->ext = cp;
 
     tail->next = g95_get_code();
@@ -1587,7 +1587,7 @@ int i;
   if (head != NULL) {
     new_st.next = c = g95_get_code();
     c->op = EXEC_SELECT;
-    c->expr = g95_constant_expr(BT_INTEGER, 0, NULL);  /* For now */
+    c->expr = g95_int_expr(0);  /* For now */
 
     i = 1;
     for(current=head; current; current=current->next, i++) {
@@ -1596,7 +1596,7 @@ int i;
       c->op = EXEC_SELECT;
 
       new_case = g95_get_case();
-      new_case->high = new_case->low = g95_constant_expr(BT_INTEGER, i, NULL);
+      new_case->high = new_case->low = g95_int_expr(i);
       c->ext = new_case;
 
       c->next = g95_get_code();
@@ -2372,7 +2372,7 @@ match m;
   if (m == MATCH_ERROR) goto cleanup;
 
   if (g95_match(" :") == MATCH_NO)
-    iter->stride = g95_constant_expr(BT_INTEGER, 1, NULL);
+    iter->stride = g95_int_expr(1);
   else {
     m = g95_match_expr(&iter->stride);
     if (m == MATCH_NO) goto syntax;

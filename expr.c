@@ -383,62 +383,6 @@ g95_expr *p;
 }
 
 
-/* g95_constant_expr()-- Convert an integer into a expression node of
- * a given type.  This is used to create small constants like zero,
- * one, etc. */
-
-g95_expr *g95_constant_expr(bt type, int i, locus *where) {
-g95_expr *p, *real, *imag;
-char *b, buffer[20];
-int digit, divisor;
-
-  b = buffer;
-
-  if (i < 0) {
-    *b++ = '-';
-    i = -i;
-  }
-
-  divisor = 1;
-  while(i/divisor > 9)
-    divisor *= 10;
-
-  while(divisor > 0) {
-    digit = i / divisor;
-    *b++ = '0' + digit;
-    i = i - digit*divisor;
-    divisor /= 10;
-  }
-
-  *b = '\0';
-
-  switch(type) {
-  case BT_INTEGER:
-    p = g95_convert_integer(buffer, g95_default_integer_kind(), 10);
-    break;
-
-  case BT_REAL:
-    p = g95_convert_real(buffer, g95_default_real_kind());
-    break;
-
-  case BT_COMPLEX:
-    real = g95_convert_real(buffer, g95_default_real_kind());
-    imag = g95_convert_real("0", g95_default_real_kind());
-
-    p = g95_convert_complex(real, imag, g95_default_complex_kind());
-    g95_free_expr(real);
-    g95_free_expr(imag);
-    break;
-
-  default:
-    g95_internal_error("g95_constant_expr(): Bad type");
-  }
-
-  p->where = (where == NULL) ? *g95_current_locus() : *where;
-  return p;
-}
-
-
 /* g95_logical_expr()-- Returns an expression node that is a logical
  * constant. */
 
@@ -848,8 +792,7 @@ try t;
 /* Now resolve the function itself.  For now, we just see if the function
  * is compatible with an intrinsic. */
 
-  t = g95_intrinsic_func_interface(expr);
-  if (t == FAILURE) {
+  if (g95_intrinsic_func_interface(expr) == MATCH_NO) {
     expr->value.function.name = expr->symbol->name;
     expr->ts = expr->symbol->ts;
   }
@@ -1296,6 +1239,7 @@ not_numeric:
 
 try g95_check_init_expr(g95_expr *e) {
 g95_actual_arglist *ap;
+match m;
 try t;
 
   if (e == NULL) return SUCCESS;
@@ -1316,8 +1260,15 @@ try t;
 	break;
       }
 
-    if (t == SUCCESS && g95_intrinsic_func_interface(e) == FAILURE)
-      t = FAILURE;
+    if (t == SUCCESS) {
+      m = g95_intrinsic_func_interface(e);
+
+      if (m == MATCH_NO)
+	g95_error("Function '%s' in initialization expression must at %L "
+		  "must be an intrinsic function", e->symbol->name, &e->where);
+
+      if (m != MATCH_YES) t = FAILURE;
+    }
 
     break;
 

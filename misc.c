@@ -188,6 +188,7 @@ void g95_init_1(void) {
   g95_scanner_init_1();
   g95_arith_init_1();
   g95_intrinsic_init_1();
+  g95_simplify_init_1();
 }
 
 
@@ -208,6 +209,7 @@ void g95_done_1(void) {
 
   g95_scanner_done_1();
   g95_intrinsic_done_1();
+  g95_simplify_done_1();
 }
 
 

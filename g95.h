@@ -616,6 +616,24 @@ typedef struct g95_expr {
 } g95_expr;
 
 
+/* Structures for information associated with different kinds of numbers */
+
+typedef struct {
+  int kind;
+  char *max;
+  int range;
+  mpz_t maxval, minval;
+} g95_integer_info;
+
+
+typedef struct {
+  int kind;
+  char *max, *eps;
+  int precision, range; /* decimal digits, decimal exponent range */
+  mpf_t maxval, epsilon;
+} g95_real_info;
+
+
 /* Equivalence structures.  Equivalent lvalues are linked along the
  * *eq pointer, equivalence sets are strung along the *next node.  */
 
@@ -906,6 +924,7 @@ int g95_default_character_kind(void);
 int g95_default_logical_kind(void);
 int g95_default_complex_kind(void);
 
+g95_expr *g95_constant_result(bt, int);
 int g95_validate_kind(bt, int);
 arith g95_check_integer_range(mpz_t, int);
 arith g95_check_real_range(mpf_t, int);
@@ -960,14 +979,6 @@ arith g95_complex2int(g95_expr **, g95_expr *);
 arith g95_complex2real(g95_expr **, g95_expr *);
 arith g95_double2real(g95_expr **, g95_expr *src);
 arith g95_real2double(g95_expr **, g95_expr *src);
-
-try g95_simplify_selected_int_kind(g95_expr *);
-try g95_simplify_selected_real_kind(g95_expr *);
-g95_expr *g95_simplify_huge(bt, int);
-g95_expr *g95_simplify_radix(bt, int);
-g95_expr *g95_simplify_epsilon(int);
-g95_expr *g95_simplify_precision(int);
-g95_expr *g95_simplify_range(bt, int);
 
 /* symbol.c */
 
@@ -1054,6 +1065,11 @@ void g95_intrinsic_done_1(void);
 
 try g95_convert_type(g95_expr *, g95_typespec *, int);
 extern g95_namespace *g95_instrinics;
+
+/* simplify.c */
+
+void g95_simplify_init_1(void);
+void g95_simplify_done_1(void);
 
 /* match.c */
 
@@ -1175,7 +1191,7 @@ void g95_expr_init_1(void);
 g95_expr *g95_get_expr(void);
 void g95_free_expr(g95_expr *);
 void g95_replace_expr(g95_expr *, g95_expr *);
-g95_expr *g95_constant_expr(bt, int, locus *);
+g95_expr *g95_int_expr(int);
 g95_expr *g95_logical_expr(int, locus *);
 g95_code *g95_build_call(g95_symbol *, ...);
 g95_expr *g95_copy_expr(g95_expr *);
@@ -1185,7 +1201,6 @@ try g95_check_init_expr(g95_expr *);
 void g95_show_expr(g95_expr *);
 
 int g95_numeric_ts(g95_typespec *);
-g95_expr *g95_int_expr(int);
 int g95_kind_max(g95_expr *, g95_expr *);
 
 /* st.c */
@@ -1276,7 +1291,7 @@ match g95_match_print(void);
 /* intrinsic.c */
 
 extern char g95_intrinsic_diagnostic[];
-try g95_intrinsic_func_interface(g95_expr *);
+match g95_intrinsic_func_interface(g95_expr *);
 try g95_intrinsic_sub_interface(g95_code *);
 
 /* format.c */

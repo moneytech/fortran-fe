@@ -454,7 +454,7 @@ int unit;
   if (k == M_READ) unit = 5;
   else unit = 6;
 
-  return g95_constant_expr(BT_INTEGER, unit, NULL);
+  return g95_int_expr(unit);
 }
 
 

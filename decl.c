@@ -89,7 +89,7 @@ match m;
   if (m == MATCH_ERROR) return m;
 
   if (m == MATCH_YES) {
-    *exp = g95_constant_expr(BT_INTEGER, length, NULL);
+    *exp = g95_int_expr(length);
     return m;
   }
 
@@ -551,13 +551,14 @@ done:
   cl->next = g95_current_ns->cl_list;
   g95_current_ns->cl_list = cl;
 
-  if (seen_length == 0) cl->length = g95_constant_expr(BT_INTEGER, 1, NULL);
+  if (seen_length == 0)
+    cl->length = g95_int_expr(1);
   else {
     if (len == NULL || g95_extract_int(len, &i) != NULL || i >= 0)
       cl->length = len;
     else {
       g95_free_expr(len);
-      cl->length = g95_constant_expr(BT_INTEGER, 0, NULL);
+      cl->length = g95_int_expr(0);
     }
   }
 

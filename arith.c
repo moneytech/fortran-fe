@@ -32,22 +32,14 @@ Boston, MA 02111-1307, USA.  */
  * the structure are calculated.  The first entry is the default kind,
  * the second entry of the real structure is the default double kind. */
 
-struct {
-  int kind;
-  char *max;
-  int range;
-  mpz_t maxval, minval; } g95_integer_kinds[] = {
+g95_integer_info g95_integer_kinds[] = {
     { 4, "2147483647", 9 },   /* Default kind is first */
     { 8, "9223372036854775807", 18 },
     { 2, "32767", 4 }, 
     { 1, "127", 2 },
     { 0, NULL, 0 } };
 
-struct {
-  int kind;
-  char *max, *eps;
-  int precision, range; /* decimal digits, decimal exponent range */
-  mpf_t maxval, epsilon; } g95_real_kinds[] = {
+g95_real_info g95_real_kinds[] = {
     /*   max = 2**(128) - 2**(104),  eps = 2**(-149)           */
     { 4, "3.40282346638528860e+38",  "1.40129846432481707e-45", 6, 37 },
     /*   max = 2**(1024) - 2**(971), eps = 2**(-1074)          */
@@ -229,10 +221,10 @@ done:
 }
 
 
-/* constant_result()-- Function to return a constant expression node
+/* g95_constant_result()-- Function to return a constant expression node
  * of a given type and kind. */
 
-static g95_expr *constant_result(bt type, int kind) {
+g95_expr *g95_constant_result(bt type, int kind) {
 g95_expr *result;
 
   result = g95_get_expr();
@@ -240,6 +232,24 @@ g95_expr *result;
   result->expr_type = EXPR_CONSTANT;
   result->ts.type = type;
   result->ts.kind = kind;
+
+  switch(type) {
+  case BT_INTEGER:
+    mpz_init(result->value.integer);
+    break;
+
+  case BT_REAL:
+    mpf_init(result->value.real);
+    break;
+
+  case BT_COMPLEX:
+    mpf_init(result->value.complex.r);
+    mpf_init(result->value.complex.i);
+    break;
+
+  default:
+    break;
+  }
 
   return result;
 }
@@ -254,7 +264,7 @@ g95_expr *result;
 arith g95_arith_not(g95_expr *op1, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, op1->ts.kind);
+  result = g95_constant_result(BT_LOGICAL, op1->ts.kind);
   result->value.logical = !op1->value.logical;
   *resultp = result;
 
@@ -265,7 +275,7 @@ g95_expr *result;
 arith g95_arith_and(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
   result->value.logical = op1->value.logical && op2->value.logical;
   *resultp = result;
 
@@ -276,7 +286,7 @@ g95_expr *result;
 arith g95_arith_or(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
   result->value.logical = op1->value.logical || op2->value.logical;
   *resultp = result;
 
@@ -287,7 +297,7 @@ g95_expr *result;
 arith g95_arith_eqv(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
   result->value.logical = op1->value.logical == op2->value.logical;
   *resultp = result;
 
@@ -298,7 +308,7 @@ g95_expr *result;
 arith g95_arith_neqv(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
+  result = g95_constant_result(BT_LOGICAL, g95_kind_max(op1, op2));
   result->value.logical = op1->value.logical != op2->value.logical;
   *resultp = result;
 
@@ -351,24 +361,19 @@ arith g95_arith_uminus(g95_expr *op1, g95_expr **resultp) {
 g95_expr *result;
 arith rc;
 
-  result = constant_result(op1->ts.type, op1->ts.kind);
+  result = g95_constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
-    mpz_init(result->value.integer);
     mpz_neg(result->value.integer, op1->value.integer);
     break;
 
   case BT_REAL:
-    mpf_init(result->value.real);
     mpf_neg(result->value.real, op1->value.real);
     break;
 
   case BT_COMPLEX:
-    mpf_init(result->value.complex.r);
     mpf_neg(result->value.complex.r, op1->value.complex.r);
-
-    mpf_init(result->value.complex.i);
     mpf_neg(result->value.complex.i, op1->value.complex.i);
     break;
 
@@ -391,23 +396,18 @@ arith g95_arith_plus(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 arith rc;
 
-  result = constant_result(op1->ts.type, op1->ts.kind);
+  result = g95_constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
-    mpz_init(result->value.integer);
     mpz_add(result->value.integer, op1->value.integer, op2->value.integer);
     break;
 
   case BT_REAL:
-    mpf_init(result->value.real);
     mpf_add(result->value.real, op1->value.real, op2->value.real);
     break;
 
   case BT_COMPLEX:
-    mpf_init(result->value.complex.r);
-    mpf_init(result->value.complex.i);
-
     mpf_add(result->value.complex.r, op1->value.complex.r,
 	    op2->value.complex.r);
 
@@ -434,23 +434,18 @@ arith g95_arith_minus(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 arith rc;
 
-  result = constant_result(op1->ts.type, op1->ts.kind);
+  result = g95_constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
-    mpz_init(result->value.integer);
     mpz_sub(result->value.integer, op1->value.integer, op2->value.integer);
     break;
 
   case BT_REAL:
-    mpf_init(result->value.real);
     mpf_sub(result->value.real, op1->value.real, op2->value.real);
     break;
 
   case BT_COMPLEX:
-    mpf_init(result->value.complex.r);
-    mpf_init(result->value.complex.i);
-
     mpf_sub(result->value.complex.r, op1->value.complex.r,
 	    op2->value.complex.r);
 
@@ -479,23 +474,18 @@ g95_expr *result;
 mpf_t x, y;
 arith rc;
 
-  result = constant_result(op1->ts.type, op1->ts.kind);
+  result = g95_constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
-    mpz_init(result->value.integer);
     mpz_mul(result->value.integer, op1->value.integer, op2->value.integer);
     break;
 
   case BT_REAL:
-    mpf_init(result->value.real);
     mpf_mul(result->value.real, op1->value.real, op2->value.real);
     break;
 
   case BT_COMPLEX:
-    mpf_init(result->value.complex.r);
-    mpf_init(result->value.complex.i);
-
     mpf_init(x);
     mpf_init(y);
 
@@ -532,12 +522,10 @@ g95_expr *result;
 mpf_t x, y, div;
 arith rc;
 
-  result = constant_result(op1->ts.type, op1->ts.kind);
+  result = g95_constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
   case BT_INTEGER:
-    mpz_init(result->value.integer);
-
     if (mpz_sgn(op2->value.integer) == 0) {
       rc = ARITH_DIV0;
       break;
@@ -548,8 +536,6 @@ arith rc;
     break;
 
   case BT_REAL:
-    mpf_init(result->value.real);
-
     if (mpf_sgn(op2->value.real) == 0) {
       rc = ARITH_DIV0;
       break;
@@ -559,9 +545,6 @@ arith rc;
     break;
 
   case BT_COMPLEX:
-    mpf_init(result->value.complex.r);
-    mpf_init(result->value.complex.i);
-
     if (mpf_sgn(op2->value.complex.r) == 0 &&
 	mpf_sgn(op2->value.complex.i) == 0) {
       rc = ARITH_DIV0;
@@ -643,8 +626,8 @@ mpf_t mod, a, result_r, result_i;
 static void complex_pow_ui(g95_expr *base, int power, g95_expr *result) {
 mpf_t temp_r, temp_i, a;
 
-  mpf_init_set_ui(result->value.complex.r, 1);
-  mpf_init_set_ui(result->value.complex.i, 0);
+  mpf_set_ui(result->value.complex.r, 1);
+  mpf_set_ui(result->value.complex.i, 0);
 
   mpf_init(temp_r);
   mpf_init(temp_i);
@@ -683,7 +666,7 @@ arith rc;
   if (g95_extract_int(op2, &power) != NULL)
     g95_internal_error("g95_arith_power(): Bad exponent");
 
-  result = constant_result(op1->ts.type, op1->ts.kind);
+  result = g95_constant_result(op1->ts.type, op1->ts.kind);
 
   rc = ARITH_OK;
 
@@ -693,7 +676,7 @@ arith rc;
       if (mpz_sgn(op1->value.integer) == 0)
 	rc = ARITH_0TO0;
       else
-	mpz_init_set_ui(result->value.integer, 1);
+	mpz_set_ui(result->value.integer, 1);
 	
       break;
 
@@ -701,7 +684,7 @@ arith rc;
       if (mpf_sgn(op1->value.real) == 0)
 	rc = ARITH_0TO0;
       else
-	mpf_init_set_ui(result->value.real, 1);
+	mpf_set_ui(result->value.real, 1);
 
       break;
 
@@ -710,8 +693,8 @@ arith rc;
 	  mpf_sgn(op1->value.complex.i) == 0)
 	rc = ARITH_0TO0;
       else {
-	mpf_init_set_ui(result->value.complex.r, 1);
-	mpf_init_set_ui(result->value.complex.r, 0);
+	mpf_set_ui(result->value.complex.r, 1);
+	mpf_set_ui(result->value.complex.r, 0);
       }
 
       break;
@@ -730,7 +713,6 @@ arith rc;
 
     switch(op1->ts.type) {
     case BT_INTEGER:
-      mpz_init(result->value.integer);
       mpz_pow_ui(result->value.integer, op1->value.integer, apower);
 
       if (power < 0) {
@@ -742,7 +724,6 @@ arith rc;
       break;
 
     case BT_REAL:
-      mpf_init(result->value.real);
       mpf_pow_ui(result->value.real, op1->value.real, apower);
 
       if (power < 0) {
@@ -781,7 +762,7 @@ arith g95_arith_concat(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 int len;
 
-  result = constant_result(BT_CHARACTER, g95_default_character_kind());
+  result = g95_constant_result(BT_CHARACTER, g95_default_character_kind());
 
   len = op1->value.character.length + op2->value.character.length;
 
@@ -839,7 +820,7 @@ static int compare_complex(g95_expr *op1, g95_expr *op2) {
 arith g95_arith_eq(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (op1->ts.type == BT_COMPLEX) ?
     compare_complex(op1, op2) : (g95_compare_expr(op1, op2) == 0);
 
@@ -851,7 +832,7 @@ g95_expr *result;
 arith g95_arith_ne(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (op1->ts.type == BT_COMPLEX) ?
     !compare_complex(op1, op2) : (g95_compare_expr(op1, op2) != 0);
 
@@ -863,7 +844,7 @@ g95_expr *result;
 arith g95_arith_gt(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (g95_compare_expr(op1, op2) > 0);
   *resultp = result;
 
@@ -874,7 +855,7 @@ g95_expr *result;
 arith g95_arith_ge(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (g95_compare_expr(op1, op2) >= 0);
   *resultp = result;
 
@@ -885,7 +866,7 @@ g95_expr *result;
 arith g95_arith_lt(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (g95_compare_expr(op1, op2) < 0);
   *resultp = result;
 
@@ -896,7 +877,7 @@ g95_expr *result;
 arith g95_arith_le(g95_expr *op1, g95_expr *op2, g95_expr **resultp) {
 g95_expr *result;
 
-  result = constant_result(BT_LOGICAL, g95_default_logical_kind());
+  result = g95_constant_result(BT_LOGICAL, g95_default_logical_kind());
   result->value.logical = (g95_compare_expr(op1, op2) <= 0);
   *resultp = result;
 
@@ -1376,188 +1357,3 @@ g95_expr *e;
   return ARITH_OK;
 }
 
-
-#define FIRST_ARG(e) (e->value.function.actual->expr)
-#define SECOND_ARG(e) (e->value.function.actual->next->expr)
-
-try g95_simplify_selected_int_kind(g95_expr *e) {
-int i, kind, range;
-g95_expr *arg;
-
-  arg = FIRST_ARG(e);
-
-  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  if (g95_extract_int(arg, &range) != NULL) return FAILURE;
-
-  kind = INT_MAX;
-  for (i=0; g95_integer_kinds[i].kind!=0; i++) {
-    if (g95_integer_kinds[i].range >= range && 
-	g95_integer_kinds[i].kind < kind) {
-      kind = g95_integer_kinds[i].kind;
-    }
-  }
-
-  if (kind == INT_MAX) {
-    kind = -1;
-    g95_warning("Range %d exceeds all integer kinds at %L", 
-		range, &arg->where);
-  }
-
-  g95_replace_expr(e, g95_constant_expr(BT_INTEGER, kind, NULL));
-  return SUCCESS;
-}
-
-
-try g95_simplify_selected_real_kind(g95_expr *e) {
-int range, precision, i, kind, foundprecision, foundrange;
-g95_expr *arg1, *arg2;
-
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-  if (arg1 == NULL && arg2 == NULL)
-    g95_internal_error("SELECTED_REAL_KIND without argument at %L should not "
-		       "go through g95_simplify_selected_real_kind",
-		       &e->where);
-
-  if (arg1 != NULL) {
-    if (arg1->expr_type != EXPR_CONSTANT) return FAILURE;
-    precision = mpz_get_si(arg1->value.integer);
-  } else
-    precision = 0;
-
-  if (arg2 != NULL) {
-    if (arg2->expr_type != EXPR_CONSTANT) return FAILURE;
-    range = mpz_get_si(arg2->value.integer);
-  } else
-    range = 0;
-
-  kind = INT_MAX;
-  foundprecision = 0;
-  foundrange = 0;
-
-  for (i=0; g95_real_kinds[i].kind!=0; i++) {
-    if (g95_real_kinds[i].precision >= precision)
-      foundprecision = 1;
-    if (g95_real_kinds[i].range >= range) 
-      foundrange = 1;
-    if (g95_real_kinds[i].precision >= precision &&
-	g95_real_kinds[i].range >= range &&
-	g95_real_kinds[i].kind < kind)
-      kind = g95_real_kinds[i].kind;
-  }
-  
-  if (kind == INT_MAX) {
-    kind = 0;
-    if (!foundprecision) {
-      g95_warning("Specified precision %d exceeds all REAL kinds at %L",
-		  precision, &arg1->where);
-      kind = -1;
-    }
-
-    if (!foundrange) {
-      g95_warning("Specified exponent range %d exceeds all REAL kinds at %L", 
-		  range, &arg2->where);
-      kind -= 2;
-    }
-  }
-
-  g95_replace_expr(e, g95_constant_expr(BT_INTEGER, kind, NULL));
-  return SUCCESS;
-}
-
-
-/* g95_simplify_huge()-- Simplify the HUGE intrinsic. */
-
-g95_expr *g95_simplify_huge(bt type, int kind) {
-g95_expr *result;
-int i;
-
-  switch(type) {
-  case BT_INTEGER:
-    i = validate_integer(kind);
-    if (i == -1) goto bad_type;
-
-    result = constant_result(type, kind);
-    mpz_init_set(result->value.integer, g95_integer_kinds[i].maxval);
-    break;
-
-  case BT_REAL:
-    i = validate_real(kind);
-    if (i == -1) goto bad_type;
-
-    result = constant_result(type, kind);
-    mpf_init_set(result->value.real, g95_real_kinds[i].maxval);
-    break;
-
-  bad_type:
-  default:
-    g95_internal_error("g95_simplify_huge(): Bad type");
-  }
-
-  return result;
-}
-
-
-/* g95_simplify_radix()-- Simplify the RADIX intrinsic */
-
-g95_expr *g95_simplify_radix(bt type, int kind) {
-
-  return g95_int_expr(2);
-}
-
-
-/* g95_simplify_epsilon()-- Simplify the EPSILON intrinsic */
-
-g95_expr *g95_simplify_epsilon(int kind) {
-g95_expr *result;
-int i;
-
-  i = validate_real(kind);
-  if (i == -1) g95_internal_error("g95_simplify_epsilon(): Bad kind");
-
-  result = constant_result(BT_REAL, kind);
-  mpf_init_set(result->value.real, g95_real_kinds[i].epsilon);
-
-  return result;
-}
-
-
-/* g95_simplify_precision()-- Simplify the PRECISION intrinsic */
-
-g95_expr *g95_simplify_precision(int kind) {
-int i;
-
-  i = validate_real(kind);
-  if (i == -1) g95_internal_error("g95_simplify_precision(): Bad kind");
-
-  return g95_int_expr(g95_real_kinds[i].precision);
-}
-
-
-/* g95_simplify_range()-- Simplify the RANGE intrinsic */
-
-g95_expr *g95_simplify_range(bt type, int kind) {
-int i;
-
-  switch(type) {
-  case BT_INTEGER:
-    i = validate_integer(kind);
-    if (i == -1) goto bad_type;
-    i = g95_integer_kinds[i].range;
-    break;
-
-  case BT_REAL:
-    i = validate_real(kind);
-    if (i == -1) goto bad_type;
-    i = g95_real_kinds[i].range;
-    break;
-
-  bad_type:
-  default:
-    g95_internal_error("g95_simplify_range(): Bad kind");
-  }
-
-  return g95_int_expr(i);
-}
