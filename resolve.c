@@ -1879,7 +1879,7 @@ try t;
     case EXEC_ASSIGN:
       if (t == FAILURE) break;
 
-      if (g95_extend_assign(code, ns) == SUCCESS) break;
+      if (g95_extend_assign(code, ns) == SUCCESS) goto call;
 
       if (g95_pure(NULL)) {
 	if (g95_impure_variable(code->expr->symbol)) {
@@ -1925,6 +1925,7 @@ try t;
       break;
 
     case EXEC_CALL:
+    call:
       resolve_call(code);
       break;
 

@@ -885,6 +885,22 @@ static int symbol_rank(g95_symbol *sym) {
 }
 
 
+/* compare_pointer()-- Given a symbol of a formal argument list and an
+ * expression, if the formal argument is a pointer, see if the actual
+ * argument is a pointer. Returns nonzero if compatible, zero if not
+ * compatible. */
+
+static int compare_pointer(g95_symbol *formal, g95_expr *actual) {
+symbol_attribute attr;
+
+  if (formal->attr.pointer) {
+    attr = g95_expr_attr(actual);
+    if (!attr.pointer) return 0;
+  }
+
+  return 1;
+}
+
 /* compare_parameter()-- Given a symbol of a formal argument list and
  * an expression, see if the two are compatible as arguments.  Returns
  * nonzero if compatible, zero if not compatible. */
@@ -1013,6 +1029,12 @@ int i, n, na;
 
     if (compare_parameter(f->sym, a->expr, ranks_must_agree) == 0) {
       if (where) g95_error("Type/rank mismatch in argument '%s' at %L",
+			   f->sym->name, &a->expr->where);
+      return 0;
+    }
+
+    if (compare_pointer(f->sym, a->expr) == 0) {
+      if (where) g95_error("Actual argument for '%s' must be a pointer at %L",
 			   f->sym->name, &a->expr->where);
       return 0;
     }
@@ -1338,7 +1360,6 @@ int i;
 
   e->expr_type = EXPR_FUNCTION;
   e->symbol = sym;
-  e->ts = sym->ts;
   e->value.function.actual = actual;
 
   if (g95_pure(NULL) && !g95_pure(sym)) {
@@ -1346,6 +1367,8 @@ int i;
 	      sym->name, &e->where);
     return FAILURE;
   }
+
+  if (g95_resolve_expr(e) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -1396,7 +1419,6 @@ g95_symbol *sym;
   c->expr = NULL;
   c->expr2 = NULL;
   c->ext.actual = actual;
-  c->sub_name = sym->name;
 
   if (g95_pure(NULL) && !g95_pure(sym)) {
     g95_error("Subroutine '%s' called in lieu of assignment at %L must be "
