@@ -65,14 +65,27 @@ g95_symbol *sym;
   for(f=proc->formal; f; f=f->next) {
     sym = f->sym;
 
-    if (sym == NULL) continue;  /* Alternate return placeholder */
+    if (sym == NULL) {  /* Alternate return placeholder */
+      if (g95_elemental(proc))
+	g95_error("Alternate return specifier in elemental subroutine "
+		  "'%s' at %L is not allowed", proc->name, &proc->declared_at);
+      continue;
+    }
 
     if (sym->formal) resolve_formal_arglist(sym);
 
     if (sym->attr.subroutine || sym->attr.external || sym->attr.intrinsic) {
-      if (g95_pure(proc) && !g95_pure(sym))
+      if (g95_pure(proc) && !g95_pure(sym)) {
 	g95_error("Dummy procedure '%s' of PURE procedure at %L must also "
 		  "be PURE", sym->name, &sym->declared_at);
+	continue;
+      }
+
+      if (g95_elemental(proc)) {
+	g95_error("Dummy procedure at %L not allowed in ELEMENTAL procedure",
+		  &sym->declared_at);
+	continue;
+      }
 
       continue;
     }
@@ -111,6 +124,21 @@ g95_symbol *sym;
 	g95_error("Argument '%s' of pure subroutine '%s' at %L must have "
 		  "its INTENT specified", sym->name, proc->name,
 		  &sym->declared_at);
+    }
+
+
+    if (g95_elemental(proc)) {
+      if (sym->as != NULL) {
+	g95_error("Argument '%s' of elemental procedure at %L must be scalar",
+		  sym->name, &sym->declared_at);
+	continue;
+      }
+
+      if (sym->attr.pointer) {
+	g95_error("Argument '%s' of elemental procedure at %L cannot have "
+		  "the POINTER attribute", sym->name, &sym->declared_at);
+	continue;
+      }
     }
   }
 }
