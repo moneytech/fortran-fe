@@ -196,35 +196,16 @@ try t;
   comp = expr->symbol->components;
 
   for(; comp; comp=comp->next, cons=cons->next) {
-
     if (g95_resolve_expr(cons->expr) == FAILURE) {
       t = FAILURE;
       continue;
     }
 
-/* Make sure we've got the right type */
+    /* If we don't have the right type, try to convert it. */
 
-    if (cons->expr->ts.type != comp->ts.type) {
-      g95_error("Expected type %s in structure constructor at %L",
-		g95_typename(comp->ts.type), &cons->expr->where);
+    if (!g95_compare_types(&cons->expr->ts, &comp->ts) &&
+	g95_convert_type(cons->expr, &comp->ts, 1) == FAILURE)
       t = FAILURE;
-      continue;
-    }
-
-    if (cons->expr->ts.type == BT_DERIVED) {
-      if (cons->expr->ts.derived != comp->ts.derived) {
-	g95_error("Expected DERIVED type %s in structure constructor at %L",
-		  comp->ts.derived->name, &cons->expr->where);
-	t = FAILURE;
-      }
-    } else {
-      if (cons->expr->ts.kind != comp->ts.kind) {
-	g95_error("Expected %s kind %d in structure constructor at %L",
-		  g95_typename(comp->ts.type), comp->ts.kind,
-		  &cons->expr->where);
-	t = FAILURE;
-      }
-    }
   }
 
   return t;
@@ -948,6 +929,14 @@ static void resolve_symbol(g95_symbol *sym) {
     g95_error("Assumed size array at %L must be a dummy argument",
 	      &sym->declared_at);
     return;
+  }
+
+  /* Resolve inital values and make sure they are compatible with the
+   * variable */
+
+  if (sym->value != NULL) {
+    if (g95_resolve_expr(sym->value) == FAILURE ||
+	g95_check_assign_symbol(sym, sym->value) == FAILURE) return;
   }
 
   /* Make sure the types of derived parameters are consistent.  This
