@@ -338,6 +338,9 @@ g95_expr temp;
     f->ts.type = BT_LOGICAL;
     f->ts.kind = g95_default_logical_kind();
   } else {
+    temp.expr_type = EXPR_OP;
+    g95_clear_ts(&temp.ts);
+    temp.operator = INTRINSIC_NONE;
     temp.op1 = a;
     temp.op2 = b;
     g95_type_convert_binary(&temp);
@@ -554,6 +557,9 @@ g95_expr temp;
     f->ts.type = BT_LOGICAL;
     f->ts.kind = g95_default_logical_kind();
   } else {
+    temp.expr_type = EXPR_OP;
+    g95_clear_ts(&temp.ts);
+    temp.operator = INTRINSIC_NONE;
     temp.op1 = a;
     temp.op2 = b;
     g95_type_convert_binary(&temp);
