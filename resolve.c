@@ -1776,9 +1776,12 @@ try t;
       break;
 
     case EXEC_DO_WHILE:
-      if (t == SUCCESS && code->expr != NULL &&
-	  code->expr->ts.type != BT_LOGICAL)
-	g95_error("Argument of DO WHILE loop at %L must be of type LOGICAL",
+      if (code->expr == NULL)
+        g95_internal_error("resolve_code(): No expression on DO WHILE");
+      if (t == SUCCESS &&
+          (code->expr->rank != 0 || code->expr->ts.type != BT_LOGICAL))
+	g95_error("Exit condition of DO WHILE loop at %L must be "
+		  "a scalar LOGICAL expression",
 		  &code->expr->where);
       break;
 
