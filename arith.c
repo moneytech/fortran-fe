@@ -949,6 +949,7 @@ g95_expr *result;
 arith rc;
 
   result = g95_constant_result(op1->ts.type, op1->ts.kind);
+  result->where = op1->where;
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -984,6 +985,7 @@ g95_expr *result;
 arith rc;
 
   result = g95_constant_result(op1->ts.type, op1->ts.kind);
+  result->where = op1->where;
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -1022,6 +1024,7 @@ g95_expr *result;
 arith rc;
 
   result = g95_constant_result(op1->ts.type, op1->ts.kind);
+  result->where = op1->where;
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -1062,6 +1065,7 @@ mpf_t x, y;
 arith rc;
 
   result = g95_constant_result(op1->ts.type, op1->ts.kind);
+  result->where = op1->where;
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -1110,7 +1114,9 @@ mpf_t x, y, div;
 arith rc;
 
   rc = ARITH_OK;
+
   result = g95_constant_result(op1->ts.type, op1->ts.kind);
+  result->where = op1->where;
 
   switch(op1->ts.type) {
   case BT_INTEGER:
@@ -1255,6 +1261,7 @@ arith rc;
     g95_internal_error("g95_arith_power(): Bad exponent");
 
   result = g95_constant_result(op1->ts.type, op1->ts.kind);
+  result->where = op1->where;
 
   if (power == 0) {     /* Handle something to the zeroth power */
     switch(op1->ts.type) {
