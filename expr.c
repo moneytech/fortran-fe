@@ -1151,7 +1151,7 @@ static try check_init_intrinsic(g95_expr *e) {
   switch(e->operator) {
   case INTRINSIC_UPLUS:
   case INTRINSIC_UMINUS:
-    if (g95_numeric_ts(&e->op1->ts)) goto not_numeric;
+    if (!g95_numeric_ts(&e->op1->ts)) goto not_numeric;
     break;
 
   case INTRINSIC_EQ:  case INTRINSIC_NE:  case INTRINSIC_GT:
@@ -1292,8 +1292,11 @@ try t;
     break;
 
   case EXPR_STRUCTURE:
+    t = g95_check_constructor(e, 0, g95_check_init_expr);
+    break;
+
   case EXPR_ARRAY:
-    t = g95_check_constructor(e, g95_check_init_expr);
+    t = g95_check_constructor(e, 1, g95_check_init_expr);
     break;
   }
 

@@ -888,8 +888,6 @@ match m;
   where = *g95_current_locus();
   head = NULL;
 
-  cons_state = CONS_START;
-
   if (g95_match(" /)") == MATCH_YES) goto empty;   /* Special case */
 
   for(;;) {
@@ -937,6 +935,7 @@ typedef struct cons_stack {
 } cons_stack;
 
 static cons_stack *base;
+static int array_constructor_flag;
 
 
 /* check_constructor()-- Recursive work function for
@@ -964,6 +963,9 @@ g95_symbol *sym;
       }
 
       if ((*check_function)(cons->expr) == FAILURE) return FAILURE;
+
+      if (array_constructor_flag && check_constructor_type(cons->expr))
+	return FAILURE;
     }
 
   ok:
@@ -987,15 +989,22 @@ g95_symbol *sym;
  * particular kind of expression-- specification, restricted,
  * or initialization as determined by the check_function.  */
 
-try g95_check_constructor(g95_expr *expr,
-			    match (*check_function)(g95_expr *)) {
+try g95_check_constructor(g95_expr *expr, int array_constructor,
+			  match (*check_function)(g95_expr *)) {
 cons_stack *base_save;
 try t;
 
-  base_save = base; 
+  base_save = base;
   base = NULL;
 
+  array_constructor_flag = array_constructor;
+
+  cons_state = CONS_START;
+
   t = check_constructor(expr->value.constructor, check_function);
+
+  if (array_constructor && t == SUCCESS && expr->ts.type == BT_UNKNOWN)
+    expr->ts = constructor_ts;
 
   base = base_save;
   return t;

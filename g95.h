@@ -1239,7 +1239,7 @@ void g95_free_constructor(g95_constructor *);
 match g95_match_array_constructor(g95_expr **);
 try g95_resolve_array_constructor(g95_expr *);
 g95_constructor *g95_copy_constructor(g95_constructor *src);
-try g95_check_constructor(g95_expr *, try (*)(g95_expr *));
+try g95_check_constructor(g95_expr *, int, try (*)(g95_expr *));
 
 
 /* interface.c */
