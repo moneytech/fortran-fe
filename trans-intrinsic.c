@@ -2017,7 +2017,7 @@ g95_is_intrinsic_libcall (g95_expr * expr)
     case G95_ISYM_SHAPE:
       /* Ignore absent optional parameters.  */
       return 1;
-      
+
     case G95_ISYM_RESHAPE:
       /* Pass absent optional parameters.  */
       return 2;

@@ -1,10 +1,14 @@
+2002-12-29  Paul Brook  <paul@nowt.org>
+
+	* trans-array.c: Document calling convention for arrays.
+
 2002-12-19  Paul Brook  <paul@nowt.org>
 
 	* trans-intrinsic.c (g95_conv_intrsinsic_function): Remove incorrect
 	assertion. Remove intrinsic subroutine G95_ISYM_* cases. Always pass
 	optional parameters for some intrinsics.
 	(g95_is_intrinsic_libcall): Add G95_ISYM_RESHAPE.
-	* trans-expr.c (g95_conv_function_call): Pass NULL for absent 
+	* trans-expr.c (g95_conv_function_call): Pass NULL for absent
 	optional parameters.
 	* trans.h (g95_se): Add ignore_optional flag.
 
