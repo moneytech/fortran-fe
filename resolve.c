@@ -1059,6 +1059,57 @@ g95_typespec ts;
 }
 
 
+/* find_array_spec()-- Given an expression that contains array
+ * references, update those array references to point to the right
+ * array specifications.  While this is filled in during matching,
+ * this information is difficult to save and load in a module, so we
+ * take care of it here.
+ *
+ * The idea here is that the original array reference comes from the
+ * base symbol.  We traverse the list of reference structures, setting
+ * the stored reference to references.  Component references can
+ * provide an additional array specification. */
+
+void find_array_spec(g95_expr *e) {
+g95_array_spec *as;
+g95_component *c;
+g95_ref *ref;
+
+  as = e->symbol->as; 
+  c = e->symbol->components;
+
+  for(ref=e->ref; ref; ref=ref->next)
+    switch(ref->type) {
+    case REF_ARRAY:
+      if (as == NULL) g95_internal_error("find_array_spec(): Missing spec");
+
+      ref->u.ar.as = as;
+      as = NULL;
+      break;
+
+    case REF_COMPONENT:
+      for(; c; c=c->next)
+	if (c == ref->u.c.component) break;
+
+      if (c == NULL)
+	g95_internal_error("find_array_spec(): Component not found");
+
+      if (c->dimension) {
+	if (as != NULL) g95_internal_error("find_array_spec(): unused as(1)");
+	as = c->as;
+      }
+
+      c = c->ts.derived->components;
+      break;
+
+    case REF_SUBSTRING:
+      break;
+    }
+
+  if (as != NULL) g95_internal_error("find_array_spec(): unused as(2)");
+}
+
+
 /* resolve_array_ref()-- Resolve an array reference */
 
 static try resolve_array_ref(g95_array_ref *ar) {
@@ -1159,6 +1210,13 @@ try resolve_substring(g95_ref *ref) {
 
 static try resolve_ref(g95_expr *expr) {
 g95_ref *ref;
+
+  for(ref=expr->ref; ref; ref=ref->next) {
+    if (ref->type == REF_ARRAY && ref->u.ar.as == NULL) {
+      find_array_spec(expr);
+      break;
+    }
+  }
 
   for(ref=expr->ref; ref; ref=ref->next)
     switch(ref->type) {

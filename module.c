@@ -1036,37 +1036,14 @@ done:
 }
 
 
-#if 0
-static void mio_array_shape(g95_array_shape **asp) {
-g95_array_shape *as;
-int i;
-
-  mio_lparen();
-
-  if (iomode == IO_OUTPUT) {
-    if (*asp == NULL) goto done;
-    as = *asp;
-  } else {
-    if (peek_atom() == ATOM_RPAREN) {
-      *asp = NULL;
-      goto done;
-    }
-
-    *asp = as = g95_get_array_shape();
-  }
-
-  mio_integer(&as->rank);
-
-  for(i=0; i<as->rank; i++)
-    mio_expr(&as->shape[i]);
-
-done:
-  mio_rparen();
-}
-#endif
+/* g95_spec_from_ref()-- Given a pointer to an array reference
+ * structure (which lives in a g95_ref structure), find the
+ * corresponding array specification structure.  Storing the pointer
+ * in the ref structure doesn't quite work when loading from a module.
+ * Generating code for an array reference also needs more infomation
+ * than just the array spec. */
 
 
-#if 0
 static mstring array_ref_types[] = {
   minit("FULL", AR_FULL),         minit("ELEMENT", AR_ELEMENT),
   minit("SECTION", AR_SECTION),   minit(NULL, -1)
@@ -1078,32 +1055,43 @@ int i;
 
   mio_lparen();
   ar->type = mio_name(ar->type, array_ref_types);
-  mio_integer(&ar->rank);
+  mio_integer(&ar->dimen);
 
   switch(ar->type) {
   case AR_FULL:
     break;
 
   case AR_ELEMENT:
-    for(i=0; i<ar->rank; i++)
-      mio_expr(&ar->shape[i].start);
+    for(i=0; i<ar->dimen; i++)
+      mio_expr(&ar->start[i]);
 
     break;
 
   case AR_SECTION:
-    for(i=0; i<ar->rank; i++) {
-      mio_expr(&ar->shape[i].start);
-      mio_expr(&ar->shape[i].end);
-      mio_expr(&ar->shape[i].stride);
+    for(i=0; i<ar->dimen; i++) {
+      mio_expr(&ar->start[i]);
+      mio_expr(&ar->end[i]);
+      mio_expr(&ar->stride[i]);
     }
 
     break;
+
+  case AR_UNKNOWN:
+    g95_internal_error("mio_array_ref(): Unknown array ref");
+  }
+
+  for(i=0; i<ar->dimen; i++)
+    mio_integer((int *) &ar->dimen_type[i]);
+
+  if (iomode == IO_INPUT) {
+    ar->where = *g95_current_locus();
+
+    for(i=0; i<ar->dimen; i++)
+      ar->c_where[i] = *g95_current_locus();
   }
 
   mio_rparen();
 }
-#endif
-
 
 
 static void mio_component(g95_component *c) {
@@ -1341,49 +1329,69 @@ g95_constructor *c, *tail;
 }
 
 
-#if 0
+
 static mstring ref_types[] = {
   minit("ARRAY", REF_ARRAY),            minit("COMPONENT", REF_COMPONENT),
   minit("SUBSTRING", REF_SUBSTRING),    minit(NULL, -1)
 };
-#endif
 
 
-
-static void mio_ref(g95_ref **r) {
-
-#if 0
-char name[G95_MAX_SYMBOL_LEN+1];
+static void mio_ref(g95_ref **rp) {
+g95_ref *r;
 
   mio_lparen();
 
+  r = *rp; 
   r->type = mio_name(r->type, ref_types);
 
-#if 0
-  mio_symbol_ref(&r->symbol);
-#endif
+  switch(r->type) {
+  case REF_ARRAY:
+    mio_array_ref(&r->u.ar);
+    break;
 
-  if (iomode == IO_OUTPUT) {
+  case REF_COMPONENT:
+    mio_symbol_ref(&r->u.c.sym);
+    mio_component(r->u.c.component);
+    break;    
 
-    write_atom(ATOM_NAME, r->component->name);
-  } else {
-    
-
+  case REF_SUBSTRING:
+    mio_expr(&r->u.ss.start);
+    mio_expr(&r->u.ss.end);
+    mio_charlen(&r->u.ss.length);
+    break;
   }
 
   mio_rparen();
-#endif
 }
 
 
-
-#if 0
 static void mio_ref_list(g95_ref **rp) {
+g95_ref *ref, *head, *tail;
 
+  mio_lparen();
 
+  if (iomode == IO_OUTPUT) {
+    for(ref=*rp; ref; ref=ref->next)
+      mio_ref(&ref);
+  } else {
+    head = tail = NULL;
+
+    while(peek_atom() != ATOM_RPAREN) {
+      if (head == NULL)
+	head = tail = g95_get_ref();
+      else {
+	tail->next = g95_get_ref();
+	tail = tail->next;
+      }
+
+      mio_ref(&tail);
+    }
+
+    *rp = head;
+  }
+
+  mio_rparen();
 }
-#endif
-
 
 
 /* mio_gmp_integer()-- Read and write an integer value */
@@ -1486,6 +1494,7 @@ g95_expr *e;
     if (t != ATOM_NAME) bad_module("Expected expression type");
 
     e = *ep = g95_get_expr();
+    e->where = *g95_current_locus();
     e->expr_type = find_enum(expr_types);
   }
 
@@ -1497,7 +1506,6 @@ g95_expr *e;
     e->operator = mio_name(e->operator, intrinsics);
 
     switch(e->operator) {
-
     case INTRINSIC_UPLUS:   case INTRINSIC_UMINUS:  case INTRINSIC_NOT:
       mio_expr(&e->op1);
       break;
@@ -1526,7 +1534,7 @@ g95_expr *e;
 
   case EXPR_VARIABLE:
     mio_symbol_ref(&e->symbol);
-    mio_ref(&e->ref);
+    mio_ref_list(&e->ref);
     break;
 
   case EXPR_SUBSTRING:
