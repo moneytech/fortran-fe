@@ -961,11 +961,15 @@ typedef struct iterator_stack {
 } iterator_stack;
 
 static iterator_stack *iter_stack;
-static g95_constructor *new_head, *new_tail;
-static int count, extract_n;
-static g95_expr *extracted;
 
-static try (*expand_work_function)(g95_expr *);
+typedef struct {
+  g95_constructor *new_head, *new_tail;
+  int count, extract_n;
+  g95_expr *extracted;
+  try (*expand_work_function)(g95_expr *);
+} expand_info;
+
+static expand_info current_expand;
 
 static try expand_constructor(g95_constructor *);
 
@@ -976,7 +980,7 @@ static try expand_constructor(g95_constructor *);
 static try count_elements(g95_expr *e) {
 
   g95_free_expr(e);
-  count++;
+  current_expand.count++;
 
   return SUCCESS;
 }
@@ -987,12 +991,12 @@ static try count_elements(g95_expr *e) {
 
 static try extract_element(g95_expr *e) {
 
-  if (count == extract_n)
-    extracted = e;
+  if (current_expand.count == current_expand.extract_n)
+    current_expand.extracted = e;
   else
     g95_free_expr(e);
 
-  count++;
+  current_expand.count++;
   return SUCCESS;
 }
 
@@ -1002,15 +1006,15 @@ static try extract_element(g95_expr *e) {
 
 static try expand(g95_expr *e) {
 
-  if (new_head == NULL)
-    new_head = new_tail = g95_get_constructor();
+  if (current_expand.new_head == NULL)
+    current_expand.new_head = current_expand.new_tail = g95_get_constructor();
   else {
-    new_tail->next = g95_get_constructor();
-    new_tail = new_tail->next;
+    current_expand.new_tail->next = g95_get_constructor();
+    current_expand.new_tail = current_expand.new_tail->next;
   }
 
-  new_tail->where = e->where;
-  new_tail->expr = e;
+  current_expand.new_tail->where = e->where;
+  current_expand.new_tail->expr = e;
 
   return SUCCESS;
 }
@@ -1051,7 +1055,7 @@ static try expand_expr(g95_expr *e) {
     return FAILURE;
   }
 
-  return expand_work_function(e);
+  return current_expand.expand_work_function(e);
 }
 
 
@@ -1150,9 +1154,12 @@ g95_expr *e;
     }
 
     e = g95_copy_expr(e);
-    if (g95_simplify_expr(e, 1) == FAILURE) return FAILURE;
+    if (g95_simplify_expr(e, 1) == FAILURE) {
+      g95_free_expr(e);
+      return FAILURE;
+    }
 
-    if (expand_work_function(e) == FAILURE) return FAILURE;
+    if (current_expand.expand_work_function(e) == FAILURE) return FAILURE;
   }
 
   return SUCCESS;
@@ -1164,7 +1171,7 @@ g95_expr *e;
  * enough. */
 
 try g95_expand_constructor(g95_expr *e) {
-g95_constructor *head_save, *tail_save;
+expand_info expand_save;
 g95_expr *f;
 try rc;
 
@@ -1174,28 +1181,26 @@ try rc;
     return SUCCESS;
   }
 
-  head_save = new_head; 
-  tail_save = new_tail;
-  new_head = new_tail = NULL;
+  expand_save = current_expand;
+  current_expand.new_head = current_expand.new_tail = NULL;
 
   iter_stack = NULL;
 
-  expand_work_function = expand;
+  current_expand.expand_work_function = expand;
 
   if (expand_constructor(e->value.constructor.head) == FAILURE) {
-    g95_free_constructor(new_head);
+    g95_free_constructor(current_expand.new_head);
     rc = FAILURE;
     goto done;
   }
 
   g95_free_constructor(e->value.constructor.head);
-  e->value.constructor.head = new_head;
+  e->value.constructor.head = current_expand.new_head;
 
   rc = SUCCESS;
 
 done:
-  new_head = head_save;
-  new_tail = tail_save;
+  current_expand = expand_save;
 
   return rc;
 }
@@ -1223,11 +1228,17 @@ int rv;
  * tree. */
 
 int g95_constant_ac(g95_expr *e) {
+expand_info expand_save;
+try rc;
 
   iter_stack = NULL;
-  expand_work_function = constant_element;
+  expand_save = current_expand;
+  current_expand.expand_work_function = constant_element;
 
-  if (expand_constructor(e->value.constructor.head) == FAILURE) return 0;
+  rc = expand_constructor(e->value.constructor.head);
+  
+  current_expand = expand_save;
+  if ( rc == FAILURE) return 0;
 
   return 1;
 }
@@ -1326,18 +1337,26 @@ g95_constructor *dest;
  * place where things do not have to be particularly fast. */
 
 g95_expr *g95_get_array_element(g95_expr *array, int element) {
+expand_info expand_save;
+g95_expr *e;
+try rc;
 
-  extract_n = element;
-  expand_work_function = extract_element;
-  extracted = NULL;
-  count = 0;
+  expand_save = current_expand; 
+  current_expand.extract_n = element;
+  current_expand.expand_work_function = extract_element;
+  current_expand.extracted = NULL;
+  current_expand.count = 0;
 
   iter_stack = NULL;
 
-  if (expand_constructor(array->value.constructor.head) == FAILURE)
+  rc = expand_constructor(array->value.constructor.head);
+  e = current_expand.extracted;
+  current_expand = expand_save; 
+
+  if (rc == FAILURE)
     return NULL;
 
-  return extracted;
+  return e;
 }
 
 
@@ -1536,6 +1555,7 @@ done:
  * error. */
 
 try g95_array_size(g95_expr *array, mpz_t *result) {
+expand_info expand_save;
 g95_ref *ref;
 int flag;
 try t;
@@ -1545,14 +1565,16 @@ try t;
     flag = g95_suppress_error;
     g95_suppress_error = 1;
 
-    count = 0;
-    expand_work_function = count_elements;
+    expand_save = current_expand;
+    current_expand.count = 0;
+    current_expand.expand_work_function = count_elements;
     iter_stack = NULL;
 
     t = expand_constructor(array->value.constructor.head);
     g95_suppress_error = flag;
 
-    if (t == SUCCESS) mpz_init_set_ui(*result, count);
+    if (t == SUCCESS) mpz_init_set_ui(*result, current_expand.count);
+    current_expand = expand_save;
     return t;
 
   case EXPR_VARIABLE:
