@@ -1266,9 +1266,11 @@ g95_st_label *p;
       g95_error("Label %d referenced at %L is never defined", p->label,
 		&p->where);
 
+#if 0
     if (p->referenced == ST_LABEL_UNKNOWN)
       g95_warning("Label %d defined at %L is never referenced", p->label,
 		  &p->where);
+#endif
   }
 }
 
