@@ -625,21 +625,16 @@ arith r1, r2, r;
 
 
 g95_expr *g95_simplify_epsilon(g95_expr *e) {
-g95_expr *arg, *result;
+g95_expr *result;
 int i;
 
-  return NULL; 
-
-  arg = FIRST_ARG(e);
-  i = g95_validate_kind(arg->ts.type, arg->ts.kind);
+  i = g95_validate_kind(e->ts.type, e->ts.kind);
   if (i == -1) g95_internal_error("g95_simplify_epsilon(): Bad kind");
 
-  result = g95_constant_result(BT_REAL, arg->ts.kind);
-  mpf_init_set(result->value.real, g95_real_kinds[i].epsilon);
+  result = g95_constant_result(BT_REAL, e->ts.kind);
+  mpf_set(result->value.real, g95_real_kinds[i].epsilon);
 
-  g95_replace_expr(e, result);
-
-  return NULL;
+  return result;
 }
 
 
@@ -755,18 +750,15 @@ g95_expr *arg;
 
 
 g95_expr *g95_simplify_huge(g95_expr *e) {
-g95_expr *arg, *result;
+g95_expr *result;
 int i;
 
-  return NULL; 
-
-  arg = FIRST_ARG(e);
-  i = g95_validate_kind(arg->ts.type, arg->ts.kind);
+  i = g95_validate_kind(e->ts.type, e->ts.kind);
   if (i == -1) goto bad_type;
 
-  result = g95_constant_result(arg->ts.type, arg->ts.kind);
+  result = g95_constant_result(e->ts.type, e->ts.kind);
 
-  switch(arg->ts.type) {
+  switch(e->ts.type) {
   case BT_INTEGER:
     mpz_init_set(result->value.integer, g95_integer_kinds[i].maxval);
     break;
@@ -780,8 +772,7 @@ int i;
     g95_internal_error("g95_simplify_huge(): Bad type");
   }
 
-  g95_replace_expr(e, result);
-  //  return SUCCESS;
+  return result;
 }
 
 
