@@ -2054,6 +2054,7 @@ g95_symbol *p, *q, *old;
       delete_node(&p->ns->sym_root, p->name);
 
       p->refs--;
+      if (p->refs < 0) g95_internal_error("g95_undo_symbols(): Negative refs");
       if (p->refs == 0) g95_free_symbol(p);
       continue;
     }
@@ -2163,7 +2164,9 @@ g95_symbol *sym;
   free_sym_tree(rb->right);
 
   sym = rb->n.sym;
+
   sym->refs--;
+  if (sym->refs < 0) g95_internal_error("free_sym_tree(): Negative refs");
   if (sym->refs == 0) g95_free_symbol(sym);
 
   g95_free(rb);

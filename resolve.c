@@ -2019,7 +2019,10 @@ mpz_t trip;
   mpz_div(trip, trip, var->iter.step->value.integer);
 
   while(mpz_cmp_ui(trip, 0) > 0) {
-    if (traverse_data_var(var->list, where) == FAILURE) return FAILURE;
+    if (traverse_data_var(var->list, where) == FAILURE) {
+      mpz_clear(trip);
+      return FAILURE;
+    }
 
     mpz_sub_ui(trip, trip, 1);
   }

@@ -1000,7 +1000,7 @@ static try extract_element(g95_expr *e) {
 /* expand()-- Work function that constructs a new constructor out of
  * the old one, stringing new elements together. */
 
-try expand(g95_expr *e) {
+static try expand(g95_expr *e) {
 
   if (new_head == NULL)
     new_head = new_tail = g95_get_constructor();
@@ -1174,7 +1174,7 @@ g95_expr *f;
  * a constructor is a constant, after removal of any iteration
  * variables.  We return FAILURE if not so. */
 
-try constant_element(g95_expr *e) {
+static try constant_element(g95_expr *e) {
 int rv;
 
   rv = g95_is_constant_expr(e);

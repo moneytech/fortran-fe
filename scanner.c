@@ -697,7 +697,7 @@ static struct { const char *extension; g95_source_form form; } exttype[] = {
   {".f95", FORM_FREE }, 
   {".f",   FORM_FIXED}, 
   {".for", FORM_FIXED},
-  {"",     FORM_UNKNOWN} };   /* sentinal value */
+  {"",     FORM_UNKNOWN} };   /* sentinel value */
        
 g95_source_form  f_form;
 const char *fileext;
