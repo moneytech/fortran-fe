@@ -37,7 +37,7 @@ Boston, MA 02111-1307, USA.  */
 typedef struct g95_use_rename {
   char local_name[G95_MAX_SYMBOL_LEN+1], use_name[G95_MAX_SYMBOL_LEN+1];
   struct g95_use_rename *next;
-  int found;
+  int found, operator;
   locus where;
 } g95_use_rename;
 
@@ -74,6 +74,8 @@ g95_use_rename *next;
 match g95_match_use(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_use_rename *tail, *new;
+interface_type type;
+int operator;
 match m;
 
   m = g95_match(" %n", module_name);
@@ -87,6 +89,8 @@ match m;
 
   if (g95_match(" only :") == MATCH_YES) only_flag = 1;
 
+  if (g95_match_eos() == MATCH_YES) return MATCH_YES;
+
   for(;;) {
     new = g95_get_use_rename();
     new->found = 0;
@@ -98,31 +102,49 @@ match m;
 
     tail = new;
 
-    m = g95_match(" %n", name);
-    if (m == MATCH_NO) goto syntax;
-    if (m == MATCH_ERROR) goto cleanup;
+    new->operator = -1;
+
+    if (g95_match_generic_spec(&type, name, &operator) == MATCH_ERROR)
+      goto cleanup;
 
     new->where = *g95_current_locus();
 
-    m = g95_match(" =>");
+    switch(type) {
+    case INTERFACE_NAMELESS:
+      g95_error("Missing generic specification in USE statement at %C");
+      goto cleanup;
 
-    if (only_flag) {
-      if (m != MATCH_YES)
-	strcpy(new->use_name, name);
-      else {
+    case INTERFACE_GENERIC:
+      m = g95_match(" =>");
+
+      if (only_flag) {
+	if (m != MATCH_YES)
+	  strcpy(new->use_name, name);
+	else {
+	  strcpy(new->local_name, name);
+
+	  m = g95_match(" %n", new->use_name);
+	  if (m == MATCH_NO) goto syntax;
+	  if (m == MATCH_ERROR) goto cleanup;
+	}
+      } else {
+	if (m != MATCH_YES) goto syntax;
 	strcpy(new->local_name, name);
 
 	m = g95_match(" %n", new->use_name);
 	if (m == MATCH_NO) goto syntax;
 	if (m == MATCH_ERROR) goto cleanup;
       }
-    } else {
-      if (m != MATCH_YES) goto syntax;
-      strcpy(new->local_name, name);
 
-      m = g95_match(" %n", new->use_name);
-      if (m == MATCH_NO) goto syntax;
-      if (m == MATCH_ERROR) goto cleanup;
+      break;
+
+    case INTERFACE_USER_OP:
+      strcpy(new->use_name, name);
+      /* Fall through */
+
+    case INTERFACE_INTRINSIC_OP:
+      new->operator = operator;
+      break;
     }
 
     if (g95_match_eos() == MATCH_YES) break;
@@ -147,6 +169,18 @@ g95_use_rename *u;
 
   for(u=g95_rename_list; u; u=u->next)
     if (strcmp(u->use_name, name) == 0) return u;
+
+  return NULL;
+}
+
+
+/* find_use_operator()-- Try to find the operator in the current list */
+
+static g95_use_rename *find_use_operator(int operator) {
+g95_use_rename *u;
+
+  for(u=g95_rename_list; u; u=u->next)
+    if (u->operator == operator) return u;
 
   return NULL;
 }
@@ -1690,8 +1724,21 @@ g95_symtree *st;
 
   mio_rparen();
 
+  /* Load intrinsic operator interfaces */
+
   mio_lparen();
   for(i=0; i<G95_INTRINSIC_OPS; i++) {
+    if (only_flag) {
+      u = find_use_operator(i);
+
+      if (u == NULL) {
+	skip_list();
+	continue;
+      }
+
+      u->found = 1;
+    }
+
     mio_interface(&head);
 
     if (head != NULL) {
@@ -1707,11 +1754,24 @@ g95_symtree *st;
   mio_rparen();
 
 /* Find out if all elements of the rename-list were found in the module */
+
   for(u=g95_rename_list; u; u=u->next) {
-    if(!u->found) {
-      g95_error("Symbol %s referenced at %L not found in module %s",
+    if (u->found) continue;
+
+    if (u->operator == -1) {
+      g95_error("Symbol '%s' referenced at %L not found in module '%s'",
 		u->use_name, &u->where, module_name);
+      continue;
     }
+       
+    if (u->operator == INTRINSIC_USER) {
+      g95_error("User operator '%s' referenced at %L not found in module '%s'",
+		u->use_name, &u->where, module_name);
+      continue;
+    }
+
+    g95_error("Intrinsic operator '%s' referenced at %L not found in module "
+	      "'%s'", g95_op2string(u->operator), &u->where, module_name);
   }
 
 /* Clean up symbol nodes that were never loaded */

@@ -139,7 +139,7 @@ int i;
   return MATCH_YES;
 
 syntax:
-  g95_error("Syntax error in OPERATOR specification at %C");
+  g95_error("Syntax error in generic specification at %C");
   return MATCH_ERROR;
 }
 
