@@ -998,6 +998,19 @@ int i;
 
   if (e == NULL || e->expr_type != EXPR_VARIABLE) return FAILURE;
 
+  /* At this point we have a numeric inquiry function with a variable
+   * argument.  The type of the variable might be undefined, but we
+   * need it now, because the arguments of these functions are allowed
+   * to be undefined. */
+
+  if (e->ts.type == BT_UNKNOWN) {
+    if (e->symbol->ts.type == BT_UNKNOWN &&
+	g95_set_default_type(e->symbol, 0, g95_current_ns) == FAILURE)
+      return FAILURE;
+
+    e->ts = e->symbol->ts;
+  }
+
   return SUCCESS;
 }
 
