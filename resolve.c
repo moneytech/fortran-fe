@@ -161,51 +161,6 @@ g95_namespace *child;
 }
 
 
-/* resolve_ref()-- Resolve subtype references */
-
-static try resolve_ref(g95_expr *expr) {
-g95_array_spec *as;
-g95_ref *ref;
-try t;
-
-  as = (expr->symbol) ? expr->symbol->as : NULL; /* NULL for substrings */
-  t = SUCCESS;
-
-  for(ref=expr->ref; ref; ref=ref->next)
-    switch(ref->type) {
-    case REF_ARRAY:
-      if (g95_resolve_array_ref(&ref->ar, as) == FAILURE) t = FAILURE;
-      as = NULL;
-      break;
-
-    case REF_COMPONENT:
-      as = ref->component->as;   /* In case an array ref is next */
-      break;
-
-    case REF_SUBSTRING:
-      if (g95_resolve_expr(ref->start) == FAILURE) t = FAILURE;
-
-      if (ref->start != NULL && ref->start->ts.type != BT_INTEGER) {
-	g95_error("Substring index at %C must be of type INTEGER",
-		  &ref->start->where);
-	t = FAILURE;
-      }
-
-      if (g95_resolve_expr(ref->end) == FAILURE) t = FAILURE;
-
-      if (ref->end != NULL && ref->end->ts.type != BT_INTEGER) {
-	g95_error("Substring index at %C must be of type INTEGER",
-		  &ref->end->where);
-	t = FAILURE;
-      }
-
-      break;
-    }
-
-  return t;
-}
-
-
 /* resolve_structure_cons()-- Resolve all of the elements of a
  * structure constructor and make sure that the types are correct. */
 
@@ -299,6 +254,7 @@ g95_symbol *s;
     s = g95_search_interface(sym->generic, 0, expr->value.function.actual);
     if (s != NULL) {
       expr->value.function.name = s->name;
+      expr->value.function.esym = s;
       expr->ts = s->ts;
       if (sym->as != NULL) expr->rank = sym->as->rank;
       return MATCH_YES;
@@ -383,6 +339,7 @@ match m;
 found:
   expr->ts = sym->ts;
   expr->value.function.name = sym->name;
+  expr->value.function.esym = sym;
   if (sym->as != NULL) expr->rank = sym->as->rank;
 
   return MATCH_YES;
@@ -446,7 +403,6 @@ g95_typespec ts;
    * default type of the symbol */
 
  set_type:
-
   if (sym->ts.type != BT_UNKNOWN)
     expr->ts = sym->ts;
   else {
@@ -575,6 +531,15 @@ try t;
   default:
     g95_internal_error("resolve_function(): bad function type");
   }
+
+#if 0
+  if (expr->expr_type == EXPR_FUNCTION &&
+      ((expr->value.function.esym != NULL &&
+	expr->value.function.esym->attr.elemental) ||
+       (expr->value.function.isym != NULL &&
+	expr->value.function.isym->elemental)))
+    expr->rank = expr->value.function.actual->expr->rank;
+#endif
 
   return t;
 }
@@ -768,6 +733,287 @@ bad_op:
 }
 
 
+/************** Array resolution subroutines **************/
+
+/* check_dimension()-- Compare a single dimension of an array
+ * reference to the array specification. */
+
+static try check_dimension(int i, g95_array_ref *ar, g95_array_spec *as) {
+int start_v, end_v, stride_v, lower_v, upper_v, start, end, stride,
+    lower, upper;
+g95_expr *e;
+
+  lower = as->lower[i] != NULL &&
+    as->lower[i]->expr_type == EXPR_CONSTANT;
+
+  upper = as->upper[i] != NULL &&
+    (((i+1 == as->rank && as->type == AS_ASSUMED_SIZE)) ? 0
+    : as->upper[i]->expr_type == EXPR_CONSTANT);
+
+  e = ar->start[i];
+  start = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
+
+  e = ar->end[i];
+  end = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
+
+  e = ar->stride[i];
+  stride = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
+
+  if (lower && g95_extract_int(as->lower[i], &lower_v) != NULL)
+    goto oops;
+
+  if (upper && g95_extract_int(as->upper[i], &upper_v) != NULL)
+    goto oops;
+
+  if (start && g95_extract_int(ar->start[i], &start_v) != NULL)
+    goto oops;
+
+  if (end && g95_extract_int(ar->end[i], &end_v) != NULL) goto oops;
+
+  if (stride && g95_extract_int(ar->stride[i], &stride_v) != NULL)
+    goto oops;
+
+/* Given start, end and stride values, calculate the minimum and
+ * maximum referenced indexes. */
+
+  switch(ar->type) {
+  case AR_FULL:
+    break;
+
+  case AR_ELEMENT:
+    if (lower && start && start_v < lower_v) goto bound;
+    if (upper && start && start_v > upper_v) goto bound;
+    break;
+
+  case AR_SECTION:
+    if (stride && stride_v == 0) {
+      g95_error("Illegal stride of zero at %L", &ar->c_where[i]);
+      return FAILURE;
+    }
+
+    break;
+
+  default:
+    g95_internal_error("check_dimension(): Bad array reference");
+  }
+
+  return SUCCESS;
+
+bound:
+  g95_warning("Array reference at %L is out of bounds", &ar->c_where[i]);
+  return SUCCESS;
+
+oops:
+  g95_internal_error("check_dimension(): Bad integer conversion");
+  return FAILURE;
+}
+
+
+/* compare_spec_to_ref()-- Compare an array reference with an
+ * array specification. */
+
+static try compare_spec_to_ref(g95_array_ref *ar) {
+g95_array_spec *as;
+int i;
+
+  if (ar->type == AR_FULL) return SUCCESS;
+
+  as = ar->as; 
+  if (as->rank != ar->rank) {
+    g95_error("Array reference at %L is of rank %d but specified as rank %d",
+              &ar->where, ar->rank, as->rank);
+    return FAILURE;
+  }
+
+  for(i=0; i<as->rank; i++)
+    if (check_dimension(i, ar, as) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+/* resolve_index()-- Resolve one part of an array index */
+
+static try resolve_index(g95_expr *index) {
+g95_typespec ts;
+
+  if (index == NULL) return SUCCESS;
+
+  if (g95_resolve_expr(index) == FAILURE) return FAILURE;
+
+  if (!g95_numeric_ts(&index->ts)) {
+    g95_error("Array index at %L must be of numeric type", &index->where);
+    return FAILURE;
+  }
+
+  if (index->ts.type != BT_INTEGER ||
+      index->ts.kind != g95_default_integer_kind()) {
+    ts.type = BT_INTEGER;
+    ts.kind = g95_default_integer_kind();
+
+    g95_convert_type(index, &ts, 2);
+  }
+
+  return SUCCESS;
+}
+
+
+/* resolve_array_ref()-- Resolve an array reference */
+
+static try resolve_array_ref(g95_array_ref *ar) {
+int i;
+
+  for(i=0; i<ar->rank; i++) {
+    if (resolve_index(ar->start[i]) == FAILURE) return FAILURE;
+    if (resolve_index(ar->end[i]) == FAILURE) return FAILURE;
+    if (resolve_index(ar->stride[i]) == FAILURE) return FAILURE;
+
+    if (ar->dimen_type[i] == DIMEN_UNKNOWN)
+      switch(ar->start[i]->rank) {
+      case 0:
+	ar->dimen_type[i] = DIMEN_ELEMENT;
+	break;
+
+      case 1:
+	ar->dimen_type[i] = DIMEN_VECTOR;
+	break;
+
+      default:
+	g95_error("Array index at %L is an array of rank %d", &ar->c_where[i],
+		  ar->start[i]->rank);
+	return FAILURE;
+      }
+  }
+
+  /* If the reference type is unknown, figure out what kind it is */
+
+  if (ar->type == AR_UNKNOWN) {
+    ar->type = AR_ELEMENT;
+    for(i=0; i<ar->rank; i++)
+      if (ar->dimen_type[i] == DIMEN_RANGE ||
+	  ar->dimen_type[i] == DIMEN_VECTOR) {
+	ar->type = AR_SECTION;
+	break;
+      }
+  }
+
+  if (compare_spec_to_ref(ar) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+/* resolve_ref()-- Resolve subtype references */
+
+static try resolve_ref(g95_expr *expr) {
+g95_ref *ref;
+
+  for(ref=expr->ref; ref; ref=ref->next)
+    switch(ref->type) {
+    case REF_ARRAY:
+      if (resolve_array_ref(&ref->ar) == FAILURE) return FAILURE;
+      break;
+
+    case REF_COMPONENT:
+      break;
+
+    case REF_SUBSTRING:
+      if (g95_resolve_expr(ref->start) == FAILURE) return FAILURE;
+
+      if (ref->start != NULL && ref->start->ts.type != BT_INTEGER) {
+	g95_error("Substring index at %C must be of type INTEGER",
+		  &ref->start->where);
+	return FAILURE;
+      }
+
+      if (g95_resolve_expr(ref->end) == FAILURE) return FAILURE;
+
+      if (ref->end != NULL && ref->end->ts.type != BT_INTEGER) {
+	g95_error("Substring index at %C must be of type INTEGER",
+		  &ref->end->where);
+	return FAILURE;
+      }
+
+      break;
+    }
+
+  return SUCCESS;
+}
+
+
+/* expression_rank()-- Given a variable expression node, compute the
+ * rank of the expression by examining the base symbol and any
+ * reference structures it may have. */
+
+static void expression_rank(g95_expr *e) {
+g95_ref *ref;
+int i, rank;
+
+  if (e->ref == NULL) {
+    if (e->expr_type == EXPR_ARRAY) {
+      e->rank = 1;
+      return;
+    }
+
+    if (e->symbol == NULL) {
+      e->rank = 0; 
+      return;
+    }
+
+    e->rank = (e->symbol->as == NULL) ? 0 : e->symbol->as->rank;
+    return;
+  }
+
+  rank = 0;
+
+  for(ref=e->ref; ref; ref=ref->next) {
+    if (ref->type != REF_ARRAY) continue;
+
+    if (ref->ar.type == AR_FULL) {
+      rank = ref->ar.as->rank;
+      break;
+    }
+
+    if (ref->ar.type == AR_SECTION) { /* Figure out the rank of the section */
+      if (rank != 0) g95_internal_error("expression_rank(): Two array specs");
+
+      for(i=0; i<ref->ar.rank; i++)
+	if (ref->ar.dimen_type[i] == DIMEN_RANGE ||
+	    ref->ar.dimen_type[i] == DIMEN_VECTOR) rank++;
+
+      break;
+    }
+  }
+
+  e->rank = rank;
+}
+
+
+/* resolve_variable()-- Resolve a variable expression. */
+
+static try resolve_variable(g95_expr *e) {
+try t;
+
+  t = FAILURE;
+  if (e->ref && resolve_ref(e) == FAILURE) return FAILURE;
+
+  if (e->symbol->attr.flavor == FL_PROCEDURE && !e->symbol->attr.function) {
+    e->ts.type = BT_PROCEDURE;
+    return SUCCESS;
+  }
+
+  if (e->symbol->ts.type != BT_UNKNOWN)
+    g95_variable_attr(e, &e->ts);
+  else {        /* Must be a simple variable reference */
+    if (g95_set_default_type(e->symbol, 1, NULL) == FAILURE) return FAILURE;
+    e->ts = e->symbol->ts;
+  }
+
+  expression_rank(e);
+  return SUCCESS;
+}
+
+
 /* g95_resolve_expr()-- Resolve an expression.  That is, make sure
  * that types of operands agree with their operators, intrinsic
  * operators are converted to function calls for overloaded types and
@@ -788,23 +1034,7 @@ try t;
     break;
 
   case EXPR_VARIABLE:
-    t = FAILURE;
-    if (e->ref && resolve_ref(e) == FAILURE) break;
-
-    if (e->symbol->attr.flavor == FL_PROCEDURE && !e->symbol->attr.function) {
-      e->ts.type = BT_PROCEDURE;
-      t = SUCCESS;
-      break;
-    }
-
-    if (e->symbol->ts.type != BT_UNKNOWN)
-      g95_variable_attr(e, &e->ts);
-    else {     /* Must be a simple variable reference */
-      if (g95_set_default_type(e->symbol, 1, NULL) == FAILURE) break;
-      e->ts = e->symbol->ts;
-    }
-
-    t = SUCCESS;
+    t = resolve_variable(e);
     break;
 
   case EXPR_SUBSTRING:
@@ -817,6 +1047,11 @@ try t;
     break;
 
   case EXPR_ARRAY:
+    t = FAILURE;
+    if (resolve_ref(e) == FAILURE) break;
+
+    expression_rank(e);
+
     t = g95_resolve_array_constructor(e);
     break;
 

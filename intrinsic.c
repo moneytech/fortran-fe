@@ -2014,6 +2014,7 @@ try g95_convert_type(g95_expr *expr, g95_typespec *ts, int eflag) {
 intrinsic_sym *sym;
 locus old_where;
 g95_expr *new;
+int rank;
 
   if (ts->type == BT_UNKNOWN) goto bad;
 
@@ -2033,6 +2034,7 @@ g95_expr *new;
 /* Insert a pre-resolved function call to the right function */
 
   old_where = expr->where;
+  rank = expr->rank;
   new = g95_get_expr();
   *new = *expr;
 
@@ -2040,6 +2042,7 @@ g95_expr *new;
   new->value.function.name = sym->lib_name;
   new->value.function.isym = sym;
   new->where = old_where;
+  new->rank = rank;
 
   *expr = *new;
 

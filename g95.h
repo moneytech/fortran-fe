@@ -125,7 +125,7 @@ typedef enum { AS_EXPLICIT=1, AS_ASSUMED_SHAPE, AS_DEFERRED,
 	       AS_ASSUMED_SIZE, AS_UNKNOWN
 } array_type;
 
-typedef enum { AR_FULL=1, AR_ELEMENT, AR_SECTION } ar_type;
+typedef enum { AR_FULL=1, AR_ELEMENT, AR_SECTION, AR_UNKNOWN } ar_type;
 
 /* Statement label types */
 
@@ -574,7 +574,7 @@ extern g95_state_data *g95_state_stack;
 
 typedef struct g95_array_ref {
   ar_type type;
-  int rank;
+  int rank;              /* # of components in the reference */
   locus where;
   g95_array_spec *as;
 
@@ -582,7 +582,7 @@ typedef struct g95_array_ref {
   struct g95_expr *start[G95_MAX_DIMENSIONS], *end[G95_MAX_DIMENSIONS],
                   *stride[G95_MAX_DIMENSIONS];
 
-  enum { DIMEN_ELEMENT=1, DIMEN_RANGE, DIMEN_VECTOR }
+  enum { DIMEN_ELEMENT=1, DIMEN_RANGE, DIMEN_VECTOR, DIMEN_UNKNOWN }
     dimen_type[G95_MAX_DIMENSIONS];
 
   struct g95_expr *offset;
@@ -654,6 +654,7 @@ typedef struct g95_expr {
       g95_actual_arglist *actual;
       char *name;   /* Points to the ultimate name of the function */
       struct intrinsic_sym *isym;
+      g95_symbol *esym;
     } function;
 
     struct {
@@ -1356,14 +1357,12 @@ try g95_set_array_spec(g95_symbol *, g95_array_spec *, locus *);
 g95_array_spec *g95_copy_array_spec(g95_array_spec *);
 try g95_resolve_array_spec(g95_array_spec *);
 match g95_match_array_spec(g95_array_spec **);
-
 match g95_match_array_ref(g95_array_ref *, g95_array_spec *, int);
-try g95_resolve_array_ref(g95_array_ref *, g95_array_spec *);
 int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
 
 void g95_free_constructor(g95_constructor *);
 match g95_match_array_constructor(g95_expr **);
-void g95_simplify_iterator_var(g95_expr *);
+try g95_simplify_iterator_var(g95_expr *);
 try g95_expand_constructor(g95_expr *);
 try g95_resolve_array_constructor(g95_expr *);
 try g95_check_constructor_type(g95_expr *);
@@ -1371,6 +1370,7 @@ try g95_check_iter_variable(g95_expr *);
 try g95_check_constructor(g95_expr *, try (*)(g95_expr *));
 g95_constructor *g95_copy_constructor(g95_constructor *src);
 g95_expr *g95_get_array_element(g95_expr *, int);
+int g95_array_size(g95_expr *);
 
 /* interface.c */
 

@@ -1277,40 +1277,6 @@ cleanup:
 }
 
 
-/* expression_rank()-- Given an expression node of type
- * EXPR_VARIABLE, compute the rank of the expression by examining the
- * base symbol and any reference structures it may have. */
-
-int expression_rank(g95_expr *e) {
-g95_ref *ref;
-int i, rank;
-
-  if (e->ref == NULL)
-    return (e->symbol->as == NULL) ? 0 : e->symbol->as->rank;
-
-  rank = 0;
-
-  for(ref=e->ref; ref; ref=ref->next) {
-    if (ref->type != REF_ARRAY) continue;
-
-    if (ref->ar.type == AR_FULL) {
-      rank = ref->ar.as->rank;
-      break;
-    }
-
-    if (ref->ar.type == AR_SECTION) { /* Figure out the rank of the section */
-      for(i=0; i<ref->ar.rank; i++)
-	if (ref->ar.dimen_type[i] == DIMEN_RANGE ||
-	    ref->ar.dimen_type[i] == DIMEN_VECTOR) rank++;
-
-      break;
-    }
-  }
-
-  return rank;
-}
-
-
 /* match_varspec()-- Match any additional specifications associated
  * with the current variable like member references or substrings. */
 
@@ -1390,7 +1356,6 @@ check_substring:
     }
   }
 
-  primary->rank = expression_rank(primary);
   return MATCH_YES;
 }
 

@@ -109,111 +109,11 @@ int i;
 }
 
 
-
-/* check_dimension()-- Compare a single dimension of array reference
- * to array specification. */
-
-static try check_dimension(int i, g95_array_ref *ar, g95_array_spec *as) {
-int start_v, end_v, stride_v, lower_v, upper_v, start, end, stride,
-    lower, upper;
-g95_expr *e;
-
-  lower = as->lower[i] != NULL &&
-    as->lower[i]->expr_type == EXPR_CONSTANT;
-
-  upper = as->upper[i] != NULL &&
-    (((i+1 == as->rank && as->type == AS_ASSUMED_SIZE)) ? 0
-    : as->upper[i]->expr_type == EXPR_CONSTANT);
-
-  e = ar->start[i];
-  start = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
-
-  e = ar->end[i];
-  end = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
-
-  e = ar->stride[i];
-  stride = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
-
-  if (lower && g95_extract_int(as->lower[i], &lower_v) != NULL)
-    goto oops;
-
-  if (upper && g95_extract_int(as->upper[i], &upper_v) != NULL)
-    goto oops;
-
-  if (start && g95_extract_int(ar->start[i], &start_v) != NULL)
-    goto oops;
-
-  if (end && g95_extract_int(ar->end[i], &end_v) != NULL) goto oops;
-
-  if (stride && g95_extract_int(ar->stride[i], &stride_v) != NULL)
-    goto oops;
-
-/* Given start, end and stride values, calculate the minimum and
- * maximum referenced indexes. */
-
-  switch(ar->type) {
-  case AR_FULL:
-    break;
-
-  case AR_ELEMENT:
-    if (lower && start && start_v < lower_v) goto bound;
-    if (upper && start && start_v > upper_v) goto bound;
-    break;
-
-  case AR_SECTION:
-    if (stride && stride_v == 0) {
-      g95_error("Illegal stride of zero at %L", &ar->c_where[i]);
-      return FAILURE;
-    }
-
-    break;
-  }
-
-  return SUCCESS;
-
-bound:
-  g95_warning("Array reference at %L is out of bounds", &ar->c_where[i]);
-  return SUCCESS;
-
-oops:
-  g95_internal_error("check_dimension(): Bad integer conversion");
-  return FAILURE;
-}
-
-
-/* compare_spec_to_ref()-- Compare an array reference with an
- * array specification. */
-
-static try compare_spec_to_ref(g95_array_ref *ar, g95_array_spec *as) {
-try t;
-int i;
-
-  if (ar->type == AR_FULL) return SUCCESS;
-
-  if (as->rank != ar->rank) {
-    g95_error("Array reference at %L is of rank %d but specified as rank %d",
-              &ar->where, ar->rank, as->rank);
-    return FAILURE;
-  }
-
-  t = SUCCESS;
-
-  for(i=0; i<as->rank; i++)
-    if (check_dimension(i, ar, as) == FAILURE) {
-      t = FAILURE;
-      break;
-    }
-
-  return t;
-}
-
-
 /* match_subscript()-- Match a single dimension of an array reference.
  * This can be a single element or an array section.  Any modifications
  * we've made to the ar structure are cleaned up by the caller.  */
 
 static match match_subscript(g95_array_ref *ar, int init) {
-g95_expr *e;
 match m;
 int i;
 
@@ -222,7 +122,11 @@ int i;
   ar->c_where[i] = *g95_current_locus();
   ar->start[i] = ar->end[i] = ar->stride[i] = NULL;
 
-  ar->dimen_type[i] = DIMEN_ELEMENT;
+  /* We can't be sure of the difference between DIMEN_ELEMENT and
+   * DIMEN_VECTOR until we know the type of the element itself at
+   * resolution time. */
+
+  ar->dimen_type[i] = DIMEN_UNKNOWN;
 
   if (g95_match_char(':') == MATCH_YES) goto end_element;
 
@@ -236,24 +140,12 @@ int i;
   if (m == MATCH_NO) g95_error("Expected array subscript at %C");
   if (m != MATCH_YES) return MATCH_ERROR;
 
-  e = ar->start[i];
-  if (e->rank != 0) {
-    if (e->rank != 1) {
-      g95_error("Vector subscript at %C must have rank of one");
-      return MATCH_ERROR;
-    }
+  if (g95_match_char(':') == MATCH_NO) return MATCH_YES;
 
-    ar->dimen_type[i] = DIMEN_VECTOR;
-    ar->type = AR_SECTION;
-    return MATCH_YES;
-  }
-
-  if (g95_match_char(':') == MATCH_NO) goto done;
-
-/* Get an optional end element */
+/* Get an optional end element.  Because we've seen the colon, we
+ * definitely have a range along this dimension. */
 
 end_element:
-  ar->type = AR_SECTION;
   ar->dimen_type[i] = DIMEN_RANGE;
 
   if (init)
@@ -275,7 +167,6 @@ end_element:
     if (m != MATCH_YES) return MATCH_ERROR;
   }
 
-done:
   return MATCH_YES;
 }
 
@@ -293,13 +184,11 @@ match m;
 
   if (g95_match_char('(') != MATCH_YES) {
     ar->type = AR_FULL;
+    ar->rank = as->rank;
     return MATCH_YES;
   }
 
-/* The type gets changed by match_subscript() if it finds a section
- * reference */
-
-  ar->type = AR_ELEMENT;
+  ar->type = AR_UNKNOWN;
 
   for(ar->rank=0; ar->rank<G95_MAX_DIMENSIONS; ar->rank++) {
     m = match_subscript(ar, init);
@@ -323,51 +212,6 @@ matched:
   ar->rank++;
 
   return MATCH_YES;
-}
-
-
-/* resolve_index()-- Resolve a single array index */
-
-static try resolve_index(g95_expr *index) {
-g95_typespec ts;
-
-  if (g95_resolve_expr(index) == FAILURE) return FAILURE;
-
-  if (index == NULL) return SUCCESS;
-
-  if (!g95_numeric_ts(&index->ts)) {
-    g95_error("Array index at %L must be of numeric type", &index->where);
-    return FAILURE;
-  }
-
-  if (index->ts.type != BT_INTEGER ||
-      index->ts.kind != g95_default_integer_kind()) {
-    ts.type = BT_INTEGER;
-    ts.kind = g95_default_integer_kind();
-
-    g95_convert_type(index, &ts, 2);
-  }
-
-  return SUCCESS;
-}
-
-
-/* g95_resolve_array_ref()-- Resolve an array reference */
-
-try g95_resolve_array_ref(g95_array_ref *ar, g95_array_spec *as) {
-try t;
-int i;
-
-  t = SUCCESS; 
-  for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-    if (resolve_index(ar->start[i]) == FAILURE) t = FAILURE;
-    if (resolve_index(ar->end[i]) == FAILURE) t = FAILURE;
-    if (resolve_index(ar->stride[i]) == FAILURE) t = FAILURE;
-  }
-
-  if (compare_spec_to_ref(ar, as) == FAILURE) t = FAILURE;
-
-  return t;
 }
 
 
@@ -700,7 +544,7 @@ error:
  * elements in a constructor.  If we hit an iterator, we give up and
  * return -1.  */
 
-static int count_elements(g95_constructor *c) {
+int count_elements(g95_constructor *c) {
 g95_expr *e;
 int i, total;
 
@@ -1128,19 +972,19 @@ static try expand_constructor(g95_constructor *);
  * that is a variable reference, substitute the current value of the
  * iteration variable. */
 
-void g95_simplify_iterator_var(g95_expr *e) {
+try g95_simplify_iterator_var(g95_expr *e) {
 iterator_stack *p;
 
   for(p=iter_stack; p; p=p->prev)
     if (e->symbol == p->variable) break;
 
-  if (p == NULL)
-    g95_internal_error("simplify_iteration_expr(): Variable '%s' not found",
-		       e->symbol->name);
+  if (p == NULL) return FAILURE;   /* Variable not found */
 
   g95_replace_expr(e, g95_int_expr(0));
 
   mpz_set(e->value.integer, p->value);
+
+  return SUCCESS;
 }
 
 
@@ -1399,3 +1243,97 @@ g95_expr *g95_get_array_element(g95_expr *array, int element) {
   return get_element(array->value.constructor, &element);
 }
 
+
+/********* Subroutines for determining the size of an array *********/
+
+/* These are needed just to accomodate RESHAPE().  There are no
+ * diagnostics here, we just return a negative number if something
+ * goes wrong. */
+
+/* size_from_spec()-- Get the size of an array from the array
+ * specification.  The array is guaranteed to be one dimensional */
+
+static int size_from_spec(g95_array_spec *as) {
+int size;
+
+  if (as == NULL || as->type != AS_EXPLICIT) return -1;
+
+  if (as->lower[0]->expr_type != EXPR_CONSTANT ||
+      as->upper[0]->expr_type != EXPR_CONSTANT) return -1;
+
+  size = mpz_get_ui(as->upper[0]->value.integer)
+       - mpz_get_ui(as->lower[0]->value.integer) + 1;
+
+  if (size < 0 || size > G95_MAX_DIMENSIONS) return -1;
+
+  return size;
+}
+
+
+/* size_from_ref()-- Get the number of elements in an array section */
+
+static int size_from_ref(g95_array_ref *ar) {
+int d, start, end, stride;
+
+  for(d=0; d<ar->rank; d++)
+    switch(ar->dimen_type[d]) {
+    case DIMEN_ELEMENT:
+      continue;
+
+    case DIMEN_VECTOR:
+      return g95_array_size(ar->start[d]);    /* Recurse! */
+
+    case DIMEN_RANGE:
+      if (ar->start[d]->expr_type != EXPR_CONSTANT ||
+	  ar->end[d]->expr_type != EXPR_CONSTANT ||
+	  ar->stride[d]->expr_type != EXPR_CONSTANT) return -1;
+
+      start = mpz_get_si(ar->start[d]->value.integer);
+      end = mpz_get_si(ar->end[d]->value.integer);
+      stride = mpz_get_si(ar->stride[d]->value.integer);
+
+      d = (end - start + stride) / stride;   /* Zero stride caught earlier */
+
+      if (d < 0 || d > G95_MAX_DIMENSIONS) return -1;
+      return d;
+
+    default:
+      g95_internal_error("size_from_section(): Bad dimen type");
+    }
+
+  g95_internal_error("size_from_section(): No range elements!");
+}
+
+
+/* g95_array_size()-- Given a shape argument to the RESHAPE intrinsic,
+ * figure out how many elements are in the SHAPE specification.  Type
+ * and rank have already been verified. Returns the rank of the
+ * argument (>0) or a negative number to indicate an error. */
+
+int g95_array_size(g95_expr *shape) {
+g95_ref *ref;
+int size;
+
+  switch(shape->expr_type) {
+  case EXPR_ARRAY:
+    if (g95_expand_constructor(shape) == FAILURE) return -1;
+    size = count_elements(shape->value.constructor);
+    break;
+
+  case EXPR_VARIABLE:
+    for(ref=shape->ref; ref; ref=ref->next) {
+      if (ref->type != REF_ARRAY) continue;
+
+      if (ref->ar.type == AR_FULL) return size_from_spec(ref->ar.as);
+      if (ref->ar.type == AR_SECTION) return size_from_ref(&ref->ar);
+    }
+
+    return size_from_spec(shape->symbol->as);
+
+  default:
+    size = -1;
+    break;
+  }
+
+  return size;
+}

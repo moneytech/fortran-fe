@@ -654,8 +654,12 @@ void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
 
   f->ts = source->ts;
-  f->value.function.name = get_string("__reshape_%c%d", 
-		 g95_type_letter(source->ts.type), source->ts.kind);
+  f->rank = g95_array_size(shape);
+  g95_status("Array rank = %d\n", f->rank);
+
+  f->value.function.name =
+    get_string("__reshape_%c%d", g95_type_letter(source->ts.type),
+	       source->ts.kind);
 }
 
 
@@ -685,8 +689,8 @@ void g95_resolve_scan(g95_expr *f, g95_expr *string, g95_expr *set,
 void g95_resolve_set_exponent(g95_expr *f, g95_expr *x, g95_expr *i) {
 
   f->ts = x->ts;
-  f->value.function.name = get_string("__set_exponent_%d_%d",
-				      x->ts.kind, i->ts.kind);
+  f->value.function.name =
+    get_string("__set_exponent_%d_%d", x->ts.kind, i->ts.kind);
 }
 
 

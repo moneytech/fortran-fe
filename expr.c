@@ -860,7 +860,7 @@ g95_actual_arglist *ap;
       break;
     }
 
-    if (type == 1) g95_simplify_iterator_var(p);
+    if (type == 1 && g95_simplify_iterator_var(p) == FAILURE) return FAILURE;
 
     break;
 
@@ -878,7 +878,6 @@ g95_actual_arglist *ap;
 
   return SUCCESS;
 }
-
 
 
 /* g95_match_scalar_expr()-- Match an expression and require it to be

@@ -1005,9 +1005,13 @@ try g95_check_reshape(g95_expr *source, g95_expr *shape,
 
   if (rank_check(shape, 1, 1) == FAILURE) return FAILURE;
 
-  /* constant size check on shape */
-
   if (type_check(shape, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+  if (g95_array_size(shape) < 0) {
+    g95_error("'shape' argument of 'reshape' intrinsic at %L must be an "
+	      "array of constant size", &shape->where);
+    return FAILURE;
+  }
 
   if (pad != NULL) {
     if (same_type_check(source, 0, pad, 2) == FAILURE) return FAILURE;
