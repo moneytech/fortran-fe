@@ -62,7 +62,7 @@ typedef struct intrinsic_sym {
   char name[G95_MAX_SYMBOL_LEN+1], lib_name[G95_MAX_SYMBOL_LEN+1];
   intrinsic_arg *arg;
   g95_typespec ts;
-  int elemental;
+  int elemental, generic;
 
   g95_expr *(*simplify)();
   try (*check_function)();
@@ -1344,6 +1344,7 @@ va_list argp;
     next_sym->ts.kind = kind;
     next_sym->simplify = simplify;
     next_sym->check_function = cfunction;
+    next_sym->generic = 0;
   }
 
   va_start(argp, cfunction);
@@ -1432,6 +1433,7 @@ intrinsic_sym *generic;
   if (generic == NULL)
     g95_internal_error("make_generic(): Can't find generic symbol '%s'", name);
 
+  generic->generic = 1;
   generic->specific = generic + 1;
   generic++;
   
