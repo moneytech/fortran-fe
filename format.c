@@ -388,13 +388,16 @@ data_desc:
     break;
 
   case FMT_P:
-    t = format_lex();
-    if (t == FMT_POSINT) {
-      error = "Repeat count cannot follow P descriptor";
-      goto syntax;
+    if (g95_option.pedantic) {
+      t = format_lex();
+      if (t == FMT_POSINT) {
+	error = "Repeat count cannot follow P descriptor";
+	goto syntax;
+      }
+
+      saved_token = t;
     }
 
-    saved_token = t;
     goto optional_comma;
 
   case FMT_POS:
