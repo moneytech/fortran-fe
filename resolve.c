@@ -1409,14 +1409,14 @@ g95_charlen *cl;
   old_ns = g95_current_ns;
   g95_current_ns = ns;
 
-  g95_check_interfaces(ns);
-
   resolve_contained_functions(ns);
 
   g95_traverse_ns(ns, resolve_symbol);
 
   for(n=ns->contained; n; n=n->sibling)
     g95_resolve(n);
+
+  g95_check_interfaces(ns);
 
   g95_traverse_ns(ns, resolve_values);
 

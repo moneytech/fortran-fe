@@ -350,90 +350,32 @@ int r1, r2;
 }
 
 
-/* count_types_test()-- Given a pair of formal argument lists, we see
- * if the two lists can be distinguished by counting the number of
- * nonoptional arguments of a given type/rank in f1 and seeing if
- * there are less then that number of those arguments in f2 (including
- * optional arguments).  Since this test is asymmetric, it has to be
- * called twice to make it symmetric.  Returns nonzero if the argument
- * lists are incompatible by this test.  This subroutine implements
- * rule 1 of section 14.1.2.3. */
+static int compare_interfaces(g95_symbol *, g95_symbol *, int);
 
-static int count_types_test(g95_formal_arglist *f1, g95_formal_arglist *f2) {
-int rc, ac1, ac2, i, j, k, n1;
-g95_formal_arglist *f;
+/* compare_type_rank_if()-- Given two symbols that are formal
+ * arguments, compare their types and rank and their formal interfaces
+ * if they are both dummy procedures.  Returns nonzero if the same,
+ * zero if different. */
 
-typedef struct {
-  int flag;
-  g95_symbol *sym;
-} arginfo;
+static int compare_type_rank_if(g95_symbol *s1, g95_symbol *s2) {
 
-arginfo *arg;
+  if (s1->attr.flavor != FL_PROCEDURE && s2->attr.flavor != FL_PROCEDURE)
+    return compare_type_rank(s1, s2);
 
-  n1 = 0;
+  if (s1->attr.flavor != FL_PROCEDURE || s2->attr.flavor != FL_PROCEDURE)
+    return 0;
 
-  if (f1 == NULL && f2 != NULL) return 0;
+  /* At this point, both symbols are procedures */
 
-  for(f=f1; f; f=f->next)
-    n1++;
+  if ((s1->attr.function == 0 && s1->attr.subroutine == 0) ||
+      (s2->attr.function == 0 && s2->attr.subroutine == 0)) return 0;
 
-  /* Build an array of integers that gives the same integer to
-   * arguments of the same type/rank.  */
+  if (s1->attr.function != s2->attr.function ||
+      s1->attr.subroutine != s2->attr.subroutine) return 0;
 
-  arg = g95_getmem(n1*sizeof(arginfo));
+  if (s1->attr.function && compare_type_rank(s1, s2) == 0) return 0;
 
-  f = f1;
-  for(i=0; i<n1; i++, f=f->next) {
-    arg[i].flag = -1;
-    arg[i].sym = f->sym;
-  }
-
-  k = 0;
-
-  for(i=0; i<n1; i++) {
-    if (arg[i].flag != -1) continue;
-
-    if (arg[i].sym->attr.optional) continue;   /* Skip optional arguments */
-
-    arg[i].flag = k;
-
-    /* Find other nonoptional arguments of the same type/rank */
-
-    for(j=i+1; j<n1; j++)
-      if (!arg[j].sym->attr.optional &&
-	  compare_type_rank(arg[i].sym, arg[j].sym)) arg[j].flag = k;
-
-    k++;
-  }
-
-  /* Now loop over each distinct type found in f1 */
-
-  k = 0;
-  rc = 0;
-
-  for(i=0; i<n1; i++) {
-    if (arg[i].flag != k) continue;
-
-    ac1 = 1;
-    for(j=i+1; j<n1; j++)
-      if (arg[j].flag == k) ac1++;
-
-    /* Count the number of arguments in f2 with that type, including
-     * those that are optional. */
-
-    ac2 = 0;
-
-    for(f=f2; f; f=f->next)
-      if (compare_type_rank(arg[i].sym, f->sym)) ac2++;
-
-    if (ac1 > ac2) { rc = 1; break; }
-
-    k++;
-  }
-
-  g95_free(arg);
-
-  return rc;
+  return compare_interfaces(s1, s2, 1);    /* Recurse! */
 }
 
 
@@ -588,6 +530,91 @@ int args;
   g95_error("Operator interface at %L has the wrong number of arguments",
 	    &intr->where);
   return;
+}
+
+
+/* count_types_test()-- Given a pair of formal argument lists, we see
+ * if the two lists can be distinguished by counting the number of
+ * nonoptional arguments of a given type/rank in f1 and seeing if
+ * there are less then that number of those arguments in f2 (including
+ * optional arguments).  Since this test is asymmetric, it has to be
+ * called twice to make it symmetric.  Returns nonzero if the argument
+ * lists are incompatible by this test.  This subroutine implements
+ * rule 1 of section 14.1.2.3. */
+
+static int count_types_test(g95_formal_arglist *f1, g95_formal_arglist *f2) {
+int rc, ac1, ac2, i, j, k, n1;
+g95_formal_arglist *f;
+
+typedef struct {
+  int flag;
+  g95_symbol *sym;
+} arginfo;
+
+arginfo *arg;
+
+  n1 = 0;
+
+  for(f=f1; f; f=f->next)
+    n1++;
+
+  /* Build an array of integers that gives the same integer to
+   * arguments of the same type/rank.  */
+
+  arg = g95_getmem(n1*sizeof(arginfo));
+
+  f = f1;
+  for(i=0; i<n1; i++, f=f->next) {
+    arg[i].flag = -1;
+    arg[i].sym = f->sym;
+  }
+
+  k = 0;
+
+  for(i=0; i<n1; i++) {
+    if (arg[i].flag != -1) continue;
+
+    if (arg[i].sym->attr.optional) continue;   /* Skip optional arguments */
+
+    arg[i].flag = k;
+
+    /* Find other nonoptional arguments of the same type/rank */
+
+    for(j=i+1; j<n1; j++)
+      if (!arg[j].sym->attr.optional &&
+	  compare_type_rank_if(arg[i].sym, arg[j].sym)) arg[j].flag = k;
+
+    k++;
+  }
+
+  /* Now loop over each distinct type found in f1 */
+
+  k = 0;
+  rc = 0;
+
+  for(i=0; i<n1; i++) {
+    if (arg[i].flag != k) continue;
+
+    ac1 = 1;
+    for(j=i+1; j<n1; j++)
+      if (arg[j].flag == k) ac1++;
+
+    /* Count the number of arguments in f2 with that type, including
+     * those that are optional. */
+
+    ac2 = 0;
+
+    for(f=f2; f; f=f->next)
+      if (compare_type_rank_if(arg[i].sym, f->sym)) ac2++;
+
+    if (ac1 > ac2) { rc = 1; break; }
+
+    k++;
+  }
+
+  g95_free(arg);
+
+  return rc;
 }
 
 
@@ -845,6 +872,27 @@ int g95_symbol_rank(g95_symbol *sym) {
 }
 
 
+/* compare_parameter()-- Given a symbol of a formal argument list and
+ * an expression, see if the two are compatible as arguments.  Returns
+ * nonzero if the same, zero if different.  */
+
+static int compare_parameter(g95_symbol *formal, g95_expr *actual) {
+
+  if (actual->ts.type == BT_PROCEDURE) {
+    if (formal->attr.flavor != FL_PROCEDURE) return 0;
+
+    if (formal->attr.function &&
+	!compare_type_rank(formal, actual->symbol)) return 0;
+
+    return compare_interfaces(formal, actual->symbol, 1);
+  }
+
+  if (g95_symbol_rank(formal) != actual->rank) return 0;
+
+  return g95_compare_types(&formal->ts, &actual->ts);
+}
+
+
 /* compare_formal_actual()-- Given formal and actual argument lists,
  * see if they are compatible.  If they are compatible, the actual
  * argument list is sorted to correspond with the formal list, and
@@ -890,9 +938,7 @@ int i, n, na;
 
     if (f->sym == NULL || a->expr == NULL) return 0;
 
-    if (g95_symbol_rank(f->sym) != a->expr->rank ||
-	g95_compare_types(&f->sym->ts, &a->expr->ts) == 0)
-      return 0;
+    if (compare_parameter(f->sym, a->expr) == 0) return 0;
 
   match:
     if (a == actual) na = i;
