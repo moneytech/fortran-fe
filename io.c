@@ -492,8 +492,11 @@ conflict:
 /* match_dt_format()-- Match a format specification */
 
 static match match_dt_format(g95_dt *dt) {
+locus where;
 g95_expr *e;
 int label;
+
+  where = *g95_current_locus(); 
 
   if (g95_match_char('*') == MATCH_YES) {
     if (dt->format_expr != NULL || dt->format_label != 0) goto conflict;
@@ -522,6 +525,8 @@ int label;
     return MATCH_YES;
   }
 
+  g95_set_locus(&where);    /* The only case where we have to restore */
+
   return MATCH_NO;
 
 conflict:
@@ -537,11 +542,13 @@ g95_symbol *sym;
 match m;
 
   if (g95_match(" unit =") == MATCH_YES) {
-    m = match_dt_unit(k, dt);   if (m != MATCH_NO) return m;
+    m = match_dt_unit(k, dt);
+    if (m != MATCH_NO) return m;
   }
 
   if (g95_match(" fmt =") == MATCH_YES) {
-    m = match_dt_format(dt);    if (m != MATCH_NO) return m;
+    m = match_dt_format(dt);
+    if (m != MATCH_NO) return m;
   }
 
   if (g95_match(" nml = %s", &sym) == MATCH_YES) {
@@ -879,6 +886,7 @@ g95_code *io_code, *term;
 g95_symbol *sym;
 g95_expr *expr;
 int comma_flag;
+locus where;
 g95_dt *dt;
 match m;
  
@@ -911,10 +919,14 @@ match m;
   if (m == MATCH_YES) goto next;
   if (m == MATCH_ERROR) goto cleanup;
 
-  if (g95_match_symbol(&sym) == MATCH_YES && sym->attr.flavor != FL_NAMELIST) {
+  where = *g95_current_locus();
+
+  if (g95_match_symbol(&sym) == MATCH_YES && sym->attr.flavor == FL_NAMELIST) {
     dt->namelist = sym;
     goto next;
   }
+
+  g95_set_locus(&where);
 
   goto loop;   /* No matches, try regular elements */
 
