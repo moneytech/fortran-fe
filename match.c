@@ -1706,12 +1706,13 @@ match m;
 /* g95_match_common()-- Match a COMMON statement */
 
 match g95_match_common(void) {
-g95_symbol *sym, *common_name, **head, *tail;
+g95_symbol *sym, *common_name, **head, *tail, *old_blank_common;
 g95_array_spec *as;
 match m;
 
   if (g95_match_eos() == MATCH_YES) goto syntax;
 
+  old_blank_common = g95_current_ns->blank_common;
   common_name = NULL;
   as = NULL;
 
@@ -1807,6 +1808,7 @@ syntax:
   g95_syntax_error(ST_COMMON);
 
 cleanup:
+  g95_current_ns->blank_common = old_blank_common;
   g95_free_array_spec(as);
   return MATCH_ERROR;
 }
