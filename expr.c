@@ -1133,11 +1133,16 @@ try t;
 match g95_match_init_expr(g95_expr **result) {
 g95_expr *expr;
 match m;
+try t;
 
   m = g95_match_expr(&expr);
   if (m != MATCH_YES) return m;
 
-  if (check_init_expr(expr) == FAILURE) {
+  g95_init_expr = 1;
+  t = check_init_expr(expr);
+  g95_init_expr = 0;
+
+  if (t == FAILURE) {
     g95_free_expr(expr);
     return MATCH_ERROR;
   }

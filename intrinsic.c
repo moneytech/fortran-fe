@@ -32,7 +32,7 @@ Boston, MA 02111-1307, USA.  */
 #include "intrinsic.h"
 
 
-int g95_intrinsic_extension;
+int g95_intrinsic_extension, g95_init_expr=0;
 
 /* Pointers to a intrinsic function and its argument names being
  * checked. */
@@ -769,7 +769,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("eoshift");
 
   add_sym("epsilon", 0, 1, BT_REAL, dr,
-	  g95_check_x, g95_simplify_epsilon, NULL,
+	  g95_check_x_ni, g95_simplify_epsilon, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
   make_generic("epsilon");
@@ -1033,7 +1033,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("max");
 
   add_sym("maxexponent", 0, 1, BT_INTEGER, di,
-	  g95_check_x, g95_simplify_maxexponent, NULL,
+	  g95_check_x_ni, g95_simplify_maxexponent, NULL,
 	  x, BT_UNKNOWN, dr, 0, NULL);
 
   make_generic("maxexponent");
@@ -1088,7 +1088,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("min");
 
   add_sym("minexponent", 0, 1, BT_INTEGER, di,
-	  g95_check_x, g95_simplify_minexponent, NULL,
+	  g95_check_x_ni, g95_simplify_minexponent, NULL,
 	  x, BT_UNKNOWN, dr, 0, NULL);
 
   make_generic("minexponent");
@@ -1375,7 +1375,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("tanh");
 
   add_sym("tiny", 0, 1, BT_REAL, dr,
-	  g95_check_x, g95_simplify_tiny, NULL,
+	  g95_check_x_ni, g95_simplify_tiny, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
   make_generic("tiny");
@@ -2117,7 +2117,7 @@ got_specific:
 
   flag |= (expr->ts.type != BT_INTEGER && expr->ts.type != BT_CHARACTER);
 
-  if (flag && g95_intrinsic_extension && g95_option.pedantic)
+  if (flag && g95_intrinsic_extension && g95_option.pedantic && g95_init_expr)
     g95_warning("Evaluation of initialization expression at %L is nonstandard",
 		&expr->where);
 

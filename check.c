@@ -1252,6 +1252,18 @@ try g95_check_x(g95_expr *x) {
   return SUCCESS;
 }
 
+/* g95_check_x_ni()-- Common check functions for numeric inquiry
+ * functions that have a single real argument. */
+
+try g95_check_x_ni(g95_expr *x) {
+
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
+
+  g95_intrinsic_extension = 0;
+
+  return SUCCESS;
+}
+
 
 /************* Check functions for intrinsic subroutines *************/
 

@@ -1232,6 +1232,8 @@ void g95_symbol_state(void);
 
 /* intrinsic.c */
 
+extern int g95_init_expr;
+
 void g95_intrinsic_init_1(void);
 void g95_intrinsic_done_1(void);
 void g95_intrinsic_symbol(g95_symbol *sym);

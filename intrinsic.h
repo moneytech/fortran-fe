@@ -93,6 +93,7 @@ try g95_check_ubound(g95_expr *, g95_expr *);
 try g95_check_unpack(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_verify(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_x(g95_expr *);
+try g95_check_x_ni(g95_expr *);
 
 /* intrinsic subroutines */
 
