@@ -156,6 +156,7 @@ g95_namespace *child;
     }
 
     sym_upper->ts = sym_lower->ts;
+    sym_upper->as = g95_copy_array_spec(sym_lower->as);
   }
 }
 
