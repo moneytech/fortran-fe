@@ -599,9 +599,9 @@ g95_constructor *next;
 }
 
 
-/* check_iterators()-- Given an expression node that might be an array
- * constructor and a symbol, make sure than no iterators in this or
- * child constructors use the symbol as an implied-DO iterator.
+/* check_duplicate_iterator()-- Given an expression node that might be an 
+ * array constructor and a symbol, make sure than no iterators in this or
+ * child constructors use the symbol as an implied-DO iterator. 
  * Returns nonzero if a duplicate was found. */
 
 static int check_duplicate_iterator(g95_constructor *c, g95_symbol *master) {
@@ -1301,7 +1301,7 @@ g95_expr *g95_get_array_element(g95_expr *array, int element) {
  * goes wrong. */
 
 
-/* size_from_spec()-- Get the size of single dimension of an array
+/* size_dimen_spec()-- Get the size of single dimension of an array
  * specification.  The array is guaranteed to be one dimensional */
 
 static try spec_dimen_size(g95_array_spec *as, int dimen, mpz_t *result) {
