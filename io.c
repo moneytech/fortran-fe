@@ -142,7 +142,7 @@ static void resolve_tag(io_tag *tag, g95_expr *e) {
 
   if (e->ts.type != tag->type)
     g95_error("%s tag at %L must be of type %s", tag->name, &e->where,
-	      g95_typename(tag->type));
+	      g95_basic_typename(tag->type));
 }
 
 
@@ -558,7 +558,7 @@ match m;
     }
 
     if (sym->attr.flavor != FL_NAMELIST) {
-      g95_error("Symbol at %C must be a NAMELIST group name");
+      g95_error("Symbol '%s' at %C must be a NAMELIST group name", sym->name);
       return MATCH_ERROR;
     }
 
@@ -913,7 +913,9 @@ match m;
   if (g95_match_char(')') == MATCH_YES) goto get_io_list;
   if (g95_match_char(',') != MATCH_YES) goto syntax; 
 
-  if (match_dt_element(k, dt) == MATCH_YES) goto next;
+  m = match_dt_element(k, dt);
+  if (m == MATCH_YES) goto next;
+  if (m == MATCH_ERROR) goto cleanup;
 
   m = match_dt_format(dt);
   if (m == MATCH_YES) goto next;
