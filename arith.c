@@ -131,20 +131,27 @@ mpf_t i10, log10;
   mpf_clear(log10);
 }
 
-unsigned factorial(int n) {
-unsigned fac;
+void factorial(int n, mpf_t *fac) {
+mpf_t term;
+int i;
 
-  if (n == 1) return(1);
-  fac = factorial(n-1)*n;
-  return fac;
+  mpf_init_set_ui(*fac,1);
+  if (n > 1) {
+    for (i=2; i<=n; ++i) {
+      mpf_set_ui(term,n);
+      mpf_mul(*fac,*fac,term);
+    }
+    mpf_clear(term);
+  }
+  return;
 }
 
 
 void exponential(mpf_t *arg, mpf_t *result) {
-mpf_t two, ln2, power, q, r, num, term, x, xp;
+mpf_t two, ln2, power, q, r, num, denom, term, x, xp;
 int i;
 long n;
-unsigned int denom, limit, p, mp;
+unsigned long p, mp;
 
 /* We use a reduction of the form
  *   x= Nln2 + r
@@ -179,12 +186,12 @@ unsigned int denom, limit, p, mp;
 
     mpf_init_set_ui(xp, 1);
     mpf_init_set_ui(num, 1);
+    mpf_init_set_ui(denom, 1);
 
-    limit = G95_REAL_BITS/10;
-    for(i=1; i<=limit; i++) {
+    for(i=1; i<=100; i++) {
       mpf_mul(num, num, r);
-      denom=factorial(i);
-      mpf_div_ui(term,num,denom);
+      mpf_mul_ui(denom,denom,i);
+      mpf_div(term,num,denom);
       mpf_add(xp,xp,term);
     }
 
@@ -206,9 +213,14 @@ unsigned int denom, limit, p, mp;
     mpf_clear(r);
     mpf_clear(power);
     mpf_clear(num);
+    mpf_clear(denom);
     mpf_clear(term);
     mpf_clear(xp);
   }
+}
+
+void sine(mpf_t *arg, mpf_t *result) {
+/* In preparation */
 }
 
 /* g95_arith_error()-- Given an arithmetic error code, return a
@@ -249,6 +261,8 @@ int i;
     mpf_add(e, e, a);
     mpf_div_ui(a, a, i);
   }
+
+/* Calculate pi, needed for evaluating (scaling) trigonometric functions */
 
 /* Convert the minimum/maximum values for each kind into their Gnu MP
  * representation. */
