@@ -635,33 +635,12 @@ done:
 }
 
 
-/* is_constant_constructor()-- Recursively checks all elements of a
- * constructor to see if everything is constant. */
-
-static int is_constant_constructor(g95_constructor *c) {
-
-  if (c == NULL) return 1;
-
-  for(; c; c=c->next) {
-    if (!g95_is_constant_expr(c->expr)) return 0;
-
-    if (c->iterator != NULL) {
-      if (!g95_is_constant_expr(c->iterator->start)) return 0;
-      if (!g95_is_constant_expr(c->iterator->end))   return 0;
-      if (!g95_is_constant_expr(c->iterator->step))  return 0;
-    }
-  }
-
-  return 1;
-}
-
-
 /* g95_is_constant_expr()-- Function to determine if an expression is
  * constant or not.  This function expects that the expression has
- * already been simplified.  Mutually recursive with
- * constant_constructor().  */
+ * already been simplified. */
 
 int g95_is_constant_expr(g95_expr *e) {
+g95_constructor *c;
 int rv;
 
   if (e == NULL) return 1; 
@@ -683,8 +662,15 @@ int rv;
     break;
 
   case EXPR_STRUCTURE:
+    rv = 0;
+    for(c=e->value.constructor; c; c=c->next)
+      if (!g95_is_constant_expr(c->expr)) break;
+
+    if (c == NULL) rv = 1;
+    break;
+
   case EXPR_ARRAY:
-    rv = is_constant_constructor(e->value.constructor);
+    rv = g95_constant_ac(e);
     break;
 
   default:
@@ -881,7 +867,7 @@ g95_actual_arglist *ap;
       break;
     }
 
-    if (type == 1 && g95_simplify_iterator_var(p) == FAILURE) return FAILURE;
+    if (type == 1) g95_simplify_iterator_var(p);
 
     break;
 

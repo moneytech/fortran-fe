@@ -23,6 +23,14 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
+
+/* This parameter is the size of the largest array constructor that we
+ * will expand to an array constructor without iterators.
+ * Constructors larger than this will remain in the iterator form. */
+
+#define G95_MAX_AC_EXPAND 100
+
+
 /**************** Array reference matching subroutines *****************/
 
 /* g95_free_array_ref()-- Free an array reference structure and
@@ -572,41 +580,6 @@ g95_constructor *c;
 }
 
 
-/************** Calculate size of array constructors **************/
-
-/* count_elements()-- Recursive functions to count the number of
- * elements in a constructor.  If we hit an iterator, we give up and
- * return -1.  */
-
-static int count_elements(g95_constructor *c) {
-g95_expr *e;
-int i, total;
-
-  total = 0;
-
-  for(; c; c=c->next) {
-    e = c->expr;
-    i = 0;
-
-    if (e != NULL) {
-      if (e->expr_type == EXPR_ARRAY)
-	i = count_elements(e->value.constructor);
-      else
-	i = 1;
-    } else if (c->iterator != NULL) i = -1;
-
-    if (i == -1) {
-      total = -1;
-      break;
-    }
-
-    total += i;
-  }
-
-  return total;
-}
-
-
 /****************** Array constructor functions ******************/
 
 /* g95_free_constructor()-- Free chains of g95_constructor structures */
@@ -989,8 +962,59 @@ typedef struct iterator_stack {
 
 static iterator_stack *iter_stack;
 static g95_constructor *new_head, *new_tail;
+static int count, extract_n;
+static g95_expr *extracted;
+
+static try (*expand_work_function)(g95_expr *);
 
 static try expand_constructor(g95_constructor *);
+
+
+/* count_elements()-- Work function that counts the number of elements present
+ * in a constructor. */
+
+static try count_elements(g95_expr *e) {
+
+  g95_free_expr(e);
+  count++;
+
+  return SUCCESS;
+}
+
+
+/* extract_element()-- Work function that extracts a particular
+ * element from an array constructor, freeing the rest. */
+
+static try extract_element(g95_expr *e) {
+
+  if (count == extract_n)
+    extracted = e;
+  else
+    g95_free_expr(e);
+
+  count++;
+  return SUCCESS;
+}
+
+
+/* expand()-- Work function that constructs a new constructor out of
+ * the old one, stringing new elements together. */
+
+try expand(g95_expr *e) {
+
+  if (new_head == NULL)
+    new_head = new_tail = g95_get_constructor();
+  else {
+    new_tail->next = g95_get_constructor();
+    new_tail = new_tail->next;
+  }
+
+  new_tail->where = e->where;
+  new_tail->expr = e;
+
+  return SUCCESS;
+}
+
 
 /* g95_simplify_iteration_var()-- Given an initialization expression
  * that is a variable reference, substitute the current value of the
@@ -1028,29 +1052,20 @@ try t;
   start = g95_copy_expr(c->iterator->start);
   if (g95_simplify_expr(start, 1) == FAILURE) goto cleanup;
 
-  if (start->expr_type != EXPR_CONSTANT || start->ts.type != BT_INTEGER) {
-    g95_error("Iterator start at %L must be a constant integer",
-	      &start->where);
+  if (start->expr_type != EXPR_CONSTANT || start->ts.type != BT_INTEGER)
     goto cleanup;
-  }
 
   end = g95_copy_expr(c->iterator->end);
   if (g95_simplify_expr(end, 1) == FAILURE) goto cleanup;
 
-  if (end->expr_type != EXPR_CONSTANT || end->ts.type != BT_INTEGER) {
-    g95_error("Iterator end at %L must be a constant integer",
-	      &end->where);
+  if (end->expr_type != EXPR_CONSTANT || end->ts.type != BT_INTEGER)
     goto cleanup;
-  }
 
   step = g95_copy_expr(c->iterator->step);
   if (g95_simplify_expr(step, 1) == FAILURE) goto cleanup;
 
-  if (step->expr_type != EXPR_CONSTANT || step->ts.type != BT_INTEGER) {
-    g95_error("Iterator step at %L must be a constant integer",
-	      &step->where);
+  if (step->expr_type != EXPR_CONSTANT || step->ts.type != BT_INTEGER)
     goto cleanup;
-  }
 
   if (mpz_sgn(step->value.integer) == 0) {
     g95_error("Iterator step at %L cannot be zero",
@@ -1095,7 +1110,9 @@ cleanup:
 
 
 /* expand_constructor()-- Expand a constructor into constant
- * constructors without any iterators. */
+ * constructors without any iterators, calling the work function for
+ * each of the expanded expressions.  The work function needs to
+ * either save or free the passed expression. */
 
 static try expand_constructor(g95_constructor *c) {
 g95_expr *e;
@@ -1113,18 +1130,10 @@ g95_expr *e;
       continue;
     }
 
-    if (new_head == NULL)
-      new_head = new_tail = g95_get_constructor();
-    else {
-      new_tail->next = g95_get_constructor();
-      new_tail = new_tail->next;
-    }
+    e = g95_copy_expr(e);
+    if (g95_simplify_expr(e, 1) == FAILURE) return FAILURE;
 
-    new_tail->where = c->where;
-    new_tail->expr = g95_copy_expr(e);
-
-    if (g95_simplify_expr(new_tail->expr, 1) == FAILURE) return FAILURE;
-    continue;
+    if (expand_work_function(e) == FAILURE) return FAILURE;
   }
 
   return SUCCESS;
@@ -1132,12 +1141,22 @@ g95_expr *e;
 
 
 /* g95_expand_constructor()-- Top level subroutine for expanding
- * constructors.  TODO: Check handling of recursive expansions. */
+ * constructors.  We only expand constructor if they are small
+ * enough. */
 
 try g95_expand_constructor(g95_expr *e) {
+g95_expr *f;
+
+  f = g95_get_array_element(e, G95_MAX_AC_EXPAND);
+  if (f != NULL) {
+    g95_free_expr(f);
+    return SUCCESS;
+  }
 
   new_head = new_tail = NULL;
   iter_stack = NULL;
+
+  expand_work_function = expand;
 
   if (expand_constructor(e->value.constructor) == FAILURE) {
     g95_free_constructor(new_head);
@@ -1148,6 +1167,38 @@ try g95_expand_constructor(g95_expr *e) {
   e->value.constructor = new_head;
 
   return SUCCESS;
+}
+
+
+/* constant_element()-- Work function for checking that an element of
+ * a constructor is a constant, after removal of any iteration
+ * variables.  We return FAILURE if not so. */
+
+try constant_element(g95_expr *e) {
+int rv;
+
+  rv = g95_is_constant_expr(e);
+  g95_free_expr(e);
+
+  return rv ? SUCCESS : FAILURE;
+}
+
+
+/* g95_constant_ac()-- Given an array constructor, determine if the
+ * constructor is constant or not by expanding it and making sure that
+ * all elements are constants.  This is a bit of a hack since
+ * something like (/ (i, i=1,100000000) /) will take a while as
+ * opposed to a more clever function that traverses the expression
+ * tree. */
+
+int g95_constant_ac(g95_expr *e) {
+
+  iter_stack = NULL;
+  expand_work_function = constant_element;
+
+  if (expand_constructor(e->value.constructor) == FAILURE) return 0;
+
+  return 1;
 }
 
 
@@ -1221,38 +1272,6 @@ g95_constructor *dest;
 }
 
 
-/* get_element()-- Recursive work function for g95_get_array_element(). */
-
-static g95_expr *get_element(g95_constructor *c, int *element) {
-g95_expr *e;
-
-  for(;; c=c->next) {
-    if (c == NULL) return NULL;
-
-    if (c->iterator)
-      g95_internal_error("get_element(): Can't deal with iterators");
-
-    e = c->expr;
-
-    if (e->expr_type == EXPR_ARRAY) {
-      e = get_element(e->value.constructor, element);
-      if (e != NULL) break;
-
-      continue;
-    }
-
-    if (*element == 0) {
-      e = c->expr;
-      break;
-    }
-
-    (*element)--;
-  }
-
-  return e;
-}
-
-
 /* g95_get_array_element()-- Given an array expression and an element
  * number (starting at zero), return a pointer to the array element.
  * NULL is returned if the size of the array has been exceeded.  The
@@ -1262,7 +1281,16 @@ g95_expr *e;
 
 g95_expr *g95_get_array_element(g95_expr *array, int element) {
 
-  return get_element(array->value.constructor, &element);
+  extract_n = element;
+  expand_work_function = extract_element;
+  extracted = NULL;
+  count = 0;
+
+  iter_stack = NULL;
+
+  if (expand_constructor(array->value.constructor) == FAILURE) return NULL;
+
+  return extracted;
 }
 
 
@@ -1408,19 +1436,22 @@ int d;
  * error. */
 
 try g95_array_size(g95_expr *array, mpz_t *result) {
-int flag, size;
 g95_ref *ref;
+int flag;
 
   switch(array->expr_type) {
   case EXPR_ARRAY:
     flag = g95_suppress_error;
     g95_suppress_error = 1;
-    g95_expand_constructor(array);   /* Errors can be OK */
+
+    count = 0;
+    expand_work_function = count_elements;
+    iter_stack = NULL;
+
+    if (expand_constructor(array->value.constructor) == FAILURE) count = -1;
+    mpz_init_set_ui(*result, count);
+
     g95_suppress_error = flag;
-
-    size = count_elements(array->value.constructor);
-    mpz_init_set_ui(*result, size);
-
     break;
 
   case EXPR_VARIABLE:
