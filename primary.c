@@ -1130,8 +1130,10 @@ match m;
     } else {   /* See if we have the first keyword argument */
       if (m == MATCH_YES && g95_match(" =") == MATCH_YES)
 	seen_keyword = 1;
-      else
+      else {
 	g95_set_locus(&name_locus);
+	name[0] = '\0';
+      }
     }
 
     /* Make sure we haven't seen this keyword yet */
@@ -1547,7 +1549,7 @@ match m;
   if (sym->attr.function || sym->attr.external || sym->attr.intrinsic)
     goto function0;
 
-  if (sym->attr.generic) goto function1;
+  if (sym->attr.generic) goto generic_function;
 
   switch(sym->attr.flavor) {
   case FL_VARIABLE:
@@ -1738,17 +1740,12 @@ match m;
 
     break;
 
-  function1:
+  generic_function:
     g95_get_symbol(name, NULL, 0, &sym);   /* Can't fail */
 
     e = g95_get_expr();
     e->symbol = sym;
     e->expr_type = EXPR_FUNCTION;
-
-    if (g95_add_function(&sym->attr, NULL) == FAILURE) {
-      m = MATCH_ERROR;
-      break;
-    }
 
     m = g95_match_actual_arglist(0, &e->value.function.actual, NULL);
     break;

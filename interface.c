@@ -310,27 +310,188 @@ g95_component *dt1, *dt2;
 }
 
 
-/* compare_formal_arglist()-- Compare two formal argument lists
- * for equality. */
 
-static int compare_formal_arglist(g95_formal_arglist *a1,
-				  g95_formal_arglist *a2) {
-g95_symbol *s1, *s2;
- 
-  for(;;) {
-    s1 = a1->sym;
-    s2 = a2->sym;
 
-    if (g95_compare_types(&s1->ts, &s2->ts) == 0) return 0;
+/* compare_type_rank()-- Given two symbols that are formal arguments,
+ * compare their ranks and types.  Returns nonzero if they have the
+ * same rank and type, zero otherwise. */
 
-    if (g95_compare_array_spec(s1->as, s2->as) == 0) return 0;
+static int compare_type_rank(g95_symbol *s1, g95_symbol *s2) {
 
-    a1 = a1->next;
-    a2 = a2->next;
+  if (s1->as != NULL && s2->as != NULL && s1->as->rank != s2->as->rank)
+    return 0;  /* Ranks differ */
 
-    if (a1 == NULL && a2 == NULL) break;
-    if (a1 == NULL || a2 == NULL) return 0;
+  return g95_compare_types(&s1->ts, &s2->ts);
+}
+
+
+/* count_types_test()-- Given a pair of formal argument lists, we see
+ * if the two lists can be distinguished by counting the number of
+ * nonoptional arguments of a given type/rank in f1 and seeing if
+ * there are less then that number of those arguments in f2 (including
+ * optional arguments).  Since this test is asymmetric, it has to be
+ * called twice to make it symmetric.  Returns nonzero if the argument
+ * lists are incompatible by this test.  This subroutine implements
+ * rule 1 of section 14.1.2.3. */
+
+static int count_types_test(g95_formal_arglist *f1, g95_formal_arglist *f2) {
+int rc, ac1, ac2, i, j, k, n1;
+g95_formal_arglist *f;
+
+typedef struct {
+  int flag;
+  g95_symbol *sym;
+} arginfo;
+
+arginfo *arg;
+
+  n1 = 0;
+
+  if (f1 == NULL && f2 != NULL) return 0;
+
+  for(f=f1; f; f=f->next)
+    n1++;
+
+  /* Build an array of integers that gives the same integer to
+   * arguments of the same type/rank.  */
+
+  arg = g95_getmem(n1*sizeof(arginfo));
+
+  f = f1;
+  for(i=0; i<n1; i++, f=f->next) {
+    arg[i].flag = -1;
+    arg[i].sym = f->sym;
   }
+
+  k = 0;
+
+  for(i=0; i<n1; i++) {
+    if (arg[i].flag != -1) continue;
+
+    if (arg[i].sym->attr.optional) continue;   /* Skip optional arguments */
+
+    arg[i].flag = k;
+
+    /* Find other nonoptional arguments of the same type/rank */
+
+    for(j=i+1; j<n1; j++)
+      if (!arg[j].sym->attr.optional &&
+	  compare_type_rank(arg[i].sym, arg[j].sym)) arg[j].flag = k;
+
+    k++;
+  }
+
+  /* Now loop over each distinct type found in f1 */
+
+  k = 0;
+  rc = 0;
+
+  for(i=0; i<n1; i++) {
+    if (arg[i].flag != k) continue;
+
+    ac1 = 1;
+    for(j=i+1; j<n1; j++)
+      if (arg[j].flag == k) ac1++;
+
+    /* Count the number of arguments in f2 with that type, including
+     * those that are optional. */
+
+    ac2 = 0;
+
+    for(f=f2; f; f=f->next)
+      if (compare_type_rank(arg[i].sym, f->sym)) ac2++;
+
+    if (ac1 > ac2) { rc = 1; break; }
+
+    k++;
+  }
+
+  g95_free(arg);
+
+  return rc;
+}
+
+
+
+/* g95_find_keyword_arg()-- Given a formal argument list and a keyword
+ * name, search the list for that keyword.  Returns the correct symbol
+ * node if found, NULL if not found. */
+
+g95_symbol *g95_find_keyword_arg(char *name, g95_formal_arglist *f) {
+
+  for(; f; f=f->next)
+    if (strcmp(f->sym->name, name) == 0) return f->sym;
+
+  return NULL;
+}
+
+
+/* correspondence_test()-- Perform the correspondence test in rule 2
+ * of section 14.1.2.3.  Returns zero if no argument is found that
+ * satisifes rule 2, nonzero otherwise.  This test is also not
+ * symmetric in f1 and f2 and must be called twice. */
+
+static int correspondence_test(g95_formal_arglist *f1,
+			       g95_formal_arglist *f2) {
+
+g95_formal_arglist *f2_save, *g;
+g95_symbol *sym;
+
+  f2_save = f2;
+
+  while(f1) {
+    if (f1->sym->attr.optional) goto next;
+
+    if (f2 != NULL && compare_type_rank(f1->sym, f2->sym)) goto next;
+
+    /* Now search for a disambiguating keyword argument starting at
+     * the current non-match. */
+
+    for(g=f1; g; g=g->next) {
+      if (g->sym->attr.optional) continue;
+
+      sym = g95_find_keyword_arg(g->sym->name, f2_save);
+      if (sym == NULL || !compare_type_rank(g->sym, sym)) return 1;
+    }
+
+  next:
+    f1 = f1->next;
+    if (f2 != NULL) f2 = f2->next;
+  }
+
+  return 0;
+}
+
+
+/* compare_interface()-- 'Compare' two formal interfaces associated
+ * with a pair of symbols.  We return nonzero if there exists an
+ * actual argument list that would be ambiguous between the two
+ * interfaces, zero otherwise. */
+
+static int compare_interface(g95_symbol *s1, g95_symbol *s2) {
+g95_formal_arglist *f1, *f2;
+
+  if ((s1->attr.function == 0 && s1->attr.subroutine == 0) ||
+      (s2->attr.function == 0 && s2->attr.subroutine == 0))
+    g95_internal_error("compare_interface(): "
+		       "procedure is neither function nor subroutine");
+
+  if (s1->attr.function != s2->attr.function &&
+      s1->attr.subroutine != s2->attr.subroutine)
+    return 0;   /* disagreement between function/subroutine */
+
+  f1 = s1->formal;
+  f2 = s2->formal;
+
+  if (f1 == NULL && f2 == NULL) return 1;   /* Special case */
+
+  if (count_types_test(f1, f2)) return 0;
+  if (count_types_test(f2, f1)) return 0;
+
+  g95_status("Correspondence test\n");
+
+  if (correspondence_test(f1, f2)) return 0;
+  if (correspondence_test(f2, f1)) return 0;
 
   return 1;
 }
@@ -356,8 +517,8 @@ g95_interface *ip;
 
     if (new->formal == NULL) continue;
 
-    if (compare_formal_arglist(new->formal, ip->sym->formal)==MATCH_YES) {
-      g95_error("Interface ending at %C is the same as the interface at %L",
+    if (compare_interface(new, ip->sym)) {
+      g95_error("Interface ending at %C is ambiguous with interface at %L",
 		&ip->where);
 
       return FAILURE;
@@ -366,7 +527,6 @@ g95_interface *ip;
 
   return SUCCESS;
 }
-
 
 
 /* check_operator_interface()-- Given a namespace and an operator,
@@ -507,29 +667,88 @@ int op;
 }
 
 
-/* g95_compare_formal_actual()-- Given formal and actual argument
- * lists, see if they are compatible.  */
+int g95_symbol_rank(g95_symbol *sym) {
 
-int g95_compare_actual_formal(g95_actual_arglist *actual,
-			      g95_formal_arglist *formal) {
+  return (sym->as == NULL) ? 0 : sym->as->rank;
+}
+
+
+/* compare_formal_actual()-- Given formal and actual argument lists,
+ * see if they are compatible.  If they are compatible, the actual
+ * argument list is sorted to correspond with the formal list, and
+ * elements for missing optional arguments are inserted.  */
+
+int compare_actual_formal(g95_actual_arglist *actual,
+			  g95_formal_arglist *formal) {
+g95_actual_arglist **new, *a, temp;
 g95_formal_arglist *f;
+int i, n, na;
 
-  for(; actual; actual=actual->next) {
-    if (actual->name[0] == '\0') { 
-      if (formal == NULL ||
-	  g95_compare_types(&formal->sym->ts, &actual->expr->ts)==0) return 0;
-      formal = formal->next;
+  if (actual == NULL && formal == NULL) return 1;
 
-    } else {  /* Search for an optional arg */
+  n = 0;
+  for(f=formal; f; f=f->next)
+    n++;
 
-      for(f=formal; f; f=f->next)
-	if (strcmp(actual->name, f->sym->name) == 0) break;
+  new = alloca(n*sizeof(g95_actual_arglist *));
 
-      if (f == NULL) return 0;
+  for(i=0; i<n; i++)
+    new[i] = NULL;
 
-      if (g95_compare_types(&f->sym->ts, &actual->expr->ts) == 0) return 0;
+  na = 0;
+  f = formal;
+  i = 0;
+
+  for(a=actual; a; a=a->next) {
+    if (a->name[0] != '\0') {
+      i = 0;
+      for(f=formal; f; f=f->next, i++)
+	if (strcmp(f->sym->name, a->name) == 0) break;
+
+      if (f == NULL) return 0;       /* Keyword not found */
+
+      if (new[i] != NULL) return 0;  /* Actual already matched to formal */
     }
+
+    if (f == NULL ||
+	g95_symbol_rank(f->sym) != actual->expr->rank ||
+	g95_compare_types(&f->sym->ts, &a->expr->ts) == 0)
+      return 0;
+
+    if (a == actual) na = i;
+
+    new[i++] = a;
   }
+
+  /* Make sure missing actual arguments are optional */
+
+  i = 0;
+  for(f=formal; f; f=f->next, i++) {
+    if (new[i] != NULL) continue;
+    if (!f->sym->attr.optional) return 0;
+  }
+
+  /* The argument lists are compatible.  We now relink a new actual
+   * argument list with null arguments in the right places.  The head
+   * of the list remains the head. */
+
+  for(i=0; i<n; i++)
+    if (new[i] == NULL) new[i] = g95_get_actual_arglist();
+
+  if (na != 0) {
+    temp = *new[0];
+    *new[0] = *actual;
+    *actual = temp;
+
+    a = new[0];
+    new[0] = new[na];
+    new[na] = a;
+  }
+
+  for(i=0; i<n-1; i++)
+    new[i]->next = new[i+1];
+
+  new[i]->next = NULL;
 
   return 1;
 }
@@ -540,11 +759,15 @@ g95_formal_arglist *f;
  * actual.  If found, returns a pointer to the symbol of the correct
  * interface.  Returns NULL if not found. */
 
-g95_symbol *g95_search_interface(g95_interface *intr,
+g95_symbol *g95_search_interface(g95_interface *intr, int sub_flag,
 				 g95_actual_arglist *actual) {
 
-  for(; intr; intr=intr->next)
-    if (g95_compare_actual_formal(actual, intr->sym->formal)) return intr->sym;
+  for(; intr; intr=intr->next) {
+    if (sub_flag && intr->sym->attr.function) continue;
+    if (!sub_flag && intr->sym->attr.subroutine) continue;
+
+    if (compare_actual_formal(actual, intr->sym->formal)) return intr->sym;
+  }
 
   return NULL;
 }
@@ -562,7 +785,7 @@ try g95_extend_expr(g95_expr *e) {
 g95_actual_arglist *actual;
 g95_symbol *ip, *sym;
 g95_namespace *ns;
-int i;
+int i, sub_flag;
 
   ip = sym = NULL;
 
@@ -575,6 +798,7 @@ int i;
   }
 
   i = e->operator;
+  sub_flag = 0;
 
   switch(i) {
   case INTRINSIC_UPLUS:   i = INTRINSIC_PLUS;     break;
@@ -591,6 +815,7 @@ int i;
   case INTRINSIC_USER:
     i = -1;
     ip = e->symbol;
+    sub_flag = 1;
     break;
 
   default:
@@ -598,10 +823,10 @@ int i;
   }
     
   if (i == -1)
-    sym = g95_search_interface(ip->operator, actual);
+    sym = g95_search_interface(ip->operator, sub_flag, actual);
   else {
     for(ns=g95_current_ns; ns; ns=ns->parent) {
-      sym = g95_search_interface(ns->operator[i], actual);
+      sym = g95_search_interface(ns->operator[i], sub_flag, actual);
       if (sym != NULL) break;
     }
   }
@@ -697,36 +922,9 @@ g95_formal_arglist *head, *tail;
 }
 
 
-/* find_modproc()-- Work function for g95_parent_procedure(). */
-
-static g95_symbol *module_procedure;
-static try modproc_return;
-
-static void find_modproc(g95_symbol *generic_sym) {
-g95_interface *ip;
-
-  if (!generic_sym->attr.generic) return;
-
-  for(ip=generic_sym->generic; ip; ip=ip->next)
-    if (ip->sym == module_procedure) break;
-
-  if (ip == NULL) return;
-
-  if (module_procedure->attr.function && generic_sym->attr.function == 0 &&
-      g95_add_function(&generic_sym->attr, NULL) == FAILURE)
-    modproc_return = FAILURE;
-
-  if (module_procedure->attr.subroutine && generic_sym->attr.subroutine == 0 &&
-      g95_add_subroutine(&generic_sym->attr, NULL) == FAILURE)
-    modproc_return = FAILURE;
-}
-
-
 /* g95_parent_procedure()-- Given a symbol that is the name of a
  * subroutine or a function contained in a module, make the necessary
- * changes in the module namespace.  If the symbol is a module
- * procedure, we can decide if the generic name and other specific
- * functions are subroutines or functions. */
+ * changes in the module namespace.  */
 
 try g95_parent_procedure(g95_symbol *sym, int sub_flag) {
 g95_symbol *m;
@@ -765,11 +963,5 @@ g95_symbol *m;
 
   m->formal = copy_formal(sym->formal);
 
-  module_procedure = m;
-  modproc_return = SUCCESS;
-
-  g95_traverse_ns(g95_current_ns->parent, &find_modproc);
-
-  return modproc_return;
+  return SUCCESS;
 }
-

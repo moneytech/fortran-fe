@@ -292,7 +292,7 @@ static match resolve_generic0(g95_expr *expr, g95_symbol *sym) {
 g95_symbol *s;
 
   if (sym->attr.generic) {
-    s = g95_search_interface(sym->generic, expr->value.function.actual);
+    s = g95_search_interface(sym->generic, 0, expr->value.function.actual);
     if (s != NULL) {
       expr->value.function.name = s->name;
       expr->ts = s->ts;
