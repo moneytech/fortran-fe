@@ -681,6 +681,8 @@ int di, dr, dd, dl, dc, dz;
 	  g95_check_dcmplx, g95_simplify_dcmplx, NULL,
 	  x, BT_REAL, dd, 0,   y, BT_REAL, dd, 1, NULL);  /* Extension */
 
+  make_generic("dcmplx", G95_ISYM_CMPLX);
+
   add_sym("conjg", 1, 1, BT_COMPLEX, dz,
 	  NULL, g95_simplify_conjg, g95_resolve_conjg,
 	  z, BT_COMPLEX, dz, 0, NULL);
