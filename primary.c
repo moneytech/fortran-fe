@@ -201,6 +201,7 @@ const char *rname;
 locus old_loc;
 char *buffer;
 g95_expr *e;
+mpz_t mask;
 
   old_loc = *g95_current_locus();
   g95_gobble_whitespace();
@@ -240,6 +241,29 @@ g95_expr *e;
 
   e = g95_convert_integer(buffer, g95_default_integer_kind(), radix);
   e->where = *g95_current_locus();
+
+/* If we're doing twos complement, allow constants with the high bit
+ * set to be faithfully reproduced. */
+
+  if (g95_integer_kinds[0].radix == 2 && 
+      mpz_cmp(e->value.integer, g95_integer_kinds[0].huge) > 0) {
+
+    mpz_init(mask);
+    mpz_ui_pow_ui(mask, 2, g95_integer_kinds[0].digits);
+
+    if (mpz_cmp(e->value.integer, mask) != 0) {
+      mpz_com(e->value.integer, e->value.integer);
+      mpz_add_ui(e->value.integer, e->value.integer, 1);
+
+      mpz_ui_pow_ui(mask, 2, g95_integer_kinds[0].digits);
+      mpz_sub_ui(mask, mask, 1);
+
+      mpz_and(e->value.integer, e->value.integer, mask);
+      mpz_neg(e->value.integer, e->value.integer);
+    }
+
+    mpz_clear(mask);
+  }
 
   if (g95_check_integer_range(e->value.integer, g95_default_integer_kind())
       != ARITH_OK) {
