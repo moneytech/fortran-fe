@@ -1538,9 +1538,14 @@ match m;
     break;
 
   case FL_PARAMETER:
-    e = g95_copy_expr(sym->value);
+    if (sym->value->expr_type != EXPR_ARRAY)
+      e = g95_copy_expr(sym->value);
+    else {
+      e = g95_get_expr();
+      e->expr_type = EXPR_VARIABLE;
+    }
+
     e->symbol = sym;
-    if (sym->as != NULL) e->rank = sym->as->rank;
     m = match_varspec(e, 0);
     break;
 

@@ -689,7 +689,8 @@ g95_expr *op1, *op2, *result;
   if (g95_simplify_expr(op1, type) == FAILURE) return FAILURE;
   if (g95_simplify_expr(op2, type) == FAILURE) return FAILURE;
 
-  if (!g95_is_constant_expr(op1) || (op2 != NULL && !g95_is_constant_expr(op2)))
+  if (!g95_is_constant_expr(op1) ||
+      (op2 != NULL && !g95_is_constant_expr(op2)))
     return SUCCESS;
 
 /* Rip p apart */
@@ -774,7 +775,7 @@ g95_expr *op1, *op2, *result;
     result = g95_neqv(op1, op2);
     break;
 
-  default: g95_internal_error("g95_simplify_expr(): Impossible operator"); 
+  default: g95_internal_error("simplify_intrinsic_op(): Bad operator"); 
   }
 
   if (result == NULL) return FAILURE;
@@ -855,7 +856,8 @@ g95_actual_arglist *ap;
     break;
 
   case EXPR_VARIABLE:
-    if (p->symbol->attr.flavor == FL_PARAMETER) {
+    if (p->symbol->attr.flavor == FL_PARAMETER &&
+	p->symbol->value->expr_type != EXPR_ARRAY) {
       g95_replace_expr(p, g95_copy_expr(p->symbol->value));
       break;
     }
@@ -1350,6 +1352,8 @@ int i;
     g95_status("(/ ");
     show_constructor(p->value.constructor);
     g95_status(" /)");
+
+    show_ref(p->ref);
     break;
 
   case EXPR_NULL:
