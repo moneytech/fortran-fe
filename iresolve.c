@@ -152,16 +152,14 @@ void g95_resolve_aint(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
 
 void g95_resolve_all(g95_expr *f, g95_expr *mask, g95_expr *dim) {
-static char all0[] = "__all0", all1[] = "__all1";
 
   f->ts = mask->ts;
 
-  if (dim == NULL || mask->rank == 1)
-    f->value.function.name = all0;
-  else {
-    f->value.function.name = all1;
-    f->rank = mask->rank - 1;
-  }
+  if (dim != NULL && mask->rank != 1) f->rank = mask->rank - 1;
+
+  f->value.function.name =
+    g95_get_string("__all%d_%c%d", f->rank, g95_type_letter(mask->ts.type),
+                   mask->ts.kind);
 }
 
 
@@ -178,16 +176,14 @@ void g95_resolve_anint(g95_expr *f, g95_expr *a, g95_expr *kind) {
 
 
 void g95_resolve_any(g95_expr *f, g95_expr *mask, g95_expr *dim) {
-static char any0[] = "__any0", any1[] = "__any1";
 
   f->ts = mask->ts;
 
-  if (dim == NULL || mask->rank == 1)
-    f->value.function.name = any0;
-  else {
-    f->value.function.name = any1;
-    f->rank = mask->rank - 1;
-  }
+  if (dim != NULL && mask->rank != 1) f->rank = mask->rank - 1;
+
+  f->value.function.name =
+    g95_get_string("__any%d_%c%d", f->rank, g95_type_letter(mask->ts.type),
+                   mask->ts.kind);
 }
 
 
