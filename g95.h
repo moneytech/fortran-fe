@@ -20,6 +20,7 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 #include <stdio.h> /* need FILE * here */
+#include "config.h"
 
 /* g95.h-- It's probably insane to have just one header file, but it
  * seemed like everything had to be recompiled anyway when a change
