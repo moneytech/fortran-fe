@@ -351,7 +351,6 @@ const char *co, *cd, *cdp;
 
   g95_status("GNU Fortran 95 Compiler " G95_VERSION
     " (C) 2000-2002 Free Software Foundation\n"
-    "Compiled " __DATE__ " " __TIME__ "\n\n"
     "Usage: g95 [options] file\n"
     "Options:\n");
 
