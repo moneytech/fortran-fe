@@ -536,6 +536,11 @@ int i;
     return 1;
   }
 
+#ifdef IN_GCC
+  if (strncmp(option, "-fdump-", 7) == 0)
+    return dump_switch_p (option + 2);
+#endif
+
   if (strcmp(option, "-i8") == 0) {
     g95_option.i8 = 1;
     return 1;
