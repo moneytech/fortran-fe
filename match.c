@@ -1792,6 +1792,7 @@ match m;
       }
 
       if (g95_match_eos() == MATCH_YES) goto done;
+      if (g95_peek_char() == '/') break;
       if (g95_match_char(',') != MATCH_YES) goto syntax;
       if (g95_peek_char() == '/') break;
     }
