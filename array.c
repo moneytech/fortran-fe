@@ -1548,13 +1548,8 @@ int i;
     g95_internal_error("g95_array_dimen_size(): Bad dimension");
 
   switch(array->expr_type) {
-  case EXPR_ARRAY:
-    if (array->shape == NULL) return FAILURE;
-
-    mpz_init_set(*result, array->shape[dimen]);
-    break;
-
   case EXPR_VARIABLE:
+  case EXPR_FUNCTION:
     for(ref=array->ref; ref; ref=ref->next) {
       if (ref->type != REF_ARRAY) continue;
 
@@ -1575,7 +1570,11 @@ int i;
     break;
 
   default:
-    return FAILURE;
+    if (array->shape == NULL) return FAILURE;
+
+    mpz_init_set(*result, array->shape[dimen]);
+
+    break;
   }
 
   return SUCCESS;
