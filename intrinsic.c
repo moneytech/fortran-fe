@@ -1339,7 +1339,7 @@ g95_actual_arglist *head, *tail, *next;
 
 /* sort_actual()-- Given an actual arglist and a formal arglist, sort
  * the actual arglist so that its arguments are in a one-to-one
- * correspondance with the format arglist.  Arguments that are not
+ * correspondence with the format arglist.  Arguments that are not
  * present are given a blank g95_actual_arglist structure.  If
  * something is obviously wrong (say, a missing required argument) we
  * abort sorting and return FAILURE. */
