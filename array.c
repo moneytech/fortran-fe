@@ -310,7 +310,6 @@ matched:
 }
 
 
-
 /* resolve_index()-- Resolve a single array index */
 
 static try resolve_index(g95_expr *index) {
@@ -990,11 +989,13 @@ g95_symbol *sym;
 try g95_check_constructor(g95_expr *expr, int array_constructor,
 			  match (*check_function)(g95_expr *)) {
 cons_stack *base_save;
+int old_flag;
 try t;
 
   base_save = base;
   base = NULL;
 
+  old_flag = array_constructor_flag;
   array_constructor_flag = array_constructor;
 
   cons_state = CONS_START;
@@ -1005,6 +1006,8 @@ try t;
     expr->ts = constructor_ts;
 
   base = base_save;
+  array_constructor_flag = old_flag;
+
   return t;
 }
 
