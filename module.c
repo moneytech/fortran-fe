@@ -2094,6 +2094,7 @@ g95_symbol *sym;
 
       st = get_unique_symtree(ns);
       st->n.sym = info->sym;
+      info->sym->refs++;
       break;
 
     default:
