@@ -73,16 +73,16 @@ match m;
 
 /* match_case_selector()-- Match a single case selector. */
 
-static match match_case_selector(g95_case *c) {
+static match match_case_selector(g95_case **cp) {
+g95_case *c;
 match m;
 
-  c->low = c->high = NULL;
+  c = g95_get_case(); 
 
   if (g95_match(" :") == MATCH_YES) {
     m = g95_match_scalar_expr(&c->high);
     if (m == MATCH_NO) goto need_expr;
     if (m == MATCH_ERROR) goto cleanup;
-
     goto done;
   }
 
@@ -99,21 +99,15 @@ match m;
   }
 
 done:
+  *cp = c;
   return MATCH_YES;
 
 need_expr:
   g95_error("Expected expression in CASE at %C");
 
 cleanup:
-  if (c->low != NULL) {
-    g95_free_expr(c->low); 
-    c->low = NULL;
-  }
-
-  if (c->high != NULL) {
-    g95_free_expr(c->high); 
-    c->high = NULL;
-  }
+  free_case(c);
+  g95_free(c);
 
   return MATCH_ERROR;
 }
@@ -144,7 +138,7 @@ match m;
 /* g95_match_case()-- Match a CASE statement */
 
 match g95_match_case(void) {
-g95_case c, *head, *tail;
+g95_case *c, *head, *tail;
 match m;
 
   head = NULL;
@@ -167,17 +161,14 @@ match m;
   if (g95_match(" (") != MATCH_YES) goto syntax;
 
   for(;;) {
-    memset(&c, '\0', sizeof(c));
     if (match_case_selector(&c) == MATCH_ERROR) goto cleanup;
 
     if (head == NULL)
-      head = tail = g95_get_case();
-    else {
-      tail->next = g95_get_case();
-      tail = tail->next;
-    }
+      head = c;
+    else
+      tail->next = c;
 
-    *tail = c;
+    tail = c;
 
     if (g95_match(" )") == MATCH_YES) break;
     if (g95_match(" ,") != MATCH_YES) goto syntax;
