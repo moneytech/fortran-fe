@@ -8,44 +8,94 @@ AC_CANONICAL_HOST
 
 AC_C_CONST
 
+case "$host" in 
+hppa*) CFLAGS="-Ae $CFLAGS";;
+esac
+
 #############################################################################
 # Find GMP (GNU Multi-Precision) library:
 
 AC_ARG_WITH(gmp-dir, [--with-gmp-dir=PATH       Specify directory for the GMP library])
 
+gmp_include_dirs="/usr/local/include"
+gmp_lib_dirs="/usr/local/lib"
+
 if test "x$with_gmp_dir" != x; then
 	if test -d $with_gmp_dir; then
-		CPPFLAGS="$CPPFLAGS -I$with_gmp_dir"
+		gmp_include_dirs="$with_gmp_dir $gmp_include_dirs"
 	fi
 	if test -d $with_gmp_dir/.libs; then
-		LDFLAGS="$LDFLAGS -L$with_gmp_dir/.libs"
+		gmp_lib_dirs="$with_gmp_dir/.libs $gmp_lib_dirs"
 	elif test -d $with_gmp_dir/$host; then
-		LDFLAGS="$LDFLAGS -L$with_gmp_dir/$host"
+		gmp_lib_dirs="$with_gmp_dir/$host $gmp_lib_dirs"
 	fi
 fi
 
-# Look for gmp header first:
-AC_CHECK_HEADER(gmp.h, [], [AC_MSG_ERROR([gmp.h not found])])
+g95_save_CPPFLAGS=$CPPFLAGS
 
-AC_MSG_CHECKING([whether gmp version is ok])
-AC_TRY_COMPILE([#include <gmp.h>],[
+for dir in $gmp_include_dirs;
+do
+	AC_MSG_CHECKING([for gmp.h in $dir])
+
+	if test -f $dir/gmp.h; then
+		AC_MSG_RESULT(yes)
+	else
+		AC_MSG_RESULT(no)
+		continue
+	fi
+
+	CPPFLAGS="-I$dir $g95_save_CPPFLAGS"
+
+	AC_MSG_CHECKING([for correct version of gmp.h in $dir])
+	AC_TRY_COMPILE([#include <gmp.h>],[
 #if __GNU_MP_VERSION < 3
        choke me
 #endif
 ], [ok=yes], [ok=no])
-AC_MSG_RESULT($ok)
-if test $ok = no; then
+
+	if test $ok = yes; then
+		AC_MSG_RESULT([yes])
+		break
+	else
+		AC_MSG_RESULT([no])
+	fi
+done
+
+AC_CHECK_HEADER(gmp.h, [], [AC_MSG_ERROR([gmp.h not found])])
+
+if test -z "$ok"; then
+	AC_MSG_ERROR([gmp.h not found])
+fi
+
+if test "$ok" != yes; then
 	AC_MSG_ERROR([gmp version 3.0 or later is needed])
 fi
 
-AC_MSG_CHECKING([for mpf_init in -lgmp])
-g95_save_LIBS="$LIBS"; LIBS="-lgmp $LIBS"
-AC_TRY_LINK([#include <gmp.h>], [mpf_t n; mpf_init(n);], [ok=yes],
-            [LIBS="$g95_save_LIBS"; ok=no])
-AC_MSG_RESULT($ok)
-if test $ok = no; then
+
+g95_save_LIBS="$LIBS";
+g95_save_LDFLAGS="$LDFLAGS";
+
+for dir in $gmp_lib_dirs;
+do
+	AC_MSG_CHECKING([for mpf_init in -lgmp])
+
+	LIBS="-lgmp $g95_save_LIBS"
+	LDFLAGS="-L$dir $g95_save_LDFLAGS"
+
+	AC_TRY_LINK([#include <gmp.h>], [mpf_t n; mpf_init(n);], [ok=yes],
+        	    [LIBS="$g95_save_LIBS"; ok=no])
+	AC_MSG_RESULT($ok)
+
+	if test "$ok" = yes; then
+		break
+	fi
+done
+
+if test "$ok" != yes; then
 	AC_MSG_ERROR([could not link with libgmp])
 fi
+
+
 
 #############################################################################
 # --enable-debug to turn on debugging (currently defaults to yes)
