@@ -219,53 +219,6 @@ int g95_string2code(mstring *m, const char *string) {
 }
 
 
-/* String Pool.  This is used to provide a stable location for various
- * string constants. */
-
-#define G95_STRINGPOOL_SIZE 500
-
-static char *pool_base, *pool_top;
-
-static void init_stringpool(void) {
-
-  pool_base = pool_top = g95_getmem(G95_STRINGPOOL_SIZE);
-  *pool_base = '\0';
-}
-
-
-/* g95_add_string()-- Add a string to the string pool */
-
-void g95_add_string(char *string) {
-int len;
-
-  len = strlen(string);
-
-  if ((pool_top - pool_base) + len + 2 >= G95_STRINGPOOL_SIZE)
-    g95_internal_error("g95_add_string(): string pool size too small");
-
-  strcpy(pool_top, string);
-
-  pool_top = strchr(pool_top, '\0') + 1;
-  *pool_top = '\0';
-}
-
-
-/* g95_get_string()-- Find a string in the string pool */
-
-char *g95_get_string(char *string) {
-char *p;
-
-  p = pool_base;
-
-  while(*p) {
-    if (strcmp(p, string) == 0) return p;
-    p = strchr(p, '\0') + 1;
-  }
-
-  g95_internal_error("g95_get_string(): string not found");
-  return NULL;
-}
-
 
 /* Initialization functions */
 
@@ -273,11 +226,11 @@ char *p;
 
 void g95_init_1(void) {
 
-  init_stringpool();
   g95_error_init_1();
   g95_scanner_init_1();
   g95_arith_init_1();
   g95_intrinsic_init_1();
+  g95_iresolve_init_1();
   g95_simplify_init_1();
 }
 
@@ -300,8 +253,7 @@ void g95_done_1(void) {
   g95_scanner_done_1();
   g95_intrinsic_done_1();
   g95_simplify_done_1();
-
-  g95_free(pool_base);
+  g95_iresolve_done_1();
 }
 
 

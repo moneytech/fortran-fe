@@ -20,15 +20,11 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
-#include "simplify.h"
+#include "intrinsic.h"
 
 #include <ctype.h>
 #include <string.h>
 
-
-extern g95_integer_info g95_integer_kinds[];
-extern g95_real_info g95_real_kinds[];
-extern g95_expr *g95_current_function;
 
 extern mpf_t mpf_pi, mpf_hpi, mpf_nhpi, mpf_tpi;
 
@@ -37,8 +33,6 @@ static mpf_t mpf_zero, mpf_half, mpf_one;
 static mpz_t mpz_zero;
 
 g95_expr g95_bad_expr;
-
-static char temp_name[30];
 
 
 /* Note that 'simplification' is not just transforming expressions.
@@ -390,22 +384,6 @@ int kind;
 }
 
 
-g95_expr *g95_simplify_all(g95_expr *mask, g95_expr *dim) {
-static char all0[] = "__all0", all1[] = "__all1";
-
-  g95_current_function->ts = mask->ts;
-
-  if (dim == NULL || mask->rank == 1)
-    g95_current_function->value.function.name = all0;
-  else {
-    g95_current_function->value.function.name = all1;
-    g95_current_function->rank = mask->rank - 1;
-  }
-
-  return NULL;
-}
-
-
 g95_expr *g95_simplify_dint(g95_expr *e) {
 g95_expr *rtrunc, *result;
 
@@ -479,22 +457,6 @@ int cmp;
   g95_free_expr(rtrunc);
 
   return range_check(result, "DNINT");
-}
-
-
-g95_expr *g95_simplify_any(g95_expr *mask, g95_expr *dim) {
-static char any0[] = "__any0", any1[] = "__any1";
-
-  g95_current_function->ts = mask->ts;
-
-  if (dim == NULL || mask->rank == 1)
-    g95_current_function->value.function.name = any0;
-  else {
-    g95_current_function->value.function.name = any1;
-    g95_current_function->rank = mask->rank - 1;
-  }
-
-  return NULL;
 }
 
 
@@ -900,40 +862,6 @@ g95_expr *result;
   }
 
   return range_check(result, "DIM");
-}
-
-
-/* dot_name()-- Given a type and kind, return a static pointer to the
- * name of the appropriate dot_product intrinsic. */
-
-static char *dot_name(bt type, int kind) {
-
-  sprintf(temp_name, "__dot_product_%c%d", g95_type_letter(type), kind);
-  return temp_name;
-}
-
-
-/* g95_simplify_dot_product()-- The "simplification" here is inserting
- * a resolved call to the right subroutine. */
-
-g95_expr *g95_simplify_dot_product(g95_expr *a, g95_expr *b) {
-g95_expr temp;
-
-  if (a->ts.type == BT_LOGICAL && b->ts.type == BT_LOGICAL) {
-    g95_current_function->ts.type = BT_LOGICAL;
-    g95_current_function->ts.kind = g95_default_logical_kind();
-  } else {
-    temp.op1 = a;
-    temp.op2 = b;
-    g95_type_convert_binary(&temp);
-    g95_current_function->ts = temp.ts;
-  }
-
-  g95_current_function->value.function.name =
-    g95_get_string(dot_name(g95_current_function->ts.type,
-			    g95_current_function->ts.kind));
-
-  return NULL;
 }
 
 
@@ -1968,48 +1896,6 @@ int i;
 }
 
 
-static char *maxval_name(bt type, int kind) {
-
-  sprintf(temp_name, "__maxval_%c%d", g95_type_letter(type), kind);
-  return temp_name;
-}
-
-
-g95_expr *g95_simplify_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
-
-  g95_current_function->ts = array->ts;
-
-  g95_current_function->value.function.name =
-    g95_get_string(maxval_name(array->ts.type, array->ts.kind));
-
-  if (dim != NULL && array->rank != 1)
-    g95_current_function->rank = array->rank - 1;
-
-  return NULL;
-}
-
-
-static char *minval_name(bt type, int kind) {
-
-  sprintf(temp_name, "__minval_%c%d", g95_type_letter(type), kind);
-  return temp_name;
-}
-
-
-g95_expr *g95_simplify_minval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
-
-  g95_current_function->ts = array->ts;
-
-  g95_current_function->value.function.name =
-    g95_get_string(minval_name(array->ts.type, array->ts.kind));
-
-  if (dim != NULL && array->rank != 1)
-    g95_current_function->rank = array->rank - 1;
-
-  return NULL;
-}
-
-
 g95_expr *g95_simplify_mod(g95_expr *a, g95_expr *p) {
 g95_expr *result;
 mpf_t quot, iquot, term;
@@ -2264,9 +2150,7 @@ g95_expr *g95_simplify_null(g95_expr *mold) {
 g95_expr *result;
 
   result = g95_get_expr();
-
   result->expr_type = EXPR_NULL;
-  result->where = g95_current_function->where;
 
   if (mold == NULL)
     result->ts.type = BT_UNKNOWN;
@@ -2432,11 +2316,8 @@ g95_expr *e;
 
   if (source->expr_type != EXPR_ARRAY || shape_exp->expr_type != EXPR_ARRAY ||
       (pad != NULL && pad->expr_type != EXPR_ARRAY) ||
-      (order_exp != NULL && order_exp->expr_type != EXPR_ARRAY)) {
-
-    g95_current_function->ts = source->ts;
+      (order_exp != NULL && order_exp->expr_type != EXPR_ARRAY))
     return NULL;
-  }
 
   mpz_init(index);
   rank = 0;
@@ -2674,29 +2555,13 @@ int i, p;
 }
 
 
-static char *scale_name(int real_kind, int int_kind) {
-
-  sprintf(temp_name, "__scale%d_%d", real_kind, int_kind);
-  return temp_name;
-}
-
-
 g95_expr *g95_simplify_scale(g95_expr *x, g95_expr *i) {
 int k, neg_flag, power, exp_range;
 mpf_t scale, radix;
 g95_expr *result;
 
-  if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT) {
-    result = g95_build_funcall(NULL, g95_copy_expr(x), g95_copy_expr(i), NULL);
-
-    g95_current_function->ts = x->ts;
-    g95_current_function->where = x->where;
-
-    g95_current_function->value.function.name =
-      g95_get_string(scale_name(x->ts.kind, i->ts.kind));
-
+  if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT)
     return NULL;
-  }
 
   result = g95_constant_result(BT_REAL, x->ts.kind);
   result->where = x->where;
@@ -2895,16 +2760,6 @@ unsigned long exp2;
   mpf_clear(frac);
 
   return range_check(result, "SET_EXPONENT");
-}
-
-
-g95_expr *g95_simplify_shape(g95_expr *source) {
-
-  g95_current_function->ts.type = BT_INTEGER;
-  g95_current_function->ts.kind = g95_default_integer_kind();
-  g95_current_function->rank = 1;
-
-  return NULL;
 }
 
 
@@ -3181,27 +3036,6 @@ mpf_t ac, ad, s, t, w;
 }
 
 
-static char *sum_name(bt type, int kind) {
-
-  sprintf(temp_name, "__sum_%c%d", g95_type_letter(type), kind);
-  return temp_name;
-}
-
-
-g95_expr *g95_simplify_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
-
-  g95_current_function->ts = array->ts;
-
-  if (dim != NULL && array->rank != 1)
-    g95_current_function->rank = array->rank - 1;
-
-  g95_current_function->value.function.name = 
-    g95_get_string(sum_name(array->ts.type, array->ts.kind));
-
-  return NULL;
-}
-
-
 g95_expr *g95_simplify_tan(g95_expr *x) {
 g95_expr *result;
 mpf_t mpf_sin, mpf_cos, mag_cos;
@@ -3384,7 +3218,6 @@ int i;
 
 
 void g95_simplify_init_1(void) {
-int i, j, k;
 
   integer_zero = g95_convert_integer("0", g95_default_integer_kind(), 10);
   real_zero = g95_convert_real("0.0", g95_default_real_kind());
@@ -3395,42 +3228,6 @@ int i, j, k;
   mpz_init_set_str(mpz_zero,   "0", 10);
 
   invert_table(ascii_table, xascii_table);
-
-  /* Names of the various DOT_PRODUCT subroutines */
-
-  g95_add_string(dot_name(BT_LOGICAL, g95_default_logical_kind()));
-
-  /* Names of integer subroutines */
-
-  for(i=0; g95_integer_kinds[i].kind; i++) {
-    k = g95_integer_kinds[i].kind;
-
-    g95_add_string(dot_name(BT_INTEGER, k));
-    g95_add_string(sum_name(BT_INTEGER, k));
-
-    g95_add_string(maxval_name(BT_INTEGER, k));
-    g95_add_string(minval_name(BT_INTEGER, k));
-  }
-
-  for(i=0; g95_real_kinds[i].kind; i++) { 
-    k = g95_integer_kinds[i].kind;
-
-    g95_add_string(dot_name(BT_REAL, k));
-    g95_add_string(dot_name(BT_COMPLEX, k));
-
-    g95_add_string(sum_name(BT_REAL, k));
-    g95_add_string(sum_name(BT_COMPLEX, k));
-
-    g95_add_string(maxval_name(BT_REAL, k));
-    g95_add_string(minval_name(BT_REAL, k));
-  }
-
-  /* Names of the various forms of the SCALE intrinsic */
-
-  for(i=0; g95_real_kinds[i].kind; i++)
-    for(j=0; g95_integer_kinds[j].kind; j++)
-      g95_add_string(scale_name(g95_real_kinds[i].kind,
-				g95_integer_kinds[j].kind));
 }
 
 
