@@ -879,8 +879,8 @@ try t;
 
     case EXEC_WHERE:
       if (t == SUCCESS && code->expr != NULL &&
-	  code->expr->ts.type != BT_LOGICAL)
-	g95_error("WHERE/ELSEWHERE clause at %L requires a LOGICAL expression",
+	  (code->expr->ts.type != BT_LOGICAL || code->expr->rank == 0))
+	g95_error("WHERE/ELSEWHERE clause at %L requires a LOGICAL array",
 		  &code->expr->where);
       break;
 

@@ -2210,7 +2210,7 @@ g95_code *c;
   m0 = g95_match_label();
   if (m0 == MATCH_ERROR) return m0;
 
-  m = g95_match(" where ( %e )", &expr);
+  m = g95_match(" where ( %E )", &expr);
   if (m != MATCH_YES) return m;
 
   if (g95_match_eos() == MATCH_YES) {
