@@ -2780,7 +2780,7 @@ int n, d;
     d = mpz_get_ui(dim->value.integer);
     ar = g95_find_array_ref(array);
     if (g95_array_ref_shape(ar, shape) == FAILURE) return NULL;
-    n = ar->dimen;
+    n = (ar->type == AR_FULL) ? ar->as->rank : ar->dimen;
   }
 
   result = g95_constant_result(BT_INTEGER, g95_default_integer_kind(),

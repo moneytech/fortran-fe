@@ -1596,8 +1596,6 @@ arith rc;
 }
 
 
-
-
 static arith reduce_binary_ac(arith (*eval)(), g95_expr *op1, g95_expr *op2,
 			      g95_expr **result) {
 g95_constructor *c, *head;
@@ -1670,7 +1668,6 @@ arith rc;
 }
 
 
-
 static arith reduce_binary_aa(arith (*eval)(), g95_expr *op1, g95_expr *op2,
 			      g95_expr **result) {
 g95_constructor *c, *d, *head;
@@ -1681,6 +1678,9 @@ arith rc;
 
   rc = ARITH_OK;
   d = op2->value.constructor.head;
+
+  if (g95_check_conformance("Elemental binary operation", op1, op2) != SUCCESS)
+    return ARITH_INCOMMENSURATE;
 
   for(c=head; c; c=c->next, d=d->next) {
     if (d == NULL) {
@@ -1714,8 +1714,6 @@ arith rc;
 
   return rc;
 }
-
-
 
 
 static arith reduce_binary(arith (*eval)(), g95_expr *op1, g95_expr *op2,

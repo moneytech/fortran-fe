@@ -1166,6 +1166,7 @@ match g95_match_implicit(void);
 void g95_set_implicit(void);
 g95_typespec *g95_get_default_type(g95_symbol *, g95_namespace *);
 try g95_set_default_type(g95_symbol *, int, g95_namespace *);
+try g95_check_conformance(const char *, g95_expr *, g95_expr *);
 try g95_check_assign(g95_expr *, g95_expr *, int);
 try g95_check_pointer_assign(g95_expr *, g95_expr *);
 try g95_check_assign_symbol(g95_symbol *, g95_expr *);

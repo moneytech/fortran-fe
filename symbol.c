@@ -295,15 +295,49 @@ g95_typespec *ts;
 }
 
 
+/* g95_check_conformance()-- Given two expressions, make sure that
+ * the arrays are conformable. */
+
+try g95_check_conformance(const char* optype, g95_expr *op1, g95_expr *op2){
+mpz_t op1size, op2size;
+int op1flag, op2flag, d;
+try t;
+
+  if (op1->rank == 0 || op2->rank == 0) return SUCCESS;
+
+  if (op1->rank != op2->rank) {
+    g95_error("Incompatible ranks in %s at %L", optype, &op1->where);
+    return FAILURE;
+  }
+
+  t = SUCCESS;
+  for(d=0; d<op1->rank; d++) {
+    op1flag = g95_array_dimen_size(op1, d, &op1size) == SUCCESS;
+    op2flag = g95_array_dimen_size(op2, d, &op2size) == SUCCESS;
+    
+    if (op1flag && op2flag && mpz_cmp(op1size, op2size) != 0) {
+      g95_error("%s at %L has different shape on dimension %d",
+		optype, &op1->where, d+1);
+      
+      t = FAILURE;
+    }
+
+    if (op1flag) mpz_clear(op1size);
+    if (op2flag) mpz_clear(op2size);
+
+    if (t == FAILURE) return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
 /* g95_check_assign()-- Given an assignable expression and an
  * arbitrary expression, make sure that the assignment can take
  * place. */
 
 try g95_check_assign(g95_expr *lvalue, g95_expr *rvalue, int conform) {
-mpz_t lsize, rsize;
-int lflag, rflag, d;
 g95_symbol *sym;
-try t;
 
   sym = lvalue->symbol;
 
@@ -324,27 +358,9 @@ try t;
   }
 
   /* Check size of array assignments */
-
-  if (lvalue->rank != 0 && rvalue->rank != 0) {
-    t = SUCCESS;
-
-    for(d=0; d<rvalue->rank; d++) {
-      lflag = g95_array_dimen_size(lvalue, d, &lsize) == SUCCESS;
-      rflag = g95_array_dimen_size(rvalue, d, &rsize) == SUCCESS;
-
-      if (lflag && rflag && mpz_cmp(lsize, rsize) != 0) {
-	g95_error("Array assignment at %L has different shape on dimension %d",
-		  &rvalue->where, d+1);
-
-	t = FAILURE;
-      }
-
-      if (lflag) mpz_clear(lsize);
-      if (rflag) mpz_clear(rsize);
-
-      if (t == FAILURE) return FAILURE;
-    }
-  }
+  if (lvalue->rank != 0 && rvalue->rank != 0 &&
+      g95_check_conformance("Array assignment", lvalue, rvalue) != SUCCESS)
+    return FAILURE;
 
   if (g95_compare_types(&lvalue->ts, &rvalue->ts)) return SUCCESS;
 
