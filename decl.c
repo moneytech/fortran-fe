@@ -1831,6 +1831,12 @@ match m;
     g95_error("Expected expression at %C in PARAMETER statement");
   if (m != MATCH_YES) return m;
 
+  if (sym->ts.type == BT_UNKNOWN &&
+      g95_set_default_type(sym, 1, NULL) == FAILURE) {
+    m = MATCH_ERROR;
+    goto cleanup;
+  }
+
   if (g95_check_assign_symbol(sym, init) == FAILURE ||
       g95_add_flavor(&sym->attr, FL_PARAMETER, NULL) == FAILURE) {
     m = MATCH_ERROR;
@@ -1844,6 +1850,7 @@ cleanup:
   g95_free_expr(init);
   return m;
 }
+
 
 /* g95_match_parameter()-- Match a parameter statement, with the weird
  * syntax that these have */
