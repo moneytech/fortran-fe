@@ -1234,7 +1234,9 @@ char name[G95_MAX_SYMBOL_LEN+1];
 
   r->type = mio_name(r->type, ref_types);
 
-  //  mio_symbol_ref(&r->symbol);
+#if 0
+  mio_symbol_ref(&r->symbol);
+#endif
 
   if (iomode == IO_OUTPUT) {
 
@@ -1519,7 +1521,7 @@ static void mio_symbol(g95_symbol *sym) {
   mio_symbol_ref(&sym->common_head);
   mio_symbol_ref(&sym->common_next);
 
-  // Save/restore namespaces
+  /* Save/restore namespaces */
 
   mio_rparen();
 }

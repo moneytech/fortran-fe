@@ -195,12 +195,12 @@ g95_expr *result;
 *      intrinsic resolution                                        ***/
 /* TODO Make these better, add more */
 
-void type_error(g95_expr *arg) {
+static void type_error(g95_expr *arg) {
   intrinsic_error("Incorrect argument type in call to intrinsic at %%L",
 		  &arg->where);
 }
 
-void kind_error(g95_expr *arg) {
+static void kind_error(g95_expr *arg) {
   intrinsic_error("Incorrect argument kind in call to intrinsic at %%L",
 		  &arg->where);
 }

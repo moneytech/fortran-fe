@@ -1884,7 +1884,9 @@ g95_symbol *p, *q, *old;
 void g95_commit_symbols(void) {
 g95_symbol *p, *q;
 
-//  if (changed != NULL) g95_status("Committing symbols\n");
+#if 0
+  if (changed != NULL) g95_status("Committing symbols\n");
+#endif
 
   for(p=changed; p; p=q) {
     q = p->tlink;

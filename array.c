@@ -260,7 +260,7 @@ end_element:
 
   if (m == MATCH_ERROR) return MATCH_ERROR;
 
-// Build UBOUND expression
+  /* Build UBOUND expression */
 
 /* See if we have an optional stride */
 

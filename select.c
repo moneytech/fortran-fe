@@ -299,6 +299,8 @@ try t;
 
   if (t == FAILURE) return;
 
-// check_case_overlap(code);
+#if 0
+  check_case_overlap(code);
+#endif
 
 }

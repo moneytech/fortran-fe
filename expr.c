@@ -952,7 +952,7 @@ try t;
 /* resolve_structure_cons()-- Resolve all of the elements of a
  * structure constructor and make sure that the types are correct. */
 
-try resolve_structure_cons(g95_expr *expr) {
+static try resolve_structure_cons(g95_expr *expr) {
 g95_constructor *cons;
 g95_component *comp;
 try t;

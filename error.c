@@ -100,8 +100,8 @@ g95_file *f;
 char c, *p;
 int i;
 
-// TODO: Either limit the total length and number of included files displayed
-// or add buffering of arbitrary number of characters in error messages.
+/* TODO: Either limit the total length and number of included files displayed */
+/* or add buffering of arbitrary number of characters in error messages. */
 
   f = l->file;
   error_printf("In file %s:%d\n", f->filename, l->lp->start_line + l->line);
