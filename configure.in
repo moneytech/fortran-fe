@@ -17,84 +17,27 @@ esac
 
 AC_ARG_WITH(gmp-dir, [--with-gmp-dir=PATH       Specify directory for the GMP library])
 
-gmp_include_dirs="/usr/local/include"
-gmp_lib_dirs="/usr/local/lib"
-
-if test "x$with_gmp_dir" != x; then
-	if test -d $with_gmp_dir; then
-		gmp_include_dirs="$with_gmp_dir $gmp_include_dirs"
-	fi
-	if test -d $with_gmp_dir/.libs; then
-		gmp_lib_dirs="$with_gmp_dir/.libs $gmp_lib_dirs"
-	elif test -d $with_gmp_dir/$host; then
-		gmp_lib_dirs="$with_gmp_dir/$host $gmp_lib_dirs"
-	fi
+if test "x$with_gmp_dir" != x -a -d "$with_gmp_dir"; then
+	CPPFLAGS="-I$with_gmp_dir $CPPFLAGS"
+	LDFLAGS="-L$with_gmp_dir/.libs $LDFLAGS"
 fi
-
-g95_save_CPPFLAGS=$CPPFLAGS
-
-for dir in $gmp_include_dirs;
-do
-	AC_MSG_CHECKING([for gmp.h in $dir])
-
-	if test -f $dir/gmp.h; then
-		AC_MSG_RESULT(yes)
-	else
-		AC_MSG_RESULT(no)
-		continue
-	fi
-
-	CPPFLAGS="-I$dir $g95_save_CPPFLAGS"
-
-	AC_MSG_CHECKING([for correct version of gmp.h in $dir])
-	AC_TRY_COMPILE([#include <gmp.h>],[
-#if __GNU_MP_VERSION < 3
-       choke me
-#endif
-], [ok=yes], [ok=no])
-
-	if test $ok = yes; then
-		AC_MSG_RESULT([yes])
-		break
-	else
-		AC_MSG_RESULT([no])
-	fi
-done
 
 AC_CHECK_HEADER(gmp.h, [], [AC_MSG_ERROR([gmp.h not found])])
 
-if test -z "$ok"; then
-	AC_MSG_ERROR([gmp.h not found])
-fi
+AC_MSG_CHECKING([for correct version of gmp.h])
+AC_TRY_COMPILE([#include <gmp.h>],[
+#if __GNU_MP_VERSION < 3
+       choke me
+#endif
+], [AC_MSG_RESULT([yes])],
+   [AC_MSG_ERROR([gmp version 3.0 or later is required])])
 
-if test "$ok" != yes; then
-	AC_MSG_ERROR([gmp version 3.0 or later is needed])
-fi
+AC_MSG_CHECKING([for mpf_init in -lgmp])
 
+LIBS="$LIBS -lgmp"
 
-g95_save_LIBS="$LIBS";
-g95_save_LDFLAGS="$LDFLAGS";
-
-for dir in $gmp_lib_dirs;
-do
-	AC_MSG_CHECKING([for mpf_init in -lgmp])
-
-	LIBS="-lgmp $g95_save_LIBS"
-	LDFLAGS="-L$dir $g95_save_LDFLAGS"
-
-	AC_TRY_LINK([#include <gmp.h>], [mpf_t n; mpf_init(n);], [ok=yes],
-        	    [LIBS="$g95_save_LIBS"; ok=no])
-	AC_MSG_RESULT($ok)
-
-	if test "$ok" = yes; then
-		break
-	fi
-done
-
-if test "$ok" != yes; then
-	AC_MSG_ERROR([could not link with libgmp])
-fi
-
+AC_TRY_LINK([#include <gmp.h>], [mpf_t n; mpf_init(n);],
+  [AC_MSG_RESULT([yes])],  [AC_MSG_ERROR([could not link with libgmp])])
 
 
 #############################################################################
