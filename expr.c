@@ -1064,7 +1064,10 @@ try t;
 
     if (g95_check_iter_variable(e) == SUCCESS) break;
 
-    /* TODO: constant references to subobjects */
+    if (e->symbol->attr.flavor == FL_PARAMETER) {
+      g95_replace_expr(e, g95_copy_expr(e->symbol->value));
+      break;      /* TODO: constant references to subobjects */
+    }
 
     g95_error("Variable '%s' at %L cannot appear in an initialization "
 	      "expression", e->symbol->name, &e->where);
