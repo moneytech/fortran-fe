@@ -316,7 +316,7 @@ int i;
     return -1;
   }
 
-  if (strcmp(option, "-fquiet") == 0) {
+  if (strcmp(option, "-fquiet") == 0 || strcmp(option, "-quiet")) {
     g95_option.quiet = 1;
     return 1;
   }
