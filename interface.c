@@ -165,13 +165,9 @@ int operator;
   case INTERFACE_GENERIC:
     if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
-    if (sym->attr.flavor == FL_PROCEDURE)
-      sym->attr.flavor = FL_GENERIC;
-    else {
-      if (sym->attr.flavor != FL_GENERIC &&
-	  g95_add_flavor(&sym->attr, FL_GENERIC, NULL) == FAILURE)
-	return MATCH_ERROR;
-    }
+    if (sym->attr.flavor != FL_GENERIC &&
+	g95_add_flavor(&sym->attr, FL_GENERIC, NULL) == FAILURE)
+      return MATCH_ERROR;
 
     current_interface.sym = g95_new_block = sym;
     break;

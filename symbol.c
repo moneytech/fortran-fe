@@ -807,6 +807,11 @@ try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 
   if (check_used(attr, loc)) return FAILURE;
 
+  if (attr->flavor == FL_PROCEDURE && f == FL_GENERIC) {
+    attr->flavor = FL_GENERIC;
+    return check_conflict(attr, loc);
+  }
+
   if (attr->flavor != FL_UNKNOWN) {
     if (loc == NULL) loc = g95_current_locus();
 
