@@ -2209,7 +2209,7 @@ int rank;
   g95_free(new);
   expr->ts = *ts;
 
-  if (g95_is_constant_expr(expr) &&
+  if (g95_is_constant_expr(expr->value.function.actual->expr) &&
       do_simplify(sym, expr) == FAILURE) {
 
     if (eflag == 2) goto bad;

@@ -624,7 +624,8 @@ int rv;
 
   case EXPR_FUNCTION:
     rv = 0;
-    if (e->value.function.actual->expr)
+    if (e->value.function.isym && e->value.function.actual && 
+	e->value.function.actual->expr)
       rv = g95_is_constant_expr(e->value.function.actual->expr);
     break;
 
