@@ -1071,7 +1071,7 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("real", 1, 0, BT_REAL, dr,
-	  g95_check_real, g95_simplify_real, NULL,
+	  g95_check_real, g95_simplify_real, g95_resolve_real,
 	  a, BT_INTEGER, di, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("float", 1, 0, BT_REAL, dr,
@@ -1602,10 +1602,9 @@ int i;
     if (!g95_compare_types(&formal->ts, &actual->expr->ts)) {
       if (error_flag)
 	g95_error("Type of argument '%s' in call to '%s' at %L should be "
-		  "%s(%d), not %s(%d)", g95_intrinsic_arg[i],
+		  "%s, not %s", g95_intrinsic_arg[i],
 		  g95_current_intrinsic, &actual->expr->where,
-		  g95_typename(formal->ts.type), formal->ts.kind,
-		  g95_typename(actual->expr->ts.type), actual->expr->ts.kind);
+		  g95_typename(&formal->ts), g95_typename(&actual->expr->ts));
       return FAILURE;
     }
   }
@@ -1986,17 +1985,13 @@ g95_expr *new;
 
 bad:
   if (eflag == 1) {
-    g95_error("Can't convert %s(%d) to %s(%d) at %L",
-	      g95_typename(expr->ts.type), expr->ts.kind,
-	      g95_typename(ts->type), ts->kind,
-	      &expr->where);
+    g95_error("Can't convert %s to %s at %L",
+	      g95_typename(&expr->ts), g95_typename(ts), &expr->where);
     return FAILURE;
   }
 
-  g95_internal_error("Can't convert %s(%d) to %s(%d) at %L",
-		     g95_typename(expr->ts.type), expr->ts.kind,
-		     g95_typename(ts->type), ts->kind,
-		     &expr->where);
+  g95_internal_error("Can't convert %s to %s at %L",
+		     g95_typename(&expr->ts), g95_typename(ts), &expr->where);
 
   return FAILURE;
 }

@@ -202,6 +202,18 @@ void g95_resolve_fraction(g95_expr *f, g95_expr *x) {
 }
 
 
+void g95_resolve_int(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = BT_INTEGER;
+  f->ts.kind = (kind == NULL) ? g95_default_integer_kind()
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__int%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
+}
+
+
 void g95_resolve_ishft(g95_expr *f, g95_expr *i, g95_expr *shift) {
 
   f->ts = i->ts;
@@ -314,6 +326,18 @@ void g95_resolve_product(g95_expr *f, g95_expr *array, g95_expr *dim,
   f->value.function.name =
     get_string("__product_%c_%d", g95_type_letter(array->ts.type),
 	       array->ts.kind);
+}
+
+
+void g95_resolve_real(g95_expr *f, g95_expr *a, g95_expr *kind) {
+
+  f->ts.type = BT_REAL;
+  f->ts.kind = (kind == NULL) ? g95_default_real_kind()
+    : mpz_get_ui(kind->value.integer);
+
+  f->value.function.name =
+    get_string("__real%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
+	       a->ts.kind);
 }
 
 

@@ -213,6 +213,7 @@ void g95_resolve_dot_product(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_dim(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_exponent(g95_expr *, g95_expr *);
 void g95_resolve_fraction(g95_expr *, g95_expr *);
+void g95_resolve_int(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_ishft(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_ishftc(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_max(g95_expr *, g95_expr *);
@@ -223,6 +224,7 @@ void g95_resolve_mod(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_modulo(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_not(g95_expr *, g95_expr *);
 void g95_resolve_product(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
+void g95_resolve_real(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_reshape(g95_expr *, g95_expr *, g95_expr *, g95_expr *,
 			 g95_expr *);
 void g95_resolve_rrspacing(g95_expr *, g95_expr *);
