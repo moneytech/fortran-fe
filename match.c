@@ -1714,9 +1714,10 @@ g95_symbol *sym, *common_name, **head, *tail, *old_blank_common;
 g95_array_spec *as;
 match m;
 
+  old_blank_common = g95_current_ns->blank_common;
+
   if (g95_match_eos() == MATCH_YES) goto syntax;
 
-  old_blank_common = g95_current_ns->blank_common;
   common_name = NULL;
   as = NULL;
 
