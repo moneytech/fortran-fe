@@ -1357,6 +1357,15 @@ int rc;
     rc = mpf_cmp(op1->value.real, op2->value.real);
     break;
     
+  case BT_CHARACTER:
+    rc = g95_compare_string(op1, op2, NULL);
+    break;
+
+  case BT_LOGICAL:
+    rc = ((!op1->value.logical && op2->value.logical) ||
+	  (op1->value.logical && !op2->value.logical));
+    break;
+
   default: g95_internal_error("g95_compare_expr(): Bad basic type");
   }
 
@@ -1404,7 +1413,6 @@ int len, alen, blen, i, ac, bc;
 
   return 0;
 }
-
 
 
 /* Specific comparison subroutines */
@@ -1538,9 +1546,16 @@ arith rc;
 
     /* Fall through */
 
-  case INTRINSIC_EQ:      case INTRINSIC_NE:     case INTRINSIC_PLUS:
-  case INTRINSIC_MINUS:   case INTRINSIC_TIMES:  case INTRINSIC_DIVIDE:
-  case INTRINSIC_POWER:   /* Numeric binary */
+  case INTRINSIC_EQ:      case INTRINSIC_NE:
+    if (op1->ts.type == BT_CHARACTER && op2->ts.type == BT_CHARACTER) {
+      unary = 0;
+      break;
+    }
+
+    /* Fall through */
+
+  case INTRINSIC_PLUS:    case INTRINSIC_MINUS:   case INTRINSIC_TIMES:
+  case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:   /* Numeric binary */
     if (!g95_numeric_ts(&op1->ts) || !g95_numeric_ts(&op2->ts))
       goto incompatible;
 
