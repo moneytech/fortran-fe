@@ -286,15 +286,23 @@ g95_component *dt1, *dt2;
   if (ts1->type != ts2->type) return 0;
   if (ts1->type != BT_DERIVED) return (ts1->kind == ts2->kind);
 
-/* Compare derived types.  Both types must have the SEQUENCE attribute
- * to be equal */
+/* Compare derived types. */
 
   if (ts1->derived == ts2->derived) return 1;
 
+/* Special case for comparing derived types across namespaces.  If the
+ * true names and module names are the same and the module name is
+ * nonnull, then they are equal. */
+
+  if (strcmp(ts1->derived->name, ts2->derived->name) == 0 &&
+      ts1->derived->module[0] != '\0' &&
+      strcmp(ts1->derived->module, ts2->derived->module) == 0) return 1;
+
+/* Compare type via the rules of the standard.  Both types must have
+ * the SEQUENCE attribute to be equal */
+
   dt1 = ts1->derived->components;
   dt2 = ts2->derived->components;
-
-  if (dt1 == dt2) return 1;
 
   if (ts1->derived->attr.sequence == 0 || ts2->derived->attr.sequence == 0)
     return 0;
