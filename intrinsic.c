@@ -26,7 +26,10 @@ Boston, MA 02111-1307, USA.  */
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <gmp.h>
 #include "g95.h"
+
+g95_symbol g95_func_convert = { "<convert>" };
 
 static g95_expr *integer_zero, *real_zero;
 
@@ -68,6 +71,7 @@ static intrinsic_arg *next_arg;
 
 static int nfunc, nsub, nargs, nconv, sizing;
 
+static mpf_t mpf_zero, mpf_half, mpf_one;
 
 #define FIRST_ARG(e) (e->value.function.actual->expr)
 #define SECOND_ARG(e) (e->value.function.actual->next->expr)
@@ -76,7 +80,6 @@ static int nfunc, nsub, nargs, nconv, sizing;
 #define FIRST_CHECK_ARG(e) (e->expr)
 #define SECOND_CHECK_ARG(e) (e->next->expr)
 #define THIRD_CHECK_ARG(e) (e->next->next->expr)
-
 
 /* intrinsic_error()-- write an error message into static memory in
  * case a caller is interested in why something failed. */
@@ -144,56 +147,6 @@ int i;
 }
 
 
-/********* Simplification and Validation subroutines **********/
-
-
-static try simplify_abs(g95_expr *e, g95_expr *zero) {
-g95_expr *arg, *result;
-
-  arg = FIRST_ARG(e);
-
-  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-  result = g95_copy_expr(arg);
-
-  if (g95_compare_expr(arg, zero) == -1)
-    g95_arith_uminus(arg, result);
-  else
-    result = g95_copy_expr(arg);
-
-  g95_replace_expr(e, result);
-  return SUCCESS;
-}
-
-
-static try simplify_iabs(g95_expr *e) {
-  return simplify_abs(e, integer_zero);}
-
-static try simplify_rabs(g95_expr *e) {
-  return simplify_abs(e, real_zero);
-}
-
-
-/* simplify_sqrt()-- Range checking instead of simplifications */
-
-static try simplify_sqrt(g95_expr *e) {
-
-  if (g95_compare_expr(FIRST_ARG(e), real_zero) == -1)
-    g95_warning("Argument of SQRT at %L has a negative value",
-		&FIRST_ARG(e)->where);
-
-  return SUCCESS;
-}
-
-
-static try simplify_kind_intrinsic(g95_expr *e) {
-g95_expr *arg;  
-  
-  arg = FIRST_ARG(e);
-  g95_replace_expr(e, g95_constant_expr(BT_INTEGER, arg->ts.kind, NULL));
-  return SUCCESS;
-}
-
 /* conv_null()-- Null conversion, does nothing */
 
 static try conv_null(g95_expr *e) { return SUCCESS; }
@@ -211,7 +164,6 @@ arith r;
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
 
-
 static try conv_d_i(g95_expr *e) {
 g95_expr *new;
 arith r;
@@ -224,7 +176,6 @@ arith r;
 
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
-
 
 static try conv_z_i(g95_expr *e) {
 g95_expr *new;
@@ -239,8 +190,6 @@ arith r;
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
 
-
-
 static try conv_i_r(g95_expr *e) {
 g95_expr *new;
 arith r;
@@ -254,7 +203,6 @@ arith r;
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
 
-
 static try conv_d_r(g95_expr *e) {
 g95_expr *new;
 
@@ -263,7 +211,6 @@ g95_expr *new;
   g95_replace_expr(e, new);
   return SUCCESS;
 }
-
 
 static try conv_z_r(g95_expr *e) {
 g95_expr *new;
@@ -277,7 +224,6 @@ arith r;
 
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
-
 
 static try conv_i_d(g95_expr *e) {
 g95_expr *new;
@@ -294,7 +240,6 @@ arith r;
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
 
-
 static try conv_r_d(g95_expr *e) {
 g95_expr *new;
 
@@ -303,7 +248,6 @@ g95_expr *new;
   g95_replace_expr(e, new);
   return SUCCESS;
 }
-
 
 static try conv_z_d(g95_expr *e) { 
 g95_expr *new;
@@ -320,20 +264,18 @@ arith r;
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
 
-
 static try conv_i_z(g95_expr *e) {
 g95_expr *new;
 arith r;
 
   new = g95_get_expr();
-  r = g95_complex2int(&new, FIRST_ARG(e));
+  r = g95_int2complex(&new, FIRST_ARG(e));
 
   if (r == ARITH_OK) g95_replace_expr(e, new);
   else g95_free_expr(new);
 
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
-
 
 static try conv_r_z(g95_expr *e) {
 g95_expr *new;
@@ -347,7 +289,6 @@ arith r;
 
   return (r == ARITH_OK) ? SUCCESS : FAILURE;
 }
-
 
 static try conv_d_z(g95_expr *e) {
 g95_expr *new;
@@ -363,15 +304,2329 @@ arith r;
 }
 
 
-/* check_real()-- Check the arguments to a REAL subroutine call.  If
- * the argument list is correct, we resolve it to one of the conv_?_r
- * functions. */
+/********* Simplification and Validation subroutines **********/
 
+/* KAH The simplification routines are quite crude and stupid at this point.
+   Many barely function and several do not function at all.  Vector
+   arguments are not handled. */
+
+/* NOT READY */
+static try is_arglist_const(g95_expr *expr) {
+g95_actual_arglist **ap;
+
+/* For now doesn't do anything */
+/*  for(; ap=ap->next) {
+  ap   = &expr->value.function.actual;
+
+    if (ap->expr == NULL) continue;
+       if (actual->expr_type != EXPR_CONSTANT) return FAILURE;
+    }
+  }
+*/
+
+  return SUCCESS;
+}
+
+/* NOT READY 
+static try is_arg_const(g95_expr *arg) {
+
+  if (arg->expr_type != EXPR_CONSTANT) {
+    return FAILURE;
+  else
+    return SUCCESS;
+  }
+}
+*/
+
+/* Simplify_abs */
+static try simplify_abs(g95_expr *e, g95_expr *zero) {
+g95_expr *arg, *result;
+/* This does not work for a complex argument, which is permitted  */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  result = g95_copy_expr(arg);
+
+  if (g95_compare_expr(arg, zero) == -1)
+    g95_arith_uminus(arg, result);
+  else
+    result = g95_copy_expr(arg);
+
+  g95_replace_expr(e, result);
+  return SUCCESS;
+} /* end simplify_abs */
+
+static try simplify_iabs(g95_expr *e) {
+  return simplify_abs(e, integer_zero);}
+
+static try simplify_rabs(g95_expr *e) {
+  return simplify_abs(e, real_zero);
+}
+
+
+/* simplify_achar() */
+static try simplify_achar(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_INTEGER) {
+    g95_warning("Argument of ACHAR at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_achar */
+
+
+/* simplify_acos() */
+static try simplify_acos(g95_expr *e) {
+g95_expr *arg, *abarg, *result;
+
+/* Range checking */
+/* Must have abs(x)<=1 */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of ACOS at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->ts.type != EXPR_CONSTANT) return FAILURE;
+
+  result = g95_copy_expr(arg);
+
+  if (g95_compare_expr(arg, real_zero) == -1) {
+    abarg  = g95_get_expr();
+    g95_arith_uminus(arg, abarg);
+  }
+  else
+    abarg = g95_copy_expr(arg);
+
+  mpf_init_set_str(mpf_one, "1.0", 10);
+    
+  if ( mpf_cmp(abarg->value.real, mpf_one) < 0 ) {
+    g95_warning("Absolute value of argument of ACOS at %L is less than 1",
+		&FIRST_ARG(e)->where);
+    mpf_clear(mpf_one);
+    g95_free_expr(abarg);
+    return FAILURE;
+  }
+
+  mpf_clear(mpf_one);
+  g95_free_expr(abarg);
+
+  return SUCCESS;
+} /* end simplify_acos */
+
+
+/* simplify_adjustl() */
+static try simplify_adjustl(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_CHARACTER) {
+    g95_warning("Argument of ADJUSTL at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_adjustl */
+
+
+/* simplify_adjustr() */
+static try simplify_adjustr(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_CHARACTER) {
+    g95_warning("Argument of ADJUSTL at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_adjustr */
+
+
+/* simplify_aimag() */
+static try simplify_aimag(g95_expr *e) {
+g95_expr *arg, *result;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_COMPLEX) {
+    g95_warning("Argument of AIMAG at %L must be complex",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  result = g95_copy_expr(arg);
+
+  mpf_init(result->value.real);
+  mpf_set(result->value.real, arg->value.complex.i);
+
+  g95_replace_expr(e, result);
+
+  return SUCCESS;
+
+} /* end simplify_aimag */
+
+
+/* simplify_ainit */
+static try simplify_aint(g95_expr *e) {
+g95_expr *arg, *result;
+int knd;
+/* Result needs to have correct KIND */
+/* knd (optional) must be a valid real kind */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of AINT at %L must be real",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd = g95_validate_kind(BT_REAL, arg->ts.type);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  result = g95_copy_expr(arg);
+
+  mpf_init(result->value.real);
+  mpf_trunc(result->value.real, arg->value.real);
+
+  g95_replace_expr(e, result);
+
+  return SUCCESS;
+
+} /* end simplify_aint */
+
+
+/* simplify_anint */
+static try simplify_anint(g95_expr *e) {
+g95_expr *arg, *rmid, *result;
+int knd;
+arith r;
+
+/* Result needs to have correct KIND */
+/* knd (optional) must be a valid real kind */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of ANINT at %L must be real",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd = g95_validate_kind(BT_REAL, arg->ts.type);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  mpf_init_set_str(mpf_half, "0.5", 10);
+
+  rmid = g95_copy_expr(arg);
+
+  mpf_init(rmid->value.real);
+
+  if (g95_compare_expr(rmid, real_zero) <= -1) {
+    mpf_sub(rmid->value.real, arg->value.real, mpf_half);
+  }
+  else {
+    mpf_add(rmid->value.real, arg->value.real, mpf_half);
+  }
+
+  result = g95_copy_expr(rmid);
+  mpf_trunc(result->value.real, rmid->value.real);
+
+  g95_replace_expr(e, result);
+
+  g95_free_expr(rmid);
+  mpf_clear(mpf_half);
+
+  return SUCCESS;
+
+} /* end simplify_anint */
+
+
+/* simplify_asin() */
+static try simplify_asin(g95_expr *e) {
+g95_expr *arg, *abarg, *result;
+
+/* Range checking */
+/* Must have abs(x)<=1 */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of ASIN %L at must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  result = g95_copy_expr(arg);
+
+  mpf_init_set_str(mpf_one, "1.0", 10);
+
+  if (g95_compare_expr(arg, real_zero) == -1) {
+    abarg  = g95_get_expr();
+    g95_arith_uminus(arg, abarg);
+  }
+  else
+    abarg = g95_copy_expr(arg);
+
+  if ( mpf_cmp(abarg->value.real, mpf_one) < 0 ) {
+    g95_warning("Absolute value of argument of ASIN at %L is less than 1",
+		&FIRST_ARG(e)->where);
+    mpf_clear(mpf_one);
+    g95_free_expr(abarg);
+    return FAILURE;
+  }
+
+  mpf_clear(mpf_one);
+  g95_free_expr(abarg);
+
+  return SUCCESS;
+} /* end simplify_asin */
+
+/* simplify_atan2() */
+static try simplify_atan2(g95_expr *e) {
+g95_expr *arg1, *arg2, *result;
+int knd1, knd2;
+mpf_t mpf_pi, mpf_hpi, mpf_nhpi;
+
+/* Range checking, some simplification */
+/* Requires checking the second argument-- x cannot be zero if y is zero */
+
+/* This probably isn't the most accurate way to set pi and half pi */
+  mpf_init_set_str(mpf_pi,   "3.1415926535898", 10);
+  mpf_init_set_str(mpf_hpi,  "1.5707963267949", 10);
+  mpf_init_set_str(mpf_nhpi,"-1.5707963267949", 10);
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_REAL ) {
+    g95_warning("First argument of ATAN2 at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg2->ts.type != BT_REAL ) {
+    g95_warning("Second argument of ATAN2 at %L must be real",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd1 = g95_validate_kind(BT_REAL, arg1->ts.type);
+  knd2 = g95_validate_kind(BT_REAL, arg2->ts.type);
+
+  if (knd1 != knd2 ) {
+    g95_warning("KIND of arguments of ATAN2 at %L must agree",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (! is_arglist_const(e) ) return FAILURE;
+
+/* Handle special cases */
+
+  /* Y = 0 */
+  if (g95_compare_expr(arg1, real_zero) == 0) {
+    if (g95_compare_expr(arg2, real_zero) == 0) { 
+      g95_warning("Both arguments of ATAN2 at %L are zero", 
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+    }
+    else if (g95_compare_expr(arg2, real_zero) > 0 ) {
+      result = g95_copy_expr(0);
+      g95_replace_expr(e, result);
+      return SUCCESS;
+    }
+    else {
+      result = g95_copy_expr(e);
+      mpf_init(result->value.real);
+      mpf_set(result->value.real, mpf_pi);
+      g95_replace_expr(e, result);
+      return SUCCESS;
+    }
+  }
+
+  /* X = 0 */
+  if (g95_compare_expr(arg2, real_zero) == 0) {
+    if (g95_compare_expr(arg1, real_zero) > 0) {
+      result = g95_copy_expr(e);
+      mpf_init(result->value.real);
+      mpf_set(result->value.real, mpf_hpi);
+      g95_replace_expr(e, result);
+      return SUCCESS;
+    }
+    else if (g95_compare_expr(arg1, real_zero) < 0) {
+      result = g95_copy_expr(e);
+      mpf_init(result->value.real);
+      mpf_set(result->value.real, mpf_nhpi);
+      g95_replace_expr(e, result);
+      return SUCCESS;
+    }
+  }
+
+/* This is where the actual evaluation would go if neither arg is zero */
+    
+  return SUCCESS;
+} /* end simplify_atan2 */
+
+/* simplify_btest() */
+static try simplify_btest(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Range checking */
+/* Second argument must be nonnegative and less than bit_size(i) */
+  
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER ) {
+    g95_warning("First argument of BTEST at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg2->ts.type != BT_INTEGER ) {
+    g95_warning("Second argument of BTEST at %L must be integer",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  if (g95_compare_expr(arg2, real_zero) == -1) {
+    g95_warning("Second argument of BTEST at %L has a negative value",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (g95_compare_expr(arg2, real_zero) == 1) {
+    /* Must be less than bit_size(i) */
+  }
+
+  return SUCCESS;
+} /* end simplify_btest */
+
+
+/* simplify_ceiling */
+static try simplify_ceiling(g95_expr *e) {
+g95_expr *arg, *ceil, *result;
+int knd;
+arith r;
+/* Result needs to have correct KIND */
+/* knd (optional) must be a valid integer kind */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of CEILING at %L must be real",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd = g95_validate_kind(BT_REAL, arg->ts.type);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  ceil = g95_copy_expr(arg);
+
+  mpf_init(ceil->value.real);
+  mpf_ceil(ceil->value.real, arg->value.real);
+
+  result = g95_get_expr();
+
+  r = g95_real2int(&result, ceil);
+
+  g95_free_expr(ceil);
+
+  if ( r == ARITH_OK ) g95_replace_expr(e, result);
+  else {
+    g95_warning("Conversion in ANINT at %L failed",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_ceiling */
+
+
+/* simplify_char() */
+static try simplify_char(g95_expr *e) {
+g95_expr *arg;
+  
+/* Range checking */
+/* Argument must be 0<=i<=n-1, where n=no. of chars in the collating sequence.
+ * knd (optional) must be a valid character kind */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_INTEGER ) {
+    g95_warning("Argument of CHAR at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (g95_compare_expr(arg, integer_zero) == -1) {
+    g95_warning("Argument of CHAR at %L has a negative value",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (g95_compare_expr(arg, integer_zero) == 1) {
+    /* Must be less than n-1, where n is the number of characters in 
+       the collating sequence*/
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_char */
+
+
+/* simplify_complx */
+static try simplify_cmplx(g95_expr *e) {
+g95_expr *arg1, *arg2, *result;
+/* NOT QUITE READY */
+/* How to handle optional arguments? */
+
+/* Takes integer, real, or (if only x is present) complex input.
+ * knd (optional) must be a valid complex kind */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  if (arg2 == NULL) {
+  switch (arg1->ts.type) {
+	case BT_COMPLEX:
+	      g95_replace_expr(e, arg1);
+	      break;
+	case BT_INTEGER:
+              result = g95_copy_expr(arg1);
+	      g95_int2complex(&result, arg1);
+              g95_replace_expr(e, result);
+	      break;
+	case BT_REAL:
+              result = g95_copy_expr(arg1);
+	      g95_real2complex(&result, arg1);
+	      g95_replace_expr(e, result);
+	      break;
+	default :
+	      g95_warning("Argument of CMPLX at %L is not a valid type",
+			      &FIRST_ARG(e)->where);
+	      return FAILURE;
+  }
+  }
+  else {
+  switch (arg1->ts.type) {
+	case BT_COMPLEX:
+      		g95_warning("CMPLX at %L cannot take two arguments if the first is complex",
+  	 	  &FIRST_ARG(e)->where);
+		return FAILURE;
+	      break;
+	case BT_INTEGER:
+	      result = g95_copy_expr(e);
+	      mpf_init(result->value.complex.r);
+	      mpf_init(result->value.complex.i);
+	      mpf_set_z(result->value.complex.r, arg1->value.integer);
+	      if ( arg2->ts.type == BT_INTEGER ) 
+      	        mpf_set_z(result->value.complex.i, arg2->value.integer);
+	      if (arg2->ts.type == BT_REAL )
+      	        mpf_set(result->value.complex.i, arg2->value.real);
+	      break;
+	case BT_REAL:
+	      result = g95_copy_expr(e);
+              mpf_init(result->value.complex.r);
+	      mpf_init(result->value.complex.i);
+	      if ( arg2->ts.type == BT_INTEGER ) 
+      	        mpf_set_z(result->value.complex.i, arg2->value.integer);
+	      if (arg2->ts.type == BT_REAL )
+      	        mpf_set(result->value.complex.i, arg2->value.real);
+	      break;
+	default :
+	      g95_warning("Argument of CMPLX at %L is not a valid type",
+			      &FIRST_ARG(e)->where);
+  }
+  }
+
+  return SUCCESS;
+} /* end simplify_cmplx */
+
+
+/* simplify_conjg() */
+static try simplify_conjg(g95_expr *e) {
+g95_expr *arg, *result;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_COMPLEX) {
+    g95_warning("Argument of CONJG at %L must be complex",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  result = g95_copy_expr(arg);
+
+  mpf_init_set_str(mpf_one, "1.0", 10);
+
+  mpf_init(result->value.complex.r);
+  mpf_init(result->value.complex.i);
+  mpf_set(result->value.complex.r, arg->value.complex.r);
+  mpf_sub(result->value.complex.i, arg->value.complex.r, mpf_one);
+
+  g95_replace_expr(e, result);
+
+  return SUCCESS;
+
+} /* end simplify_conjg */
+
+
+/* simplify_cos */
+static try simplify_cos(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+/* Type checking */
+
+  if (arg->ts.type != BT_REAL || arg->ts.type != BT_COMPLEX) {
+    g95_warning("Argument of COS at %L must be real or complex",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_cos */
+
+
+/* simplify_cosh */
+static try simplify_cosh(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of COSH at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_cosh */
+
+
+/* simplify_dble */
+static try simplify_dble(g95_expr *e) {
+g95_expr *arg, *rmid, *result;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  rmid = g95_copy_expr(arg);
+
+  switch (arg->ts.type) {
+	  case BT_INTEGER:
+		  g95_int2real(&rmid, arg);
+		  g95_real2double(&result, rmid);
+		  break;
+	  case BT_REAL:
+		  g95_real2double(&result, arg);
+		  break;
+	  case BT_COMPLEX:
+		  g95_complex2real(&rmid, arg);
+		  g95_real2double(&result, rmid);
+		  break;
+	  default:
+	          g95_warning("Argument of DBLE at %L is not a valid type",
+			      &FIRST_ARG(e)->where);
+	          g95_free_expr(rmid);
+                  return FAILURE;
+  }
+
+  g95_free_expr(rmid);
+
+  return SUCCESS;
+} /* end simplify_dble */
+
+
+/* simplify_dim */
+static try simplify_dim(g95_expr *e) {
+g95_expr *arg1, *arg2, *result;
+int knd1, knd2;
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if ( arg1->ts.type != BT_INTEGER || arg1->ts.type != BT_REAL ) {
+    g95_warning("Arguments of DIM at %L must be integer or real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if ( (arg1->ts.type == BT_INTEGER && arg2->ts.type != BT_INTEGER) ||
+       (arg1->ts.type == BT_REAL && arg2->ts.type != BT_REAL ) ) {
+    g95_warning("Type of arguments of DIM at %L must agree",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if ( arg1->ts.type == BT_INTEGER ) {
+    knd1 = g95_validate_kind(BT_INTEGER, arg1->ts.type);
+    knd2 = g95_validate_kind(BT_INTEGER, arg2->ts.type);
+    if (knd1 != knd2 ) {
+      g95_warning("Kind of arguments of DIM at %L must agree",
+		&FIRST_ARG(e)->where);
+      return FAILURE;
+    }
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  result = g95_get_expr();
+
+  if (g95_compare_expr(arg1, arg2) > 0) {
+    g95_arith_minus(arg1, arg2, result);
+  }
+  else 
+    result = g95_copy_expr(0);
+
+  return SUCCESS;
+} /* end simplify_dim */
+
+
+/* simplify_dprod */
+static try simplify_dprod(g95_expr *e) {
+g95_expr *arg1, *arg2, *dbl1, *dbl2, *result;
+arith r1, r2, r;
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_REAL || arg2->ts.type != BT_REAL ) {
+     g95_warning("Arguments of DPROD at %L must be real",
+        	    &FIRST_ARG(e)->where);
+     return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  r1 = g95_real2double(&dbl1, arg1);
+  r2 = g95_real2double(&dbl2, arg2);
+
+  if (r1 == ARITH_OK && r2 == ARITH_OK) {
+    r = g95_arith_times(dbl1, dbl2, result);
+    if ( r == ARITH_OK ) {
+      result = g95_get_expr();
+      r = g95_arith_times(dbl1, dbl2, result);
+      if ( r == ARITH_OK ) {
+	g95_replace_expr(e, result);
+	g95_free_expr(dbl1);
+	g95_free_expr(dbl2);
+        return SUCCESS;
+      }
+      else {
+        g95_warning("Invalid result in DPROD at %L",
+               	      &FIRST_ARG(e)->where);
+	g95_free_expr(dbl1);
+	g95_free_expr(dbl2);
+	g95_free_expr(result);
+	return FAILURE;
+      }
+    }
+    else {
+     g95_warning("Invalid result in DPROD at %L",
+        	    &FIRST_ARG(e)->where);
+     g95_free_expr(dbl1);
+     g95_free_expr(dbl2);
+     return FAILURE;
+    }
+  } 
+  else {
+     g95_warning("Conversion failed in DPROD at %L",
+        	    &FIRST_ARG(e)->where);
+     g95_free_expr(dbl1);
+     g95_free_expr(dbl2);
+     return FAILURE;
+  }
+
+} /* end simplify_dprod */
+
+
+/* simplify_exp */
+static try simplify_exp(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+/* Type checking */
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of EXP at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_exp */
+
+
+/* simplify_exponent */
+static try simplify_exponent(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+/* Type checking */
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of EXPONENT at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_exponent */
+
+
+/* simplify_floor */
+static try simplify_floor(g95_expr *e) {
+g95_expr *arg, *floor, *result;
+int knd;
+arith r;
+/* Result needs to have correct KIND */
+/* knd (optional) must be a valid integer kind */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of FLOOR at %L must be real",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd = g95_validate_kind(BT_REAL, arg->ts.type);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  floor = g95_copy_expr(arg);
+
+  mpf_init(floor->value.real);
+  mpf_floor(floor->value.real, arg->value.real);
+
+  result = g95_get_expr();
+
+  r = g95_real2int(&result, floor);
+
+  g95_free_expr(floor);
+
+  if ( r == ARITH_OK ) {
+    g95_replace_expr(e, result);
+    return SUCCESS;
+  }
+  else {
+    g95_warning("Conversion in ANINT at %L failed",
+		&SECOND_ARG(e)->where);
+    g95_free_expr(result);
+    return FAILURE;
+  }
+
+} /* end simplify_floor */
+
+
+/* simplify_fraction */
+static try simplify_fraction(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of FRACTION at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_fraction */
+
+
+/* simplify_iachar() */
+static try simplify_iachar(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  /* Need to check character length */
+  if (arg->ts.type != BT_CHARACTER ) {
+    g95_warning("Argument of IACHAR at %L must be character and of length one",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_iachar */
+
+
+/* simplify_iand() */
+static try simplify_iand(g95_expr *e) {
+g95_expr *arg1, *arg2;
+int knd1, knd2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER) {
+    g95_warning("Arguments of IAND at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd1 = g95_validate_kind(BT_INTEGER, arg1->ts.type);
+  knd2 = g95_validate_kind(BT_INTEGER, arg2->ts.type);
+  if (knd1 != knd2 ) {
+    g95_warning("Kind of arguments of IAND at %L must agree",
+                 &FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_iand */
+
+
+/* simplify_ibclr() */
+static try simplify_ibclr(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER ) {
+    g95_warning("Arguments of IBCLR at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+/* Range checking */
+/* Second argument must be nonnegative and less than bit_size(i) */
+
+  if ( g95_compare_expr(arg2, integer_zero) < 0 ) {
+    g95_warning("Last argument of IBCLR at %L must be nonnegative",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+/* Second argument must be less than BIT_SIZE(I), no check yet */
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_ibclr */
+
+
+/* simplify_ibits() */
+static try simplify_ibits(g95_expr *e) {
+g95_expr *arg1, *arg2, *arg3;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+  arg3 = THIRD_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER 
+		  || arg3->ts.type != BT_INTEGER ) {
+    g95_warning("Arguments of IBITS at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+/* Range checking */
+/* Second argument must be nonnegative and pos+ln must be less than
+ * bit_size(i); third argument must be nonnegative */
+
+  if ( g95_compare_expr(arg2, integer_zero) < 0 ) {
+    g95_warning("Second argument of IBITS at %L must be nonnegative",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if ( g95_compare_expr(arg3, integer_zero) < 0 ) {
+    g95_warning("Last argument of IBITS at %L must be nonnegative",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+/* Arg2+arg3 must be less than or equal to BIT_SIZE(I), no check yet */
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT ||
+	  arg3->expr_type != EXPR_CONSTANT ) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_ibits */
+
+
+/* simplify_ibset() */
+static try simplify_ibset(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER ) {
+    g95_warning("Arguments of IBSET at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+/* Range checking */
+/* Second argument must be nonnegative and less than bit_size(i) */
+
+  if ( g95_compare_expr(arg2, integer_zero) < 0 ) {
+    g95_warning("Last argument of IBSET at %L must be nonnegative",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+/* Second argument must be less than BIT_SIZE(I), no check yet */
+
+  return SUCCESS;
+} /* end simplify_ibset */
+
+
+/* simplify_ichar() */
+static try simplify_ichar(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+/* Argument must be of length 1; its value must be representable by the 
+ * processor */
+
+  arg = FIRST_ARG(e);
+
+  /* Need to check character length */
+  if (arg->ts.type != BT_CHARACTER ) {
+    g95_warning("Argument of IACHAR at %L must be character and of length one",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_ichar */
+
+
+/* simplify_ieor() */
+static try simplify_ieor(g95_expr *e) {
+g95_expr *arg1, *arg2;
+int knd1, knd2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER && arg2->ts.type != BT_INTEGER) {
+    g95_warning("Arguments of IEOR at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd1 = g95_validate_kind(BT_INTEGER, arg1->ts.type);
+  knd2 = g95_validate_kind(BT_INTEGER, arg2->ts.type);
+  if (knd1 != knd2 ) {
+    g95_warning("Kind of arguments of IEOR at %L must agree",
+                 &FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_ieor */
+
+
+/* simplify_index() */
+static try simplify_index(g95_expr *e) {
+g95_expr *arg1, *arg2, *arg3;
+  
+/* Takes optional argument, not really implemented */
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER) {
+    g95_warning("First two arguments of INDEX at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg3->ts.type != BT_LOGICAL) {
+    g95_warning("Optional argument of INDEX at %L must be logical",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+/* simplify_int */
+static try simplify_int(g95_expr *e) {
+g95_expr *arg, *rmid, *rtrunc, *result;
+int knd;
+mpf_t mpf_half;
+arith r;
+
+/* Result needs to have correct KIND */
+/* knd (optional) must be a valid integer kind */
+
+  arg = FIRST_ARG(e);
+
+  knd = g95_validate_kind(BT_REAL, arg->ts.type);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  result = g95_copy_expr(arg);
+
+  switch ( arg->ts.type ) {
+          case BT_INTEGER:
+	          break;
+          case BT_REAL:
+		  rmid = g95_get_expr();
+                  mpf_init(rmid->value.real);
+                  mpf_trunc(rmid->value.real, arg->value.real);
+                  r = g95_real2int(&result, rmid);
+		  g95_free(rmid);
+                  if ( r == ARITH_OK ) {
+		    g95_replace_expr(e, result);
+		    return SUCCESS;
+		  }
+                  else {
+                    g95_warning("Conversion in NINT at %L failed",
+	               	        &SECOND_ARG(e)->where);
+		    g95_free_expr(result);
+                    return FAILURE;
+                  }
+	          break;
+          case BT_COMPLEX:
+	          rmid   = g95_get_expr();
+	          rtrunc = g95_get_expr();
+		  g95_complex2real(&rmid,arg);
+		  mpf_init(rtrunc->value.real);
+	          mpf_trunc(rtrunc->value.real, rmid->value.real);
+                  r = g95_real2int(&result, rtrunc);
+		  g95_free_expr(rmid);
+		  g95_free_expr(rtrunc);
+                  if ( r == ARITH_OK ) {
+		    g95_replace_expr(e, result);
+		    return SUCCESS;
+		  }
+                  else {
+                    g95_warning("Conversion in NINT at %L failed",
+	                	&SECOND_ARG(e)->where);
+		    g95_free_expr(result);
+                    return FAILURE;
+		  }
+	          break;
+	  default:
+	          g95_warning("Argument of INT at %L is not a valid type",
+			      &FIRST_ARG(e)->where);
+                  return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_int */
+
+
+/* simplify_ior() */
+static try simplify_ior(g95_expr *e) {
+g95_expr *arg1, *arg2;
+int knd1, knd2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER && arg2->ts.type != BT_INTEGER) {
+    g95_warning("Arguments of IOR at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd1 = g95_validate_kind(BT_INTEGER, arg1->ts.type);
+  knd2 = g95_validate_kind(BT_INTEGER, arg2->ts.type);
+  if (knd1 != knd2 ) {
+    g95_warning("Kind of arguments of IOR at %L must agree",
+                 &FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_ior */
+
+
+/* simplify_ishft() */
+static try simplify_ishft(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER ) {
+    g95_warning("Arguments of ISHFT at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+/* Range checking */
+/* Absolute value of second argument (the shift) must be <=bit_size(i) */
+
+  if ( g95_compare_expr(arg2, integer_zero) < 0 ) {
+    g95_warning("Last argument of ISHFT at %L must be nonnegative",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+/* Second argument must be less than or equal to BIT_SIZE(I), no check yet */
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_ishft */
+
+
+/* simplify_ishftc() */
+static try simplify_ishftc(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Takes optional argument, not implemented */
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER ) {
+    g95_warning("Arguments of ISHFTC at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+/* Range checking */
+
+/* Optional argument must be positive and less than or equal to BIT_SIZE(I) */
+/* If not present, it is treated as if equal to BIT_SIZE(I) */
+
+/* no check yet on bit_size */
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_ishftc */
+
+
+/* simplify_kind */
+static try simplify_kind_intrinsic(g95_expr *e) {
+g95_expr *arg;  
+  
+  arg = FIRST_ARG(e);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+/*   g95_replace_expr(e, g95_int_expr(arg->ts.kind)); */
+   g95_replace_expr(e, arg);
+  return SUCCESS;
+} /* end simplify_kind */
+
+
+/* simplify_len_trim() */
+static try simplify_len_trim(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_CHARACTER ) {
+    g95_warning("Argument of LEN_TRIM at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_len_trim */
+
+
+/* simplify_lge() */
+static try simplify_lge(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
+    g95_warning("Arguments of LGE at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_lge */
+
+
+/* simplify_lgt() */
+static try simplify_lgt(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
+    g95_warning("Arguments of LGT at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_lgt */
+
+
+/* simplify_lle() */
+static try simplify_lle(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
+    g95_warning("Arguments of LLE at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_lle */
+
+
+/* simplify_llt() */
+static try simplify_llt(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
+    g95_warning("Arguments of LLE at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_llt */
+
+
+/* simplify_log */
+static try simplify_log(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+/* Type checking */
+
+  if (arg->ts.type != BT_REAL || arg->ts.type != BT_COMPLEX) {
+    g95_warning("Argument of LOG at %L must be real or complex",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+/* Range checking */
+/* If x is real, x must be >zero. If complex, its value must not be zero */
+
+  if (arg->ts.type == BT_REAL ) {
+    if ( g95_compare_expr(arg, real_zero) <= 0 ) {
+      g95_warning("Argument of LOG at %L cannot be less than or equal to zero",
+  		  &FIRST_ARG(e)->where);
+      return FAILURE;
+    }
+  }
+
+  mpf_init_set_str(mpf_zero, "0.0", 10);
+
+  if (arg->ts.type == BT_COMPLEX ) {
+    if ( (mpf_cmp(arg->value.complex.r, mpf_zero) == 0) && 
+         (mpf_cmp(arg->value.complex.i, mpf_zero) == 0) ) {
+      g95_warning("Complex argument of LOG at %L cannot be zero",
+  		  &FIRST_ARG(e)->where);
+      return FAILURE;
+    }
+  }
+
+  mpf_clear(mpf_zero);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_log */
+
+
+/* simplify_log10 */
+static try simplify_log10(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+/* Type checking */
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of LOG10 at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+/* Range checking */
+/* Argument must be >zero */
+
+  if ( g95_compare_expr(arg, real_zero) <= 0 ) {
+    g95_warning("Argument of LOG10 at %L cannot be less than or equal to zero",
+    	        &FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_log10 */
+
+
+/* simplify_logical() */
+static try simplify_logical(g95_expr *e) {
+g95_expr *arg;
+int knd;
+
+/* Takes optional argument, not handled yet */
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_LOGICAL) {
+    g95_warning("Argument of LOGICAL at %L must be logical",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd = g95_validate_kind(BT_INTEGER, arg->ts.type);
+
+  if (arg->expr_type != EXPR_CONSTANT)
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_logical */
+
+
+/* simplify_max */
+static try simplify_max(g95_expr *e) {
+g95_expr *arg;
+
+/* This isnt even a skeleton */
+
+  arg = FIRST_ARG(e);
+
+  if (! is_arglist_const(e) ) return FAILURE;
+
+  return SUCCESS;
+
+} /* end simplify_max */
+
+
+/* simplify_maxexponent */
+static try simplify_maxexponent(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of MAXEXPONENT at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+
+} /* end simplify_maxexponent */
+
+
+/* simplify_min */
+static try simplify_min(g95_expr *e) {
+g95_expr *arg;
+
+/* This isnt even a skeleton */
+
+  arg = FIRST_ARG(e);
+
+  if (! is_arglist_const(e) ) return FAILURE;
+
+  return SUCCESS;
+
+} /* end simplify_min */
+
+
+/* simplify_minexponent */
+static try simplify_minexponent(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of MINEXPONENT at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+
+} /* end simplify_minexponent */
+
+
+/* simplify_mod() */
+static try simplify_mod(g95_expr *e) {
+g95_expr *arg1, *arg2, *rmid1, *rmid2, *result;
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->expr_type != EXPR_CONSTANT && arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  switch (arg1->ts.type) {
+    	case BT_INTEGER:
+	    	if (arg2->ts.type != BT_INTEGER ) {
+	     	        g95_warning("Type of arguments of MOD at %L must agree",
+  				&FIRST_ARG(e)->where);
+      		        return FAILURE;
+    		}
+    		else {
+	      	  if (g95_compare_expr(arg2, integer_zero) != 0) {
+			result = g95_copy_expr(e);
+       		 	mpz_init(result->value.integer);
+       		 	mpz_mod(result->value.integer, arg1->value.integer, 
+                                                       arg2->value.integer);
+			g95_replace_expr(e, result);
+			return SUCCESS;
+      		  }
+      		  else {
+		  /* Result is processor-dependent */
+       		 	g95_warning("Second argument MOD at %L is zero",
+  		       		  &FIRST_ARG(e)->where);
+       		 	return FAILURE;
+      		  }
+		}
+	    	break;
+    	case BT_REAL:
+	    	if (arg2->ts.type != BT_REAL ) {
+		      g95_warning("Type of arguments of MOD at %L must agree",
+  				&FIRST_ARG(e)->where);
+      		      return FAILURE;
+    		}
+	    	else {
+      		  if (g95_compare_expr(arg2, real_zero) != 0) {
+			rmid1 = g95_get_expr();
+			rmid2 = g95_get_expr();
+			result =g95_copy_expr(e);
+			g95_real2int( &rmid1, arg1 );
+			g95_real2int( &rmid2, arg2 );
+ 			mpz_init(result->value.integer);
+                    	mpz_mod (result->value.integer, arg1->value.integer,
+			                                arg2->value.integer);
+			g95_replace_expr(e, result);
+			g95_free_expr(rmid1);
+			g95_free_expr(rmid2);
+	                return SUCCESS;
+      		  }
+      		  else {
+		  /* Result is processor-dependent */
+       		 	g95_warning("Second argument of MOD at %L is zero",
+  	       			  &FIRST_ARG(e)->where);
+	        	return FAILURE;
+      		  }
+		}
+    		break;
+	    default:
+       		g95_warning("Type of arguments of MOD at %L must be real or integer",
+	 	       	&FIRST_ARG(e)->where);
+		return FAILURE;
+  }
+
+/* If we get to here something went wrong */
+  return FAILURE;
+
+} /* end simplify_mod */
+
+
+/* simplify_modulo */
+static try simplify_modulo(g95_expr *e) {
+g95_expr *arg;
+
+/* This isnt even a skeleton */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+
+} /* end simplify_modulo */
+
+
+/* simplify_mvbits() */
+static try simplify_mvbits(g95_expr *e) {
+g95_expr *arg1, *arg2, *arg3, *arg4, *arg5;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+  arg3 = THIRD_ARG(e);
+
+  arg4 = e->value.function.actual->next->next->expr;
+  arg5 = e->value.function.actual->next->next->expr;
+
+  if (arg1->ts.type != BT_INTEGER || arg2->ts.type != BT_INTEGER 
+		  || arg3->ts.type != BT_INTEGER 
+		  || arg4->ts.type != BT_INTEGER 
+		  || arg5->ts.type != BT_INTEGER ) {
+    g95_warning("Arguments of MVBITS at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (g95_compare_expr(arg2, integer_zero) < 0) {
+    g95_warning("Second argument of MVBITS at %L must be nonnegative",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (g95_compare_expr(arg3, integer_zero) < 0) {
+    g95_warning("Third argument of MVBITS at %L must be nonnegative",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (g95_compare_expr(arg5, integer_zero) < 0) {
+    g95_warning("Third argument of MVBITS at %L must be nonnegative",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+} /* end simplify_mvbits */
+
+
+/* simplify_nearest */
+static try simplify_nearest(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_REAL && arg2->ts.type != BT_INTEGER) {
+    g95_warning("Illegal type in NEAREST at %L",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+/* Range checking */
+/* Second argument must not be equal to zero */
+
+  if (g95_compare_expr(arg2, real_zero) == 0) {
+    g95_warning("Second argument of NEAREST at %L is zero",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT ) 
+    return FAILURE;
+
+  return SUCCESS;
+
+} /* end simplify_nearest */
+
+
+/* simplify_nint */
+static try simplify_nint(g95_expr *e) {
+g95_expr *arg, *rmid, *rtrunc, *result;
+int knd;
+arith r;
+mpf_t mpf_half;
+
+/* Result needs to have correct KIND */
+/* Takes optional KIND argument, not implemented */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of NINT at %L must be real",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd = g95_validate_kind(BT_REAL, arg->ts.type);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  rmid = g95_copy_expr(arg);
+
+  mpf_init_set_str(mpf_half, "0.5", 10);
+
+  if ( g95_compare_expr(arg, real_zero) <= 0 ) {
+    mpf_init(rmid->value.real);
+    mpf_sub(rmid->value.real, arg->value.real, mpf_half);
+  }
+  else if ( g95_compare_expr(arg, real_zero) > 0 ) {
+    mpf_init(rmid->value.real);
+    mpf_add(rmid->value.real, arg->value.real, mpf_half);
+  }
+
+  rtrunc = g95_copy_expr(rmid);
+  mpf_trunc(rtrunc->value.real,rmid->value.real);
+
+  r = g95_real2int(&result, rtrunc);
+
+  g95_free_expr(rmid);
+  g95_free_expr(rtrunc);
+
+  if ( r == ARITH_OK ) {
+    g95_replace_expr(e, result);
+    return SUCCESS;
+  }
+  else {
+    g95_warning("Conversion in NINT at %L failed",
+		&SECOND_ARG(e)->where);
+    return FAILURE;
+  }
+
+} /* end simplify_nint */
+
+
+/* simplify_not() */
+static try simplify_not(g95_expr *e) {
+g95_expr *arg;
+int knd;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_INTEGER) {
+    g95_warning("Argument of NOT at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd = g95_validate_kind(BT_INTEGER, arg->ts.type);
+
+  if (arg->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_not */
+
+
+/* simplify_precision */
+static try simplify_precision(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL || arg->ts.type != BT_COMPLEX) {
+    g95_warning("Argument of PRECISION at %L must be real or complex",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_precision */
+
+
+/* simplify_radix */
+static try simplify_radix(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_INTEGER || arg->ts.type != BT_REAL) {
+    g95_warning("Argument of PRECISION at %L must be integer or real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_radix */
+
+
+/* simplify_range */
+static try simplify_range(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_INTEGER || arg->ts.type != BT_REAL 
+		  || arg->ts.type != BT_COMPLEX) {
+    g95_warning("Argument of PRECISION at %L must be integer, real, or complex",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_range */
+
+
+/* simplify_real() */
+static try simplify_real(g95_expr *e) {
+g95_expr *arg, *result;
+arith r;
+
+/* Needs KIND */
+/* knd (optional) must be a valid real kind */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  result = g95_copy_expr(arg);
+
+  switch (arg->ts.type) {
+	case BT_INTEGER:
+            r = g95_int2real(&result, arg);
+	    if ( r == ARITH_OK ) {
+		g95_replace_expr(e, result);
+	        return SUCCESS;
+	    }
+	    else {
+	        g95_free_expr(result);
+		return FAILURE;
+	    }
+	    break;
+
+	case BT_REAL:
+	    g95_replace_expr(e, result);
+	    return SUCCESS;
+	    break;
+
+	case BT_COMPLEX:
+       	    mpf_init(result->value.real);
+	    mpf_set(result->value.real, arg->value.complex.r);
+            g95_replace_expr(e, result);
+	    return SUCCESS;
+	    break;
+
+        default:
+       	    g95_warning("Invalid argument type in REAL at %L",
+ 	       	&FIRST_ARG(e)->where);
+	    g95_free(result);
+	    return FAILURE;
+  }
+
+  return SUCCESS;
+
+} /* end simplify_real */
+
+
+/* simplify_rrspacing */
+static try simplify_rrspacing(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of RRSPACING at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+
+} /* end simplify_rrspacing */
+
+
+/* simplify_scale */
+static try simplify_scale(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_REAL) {
+    g95_warning("First argument of SCALE at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg2->ts.type != BT_INTEGER) {
+    g95_warning("Second argument of SCALE at %L must be integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT ) 
+    return FAILURE;
+
+  return SUCCESS;
+}
+
+
+/* simplify_scan() */
+static try simplify_scan(g95_expr *e) {
+g95_expr *arg1, *arg2, *arg3;
+int knd1, knd2;
+
+/* Takes optional argument, not implemented */
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
+    g95_warning("Arguments of SCAN at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd1 = g95_validate_kind(BT_INTEGER, arg1->ts.type);
+  knd2 = g95_validate_kind(BT_INTEGER, arg2->ts.type);
+
+  if (knd1 != knd2 ) {
+    g95_warning("Kind of arguments of SCAN at %L must agree",
+                 &FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_scan */
+
+
+/* simplify_selected_int_kind */
+static try simplify_selected_int_kind(g95_expr *e) {
+g95_expr *arg;
+
+/* This isnt even a skeleton */
+  return SUCCESS;
+
+} /* end simplify_selected_int_kind */
+
+
+/* simplify_selected_real_kind */
+static try simplify_selected_real_kind(g95_expr *e) {
+g95_expr *arg;
+
+/* This isnt even a skeleton */
+  return SUCCESS;
+
+} /* end simplify_selected_real_kind */
+
+
+/* simplify_set_exponent */
+static try simplify_set_exponent(g95_expr *e) {
+g95_expr *arg1, *arg2;
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_REAL) {
+    g95_warning("First argument of SET_EXPONENT at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg2->ts.type != BT_INTEGER) {
+    g95_warning("Second argument of SET_EXPONENT at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_set_exponent */
+
+
+/* simplify_sign */
+static try simplify_sign(g95_expr *e) {
+g95_expr *arg1, *arg2, *rmid, *result;
+int knd1, knd2;
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+/* Type checking */
+
+  if (arg1->ts.type != BT_REAL || arg1->ts.type != BT_INTEGER) {
+    g95_warning("First argument of SIGN at %L must be real or integer",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if ( (arg2->ts.type != arg1->ts.type) ) {
+    g95_warning("Type of arguments of SET_EXPONENT at %L must agree",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd1 = g95_validate_kind(BT_INTEGER, arg1->ts.type);
+  knd2 = g95_validate_kind(BT_INTEGER, arg2->ts.type);
+
+  if (knd1 != knd2 ) {
+    g95_warning("Kind of arguments of SIGN at %L must agree",
+                 &FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  result = g95_copy_expr(arg1);
+
+  switch (arg1->ts.type) {
+	case BT_INTEGER:
+        	mpz_init(result->value.integer);
+    		if ( g95_compare_expr(arg2, integer_zero) >= 0 ) {
+		  mpz_abs(result->value.integer, arg1->value.integer);
+		}
+		else {
+		  rmid = g95_get_expr();
+        	  mpz_init(rmid->value.integer);
+		  mpz_abs(rmid->value.integer, arg1->value.integer);
+		  mpz_neg(result->value.integer, rmid->value.integer);
+		  g95_free_expr(rmid);
+		}
+		break;
+	case BT_REAL:
+        	mpf_init(result->value.real);
+    		if ( g95_compare_expr(arg2, real_zero) > 0 ) {
+		  mpf_abs(result->value.real, arg1->value.real);
+		}
+		else if ( g95_compare_expr(arg2, real_zero) < 0 ) {
+		  rmid = g95_get_expr();
+        	  mpf_init(rmid->value.real);
+		  mpf_abs(rmid->value.real, arg1->value.real);
+		  mpf_neg(result->value.real, rmid->value.real);
+		  g95_free_expr(rmid);
+		}
+		else
+		  /* This is not making a distinction between pos and neg zero*/
+		  mpf_init(result->value.real);
+		break;
+	  default:
+		return FAILURE;
+  }
+
+  g95_replace_expr(e, result);
+
+  return SUCCESS;
+} /* end simplify_sign */
+
+
+/* simplify_sin */
+static try simplify_sin(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL || arg->ts.type != BT_COMPLEX) {
+    g95_warning("Argument of SIN at %L must be real or complex",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_sin */
+
+
+/* simplify_sinh */
+static try simplify_sinh(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of SINH at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_sinh */
+
+
+/* simplify_spacing */
+static try simplify_spacing(g95_expr *e) {
+g95_expr *arg;
+
+/* Type checking */
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of SPACING at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+  return SUCCESS;
+
+} /* end simplify_spacing */
+
+
+/* simplify_sqrt() */
+static try simplify_sqrt(g95_expr *e) {
+g95_expr *arg, *result;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+
+/* Type checking */
+
+  switch (arg->ts.type) {
+  	case BT_REAL:
+	  if (g95_compare_expr(arg, real_zero) == -1) {
+	    g95_warning("Argument of SQRT at %L has a negative value",
+			&FIRST_ARG(e)->where);
+	    return FAILURE;
+	  }
+	  else {
+	    result = g95_copy_expr(arg);
+            mpf_sqrt(result->value.real, arg->value.real);
+            g95_replace_expr(e,result);
+            return SUCCESS;
+	  }
+	  break;
+
+	case BT_COMPLEX:
+	  /* Need to compute principle value */
+	  break;
+
+        default:
+	    g95_warning("Argument of SQRT at %L must be real or complex",
+			&FIRST_ARG(e)->where);
+	    return FAILURE;
+  }
+
+/* If we reach here something went wrong */
+  return FAILURE;
+
+} /* end simplify_sqrt */
+
+
+/* simplify_tan */
+static try simplify_tan(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of TAN at %L must be real or complex",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_sin */
+
+
+/* simplify_tanh */
+static try simplify_tanh(g95_expr *e) {
+g95_expr *arg;
+
+  arg = FIRST_ARG(e);
+
+  if (arg->ts.type != BT_REAL) {
+    g95_warning("Argument of TANH at %L must be real",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+} /* end simplify_tanh */
+
+
+/* simplify_verify() */
+static try simplify_verify(g95_expr *e) {
+g95_expr *arg1, *arg2, *arg3;
+int knd1, knd2;
+
+/* Takes optional argument, not implemented */
+
+/* Type checking */
+
+  arg1 = FIRST_ARG(e);
+  arg2 = SECOND_ARG(e);
+
+  if (arg1->ts.type != BT_CHARACTER || arg2->ts.type != BT_CHARACTER ) {
+    g95_warning("Arguments of VERIFY at %L must be character",
+		&FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  knd1 = g95_validate_kind(BT_INTEGER, arg1->ts.type);
+  knd2 = g95_validate_kind(BT_INTEGER, arg2->ts.type);
+
+  if (knd1 != knd2 ) {
+    g95_warning("Kind of arguments of VERIFY at %L must agree",
+                 &FIRST_ARG(e)->where);
+    return FAILURE;
+  }
+
+  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT) 
+    return FAILURE;
+
+  return SUCCESS;
+} /* end simplify_verify */
+
+
+/**************************************************************************
+*                 End of simplification functions
+***************************************************************************/
+
+/* check_real() */
 static try check_real(g95_actual_arglist *arg) {
 g95_expr *first, *second;
 intrinsic_sym *sym;
 g95_typespec ts;
 int kind;
+
+/* Check the arguments to a REAL subroutine call.  If
+ * the argument list is correct, we resolve it to one of the conv_?_r
+ * functions. */
 
   first = FIRST_CHECK_ARG(arg);
   second = SECOND_CHECK_ARG(arg);
@@ -468,7 +2723,7 @@ g95_expr *first, *second;
 
 /*********** Subroutines to build the intrinsic list ****************/
 
-/* add_sym()-- Add a single intrinsic symbol to the current list.  The
+/* add_sym()-- Add a single intrinsic symbol to the current list. 
  * Argument list:
  *    char *    Name of function
  *    int       Whether function is elemental (1=Non-elemental, 0=elemental)
@@ -580,7 +2835,7 @@ static intrinsic_sym *find_subroutine(char *name) {
 
 
 /* make_generic()-- Collect a set of intrinsic functions into a
- * generic collections.  The first argument is the name of the generic
+ * generic collection.  The first argument is the name of the generic
  * function (which is probably also the name of a specific function)
  * and the rest of the arguments are the names of the specific
  * functions. */
@@ -618,7 +2873,7 @@ va_list argp;
 /******* Check functions ********/
 
 /* These functions check to see if an argument list is compatible with
- * a particular intrinsic function or subroutine.  Presense of
+ * a particular intrinsic function or subroutine.  Presence of
  * required arguments has already been established, and the argument
  * list has NULL arguments in the correct places.  */
 
@@ -657,29 +2912,27 @@ int di, dr, dd, dl, dc, dz;
   dz = g95_default_complex_kind();
 
   add_sym("abs",  0, BT_REAL,    dr, simplify_rabs, NULL, a, BT_REAL,    dr, 0, NULL);
-  add_sym("iabs", 0, BT_INTEGER, di, simplify_iabs, NULL, NULL, a, BT_INTEGER, di, 0, NULL);
-  add_sym("dabs", 0, BT_REAL,    dd, simplify_rabs, NULL, NULL, a, BT_REAL,    dd, 0, NULL);
+  add_sym("iabs", 0, BT_INTEGER, di, simplify_iabs, NULL, a, BT_INTEGER, di, 0, NULL);
+  add_sym("dabs", 0, BT_REAL,    dd, simplify_rabs, NULL, a, BT_REAL,    dd, 0, NULL);
   add_sym("cabs", 0, BT_REAL,    dr, NULL, NULL, a, BT_COMPLEX, dz, 0, NULL);
   make_generic("abs", "abs", "iabs", "dabs", "cabs", NULL);
   
-  add_sym("achar", 0, BT_CHARACTER, dc, NULL, NULL,
+  add_sym("achar", 0, BT_CHARACTER, dc, simplify_achar, NULL,
 	  i, BT_INTEGER, di, 0, NULL);
   
-/* KAH Must have abs(x)<=1 */
-  add_sym("acos",  0, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);
-  add_sym("dacos", 0, BT_REAL, dd, NULL, not_ready, x, BT_REAL, dd, 0, NULL);
+  add_sym("acos",  0, BT_REAL, dr, simplify_acos, not_ready, x, BT_REAL, dr, 0, NULL);
+  add_sym("dacos", 0, BT_REAL, dd, simplify_acos, not_ready, x, BT_REAL, dd, 0, NULL);
   make_generic("acos", "acos", "dacos", NULL);
 
-  add_sym("adjustl", 0, BT_CHARACTER, dc, NULL, NULL,
+  add_sym("adjustl", 0, BT_CHARACTER, dc, simplify_adjustl, NULL,
 	  stg, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("adjustr", 0, BT_CHARACTER, dc, NULL, NULL,
+  add_sym("adjustr", 0, BT_CHARACTER, dc, simplify_adjustr, NULL,
 	  stg, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("aimag", 0, BT_REAL, dr, NULL, NULL, z, BT_COMPLEX, dz, 0, NULL);
+  add_sym("aimag", 0, BT_REAL, dr, simplify_aimag, NULL, z, BT_COMPLEX, dz, 0, NULL);
 
-/* KAH knd (optional) must be a valid real kind */
-  add_sym("aint", 0, BT_REAL, dr, NULL, not_ready, a, BT_REAL, dr, 0,
+  add_sym("aint", 0, BT_REAL, dr, simplify_aint, not_ready, a, BT_REAL, dr, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
   add_sym("dint", 0, BT_REAL, dd, NULL, NULL, a, BT_REAL, dd, 0, NULL);
   make_generic("aint", "aint", "dint", NULL);
@@ -692,19 +2945,17 @@ int di, dr, dd, dl, dc, dz;
   add_sym("allocated", 1, BT_LOGICAL, dl, NULL, not_ready,
 	  ar, BT_REAL, dr, 0, NULL);
 
-/* KAH knd (optional) must be a valid real kind */
-  add_sym("anint", 0, BT_REAL, dr, NULL, not_ready, a, BT_REAL, dr, 0,
+  add_sym("anint", 0, BT_REAL, dr, simplify_anint, not_ready, a, BT_REAL, dr, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
-  add_sym("dnint", 0, BT_REAL, dd, NULL, NULL, a, BT_REAL, dd, 0, NULL);
+  add_sym("dnint", 0, BT_REAL, dd, simplify_anint, NULL, a, BT_REAL, dd, 0, NULL);
   make_generic("anint", "anint", "dnint", NULL);
 
 /* KAH Takes logical array input */
   add_sym("any", 1, BT_LOGICAL, dl, NULL, not_ready,
 	  msk, BT_LOGICAL, dl, 0, dm, BT_INTEGER, di, 1, NULL);
 
-/* KAH must have abs(x)<=1 */
-  add_sym("asin",  0, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);
-  add_sym("dasin", 0, BT_REAL, dd, NULL, not_ready, x, BT_REAL, dd, 0, NULL);
+  add_sym("asin",  0, BT_REAL, dr, simplify_asin, not_ready, x, BT_REAL, dr, 0, NULL);
+  add_sym("dasin", 0, BT_REAL, dd, simplify_asin, not_ready, x, BT_REAL, dd, 0, NULL);
   make_generic("asin", "asin", "dasin", NULL);
 
 /* KAH Takes pointer and target types-- BT_INTEGER used as a placeholder */
@@ -715,11 +2966,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("datan", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("atan", "atan", "datan", NULL);
 
-/* KAH Atan2 requires checking the second argument-- x cannot be zero
- * if y is zero */
-  add_sym("atan2",  0, BT_REAL, dr, NULL, not_ready,
+  add_sym("atan2",  0, BT_REAL, dr, simplify_atan2, not_ready,
 	  y, BT_REAL, dr, 0, x, BT_REAL, dr, 0, NULL);
-  add_sym("datan2", 0, BT_REAL, dd, NULL, not_ready,
+  add_sym("datan2", 0, BT_REAL, dd, simplify_atan2, not_ready,
 	  y, BT_REAL, dd, 0, x, BT_REAL, dd, 0, NULL);
   make_generic("atan2", "atan2", "datan2", NULL);
 
@@ -727,32 +2976,26 @@ int di, dr, dd, dl, dc, dz;
   add_sym("bit_size", 1, BT_INTEGER, di, NULL, not_ready,
 	  i, BT_INTEGER, di, 0, NULL);
 
-/* KAH pos must be nonnegative and less than bit_size(i) */
-  add_sym("btest", 0, BT_LOGICAL, dl, NULL, not_ready,
+  add_sym("btest", 0, BT_LOGICAL, dl, simplify_btest, not_ready,
 	  i, BT_INTEGER, di, 0, pos, BT_INTEGER, di, 0, NULL);
 
-/* KAH knd (optional) must be a valid integer kind */
-  add_sym("ceiling", 0, BT_INTEGER, di, NULL, not_ready, a, BT_REAL, dr, 0,
+  add_sym("ceiling", 0, BT_INTEGER, di, simplify_ceiling, not_ready, a, BT_REAL, dr, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
 
-/* KAH i must be 0<=i<=n-1, where n=no. of chars in the collating sequence.
- * knd (optional) must be a valid character kind */
-  add_sym("char", 0, BT_CHARACTER, dc, NULL, not_ready,
+  add_sym("char", 0, BT_CHARACTER, dc, simplify_char, not_ready,
 	  i, BT_INTEGER, di, 0, knd, BT_INTEGER, di, 1, NULL);
 
-/* KAH Takes integer, real, or (if only x is present) complex input.
- * knd (optional) must be a valid complex kind */
-  add_sym("cmplx", 0, BT_COMPLEX, dz, NULL, not_ready,
+  add_sym("cmplx", 0, BT_COMPLEX, dz, simplify_cmplx, not_ready,
 	  x, BT_REAL, dr, 0, y, BT_REAL, dr, 1, knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("conjg", 0, BT_COMPLEX, dz, NULL, NULL, z, BT_COMPLEX, dz, 0, NULL);
+  add_sym("conjg", 0, BT_COMPLEX, dz, simplify_conjg, NULL, z, BT_COMPLEX, dz, 0, NULL);
 
-  add_sym("cos",  0, BT_REAL,    dr, NULL, NULL, x, BT_REAL,    dr, 0, NULL);
+  add_sym("cos",  0, BT_REAL,    dr, simplify_cos, NULL, x, BT_REAL,    dr, 0, NULL);
   add_sym("dcos", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,    dd, 0, NULL);
   add_sym("ccos", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX, dz, 0, NULL);
   make_generic("cos", "cos", "dcos", "ccos", NULL);
 
-  add_sym("cosh",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym("cosh",  0, BT_REAL, dr, simplify_cosh, NULL, x, BT_REAL, dr, 0, NULL);
   add_sym("dcosh", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("cosh", "cosh", "dcosh", NULL);
 
@@ -764,18 +3007,17 @@ int di, dr, dd, dl, dc, dz;
   add_sym("cshift", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  sh, BT_INTEGER, di, 0, dm, BT_INTEGER, di, 1, NULL);
 
-/* KAH Input can be real, integer, or complex */
-  add_sym("dble", 0, BT_REAL, dd, NULL, not_ready, a, BT_REAL, dr, 0, NULL);
+  add_sym("dble", 0, BT_REAL, dd, simplify_dble, not_ready, a, BT_REAL, dr, 0, NULL);
 
 /* KAH Input can be integer or real, scalar or array */
   add_sym("digits", 1, BT_INTEGER, di, NULL, not_ready,
 	  x, BT_REAL, dr, 0, NULL);
 
-  add_sym("dim",  0, BT_REAL,    dr, NULL, NULL,
+  add_sym("dim",  0, BT_REAL,    dr, simplify_dim, NULL,
 	  x, BT_REAL,    dr, 0, y, BT_REAL,    dr, 0, NULL);
-  add_sym("idim", 0, BT_INTEGER, di, NULL, NULL,
+  add_sym("idim", 0, BT_INTEGER, di, simplify_dim, NULL,
 	  x, BT_INTEGER, di, 0, y, BT_INTEGER, di, 0, NULL);
-  add_sym("ddim", 0, BT_REAL,    dd, NULL, NULL,
+  add_sym("ddim", 0, BT_REAL,    dd, simplify_dim, NULL,
 	  x, BT_REAL,    dd, 0, y, BT_REAL,    dd, 0, NULL);
   make_generic("dim", "dim", "idim", "ddim", NULL);
 
@@ -784,7 +3026,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("dot_product", 1, BT_REAL, dr, NULL, not_ready,
 	  va, BT_REAL, dr, 0, vb, BT_REAL, dr, 0, NULL);
 
-  add_sym("dprod", 0, BT_REAL, dd, NULL, NULL,
+  add_sym("dprod", 0, BT_REAL, dd, simplify_dprod, NULL,
 	  x, BT_REAL, dr, 0, y, BT_REAL, dr, 0, NULL);
 
 /* KAH Takes array argument */
@@ -795,70 +3037,58 @@ int di, dr, dd, dl, dc, dz;
 /* KAH Takes and returns real scalar or array */
   add_sym("epsilon", 1, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);
 
-  add_sym("exp",  0, BT_REAL,    dr, NULL, NULL, x, BT_REAL,    dr, 0, NULL);
+  add_sym("exp",  0, BT_REAL,    dr, simplify_exp, NULL, x, BT_REAL,    dr, 0, NULL);
   add_sym("dexp", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,    dd, 0, NULL);
   add_sym("cexp", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX, dz, 0, NULL);
   make_generic("exp", "exp", "dexp", "cexp", NULL);
 
-  add_sym("exponent", 0, BT_INTEGER, di, NULL, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym("exponent", 0, BT_INTEGER, di, simplify_exponent, NULL, x, BT_REAL, dr, 0, NULL);
 
-/* KAH knd (optional) must be a valid integer kind */
-  add_sym("floor", 0, BT_INTEGER, di, NULL, not_ready, a, BT_REAL, dr, 0,
+  add_sym("floor", 0, BT_INTEGER, di, simplify_floor, not_ready, a, BT_REAL, dr, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("fraction", 0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym("fraction", 0, BT_REAL, dr, simplify_fraction, NULL, x, BT_REAL, dr, 0, NULL);
 
 /* KAH May be integer or real, input may be scalar or array */
   add_sym("huge", 1, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);
 
-  add_sym("iachar", 0, BT_INTEGER, di, NULL, NULL,
+  add_sym("iachar", 0, BT_INTEGER, di, simplify_iachar, NULL,
 	  c, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("iand", 0, BT_INTEGER, di, NULL, NULL,
+  add_sym("iand", 0, BT_INTEGER, di, simplify_iand, NULL,
 	  i, BT_INTEGER, di, 0, j, BT_INTEGER, di, 0, NULL);
 
-/* KAH pos must be nonnegative and less than bit_size(i) */
-  add_sym("ibclr", 0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("ibclr", 0, BT_INTEGER, di, simplify_ibclr, not_ready,
 	  i, BT_INTEGER, di, 0, pos, BT_INTEGER, di, 0, NULL);
 
-/* KAH pos must be nonnegative and pos+ln must be less than
- * bit_size(i); ln must be nonnegative */
-  add_sym("ibits", 0, BT_INTEGER, di, NULL, not_ready, i, BT_INTEGER, di, 0,
+  add_sym("ibits", 0, BT_INTEGER, di, simplify_ibits, not_ready, i, BT_INTEGER, di, 0,
 	  pos, BT_INTEGER, di, 0, ln, BT_INTEGER, di, 0, NULL);
 
-/* KAH pos must be nonnegative and less than bit_size(i) */
-  add_sym("ibset", 0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("ibset", 0, BT_INTEGER, di, simplify_ibset, not_ready,
 	  i, BT_INTEGER, di, 0, pos, BT_INTEGER, di, 0, NULL);
 
-/* KAH c must be of length 1; its value must be representable by the 
- * processor */
-  add_sym("ichar", 0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("ichar", 0, BT_INTEGER, di, simplify_ichar, not_ready,
 	  c, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("ieor", 0, BT_INTEGER, di, NULL, NULL,
+  add_sym("ieor", 0, BT_INTEGER, di, simplify_ieor, NULL,
 	  i, BT_INTEGER, di, 0, j, BT_INTEGER, di, 0, NULL);
 
-  add_sym("index", 0, BT_INTEGER, di, NULL, NULL, stg, BT_CHARACTER, dc, 0,
+  add_sym("index", 0, BT_INTEGER, di, simplify_index, NULL, stg, BT_CHARACTER, dc, 0,
 	  ssg, BT_CHARACTER, dc, 0, bck, BT_LOGICAL, dl, 1, NULL);
 
-/* KAH Input can be integer, real, or complex.
- * knd (optional) must be a valid integer kind */
-  add_sym("int",   0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("int",   0, BT_INTEGER, di, simplify_int, not_ready,
 	  a, BT_REAL, dr, 0, knd, BT_INTEGER, di, 1, NULL);
-  add_sym("ifix",  0, BT_INTEGER, di, NULL, NULL, a, BT_REAL, dr, 0, NULL);
-  add_sym("idint", 0, BT_INTEGER, di, NULL, NULL, a, BT_REAL, dd, 0, NULL);
+  add_sym("ifix",  0, BT_INTEGER, di, simplify_int, NULL, a, BT_REAL, dr, 0, NULL);
+  add_sym("idint", 0, BT_INTEGER, di, simplify_int, NULL, a, BT_REAL, dd, 0, NULL);
   make_generic("int", "int", "ifix", "idint", NULL);
 
-  add_sym("ior", 0, BT_INTEGER, di, NULL, NULL,
+  add_sym("ior", 0, BT_INTEGER, di, simplify_ior, NULL,
 	  i, BT_INTEGER, di, 0, j, BT_INTEGER, di, 0, NULL);
 
-/* KAH absolute value of sh (shift) must be <=bit_size(i) */
-  add_sym("ishft", 0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("ishft", 0, BT_INTEGER, di, simplify_ishft, not_ready,
 	  i, BT_INTEGER, di, 0, sh, BT_INTEGER, di, 0, NULL);
 
-/* KAH absolute value of sh (shift) must be <=sz; sz (size) must be
- * positive and <=bit_size(i) */
-  add_sym("ishftc", 0, BT_INTEGER, di, NULL, not_ready, i, BT_INTEGER, di, 0,
+  add_sym("ishftc", 0, BT_INTEGER, di, simplify_ishftc, not_ready, i, BT_INTEGER, di, 0,
 	  sh, BT_INTEGER, di, 0, sz, BT_INTEGER, di, 1, NULL);
 
 /* KAH Input can be any type, or an array of any type */
@@ -872,40 +3102,38 @@ int di, dr, dd, dl, dc, dz;
   add_sym("len", 1, BT_INTEGER, di, NULL, NULL,
 	  stg, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("len_trim", 0, BT_INTEGER, di, NULL, NULL,
+  add_sym("len_trim", 0, BT_INTEGER, di, simplify_len_trim, NULL,
 	  stg, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("lge", 0, BT_LOGICAL, dl, NULL, NULL,
+  add_sym("lge", 0, BT_LOGICAL, dl, simplify_lge, NULL,
 	  sta, BT_CHARACTER, dc, 0, stb, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("lgt", 0, BT_LOGICAL, dl, NULL, NULL,
+  add_sym("lgt", 0, BT_LOGICAL, dl, simplify_lgt, NULL,
 	  sta, BT_CHARACTER, dc, 0, stb, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("lle", 0, BT_LOGICAL, dl, NULL, NULL,
+  add_sym("lle", 0, BT_LOGICAL, dl, simplify_lle, NULL,
 	  sta, BT_CHARACTER, dc, 0, stb, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym("llt", 0, BT_LOGICAL, dl, NULL, NULL,
+  add_sym("llt", 0, BT_LOGICAL, dl, simplify_llt, NULL,
 	  sta, BT_CHARACTER, dc, 0, stb, BT_CHARACTER, dc, 0, NULL);
 
-/* KAH If x is real, x must be >zero. If complex, its value must not be zero */
-  add_sym("log",  0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("log",  0, BT_REAL,    dr, simplify_log, not_ready,
 	  x, BT_REAL,    dr, 0, NULL);
-  add_sym("alog", 0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("alog", 0, BT_REAL,    dr, simplify_log, not_ready,
 	  x, BT_REAL,    dr, 0, NULL);
-  add_sym("dlog", 0, BT_REAL,    dd, NULL, not_ready,
+  add_sym("dlog", 0, BT_REAL,    dd, simplify_log, not_ready,
 	  x, BT_REAL,    dd, 0, NULL);
-  add_sym("clog", 0, BT_COMPLEX, dz, NULL, not_ready,
+  add_sym("clog", 0, BT_COMPLEX, dz, simplify_log, not_ready,
 	  x, BT_COMPLEX, dz, 0, NULL);
   make_generic("log", "log", "alog", "dlog", "clog", NULL);
 
-/* KAH x must be >zero */
-  add_sym("log10",  0, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);
-  add_sym("alog10", 0, BT_REAL, dr, NULL, not_ready, x, BT_REAL, dr, 0, NULL);
-  add_sym("dlog10", 0, BT_REAL, dd, NULL, not_ready, x, BT_REAL, dd, 0, NULL);
+  add_sym("log10",  0, BT_REAL, dr, simplify_log10, not_ready, x, BT_REAL, dr, 0, NULL);
+  add_sym("alog10", 0, BT_REAL, dr, simplify_log10, not_ready, x, BT_REAL, dr, 0, NULL);
+  add_sym("dlog10", 0, BT_REAL, dd, simplify_log10, not_ready, x, BT_REAL, dd, 0, NULL);
   make_generic("log10", "log10", "alog10", "dlog10", NULL);
 
 /* KAH knd (optional) must be a valid logical kind */
-  add_sym("logical", 0, BT_LOGICAL, dl, NULL, not_ready, l, BT_LOGICAL, dl, 0,
+  add_sym("logical", 0, BT_LOGICAL, dl, simplify_logical, not_ready, l, BT_LOGICAL, dl, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
 
 /* KAH Takes and returns arrays of any numeric or logical type */
@@ -915,7 +3143,7 @@ int di, dr, dd, dl, dc, dz;
 /* KAH Takes an indefinite number of arguments (but at least two), the
  * argument names are a1,a2[,a3,...]
  * Note: amax0 is equivalent to real(max), max1 is equivalent to int(max) */
-  add_sym("max",   0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("max",   0, BT_REAL,    dr, simplify_max, not_ready,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
   add_sym("max0",  0, BT_INTEGER, di, NULL, not_ready,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
@@ -930,7 +3158,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("max", "max", "max0", "amax1", "dmax1", "amax0", "max1", NULL);
 
 /* KAH Takes scalar or array input */
-  add_sym("maxexponent", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("maxexponent", 1, BT_INTEGER, di, simplify_maxexponent, not_ready,
 	  x, BT_REAL, dr, 0, NULL);
 
 /* KAH Takes array argument of type integer or real.  The type of the
@@ -952,7 +3180,7 @@ int di, dr, dd, dl, dc, dz;
 /* KAH Takes an indefinite number of arguments (but at least two).  The
  * argument names are a1,a2[,a3,...]
  * Note: amin0 is equivalent to real(min), min1 is equivalent to int(min) */
-  add_sym("min",   0, BT_REAL,    dr, NULL, not_ready,
+  add_sym("min",   0, BT_REAL,    dr, simplify_min, not_ready,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
   add_sym("min0",  0, BT_INTEGER, di, NULL, not_ready,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
@@ -966,8 +3194,7 @@ int di, dr, dd, dl, dc, dz;
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
   make_generic("min", "min", "min0", "amin1", "dmin1", "amin0", "min1", NULL);
 
-/* KAH Takes scalar or array input */
-  add_sym("minexponent", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("minexponent", 1, BT_INTEGER, di, simplify_minexponent, not_ready,
 	  x, BT_REAL, dr, 0, NULL);
 
 /* KAH Takes array argument of type integer or real.  The type of the
@@ -982,29 +3209,26 @@ int di, dr, dd, dl, dc, dz;
   add_sym("minval", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("mod",  0, BT_INTEGER, di, NULL, NULL,
+  add_sym("mod",  0, BT_INTEGER, di, simplify_mod, NULL,
 	  a, BT_INTEGER, di, 0, p, BT_INTEGER, di, 0, NULL);
-  add_sym("amod", 0, BT_REAL,    dr, NULL, NULL,
+  add_sym("amod", 0, BT_REAL,    dr, simplify_mod, NULL,
 	  a, BT_REAL,    dr, 0, p, BT_REAL,    dr, 0, NULL);
-  add_sym("dmod", 0, BT_REAL,    dd, NULL, NULL,
+  add_sym("dmod", 0, BT_REAL,    dd, simplify_mod, NULL,
 	  a, BT_REAL,    dd, 0, p, BT_REAL,    dd, 0, NULL);
   make_generic("mod", "mod", "amod", "dmod", NULL);
 
-/* KAH Takes integer or real, returns same type */
-  add_sym("modulo", 0, BT_INTEGER, di, NULL, not_ready,
+  add_sym("modulo", 0, BT_INTEGER, di, simplify_modulo, not_ready,
 	  a, BT_INTEGER, di, 0, p, BT_INTEGER, di, 0, NULL);
 
-/* KAH s must not be equal to zero */
-  add_sym("nearest", 0, BT_REAL, dr, NULL, not_ready,
+  add_sym("nearest", 0, BT_REAL, dr, simplify_nearest, not_ready,
 	  x, BT_REAL, dr, 0, s, BT_REAL, dr, 0, NULL);
 
-/* KAH knd (optional) must be a valid integer kind */
-  add_sym("nint",   0, BT_INTEGER, di, NULL, not_ready, a, BT_REAL, dr, 0,
+  add_sym("nint",   0, BT_INTEGER, di, simplify_nint, not_ready, a, BT_REAL, dr, 0,
 	  knd, BT_INTEGER, di, 1, NULL);
-  add_sym("idnint", 0, BT_INTEGER, di, NULL, NULL, a, BT_REAL, dd, 0, NULL);
+  add_sym("idnint", 0, BT_INTEGER, di, simplify_nint, NULL, a, BT_REAL, dd, 0, NULL);
   make_generic("nint", "nint", "idnint", NULL);
 
-  add_sym("not", 0, BT_INTEGER, di, NULL, NULL, i, BT_INTEGER, di, 0, NULL);
+  add_sym("not", 0, BT_INTEGER, di, simplify_not, NULL, i, BT_INTEGER, di, 0, NULL);
 
 /* KAH Takes and returns pointers-- using BT_INTEGER as a placeholder */
   add_sym("null", 1, BT_INTEGER, di, NULL, not_ready,
@@ -1014,8 +3238,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("pack", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  msk, BT_LOGICAL, dl, 0, v, BT_REAL, dr, 1, NULL);
 
-/* KAH Takes real or complex, can take arrays */
-  add_sym("precision",1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("precision",1, BT_INTEGER, di, simplify_precision, not_ready,
 	  x, BT_REAL, dr, 0, NULL);
 
 /* KAH Takes any type, including pointer */
@@ -1028,19 +3251,15 @@ int di, dr, dd, dl, dc, dz;
   add_sym("product", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
-/* KAH Takes real or integer, scalar or array */
-  add_sym("radix", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("radix", 1, BT_INTEGER, di, simplify_radix, not_ready,
 	  x, BT_REAL, dr, 0, NULL);
 
-/* KAH Takes integer, real, or complex input, scalar or array */
-  add_sym("range", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("range", 1, BT_INTEGER, di, simplify_range, not_ready,
 	  x, BT_REAL, dr, 0, NULL);
 
-/* KAH Takes integer, real, or, complex input.
- * knd (optional) must be a valid real kind */
-  add_sym("real",  0, BT_REAL, dr, NULL, check_real,
+  add_sym("real",  0, BT_REAL, dr, simplify_real, check_real,
 	  a, BT_INTEGER, di, 0, knd, BT_INTEGER, di, 1, NULL);
-  add_sym("float", 0, BT_REAL, dr, NULL, NULL, a, BT_INTEGER, di, 0, NULL);
+  add_sym("float", 0, BT_REAL, dr, simplify_real, NULL, a, BT_INTEGER, di, 0, NULL);
   add_sym("sngl",  0, BT_REAL, dr, NULL, NULL, a, BT_REAL,    dd, 0, NULL);
   make_generic("real", "real", "float", "sngl", NULL);
 
@@ -1052,52 +3271,51 @@ int di, dr, dd, dl, dc, dz;
 	  src, BT_REAL, dr, 0, shp, BT_INTEGER, di, 0,
 	  pad, BT_REAL, dr, 1, ord, BT_INTEGER, di, 1, NULL);
 
-  add_sym("rrspacing",0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym("rrspacing",0, BT_REAL, dr, simplify_rrspacing, NULL, x, BT_REAL, dr, 0, NULL);
 
-  add_sym("scale", 0, BT_REAL, dr, NULL, NULL,
+  add_sym("scale", 0, BT_REAL, dr, simplify_scale, NULL,
 	  x, BT_REAL, dr, 0, i, BT_INTEGER, di, 0, NULL);
 
-/* KAH Can take any kind of character, not just default */
-  add_sym("scan", 0, BT_INTEGER, di, NULL, not_ready, stg, BT_CHARACTER, dc, 0,
+  add_sym("scan", 0, BT_INTEGER, di, simplify_scan, not_ready, stg, BT_CHARACTER, dc, 0,
 	  set, BT_CHARACTER, dc, 0, bck, BT_LOGICAL, dl, 1, NULL);    
 
   add_sym("selected_int_kind", 1, BT_INTEGER, di, 
-	  g95_simplify_selected_int_kind, check_selected_int_kind,
+	  simplify_selected_int_kind, check_selected_int_kind,
 	  r, BT_INTEGER, di, 0, NULL);
 
   add_sym("selected_real_kind", 1, BT_INTEGER, di, 
-	  g95_simplify_selected_real_kind, check_selected_real_kind,
+	  simplify_selected_real_kind, check_selected_real_kind,
 	  p, BT_INTEGER, di, 1, r, BT_INTEGER, di, 1, NULL);
 
-  add_sym("set_exponent", 0, BT_REAL, dr, NULL, NULL,
+  add_sym("set_exponent", 0, BT_REAL, dr, simplify_set_exponent, NULL,
 	  x, BT_REAL, dr, 0, i, BT_INTEGER, di, 0, NULL);
 
 /* KAH Takes array of any type, returns integer array */
   add_sym("shape", 1, BT_INTEGER, di, NULL, not_ready,
 	  src, BT_REAL, dr, 0, NULL);
 
-  add_sym("sign",  0, BT_REAL,    dr, NULL, NULL,
+  add_sym("sign",  0, BT_REAL,    dr, simplify_sign, NULL,
 	  a, BT_REAL,    dr, 0, b, BT_REAL,    dr, 0, NULL);
-  add_sym("isign", 0, BT_INTEGER, di, NULL, NULL,
+  add_sym("isign", 0, BT_INTEGER, di, simplify_sign, NULL,
 	  a, BT_INTEGER, di, 0, b, BT_INTEGER, di, 0, NULL);
-  add_sym("dsign", 0, BT_REAL,    dd, NULL, NULL,
+  add_sym("dsign", 0, BT_REAL,    dd, simplify_sign, NULL,
 	  a, BT_REAL,    dd, 0, b, BT_REAL,    dd, 0, NULL);
   make_generic("sign", "sign", "isign", "dsign", NULL);
 
-  add_sym("sin",  0, BT_REAL,    dr, NULL, NULL, x, BT_REAL,    dr, 0, NULL);
-  add_sym("dsin", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,    dd, 0, NULL);
-  add_sym("csin", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX, dz, 0, NULL);
+  add_sym("sin",  0, BT_REAL,    dr, simplify_sin, NULL, x, BT_REAL,    dr, 0, NULL);
+  add_sym("dsin", 0, BT_REAL,    dd, simplify_sin, NULL, x, BT_REAL,    dd, 0, NULL);
+  add_sym("csin", 0, BT_COMPLEX, dz, simplify_sin, NULL, x, BT_COMPLEX, dz, 0, NULL);
   make_generic("sin", "sin", "dsin", "csin", NULL);
 
-  add_sym("sinh",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
-  add_sym("dsinh", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
+  add_sym("sinh",  0, BT_REAL, dr, simplify_sinh, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym("dsinh", 0, BT_REAL, dd, simplify_sinh, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("sinh", "sinh", "dsinh", NULL);
 
 /* KAH Takes array of any type */
   add_sym("size", 1, BT_INTEGER, di, NULL, not_ready,
 	  ar, BT_REAL, dr, 0, dm, BT_INTEGER, di, 1, NULL);
 
-  add_sym("spacing", 0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym("spacing", 0, BT_REAL, dr, simplify_spacing, NULL, x, BT_REAL, dr, 0, NULL);
 
 /* KAH Takes array of any type, returns array */
   add_sym("spread", 1, BT_REAL, dr, NULL, not_ready, src, BT_REAL, dr, 0,
@@ -1118,12 +3336,12 @@ int di, dr, dd, dl, dc, dz;
   add_sym("sum", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  dm, BT_INTEGER, di, 1, msk, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("tan",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
-  add_sym("dtan", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
+  add_sym("tan",  0, BT_REAL, dr, simplify_tan, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym("dtan", 0, BT_REAL, dd, simplify_tan, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("tan", "tan", "dtan", NULL);
 
-  add_sym("tanh",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
-  add_sym("dtanh", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
+  add_sym("tanh",  0, BT_REAL, dr, simplify_tanh, NULL, x, BT_REAL, dr, 0, NULL);
+  add_sym("dtanh", 0, BT_REAL, dd, simplify_tanh, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("tanh", "tanh", "dtanh", NULL);
 
 /* KAH Input may be scalar or array */
@@ -1148,7 +3366,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("unpack", 1, BT_REAL, dr, NULL, not_ready, v, BT_REAL, dr, 0,
 	  msk, BT_LOGICAL, dl, 0, f, BT_REAL, dr, 0, NULL);
 
-  add_sym("verify", 0, BT_INTEGER, di, NULL, NULL, stg, BT_CHARACTER, dc, 0,
+  add_sym("verify", 0, BT_INTEGER, di, simplify_verify, NULL, stg, BT_CHARACTER, dc, 0,
 	  set, BT_CHARACTER, dc, 0, bck, BT_LOGICAL, dl, 1, NULL);
 }
 
@@ -1178,7 +3396,7 @@ int di, dr, dc;
 
 /* KAH j, ln and pt must be non-negative. i and t must have same kind
  * parameter. */
-  add_sym("mvbits", 0, BT_UNKNOWN, 0, NULL, not_ready,
+  add_sym("mvbits", 0, BT_UNKNOWN, 0, simplify_mvbits, not_ready,
 	  f, BT_INTEGER, di, 0, fp, BT_INTEGER, di, 0, ln, BT_INTEGER, di, 0,
 	  t, BT_INTEGER, di, 0, tp, BT_INTEGER, di, 0, NULL);
 
@@ -1291,6 +3509,7 @@ void g95_intrinsic_init_1(void) {
 
   integer_zero = g95_convert_integer("0", g95_default_integer_kind(), 10);
   real_zero = g95_convert_real("0.0", g95_default_real_kind());
+
 }
 
 
@@ -1466,7 +3685,7 @@ intrinsic_arg *formal;
 
 /* check_specific()-- Given a pointer to an intrinsic symbol and an
  * expression consisting of a function call, see if the function call
- * is consistent with the intrinsic's formal arugment list.  If it is,
+ * is consistent with the intrinsic's formal argument list.  If it is,
  * try to simplify the expression.  */
 
 static try check_specific(intrinsic_sym *specific, g95_expr *expr) {
@@ -1507,7 +3726,7 @@ intrinsic_sym *isym, *specific;
 
   isym = find_function(expr->symbol->name);
   if (isym == NULL) {
-    intrinsic_error("There is no intrinsic function named '%s' at %%L",
+    intrinsic_error("The function '%s' at %%L is not a valid intrinsic",
 		    expr->symbol->name);
     return FAILURE;
   }
@@ -1540,7 +3759,7 @@ char *name;
 
   isym = find_subroutine(name);
   if (isym == NULL) {
-    intrinsic_error("There is no intrinsic subroutine named '%s' at %%L",
+    intrinsic_error("The subroutine '%s' at %%L is not a valid intrinsic",
 		    name);
     return FAILURE;
   }
@@ -1638,7 +3857,7 @@ bad:
 /* g95_simplify_intrinsic()-- Try to simplify an expression node that
  * (might) represent an intrinsic function call.  Most intrinsic
  * function calls are not simplified here-- most are simplified as
- * soon as it a function is resolved as an intrinsic, but sometimes a
+ * soon as the function is resolved as an intrinsic, but sometimes a
  * type conversion intrinsic is inserted before resolution and must be
  * simplified at some point.
  *
