@@ -780,7 +780,7 @@ g95_expr *result;
 
 g95_expr *g95_simplify_exponent(g95_expr *x) {
 g95_expr *result;
-mpf_t i2, ln2, lnx;
+mpf_t i2, absv, ln2, lnx;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -789,15 +789,18 @@ mpf_t i2, ln2, lnx;
 
   if (mpf_cmp(x->value.real,mpf_zero) == 0) {
     mpz_set_ui(result->value.integer,0);
-    return range_check(result,"EXPONENT");
+    return result;
   }
 
   mpf_init_set_ui(i2,2);
+  mpf_init(absv);
   mpf_init(ln2);
   mpf_init(lnx);
 
   natural_logarithm(&i2,&ln2);
-  natural_logarithm(&x->value.real,&lnx);
+
+  mpf_abs(absv,x->value.real);
+  natural_logarithm(&absv,&lnx);
 
   mpf_div(lnx,lnx,ln2);
   mpf_trunc(lnx,lnx);
@@ -807,6 +810,7 @@ mpf_t i2, ln2, lnx;
   mpf_clear(i2);
   mpf_clear(ln2);
   mpf_clear(lnx);
+  mpf_clear(absv);
 
   return range_check(result,"EXPONENT");
 
@@ -839,7 +843,7 @@ int kind;
 
 g95_expr *g95_simplify_fraction(g95_expr *x) {
 g95_expr *result;
-mpf_t i1, i2, ln2, lnx, pow2, ratio;
+mpf_t i2, absv, ln2, lnx, pow2;
 unsigned long exp2;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
@@ -849,38 +853,36 @@ unsigned long exp2;
 
   if (mpf_cmp(x->value.real,mpf_zero) == 0) {
     mpf_set(result->value.real,mpf_zero);
-    return range_check(result,"FRACTION");
+    return result;
   }
 
-  mpf_init_set_ui(i1,1);
   mpf_init_set_ui(i2,2);
+  mpf_init(absv);
   mpf_init(ln2);
   mpf_init(lnx);
   mpf_init(pow2);
-  mpf_init(ratio);
 
   natural_logarithm(&i2,&ln2);
-  natural_logarithm(&x->value.real,&lnx);
+
+  mpf_abs(absv,x->value.real);
+  natural_logarithm(&absv,&lnx);
 
   mpf_div(lnx,lnx,ln2);
   mpf_trunc(lnx,lnx);
   mpf_add_ui(lnx,lnx,1);
 
   exp2 = (unsigned long) mpf_get_d(lnx);
-  mpf_mul_2exp(pow2,i1,exp2);
+  mpf_pow_ui(pow2,i2,exp2);
 
-  mpf_div(ratio,x->value.real,pow2);
+  mpf_div(result->value.real,absv,pow2);
 
-  mpf_set(result->value.real,ratio);
-
-  mpf_clear(i1);
   mpf_clear(i2);
   mpf_clear(ln2);
+  mpf_clear(absv);
   mpf_clear(lnx);
   mpf_clear(pow2);
-  mpf_clear(ratio);
 
-  return result;
+  return range_check(result,"FRACTION");
 
 }
 
@@ -911,7 +913,6 @@ int i;
 
   return result;
 }
-
 
 
 g95_expr *g95_simplify_iachar(g95_expr *e) {
@@ -2375,31 +2376,89 @@ int i, j, len, ncopies, nlen;
 }
 
 
-g95_expr *g95_simplify_rrspacing(g95_expr *e) {
-g95_expr *arg;
+g95_expr *g95_simplify_rrspacing(g95_expr *x) {
+g95_expr *result;
+mpf_t i2, absv, ln2, lnx, frac, pow2;
+unsigned long exp2;
+int i, p;
 
-  return NULL; 
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-/* Type checking */
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i < 0) g95_internal_error("g95_simplify_rrspacing(): bad kind");
 
-  arg = FIRST_ARG(e);
+  result=g95_constant_result(BT_REAL,x->ts.kind);
+  result->where = x->where;
 
-  if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of RRSPACING at %L must be real",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  p = g95_real_kinds[i].digits;
+
+  if (mpf_cmp(x->value.real,mpf_zero) == 0) {
+    mpf_ui_div(result->value.real,1.0,g95_real_kinds[i].tiny);
+    return result;
   }
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+  mpf_init_set_ui(i2,2);
+  mpf_init(ln2);
+  mpf_init(absv);
+  mpf_init(lnx);
+  mpf_init(frac);
+  mpf_init(pow2);
 
-  //  return SUCCESS;
+  natural_logarithm(&i2,&ln2);
+
+  mpf_abs(absv,x->value.real);
+  natural_logarithm(&absv,&lnx);
+
+  mpf_div(lnx,lnx,ln2);
+  mpf_trunc(lnx,lnx);
+  mpf_add_ui(lnx,lnx,1);
+
+  exp2 = (unsigned long) mpf_get_d(lnx);
+  mpf_pow_ui(pow2,i2,exp2);
+  mpf_div(frac,absv,pow2);
+
+  exp2 = (unsigned long) p;
+  mpf_mul_2exp(result->value.real,frac,exp2);
+
+  mpf_clear(i2);
+  mpf_clear(ln2);
+  mpf_clear(absv);
+  mpf_clear(lnx);
+  mpf_clear(frac);
+  mpf_clear(pow2);
+
+  return range_check(result,"RRSPACING");
 
 }
 
 
-g95_expr *g95_simplify_scale(g95_expr *e) {
+g95_expr *g95_simplify_scale(g95_expr *x, g95_expr *i) {
+g95_expr *result;
+int kind;
+long exp;
+unsigned long exp2;
 
-  return NULL; 
+  if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT) return NULL;
+
+  kind = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (kind < 0) g95_internal_error("g95_simplify_scale(): bad kind");
+
+  result=g95_constant_result(BT_REAL,x->ts.kind);
+  result->where = x->where;
+
+  exp = (long) mpz_get_d(i->value.integer);
+
+  if ( exp >= 0 ) {
+    exp2 = (unsigned) exp;
+    mpf_mul_2exp(result->value.real,x->value.real,exp2);
+  }
+  else {
+    exp = -exp;
+    exp2 = (unsigned) exp;
+    mpf_div_2exp(result->value.real,x->value.real,exp2);
+  }
+
+  return range_check(result,"SCALE");
 
 }
 
@@ -2519,10 +2578,56 @@ int range, precision, i, kind, found_precision, found_range;
 }
 
 
+g95_expr *g95_simplify_set_exponent(g95_expr *x, g95_expr *i) {
+g95_expr *result;
+mpf_t i2, ln2, absv, lnx, pow2, frac;
+unsigned long exp2;
 
-g95_expr *g95_simplify_set_exponent(g95_expr *e) {
+  if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT) 
+    return NULL;
 
-  return NULL; 
+  result=g95_constant_result(BT_REAL,x->ts.kind);
+  result->where = x->where;
+
+  if (mpf_cmp(x->value.real,mpf_zero) == 0) {
+    mpf_set(result->value.real,mpf_zero);
+    return result;
+  }
+
+  mpf_init_set_ui(i2,2);
+  mpf_init(ln2);
+  mpf_init(absv);
+  mpf_init(lnx);
+  mpf_init(pow2);
+  mpf_init(frac);
+
+  natural_logarithm(&i2,&ln2);
+
+  mpf_abs(absv,x->value.real);
+  natural_logarithm(&absv,&lnx);
+
+  mpf_div(lnx,lnx,ln2);
+  mpf_trunc(lnx,lnx);
+  mpf_add_ui(lnx,lnx,1);
+
+/* old exponent value, and fraction */
+  exp2 = (unsigned long) mpf_get_d(lnx);
+  mpf_pow_ui(pow2,i2,exp2);
+
+  mpf_div(frac,absv,pow2);
+
+/* New exponent */
+  exp2 = (unsigned long) mpz_get_d(i->value.integer);
+  mpf_mul_2exp(result->value.real,frac,exp2);
+
+  mpf_clear(i2);
+  mpf_clear(ln2);
+  mpf_clear(absv);
+  mpf_clear(lnx);
+  mpf_clear(pow2);
+  mpf_clear(frac);
+
+  return range_check(result,"SET_EXPONENT");
 
 }
 
@@ -2590,12 +2695,67 @@ g95_expr *g95_simplify_sinh(g95_expr *e) {
 
 
 /* simplify_spacing */
-g95_expr *g95_simplify_spacing(g95_expr *e) {
+g95_expr *g95_simplify_spacing(g95_expr *x) {
+g95_expr *result;
+mpf_t i1, i2, ln2, absv, lnx;
+long diff;
+unsigned long exp2;
+int i, p;
 
-  return NULL; 
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i < 0) g95_internal_error("g95_simplify_spacing(): bad kind");
+
+  result=g95_constant_result(BT_REAL,x->ts.kind);
+  result->where = x->where;
+
+  p = g95_real_kinds[i].digits;
+
+  if (mpf_cmp(x->value.real,mpf_zero) == 0) {
+    mpf_set(result->value.real,g95_real_kinds[i].tiny);
+    return result;
+  }
+
+  mpf_init_set_ui(i1,1);
+  mpf_init_set_ui(i2,2);
+  mpf_init(ln2);
+  mpf_init(absv);
+  mpf_init(lnx);
+
+  natural_logarithm(&i2,&ln2);
+
+  mpf_abs(absv,x->value.real);
+  natural_logarithm(&absv,&lnx);
+
+  mpf_div(lnx,lnx,ln2);
+  mpf_trunc(lnx,lnx);
+  mpf_add_ui(lnx,lnx,1);
+
+  diff = (long) mpf_get_d(lnx) - (long) p;
+
+  if ( diff >= 0 ) {
+    exp2 = (unsigned) diff;
+    mpf_mul_2exp(result->value.real,i1,exp2);
+  }
+  else {
+    diff = -diff;
+    exp2 = (unsigned) diff;
+    mpf_div_2exp(result->value.real,i1,exp2);
+  }
+
+  mpf_clear(i1);
+  mpf_clear(i2);
+  mpf_clear(ln2);
+  mpf_clear(absv);
+  mpf_clear(lnx);
+
+  if ( mpf_cmp(result->value.real,g95_real_kinds[i].tiny) < 0 ) 
+    mpf_set(result->value.real,g95_real_kinds[i].tiny);
+
+  return range_check(result,"SPACING");
 
 }
-
 
 
 g95_expr *g95_simplify_sqrt(g95_expr *e) {
@@ -2628,7 +2788,7 @@ g95_expr *sroot, *result;
 	    return result;
 	  }
 	case BT_COMPLEX:
-	  // Need to compute principle value
+	  /* Need to compute principle value */
 	  g95_warning("Complex constant sqrt not implemented yet %L",&e->where);
 	  return NULL;
 	  break;

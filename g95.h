@@ -695,7 +695,7 @@ typedef struct {
   g95_state_data d;
 
   bt selector_type;
-  // root;
+  /* root; */
 
 } g95_select;
 
