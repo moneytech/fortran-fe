@@ -1256,43 +1256,31 @@ match g95_match_subroutine(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
 symbol_attribute attr;
 g95_symbol *sym;
-locus old_loc;
 match m;
 
   g95_clear_attr(&attr);
-  old_loc = *g95_current_locus();
 
   m = match_prefix(&attr, NULL);
   if (m != MATCH_YES) return m;
 
   m = g95_match("subroutine% %n", name);
-  if (m != MATCH_YES) {
-    g95_set_locus(&old_loc);
-    return m;
-  }
+  if (m != MATCH_YES) return m;
 
   if (get_proc_name(name, &sym)) return MATCH_ERROR;
   g95_new_block = sym;
 
-  if (g95_add_subroutine(&sym->attr, NULL) == FAILURE) {
-    m = MATCH_ERROR;
-    goto error;
+  if (g95_add_subroutine(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
+
+  if (g95_match_formal_arglist(sym, 0) != MATCH_YES) return MATCH_ERROR;
+
+  if (g95_match_eos() != MATCH_YES) {
+    g95_syntax_error(ST_SUBROUTINE);
+    return MATCH_ERROR;
   }
 
-  m = g95_match_formal_arglist(sym, 0);
-  if (m != MATCH_YES) goto error;
-
-  m = g95_match_eos();
-  if (m != MATCH_YES) goto error;
-
-  if (g95_parent_procedure(sym, 1) == FAILURE) goto error;
+  if (g95_parent_procedure(sym, 1) == FAILURE) return MATCH_ERROR;
 
   return MATCH_YES;
-
-error:
-  g95_set_locus(&old_loc);
-  g95_reject_statement();
-  return m;
 }
 
 

@@ -1555,6 +1555,7 @@ g95_label_list *q;
  * contain GOTOs to the various labels. */
 
 match g95_match_call(void) {
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_label_list *head, *current;
 g95_actual_arglist *arglist;
 g95_case *new_case;
@@ -1566,9 +1567,11 @@ int i;
   arglist = NULL;
   head = NULL;
 
-  m = g95_match("% %s", &sym);
+  m = g95_match("% %n", name);
   if (m == MATCH_NO) goto syntax;
   if (m != MATCH_YES) return m;
+
+  if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
   if (sym->attr.flavor != FL_GENERIC && !sym->attr.subroutine &&
       g95_add_subroutine(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
