@@ -927,7 +927,7 @@ try t;
 
     sprintf(msg, "Operands of logical operator '%s' at %%L are %s/%s",
 	    g95_op2string(e->operator), g95_typename(&op1->ts),
-	    g95_typename(&op1->ts));
+	    g95_typename(&op2->ts));
 
     goto bad_op;
       
