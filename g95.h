@@ -1145,6 +1145,8 @@ g95_expr *g95_real2complex(g95_expr *, int);
 g95_expr *g95_complex2int(g95_expr *, int);
 g95_expr *g95_complex2real(g95_expr *, int);
 g95_expr *g95_complex2complex(g95_expr *, int);
+g95_expr *g95_log2log(g95_expr *, int);
+
 
 /* symbol.c */
 

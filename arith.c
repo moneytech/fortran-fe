@@ -2216,3 +2216,15 @@ arith rc;
 
   return result;
 }
+
+
+/* g95_log2log()-- Logical kind conversion. */
+
+g95_expr *g95_log2log(g95_expr *src, int kind) {
+g95_expr *result;
+
+  result = g95_constant_result(BT_LOGICAL, kind, &src->where);
+  result->value.logical = src->value.logical;
+
+  return result;
+}

@@ -137,6 +137,11 @@ g95_constructor *head, *c, *tail=NULL;
     }
     break;
 
+  case BT_LOGICAL:
+    if (type != BT_LOGICAL) goto oops;
+    f = g95_log2log;
+    break;
+
   default: oops:
     g95_internal_error("convert_constant(): Unexpected type");
   }
