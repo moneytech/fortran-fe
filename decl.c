@@ -144,20 +144,16 @@ normal:
 /* get_proc_name()-- Special subroutine for getting a symbol node
  * associated with a procedure name, used in SUBROUTINE and FUNCTION
  * statements.  Normally, we just g95_get_symbol() without searching
- * any parent units.  If we are compiling an interface or a contained
- * program unit, we search/create in the parent unit and create a link
- * from the current namespace.  Returns nonzero if there was a
- * problem, zero otherwise. */
+ * any parent units.  If we are compiling an interface, we
+ * search/create in the parent unit and create a link from the current
+ * namespace.  Returns value from g95_get_symbol() */
 
 static int get_proc_name(char *name, g95_symbol **result) {
 
-  if (g95_current_state() != COMP_INTERFACE &&
-      g95_current_state() != COMP_CONTAINS)
-    return g95_get_symbol(name, NULL, 0, result);
+  if (g95_current_state() == COMP_INTERFACE)
+    return g95_get_symbol(name, g95_current_ns->parent, 0, result);
 
-  if (g95_get_symbol(name, g95_current_ns->parent, 0, result)) return 1;
-
-  return 0;
+  return g95_get_symbol(name, NULL, 0, result);
 }
 
 
@@ -1140,16 +1136,17 @@ match m;
 
 /* Make changes to the symbol */
 
+  m = MATCH_ERROR;
+
   if (current_attr.recursive && result == NULL) {
     g95_error("RECURSIVE function at %C requires a RESULT specification");
-    m = MATCH_ERROR;
     goto cleanup;
   }
 
-  if (result == NULL) {
-    if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) goto cleanup;
-  } else {
+  if (g95_current_state() == COMP_INTERFACE || result != NULL) {
     if (g95_add_function(&sym->attr, NULL) == FAILURE) goto cleanup;
+  } else {
+    if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) goto cleanup;
   }
 
   if (g95_missing_attr(&sym->attr, NULL) == FAILURE ||
