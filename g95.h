@@ -753,7 +753,7 @@ typedef struct g95_data {
 /* Structure for holding compile options */
 
 typedef struct {
-  char *source, *object;
+  char *source, *object, *includepath;
   int verbose, pedantic, resolve, line_truncation, fixed_80;
 } g95_option_t;
 

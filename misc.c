@@ -168,7 +168,8 @@ static void display_help(void) {
     "  -Wline-truncation         Warn about truncated source lines\n"
     "  -ffixed-line-length-80    80 character line width in fixed mode\n"
     "  -pedantic                 Warn about use of non-standard features\n"
-    "  -r                        Run the resolution phase\n\n"
+    "  -r                        Run the resolution phase\n"
+    "  -I[directory]             Search for include files in directory\n\n"
     "See http://g95.sourceforge.net for more information.\n\n");
 
   exit(0);
@@ -210,6 +211,17 @@ char *option;
     return 1;
   }
 
+  if (option[0] == '-' && option[1] == 'I') {
+    if(g95_option.includepath) {
+      g95_status("g95: Only one -I option allowed\n");
+      exit(3);
+    }
+    g95_option.includepath = (char *)g95_getmem(strlen(&option[2]));
+    strcpy(g95_option.includepath, &option[2]);
+    return 1;
+  }
+    
+
   if (option[0] == '-') {
     g95_status("g95: Unrecognised option '%s'\n", option);
     exit(3);
@@ -230,6 +242,7 @@ char *option;
 static void init_options(void) {
 
   g95_option.source = NULL;
+  g95_option.includepath = NULL;
   g95_option.verbose = 0;
   g95_option.pedantic = 0;
   g95_option.resolve = 0;

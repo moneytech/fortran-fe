@@ -227,7 +227,7 @@ int c;
 int g95_check_include(void) {
 char c, quote, *include, path[PATH_MAX+1];
 locus start;
-int i;
+int i, j;
 
   include = "include";
 
@@ -246,6 +246,12 @@ int i;
 
 /* Copy the filename */
 
+  j = 0;
+  if (g95_option.includepath) {
+    strcpy(path, g95_option.includepath);
+    j = strlen(path);
+  }
+
   for(i=0;;) {
     c = next_char();
     if (c == '\n') goto no_include;   /* No close quote */
@@ -254,13 +260,13 @@ int i;
 /* This shouldn't happen-- PATH_MAX should be way longer than the max
  * line length */
 
-    if (i >= PATH_MAX)
+    if (j+i >= PATH_MAX)
       g95_internal_error("Pathname of include file is too long at %C");
 
-    path[i++] = c;
+    path[j+i++] = c;
   }
 
-  path[i] = '\0';
+  path[j+i] = '\0';
   if (i == 0) goto no_include;     /* No filename! */
 
 /* At this point, we've got a filename to be included.  The rest of
