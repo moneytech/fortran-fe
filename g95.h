@@ -27,6 +27,10 @@ Boston, MA 02111-1307, USA.  */
  * reasonable. */
 
 
+#ifndef BACKEND_CODE /* Defined only if included by backend code. */
+#include "config.h"
+#endif
+
 /* The following ifdefs are recommended by the autoconf documentation
  * for any code using alloca */
 
@@ -46,10 +50,8 @@ char *alloca ();
 #endif /* do not HAVE_ALLOCA_H */
 #endif /* not __GNUC__ */
 
+
 #include <stdio.h> /* need FILE * here */
-#ifndef BACKEND_CODE /* Defined only if included by backend code. */
-#include "config.h"
-#endif
 
 /* Major control parameters */
 
