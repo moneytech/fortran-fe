@@ -2130,24 +2130,28 @@ static void resolve_symbol(g95_symbol *sym) {
     return;
   }
   
-  /* Constraints on allocatable */
+  /* Constraints on deferred shape variable */
 
-  if (sym->attr.flavor == FL_VARIABLE && sym->attr.allocatable) {
+  if (sym->attr.flavor == FL_VARIABLE) {
     if (sym->as == NULL || sym->as->type != AS_DEFERRED) {
-      g95_error("Allocatable array at %L must have a deferred shape",
-		&sym->declared_at);
-      return;
-    }
-  }
+      if (sym->attr.allocatable) {
+	g95_error("Allocatable array at %L must have a deferred shape",
+		  &sym->declared_at);
+	return;
+      }
 
-  /* Constraints on array pointer */
+      if (sym->attr.pointer && sym->attr.dimension) {
+	g95_error("Pointer to array at %L must have a deferred shape",
+		  &sym->declared_at);
+	return;
+      }
 
-  if (sym->attr.flavor == FL_VARIABLE && sym->attr.pointer &&
-      sym->attr.dimension) {
-    if (sym->as == NULL || sym->as->type != AS_DEFERRED) {
-      g95_error("Pointer array at %L must have a deferred shape",
-		&sym->declared_at);
-      return;
+    } else {
+      if (!sym->attr.allocatable && !sym->attr.pointer && !sym->attr.dummy) {
+	g95_error("Array at %L cannot have a deferred shape",
+		  &sym->declared_at);
+	return;
+      }
     }
   }
 

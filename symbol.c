@@ -2087,13 +2087,13 @@ g95_symbol *sym;
   sym->refs--;
   if (sym->refs < 0) g95_internal_error("free_sym_tree(): Negative refs");
 
-  if (sym->refs == 0) {   /* Go ahead and delete the symbol */
-    if (sym->formal_ns != NULL) {
-      ns = sym->formal_ns;
-      sym->formal_ns = NULL;
-      g95_free_namespace(ns);
-    }
-
+  if (sym->formal_ns != NULL && sym->refs == 1) {
+    /* as formal_ns contains a reference to sym, delete formal_ns just
+     * before the deletion of sym. */
+    ns = sym->formal_ns;
+    sym->formal_ns = NULL;
+    g95_free_namespace(ns);
+  } else if (sym->refs == 0) {   /* Go ahead and delete the symbol */
     g95_free_symbol(sym);
   }
 
