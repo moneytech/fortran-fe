@@ -1011,7 +1011,8 @@ int c;
        * it still might be a procedure reference if the name is the
        * only argument */
 
-      if (g95_find_state(COMP_MODULE) == FAILURE) break;
+      if (g95_find_state(COMP_MODULE) == FAILURE ||
+	  (sym != NULL && sym->attr.flavor != FL_UNKNOWN)) break;
 
       w = *g95_current_locus();
       g95_gobble_whitespace();
@@ -1024,6 +1025,7 @@ int c;
       e->symbol = sym;
       e->expr_type = EXPR_VARIABLE;
       e->ts.type = BT_UNKNOWN;
+      e->where = where;
 
       *result = e;
       return MATCH_YES;
@@ -1039,6 +1041,7 @@ int c;
     e->symbol = sym;
     e->expr_type = EXPR_VARIABLE;
     e->ts.type = BT_PROCEDURE;
+    e->where = where;
 
     *result = e;
     return MATCH_YES;
