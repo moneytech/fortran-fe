@@ -51,7 +51,11 @@ void g95_show_actual_arglist(g95_actual_arglist *a) {
   for(; a; a=a->next) {
     g95_status_char('(');
     if (a->name[0] != '\0') g95_status("%s = ", a->name);
-    g95_show_expr(a->expr);
+    if (a->expr != NULL)
+      g95_show_expr(a->expr);
+    else
+      g95_status("(arg not-present)");
+
     g95_status_char(')');
     if (a->next != NULL) g95_status(" ");
   }
