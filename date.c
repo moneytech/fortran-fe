@@ -1,4 +1,4 @@
-/* Miscellaneous things
+/* Keeps compilation date
    Copyright (C) 2000 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 

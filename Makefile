@@ -11,7 +11,7 @@ OBJS=module.o matchexp.o format.o io.o scanner.o error.o parse.o expr.o \
      primary.o symbol.o arith.o match.o st.o intrinsic.o array.o interface.o \
      misc.o decl.o select.o simplify.o
 
-g95: $(OBJS)
+g95: $(OBJS) date.c
 	@$(CC) -c date.c
 	$(CC) $(LDFLAGS) -o $@ date.o $(OBJS) -L$(GMPDIR)/.libs $(LIBS)
 	@rm date.o
