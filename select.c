@@ -167,6 +167,7 @@ match m;
   if (g95_match(" (") != MATCH_YES) goto syntax;
 
   for(;;) {
+    memset(&c, '\0', sizeof(c));
     if (match_case_selector(&c) == MATCH_ERROR) goto cleanup;
 
     if (head == NULL)
@@ -188,8 +189,6 @@ match m;
 
   new_st.op = EXEC_SELECT;
   new_st.ext = head;
-
-  if (head == (g95_case *) 1) abort();
 
   return MATCH_YES;
 
