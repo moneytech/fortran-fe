@@ -40,6 +40,7 @@ Boston, MA 02111-1307, USA.  */
 #include <assert.h>
 #define BACKEND_CODE
 #include "g95.h"
+#include "intrinsic.h"
 #include "trans.h"
 #include "trans-const.h"
 #include "trans-types.h"
@@ -107,53 +108,53 @@ Boston, MA 02111-1307, USA.  */
    builtin functions.  */
 typedef struct g95_intrinsic_map_t GTY(())
 {
+  const int id;
   const char *name;
-  int len;
   tree GTY(()) real4_decl;
   tree GTY(()) real8_decl;
   tree GTY(()) complex4_decl;
   tree GTY(()) complex8_decl;
 } g95_intrinsic_map_t;
 
-#define I_LIB(fe) {fe, -1, NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE},
+#define I_LIB(id, name) {id, name, NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE},
 static GTY(()) g95_intrinsic_map_t g95_intrinsic_map[] =
 {
   /* Math functions.  These are in libm.  */
-I_LIB("sin")
-I_LIB("cos")
-I_LIB("sqrt")
-I_LIB("tan")
+I_LIB(G95_ISYM_SIN, "sin")
+I_LIB(G95_ISYM_COS, "cos")
+I_LIB(G95_ISYM_SQRT, "sqrt")
+I_LIB(G95_ISYM_TAN, "tan")
 
-I_LIB("asin")
-I_LIB("acos")
-I_LIB("atan")
-I_LIB("atan2")
+I_LIB(G95_ISYM_ASIN, "asin")
+I_LIB(G95_ISYM_ACOS, "acos")
+I_LIB(G95_ISYM_ATAN, "atan")
+I_LIB(G95_ISYM_ATAN2, "atan2")
 
-I_LIB("sinh")
-I_LIB("cosh")
-I_LIB("tanh")
+I_LIB(G95_ISYM_SINH, "sinh")
+I_LIB(G95_ISYM_COSH, "cosh")
+I_LIB(G95_ISYM_TANH, "tanh")
 
-I_LIB("exp")
-I_LIB("log")
-I_LIB("log10")
+I_LIB(G95_ISYM_EXP, "exp")
+I_LIB(G95_ISYM_LOG, "log")
+I_LIB(G95_ISYM_LOG10, "log10")
 
-  {NULL, -1, NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE}
+I_LIB(G95_ISYM_NONE, NULL)
 };
 #undef I_LIB
 
 typedef struct
 {
-  const char *name;
+  const int id;
   const int code4;
   const int code8;
 } g95_builtin_intrinsic_t;
 
 static const g95_builtin_intrinsic_t g95_builtin_intrinsics[]=
 {
-  {"sin", BUILT_IN_SINF, BUILT_IN_SIN},
-  {"cos", BUILT_IN_COSF, BUILT_IN_COS},
-  {"sqrt", BUILT_IN_SQRTF, BUILT_IN_SQRT},
-  {NULL, 0, 0}
+  {G95_ISYM_SIN, BUILT_IN_SINF, BUILT_IN_SIN},
+  {G95_ISYM_COS, BUILT_IN_COSF, BUILT_IN_COS},
+  {G95_ISYM_SQRT, BUILT_IN_SQRTF, BUILT_IN_SQRT},
+  {G95_ISYM_NONE, 0, 0}
 };
 
 /* Evaluate the arguments to an intrinsic function.  */
@@ -178,6 +179,11 @@ g95_conv_intrinsic_function_args (g95_se * se, g95_expr * expr)
       g95_add_stmt_to_pre (se, argse.pre, argse.pre_tail);
       g95_add_stmt_to_post (se, argse.post, argse.post_tail);
 
+      if (actual->expr->ts.type == BT_CHARACTER)
+        {
+          g95_conv_string_parameter (&argse);
+          args = g95_chainon_list (args, argse.string_length);
+        }
       args = g95_chainon_list (args, argse.expr);
     }
   return args;
@@ -266,20 +272,15 @@ g95_build_intrinsic_lib_fndecls ()
   const g95_builtin_intrinsic_t *i;
   g95_intrinsic_map_t *m;
 
-  /* Fill in the string lengths.  */
-  for (m = g95_intrinsic_map; m->name; m++)
-    m->len = strlen (m->name);
-
-  /* Add GCC builting functions.  */
-  for (i = g95_builtin_intrinsics; i->name; i++)
+  /* Add GCC builtin functions.  */
+  for (i = g95_builtin_intrinsics; i->id != G95_ISYM_NONE; i++)
     {
-      for (m = g95_intrinsic_map; m->name; m++)
+      for (m = g95_intrinsic_map; m->id != G95_ISYM_NONE; m++)
         {
-          if (strcmp (m->name, i->name) == 0)
+          if (m->id == i->id)
             break;
         }
-
-      assert (m->name);
+      assert (m->id != G95_ISYM_NONE);
 
       m->real4_decl = built_in_decls[i->code4];
       m->real8_decl = built_in_decls[i->code8];
@@ -361,25 +362,25 @@ g95_get_intrinsic_lib_fndecl (g95_intrinsic_map_t * m, g95_expr * expr)
 
 /* Convert an intrinsic function into an external or builtin call.  */
 static void
-g95_conv_intrinsic_lib_function (g95_se * se, g95_expr * expr,
-                                 const char *name)
+g95_conv_intrinsic_lib_function (g95_se * se, g95_expr * expr)
 {
   g95_intrinsic_map_t *m;
   tree args;
   tree fndecl;
+  int id;
 
+  id = expr->value.function.isym->generic_id;
   /* Find the entry for this function.  */
-  for (m = g95_intrinsic_map; m->name; m++)
+  for (m = g95_intrinsic_map; m->id != G95_ISYM_NONE; m++)
     {
-      if (strncmp (m->name, name, m->len) == 0
-          && name[m->len] == '_')
+      if (id == m->id)
         break;
     }
 
-  if (! m->name)
+  if (m->id == G95_ISYM_NONE)
     {
-      internal_error ("Intrinsic function %s not implemented",
-                      expr->value.function.name);
+      internal_error ("Intrinsic function %s(%d) not recognized",
+                      expr->value.function.name, id);
     }
 
   /* Get the decl and generate the call.  */
@@ -611,8 +612,9 @@ g95_conv_intrinsic_dim (g95_se * se, g95_expr * expr)
 }
 
 /* SIGN(A, B) is absolute value of A times sign of B.  Implement this by
-   negating A if A and B have differing signs.
-    sign (a, b)
+   negating A if A and B have differing signs.  The real value versions
+   use library functions to ensure the correct handling of negative zero.
+    sign (int a, int b)
     {
       cond = (a >= 0);
       tmp = (b < 0);
@@ -626,8 +628,7 @@ g95_conv_intrinsic_dim (g95_se * se, g95_expr * expr)
         val = a;
       return val;
     }
-   This should work for negative zero provided -0.0 < 0.0
- */
+  */
 static void
 g95_conv_intrinsic_sign (g95_se * se, g95_expr * expr)
 {
@@ -646,7 +647,20 @@ g95_conv_intrinsic_sign (g95_se * se, g95_expr * expr)
   tree stmt;
   tree val;
 
+
   arg = g95_conv_intrinsic_function_args (se, expr);
+  if (expr->ts.type == BT_REAL)
+    {
+      switch (expr->ts.kind)
+        {
+        case 4: tmp = gfor_fndecl_math_sign4; break;
+        case 8: tmp = gfor_fndecl_math_sign8; break;
+        default: abort ();
+        }
+      se->expr = g95_build_function_call (tmp, arg);
+      return;
+    }
+
   arg2 = TREE_VALUE (TREE_CHAIN (arg));
   arg = TREE_VALUE (arg);
   type = TREE_TYPE (arg);
@@ -835,6 +849,9 @@ g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
   g95_conv_ss_startstride (&loop);
   g95_conv_loop_setup (&loop);
 
+  g95_mark_ss_chain_used (arrayss, 1);
+  if (maskss)
+      g95_mark_ss_chain_used (maskss, 1);
   /* Generate the loop body.  */
   g95_start_scalarized_body (&loop);
   head = tail = NULL_TREE;
@@ -1133,6 +1150,43 @@ g95_conv_intrinsic_ishftc (g95_se * se, g95_expr * expr)
   se->expr = val;
 }
 
+/* The length of a character string.  */
+static void
+g95_conv_intrinsic_len (g95_se * se, g95_expr * expr)
+{
+  tree len;
+  tree type;
+  g95_se argse;
+
+  assert (!se->ss);
+
+  g95_init_se (&argse, se);
+  g95_conv_simple_rhs (&argse, expr);
+  g95_add_stmt_to_pre (se, argse.pre, argse.pre_tail);
+  g95_add_stmt_to_post (se, argse.post, argse.post_tail);
+  len = argse.string_length;
+
+  type = g95_typenode_for_spec (&expr->ts);
+  se->expr = g95_simple_convert (type, len);
+}
+
+/* The length of a character string not including trailing blanks.  */
+static void
+g95_conv_intrinsic_len_trim (g95_se * se, g95_expr * expr)
+{
+  tree args;
+  tree type;
+
+  args = g95_conv_intrinsic_function_args (se, expr);
+  type = g95_typenode_for_spec (&expr->ts);
+  se->expr = g95_build_function_call (gfor_fndecl_string_len_trim, args);
+  if (TREE_TYPE (se->expr) != type)
+    {
+      se->expr = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, NULL);
+      se->expr = g95_simple_convert (type, se->expr);
+    }
+}
+
 /* Generate code for an intrinsic function.  Some map directly to library
    calls, others get special handling.  In some cases the name of the function
    used depends on the type specifiers.  */
@@ -1155,60 +1209,178 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
   assert (strncmp (expr->value.function.name, "__", 2) == 0);
   name = &expr->value.function.name[2];
 
-  if (strncmp (name, "convert_", 7) == 0
-      || strncmp (name, "real_", 5) == 0
-      || strncmp (name, "int_", 4) == 0
-      || strcmp (name, "ifix") == 0
-      || strcmp (name, "idint") == 0
-      || strcmp (name, "float") == 0
-      || strcmp (name, "sngl") == 0
-      || strncmp (name, "logical_", 8) == 0)
-    g95_conv_intrinsic_conversion (se, expr);
-  else if (strncmp (name, "conjg_", 6) == 0)
-    g95_conv_intrinsic_conjg (se, expr);
-  else if (strncmp (name, "aimag_", 6) == 0)
-    g95_conv_intrinsic_imagpart (se, expr);
-  else if (strncmp (name, "abs_", 4) == 0)
-    g95_conv_intrinsic_abs (se, expr);
-  else if (strncmp (name, "cmplx", 5) == 0)
-    g95_conv_intrinsic_cmplx (se, expr, name[5] == '1');
-  else if (strncmp (name, "dim_", 4) == 0)
-    g95_conv_intrinsic_dim (se, expr);
-  else if (strncmp (name, "sign_", 5) == 0)
-    g95_conv_intrinsic_sign (se, expr);
-  else if (strcmp (name, "dprod") == 0)
-    g95_conv_intrinsic_dprod (se, expr);
-  else if (strncmp (name, "min_", 4) == 0)
-    g95_conv_intrinsic_minmax(se, expr, LT_EXPR);
-  else if (strncmp (name, "max_", 4) == 0)
-    g95_conv_intrinsic_minmax(se, expr, GT_EXPR);
-  else if (strncmp (name, "sum_", 4) == 0)
-    g95_conv_intrinsic_sum (se, expr);
-  else if (strncmp (name, "btest_", 6) == 0)
-    g95_conv_intrinsic_btest (se, expr);
-  else if (strncmp (name, "iand_", 5) == 0)
-    g95_conv_intrinsic_bitop (se, expr, BIT_AND_EXPR);
-  else if (strncmp (name, "ieor_", 5) == 0)
-    g95_conv_intrinsic_bitop (se, expr, BIT_XOR_EXPR);
-  else if (strncmp (name, "ior_", 4) == 0)
-    g95_conv_intrinsic_bitop (se, expr, BIT_IOR_EXPR);
-  else if (strncmp (name, "not_", 4) == 0)
-    g95_conv_intrinsic_not (se, expr);
-  else if (strncmp (name, "ibits_", 5) == 0)
-    g95_conv_intrinsic_ibits (se, expr);
-  else if (strncmp (name, "ibset_", 5) == 0)
-    g95_conv_intrinsic_singlebitop (se, expr, 1);
-  else if (strncmp (name, "ibclr_", 5) == 0)
-    g95_conv_intrinsic_singlebitop (se, expr, 0);
-  else if (strncmp (name, "ishft_", 6) == 0)
-    g95_conv_intrinsic_ishft (se, expr);
-  else if (strncmp (name, "ishftc_", 7) == 0)
-    g95_conv_intrinsic_ishftc (se, expr);
-  else if (strncmp (name, "ubound", 6) == 0
-           || strncmp (name, "lbound", 6) == 0)
-    g95_conv_intrinsic_bound (se, expr, name[0] == 'u');
-  else
-    g95_conv_intrinsic_lib_function (se, expr, name);
+  switch (expr->value.function.isym->generic_id)
+    {
+    case G95_ISYM_NONE:
+      abort ();
+
+    case G95_ISYM_ACHAR:
+    case G95_ISYM_ADJUSTL:
+    case G95_ISYM_ADJUSTR:
+    case G95_ISYM_AINT:
+    case G95_ISYM_ANINT:
+    case G95_ISYM_ALL:
+    case G95_ISYM_ALLOCATED:
+    case G95_ISYM_ANINIT:
+    case G95_ISYM_ANY:
+    case G95_ISYM_ASSOCIATED:
+    case G95_ISYM_CEILING:
+    case G95_ISYM_CHAR:
+    case G95_ISYM_COUNT:
+    case G95_ISYM_CPU_TIME:
+    case G95_ISYM_CSHIFT:
+    case G95_ISYM_DATE_AND_TIME:
+    case G95_ISYM_DOT_PRODUCT:
+    case G95_ISYM_EOSHIFT:
+    case G95_ISYM_EXPONENT:
+    case G95_ISYM_FLOOR:
+    case G95_ISYM_FRACTION:
+    case G95_ISYM_IACHAR:
+    case G95_ISYM_ICHAR:
+    case G95_ISYM_INDEX:
+    case G95_ISYM_LGE:
+    case G95_ISYM_LGT:
+    case G95_ISYM_LLE:
+    case G95_ISYM_LLT:
+    case G95_ISYM_MATMUL:
+    case G95_ISYM_MAXLOC:
+    case G95_ISYM_MAXVAL:
+    case G95_ISYM_MERGE:
+    case G95_ISYM_MINLOC:
+    case G95_ISYM_MINVAL:
+    case G95_ISYM_MOD:
+    case G95_ISYM_MODULO:
+    case G95_ISYM_MVBITS:
+    case G95_ISYM_NEAREST:
+    case G95_ISYM_NINT:
+    case G95_ISYM_PACK:
+    case G95_ISYM_PRESENT:
+    case G95_ISYM_PRODUCT:
+    case G95_ISYM_RANDOM_NUMBER:
+    case G95_ISYM_RANDOM_SEED:
+    case G95_ISYM_REPEAT:
+    case G95_ISYM_RESHAPE:
+    case G95_ISYM_SCAN:
+    case G95_ISYM_SET_EXPONENT:
+    case G95_ISYM_SHAPE:
+    case G95_ISYM_SIZE:
+    case G95_ISYM_SPREAD:
+    case G95_ISYM_SYSTEM_CLOCK:
+    case G95_ISYM_TRANSFER:
+    case G95_ISYM_TRANSPOSE:
+    case G95_ISYM_TRIM:
+    case G95_ISYM_UNPACK:
+    case G95_ISYM_VERIFY:
+      g95_todo_error ("Intrinsic %s", expr->value.function.name);
+
+    case G95_ISYM_ABS:
+      g95_conv_intrinsic_abs (se, expr);
+      break;
+
+    case G95_ISYM_AIMAG:
+      g95_conv_intrinsic_imagpart (se, expr);
+      break;
+
+    case G95_ISYM_BTEST:
+      g95_conv_intrinsic_btest (se, expr);
+      break;
+
+    case G95_ISYM_CONVERSION:
+    case G95_ISYM_REAL:
+    case G95_ISYM_INT:
+    case G95_ISYM_LOGICAL:
+    case G95_ISYM_DBLE:
+      g95_conv_intrinsic_conversion (se, expr);
+      break;
+
+    case G95_ISYM_CMPLX:
+      g95_conv_intrinsic_cmplx (se, expr, name[5] == '1');
+      break;
+
+    case G95_ISYM_CONJG:
+      g95_conv_intrinsic_conjg (se, expr);
+      break;
+
+    case G95_ISYM_DIM:
+      g95_conv_intrinsic_dim (se, expr);
+      break;
+
+    case G95_ISYM_DPROD:
+      g95_conv_intrinsic_dprod (se, expr);
+      break;
+
+    case G95_ISYM_IAND:
+      g95_conv_intrinsic_bitop (se, expr, BIT_AND_EXPR);
+      break;
+
+    case G95_ISYM_IBCLR:
+      g95_conv_intrinsic_singlebitop (se, expr, 0);
+      break;
+
+    case G95_ISYM_IBITS:
+      g95_conv_intrinsic_ibits (se, expr);
+      break;
+
+    case G95_ISYM_IBSET:
+      g95_conv_intrinsic_singlebitop (se, expr, 1);
+      break;
+
+    case G95_ISYM_IEOR:
+      g95_conv_intrinsic_bitop (se, expr, BIT_XOR_EXPR);
+      break;
+
+    case G95_ISYM_IOR:
+      g95_conv_intrinsic_bitop (se, expr, BIT_IOR_EXPR);
+      break;
+
+    case G95_ISYM_ISHFT:
+      g95_conv_intrinsic_ishft (se, expr);
+      break;
+
+    case G95_ISYM_ISHFTC:
+      g95_conv_intrinsic_ishftc (se, expr);
+      break;
+
+    case G95_ISYM_LBOUND:
+      g95_conv_intrinsic_bound (se, expr, 0);
+      break;
+
+    case G95_ISYM_LEN:
+      g95_conv_intrinsic_len (se, expr);
+      break;
+
+    case G95_ISYM_LEN_TRIM:
+      g95_conv_intrinsic_len_trim (se, expr);
+      break;
+
+    case G95_ISYM_MAX:
+      g95_conv_intrinsic_minmax(se, expr, GT_EXPR);
+      break;
+
+    case G95_ISYM_MIN:
+      g95_conv_intrinsic_minmax(se, expr, LT_EXPR);
+      break;
+
+    case G95_ISYM_NOT:
+      g95_conv_intrinsic_not (se, expr);
+      break;
+
+    case G95_ISYM_SIGN:
+      g95_conv_intrinsic_sign (se, expr);
+      break;
+
+    case G95_ISYM_SUM:
+      g95_conv_intrinsic_sum (se, expr);
+      break;
+
+    case G95_ISYM_UBOUND:
+      g95_conv_intrinsic_bound (se, expr, 1);
+      break;
+
+    default:
+      g95_conv_intrinsic_lib_function (se, expr);
+      break;
+    }
 }
 
 /* This generates code to execute before entering the scalarization loop.
@@ -1248,13 +1420,22 @@ g95_walk_intrinsic_function (g95_ss * ss, g95_expr * expr,
     return g95_walk_elemental_function_args (ss, expr, G95_SS_SCALAR);
 
   /* Special cases.  */
-  if (strcmp (isym->name, "ubound") == 0
-      || strcmp (isym->name, "lbound") == 0)
-    return g95_walk_intrinsic_bound (ss, expr);
+  switch (isym->generic_id)
+    {
+    case G95_ISYM_LBOUND:
+    case G95_ISYM_UBOUND:
+      return g95_walk_intrinsic_bound (ss, expr);
 
-  /* These can probably be handles in the same way as normal functions.  */
-  g95_todo_error ("Scalarization of non-elemental intrinsic: %s",
-                  expr->value.function.name);
+    case G95_ISYM_LEN:
+      /* Returns a single scalar value.  Pass it back.  */
+      return ss;
+
+    default:
+      /* Many of these can probably be handled in the same way as normal
+         functions.  */
+      g95_todo_error ("Scalarization of non-elemental intrinsic: %s",
+                      expr->value.function.name);
+    }
 }
 
 #include "gt-f95-trans-intrinsic.h"

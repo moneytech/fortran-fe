@@ -196,6 +196,7 @@ g95_simple_fold_tmp(tree expr, tree * phead, tree * ptail, tree * tmpvar)
   return var;
 }
 
+static int nest_level = 0;
 /* Create a new scope/binding level.  */
 void
 g95_start_stmt (void)
@@ -272,7 +273,7 @@ g95_finish_stmt (tree body, tree tail)
       stmt = TREE_CHAIN (stmt);
     }
 
-  block = poplevel (0, 0, 0);
+  block = poplevel (1, 0, 0);
 
   TREE_CHAIN (stmt) = body;
 
@@ -614,40 +615,11 @@ g95_trans_code (g95_code * code)
   return head;
 }
 
-/* These functions still need a bit of work to support everything,  */
-
-/* Recursively generate prototypes for all functions and contained
-   functions in a given namespace.  */
-static void
-g95_generate_function_protos (g95_namespace * ns)
-{
-  g95_namespace *n;
-
-  /* Generate prototypes for functions/subroutines declared in an interface.  */
-  /* ignore this for now
-  for (n = ns->proc_name->formal_ns; n; n = n->sibling) */
-
-  for (n = ns->contained; n; n = n->sibling)
-    {
-      /* Namespaces are also added for module procedures.  We don't want to
-         process those here.  */
-      if (n->parent != ns)
-        continue;
-
-      g95_get_function_decl (n->proc_name);
-      /*g95_generate_function_protos (n, func_decl);*/
-    }
-}
-
 /* This function is called after a complete program unit has been parsed
-   and resolved. First we generate prototype declarations for all
-   functions, and then we generate code for one function at a time.
-*/
+   and resolved.  */
 void
 g95_generate_code (g95_namespace * ns)
 {
-  tree fndecl;
-  g95_namespace *n;
   g95_symbol *main_program = NULL;
   symbol_attribute attr;
 
@@ -665,25 +637,7 @@ g95_generate_code (g95_namespace * ns)
       ns->proc_name = main_program;
     }
 
-  fndecl = g95_get_function_decl (ns->proc_name);
-
-  current_function_decl = fndecl;
-
-  g95_generate_function_protos (ns);
-
-  for (n = ns->contained ; n ; n = n->sibling)
-    {
-      /* Skip namespaces for used module procedures.  */
-      if (n->parent != ns)
-        continue;
-
-      g95_todo_error("contained subroutines");
-      g95_generate_function_code (n);
-    }
-
   g95_generate_function_code (ns);
-
-  current_function_decl = NULL;
 }
 
 static void
@@ -738,8 +692,5 @@ g95_generate_module_code (g95_namespace * ns)
   g95_traverse_ns (ns, g95_create_module_variable);
 
   for (n = ns->contained ; n ; n = n->sibling)
-    {
-      g95_get_function_decl (n->proc_name);
-      g95_generate_function_code (n);
-    }
+    g95_generate_function_code (n);
 }

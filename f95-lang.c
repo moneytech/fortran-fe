@@ -107,7 +107,6 @@ static void g95_init_builtin_functions (void);
 static const char *g95_init (const char *);
 static void g95_finish (void);
 static void g95_print_identifier (FILE *, tree, int);
-void do_expand_body (tree);
 void do_function_end (void);
 int global_bindings_p (void);
 void insert_block (tree);
@@ -218,7 +217,7 @@ static GTY (()) tree g95_scope_stmt_stack;
 /* Check that a stmt is SIMPLE. Used to be part of tree-simple.c but then
    disappeared.  We generate SIMPLE trees anyway, these are just used to
    double-check.  */
-static int
+int
 is_simple_decl_stmt (tree stmt)
 {
   tree decl = DECL_STMT_DECL (stmt);
@@ -350,11 +349,15 @@ is_simple_stmt (tree t)
 }
 
 void
-expand_function_body (tree fndecl)
+expand_function_body (tree fndecl, int nested)
 {
-  int nested;
+  timevar_push (TV_EXPAND);
 
-  nested = (DECL_CONTEXT (current_function_decl) != NULL_TREE);
+  if (nested)
+    {
+      push_function_context ();
+      current_function_decl = fndecl;
+    }
 
   init_function_start (fndecl, input_filename, 1);
 
@@ -369,11 +372,6 @@ expand_function_body (tree fndecl)
 
   immediate_size_expand = 0;
   cfun->x_dont_save_pending_sizes_p = 1;
-
-  /* Don't do tree optimizations till we've got it working
-  optimize_function_tree (fndecl) */
-
-  timevar_push (TV_EXPAND);
 
   /* The code _should_ already be in SIMPLE form.  If not then something has
      gone wrong.*/
@@ -412,6 +410,9 @@ expand_function_body (tree fndecl)
     }
   if (nested)
     ggc_pop_context ();
+
+  if (nested)
+    pop_function_context ();
 
   timevar_pop (TV_EXPAND);
 }
@@ -470,6 +471,21 @@ g95_be_parse_file (void *set_yydebug ATTRIBUTE_UNUSED)
 
 /* Routines Expected by GCC:  */
 
+static void
+f95_expand_decl_stmt (tree t)
+{
+  tree decl;
+
+  decl = DECL_STMT_DECL (t);
+
+  /* Expand nexted functions.  */
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && DECL_CONTEXT (decl) == current_function_decl
+      && DECL_SAVED_TREE (decl))
+    expand_function_body (decl, 1);
+
+}
+
 const char *
 g95_init (const char *filename)
 {
@@ -478,6 +494,8 @@ g95_init (const char *filename)
     {
       filename = "";
     }
+
+  lang_expand_decl_stmt = f95_expand_decl_stmt;
 
   g95_option.source = (char *) filename;
   g95_init_1 ();

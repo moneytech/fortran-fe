@@ -353,6 +353,7 @@ g95_trans_io_call (g95_code * code)
   g95_ss *ss;
   g95_se se;
   g95_expr *expr;
+  g95_loopinfo loop;
   tree args;
   tree tmp;
   tree fndecl;
@@ -365,8 +366,24 @@ g95_trans_io_call (g95_code * code)
 
   expr = code->ext.actual->expr;
   ss = g95_walk_expr (g95_ss_terminator, expr);
+
   if (ss != g95_ss_terminator)
-    g95_todo_error ("array IO");
+    {
+      ss = g95_reverse_ss (ss);
+      /* Initialize the scalarizer.  */
+      g95_init_loopinfo (&loop);
+      g95_add_ss_to_loop (&loop, ss);
+
+      /* Initialize the loop.  */
+      g95_conv_ss_startstride (&loop);
+      g95_conv_loop_setup (&loop);
+
+      /* The main loop body.  */
+      g95_mark_ss_chain_used (ss, 1);
+      g95_start_scalarized_body (&loop);
+      g95_copy_loopinfo_to_se (&se, &loop);
+      se.ss = ss;
+    }
 
   g95_conv_simple_val (&se, expr);
   kind = expr->ts.kind;
@@ -457,7 +474,16 @@ g95_trans_io_call (g95_code * code)
   g95_add_stmt_to_pre (&se, tmp, tmp);
   g95_add_stmt_to_pre (&se, se.post, se.post_tail);
 
-  tmp = g95_finish_stmt (se.pre, se.pre_tail);
+  if (se.ss)
+    {
+      assert (se.ss == g95_ss_terminator);
+      g95_trans_scalarizing_loops (&loop, se.pre, se.pre_tail);
+
+      g95_add_stmt_to_pre (&loop, loop.post, loop.post_tail);
+      tmp = g95_finish_stmt (loop.pre, loop.pre_tail);
+    }
+  else
+    tmp = g95_finish_stmt (se.pre, se.pre_tail);
 
   return tmp;
 }

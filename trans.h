@@ -309,7 +309,7 @@ extern GTY(()) tree g95_current_io_state;
 tree pushdecl (tree);
 void pushlevel (int);
 tree poplevel (int, int, int);
-void expand_function_body (tree);
+void expand_function_body (tree, int);
 tree getdecls(void);
 
 /* Runtime library function decls.  */
@@ -333,6 +333,8 @@ extern GTY(()) tree gfor_fndecl_math_cpowf;
 extern GTY(()) tree gfor_fndecl_math_cpow;
 extern GTY(()) tree gfor_fndecl_math_cabsf;
 extern GTY(()) tree gfor_fndecl_math_cabs;
+extern GTY(()) tree gfor_fndecl_math_sign4;
+extern GTY(()) tree gfor_fndecl_math_sign8;
 extern GTY(()) tree gfor_fndecl_math_ishftc4;
 extern GTY(()) tree gfor_fndecl_math_ishftc8;
 
@@ -340,6 +342,7 @@ extern GTY(()) tree gfor_fndecl_math_ishftc8;
 extern GTY(()) tree gfor_fndecl_copy_string;
 extern GTY(()) tree gfor_fndecl_compare_string;
 extern GTY(()) tree gfor_fndecl_concat_string;
+extern GTY(()) tree gfor_fndecl_string_len_trim;
 
 /* True if node is an integer constant.  */
 #define INTEGER_CST_P(node) (TREE_CODE(node) == INTEGER_CST)

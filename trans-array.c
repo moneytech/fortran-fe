@@ -1977,7 +1977,6 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
       if (temp_dim == -1)
         break;
 
-      /* TODO: follow component refs for derived types.  */
       if (dest->expr->symbol == ss->expr->symbol)
         {
           lref = dest->expr->ref;
@@ -3630,14 +3629,14 @@ g95_trans_deferred_array (g95_symbol * sym, tree body)
    a scalar expression.  It is up to the caller to take whatever action is
    neccessary.
 
-   TODO:Extension - multiple component subscripts.
+   Possible extension - multiple component subscripts.
     x(:,:) = foo%a(:)%b(:)
    Transforms to
     forall (i=..., j=...)
       x(i,j) = foo%a(j)%b(i)
     end forall
    This adds a fair amout of complexity because you need to deal with more
-   than one ref.  Could be handled in a similar manner to vector subscripts.  */
+   than one ref.  Maybe handle in a similar manner to vector subscripts.  */
 
 /* Walk a variable reference.  */
 static g95_ss *

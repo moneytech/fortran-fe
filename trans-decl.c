@@ -40,7 +40,7 @@ Boston, MA 02111-1307, USA.  */
 #include "trans-types.h"
 #include "trans-array.h"
 #include "trans-const.h"
-/* Only for g95_trans_code.  Souldn't need to include this.  */
+/* Only for g95_trans_code.  Shouldn't need to include this.  */
 #include "trans-stmt.h"
 
 #define MAX_LABEL_VALUE 99999
@@ -52,6 +52,7 @@ static GTY(()) tree current_function_return_label;
 
 /* Holds the variable DECLs for the current function.  */
 static GTY (()) tree saved_function_decls = NULL_TREE;
+static GTY (()) tree saved_parent_function_decls = NULL_TREE;
 
 /* List of static constructor functions.  */
 tree g95_static_ctors;
@@ -77,6 +78,8 @@ tree gfor_fndecl_math_cpowf;
 tree gfor_fndecl_math_cpow;
 tree gfor_fndecl_math_cabsf;
 tree gfor_fndecl_math_cabs;
+tree gfor_fndecl_math_sign4;
+tree gfor_fndecl_math_sign8;
 tree gfor_fndecl_math_ishftc4;
 tree gfor_fndecl_math_ishftc8;
 
@@ -84,6 +87,20 @@ tree gfor_fndecl_math_ishftc8;
 tree gfor_fndecl_copy_string;
 tree gfor_fndecl_compare_string;
 tree gfor_fndecl_concat_string;
+tree gfor_fndecl_string_len_trim;
+
+static void
+g95_add_decl_to_parent_function (tree decl)
+{
+  tree stmt;
+
+  assert (decl);
+  DECL_CONTEXT (decl) = DECL_CONTEXT (current_function_decl);
+  DECL_NONLOCAL (decl) = 1;
+  stmt = build_stmt (DECL_STMT, decl);
+  TREE_CHAIN (stmt) = saved_parent_function_decls;
+  saved_parent_function_decls = stmt;
+}
 
 static void
 g95_add_decl_to_function (tree decl)
@@ -91,6 +108,7 @@ g95_add_decl_to_function (tree decl)
   tree stmt;
 
   assert (decl);
+  DECL_CONTEXT (decl) = current_function_decl;
   stmt = build_stmt (DECL_STMT, decl);
   TREE_CHAIN (stmt) = saved_function_decls;
   saved_function_decls = stmt;
@@ -287,7 +305,12 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
      because this would add them to the current scope rather than the
      function scope.  */
   if (current_function_decl != NULL_TREE)
-    g95_add_decl_to_function (decl);
+    {
+      if (sym->ns->proc_name->backend_decl == current_function_decl)
+        g95_add_decl_to_function (decl);
+      else
+        g95_add_decl_to_parent_function (decl);
+    }
 
   /* If a variable is USE associated, it's always external.  */
   if (sym->attr.use_assoc)
@@ -421,8 +444,16 @@ g95_get_symbol_decl (g95_symbol * sym)
   else if (sym->attr.intrinsic)
     g95_todo_error ("intrinsic variables");
 
-  /* Catch external function declarations.  */
-  assert (! (sym->attr.function || sym->attr.subroutine));
+  /* Catch function declarations.  Only used for actual parameters.  */
+  if (sym->attr.flavor == FL_PROCEDURE)
+    {
+      /* TODO: Frontend bug: no function or subroutine flag.  */
+      if (! (sym->attr.function || sym->attr.subroutine))
+        sym->attr.subroutine = 1;
+
+      decl = g95_get_extern_function_decl (sym);
+      return decl;
+    }
 
   decl = build_decl (VAR_DECL,
                      g95_sym_identifier (sym),
@@ -444,9 +475,6 @@ g95_get_symbol_decl (g95_symbol * sym)
           && ! sym->attr.pointer)
         G95_DECL_PACKED_ARRAY (decl) = 1;
     }
-
-  if (sym->ns->proc_name->backend_decl != current_function_decl)
-    g95_todo_error ("Use of parent variable in nested subroutine");
 
   g95_finish_var_decl (decl, sym);
 
@@ -536,18 +564,16 @@ g95_get_extern_function_decl (g95_symbol *sym)
   return fndecl;
 }
 
-/* Get a function declaration.  Create it if it doesn't exist.  For external
-   functions (in the C sense) use g95_get_extern_function_decl.  */
-tree
-g95_get_function_decl (g95_symbol * sym)
+/* Create a declaration for a procedure.  For external functions (in the C
+   sense) use g95_get_extern_function_decl.  */
+static void
+g95_build_function_decl (g95_symbol * sym)
 {
   tree fndecl, type, result_decl, typelist, arglist;
   symbol_attribute attr;
   g95_formal_arglist *f;
 
-  if (sym->backend_decl)
-    return sym->backend_decl;
-
+  assert (! sym->backend_decl);
   assert (! sym->attr.external);
 
   /* Allow only one nesting level.  Allow external declarations.  */
@@ -729,8 +755,6 @@ g95_get_function_decl (g95_symbol * sym)
       current_function_decl = DECL_CONTEXT (fndecl);
     }
   sym->backend_decl = fndecl;
-
-  return fndecl;
 }
 
 /* Return the decl used to hold the function return value.  */
@@ -849,6 +873,11 @@ g95_build_intrinsic_function_decls (void)
                                     g95_strlen_type_node, pchar_type_node,
                                     g95_strlen_type_node, pchar_type_node);
 
+  gfor_fndecl_string_len_trim =
+    g95_build_library_function_decl (get_identifier ("_gfor_string_len_trim"),
+                                    g95_int4_type_node,
+                                    2, g95_strlen_type_node, pchar_type_node);
+
   /* Power functions.  */
   gfor_fndecl_math_powf =
     g95_build_library_function_decl (get_identifier ("powf"),
@@ -874,6 +903,14 @@ g95_build_intrinsic_function_decls (void)
     g95_build_library_function_decl (get_identifier ("cabs"),
                                      g95_real8_type_node,
                                      1, g95_complex8_type_node);
+  gfor_fndecl_math_sign4 =
+    g95_build_library_function_decl (get_identifier ("copysignf"),
+                                     g95_real4_type_node,
+                                     1, g95_real4_type_node);
+  gfor_fndecl_math_sign8 =
+    g95_build_library_function_decl (get_identifier ("copysign"),
+                                     g95_real8_type_node,
+                                     1, g95_real8_type_node);
   gfor_fndecl_math_ishftc4 =
     g95_build_library_function_decl (get_identifier ("__gfor_ishftc4"),
                                      g95_int4_type_node,
@@ -1115,17 +1152,54 @@ g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
   return body;
 }
 
+static void
+g95_generate_contained_functions (g95_namespace * parent)
+{
+  g95_namespace * ns;
+
+  /* We create all the prototypes before generating any code.  */
+  for (ns = parent->contained; ns; ns = ns->sibling)
+    {
+      /* Skip namespaces from used modules.  */
+      if (ns->parent != parent)
+        continue;
+
+      g95_build_function_decl (ns->proc_name);
+    }
+
+  for (ns = parent->contained; ns; ns = ns->sibling)
+    {
+      /* Skip namespaces from used modules.  */
+      if (ns->parent != parent)
+        continue;
+
+      g95_generate_function_code (ns);
+    }
+}
+
 /* Generate code for a function.  */
 void
 g95_generate_function_code (g95_namespace * ns)
 {
   tree fndecl;
   tree old_context;
+  tree stmt;
+  tree decl;
   tree body;
   tree result;
   g95_symbol *sym;
 
+  /* Create the declaration for functions with global scope.  */
+  if (! current_function_decl)
+    g95_build_function_decl (ns->proc_name);
+
   old_context = current_function_decl;
+
+  if (old_context)
+    {
+      push_function_context ();
+      saved_parent_function_decls = saved_function_decls;
+    }
 
   sym = ns->proc_name;
 
@@ -1170,11 +1244,11 @@ g95_generate_function_code (g95_namespace * ns)
   /* function.c requires a push at the start of the function */
   pushlevel (0);
 
+  g95_generate_contained_functions (ns);
+
   /* Check that the frontend isn't still using this.  */
   assert (sym->tlink == NULL);
   sym->tlink = sym;
-
-  g95_start_stmt ();
 
   current_function_return_label = NULL;
 
@@ -1216,12 +1290,29 @@ g95_generate_function_code (g95_namespace * ns)
       g95_add_decl_to_function (g95_current_io_state);
       g95_current_io_state = NULL_TREE;
     }
+
+  /* Add any decls that were pushed.  */
+  for (decl = getdecls(); decl; decl = TREE_CHAIN (decl))
+    {
+      stmt = build_stmt (DECL_STMT, decl);
+      body = chainon (stmt, body);
+    }
+
   /* Add all the decls we created during processing.  */
+  for (stmt = saved_function_decls; stmt; stmt = TREE_CHAIN (stmt))
+    pushdecl (DECL_STMT_DECL (stmt));
+
   body = chainon (saved_function_decls, body);
   saved_function_decls = NULL;
 
-  body = g95_finish_stmt (body, NULL_TREE);
+  stmt = build_stmt (SCOPE_STMT, NULL);
+  SCOPE_BEGIN_P (stmt) = 1;
+  body = chainon(stmt, body);
+  stmt = build_stmt (SCOPE_STMT, NULL);
+  SCOPE_BEGIN_P (stmt) = 0;
+  body = chainon(body, stmt);
 
+  body = build_stmt (COMPOUND_STMT, body);
   DECL_SAVED_TREE (fndecl) = body;
 
   /* Finish off this function and send it for code generation.  */
@@ -1259,7 +1350,14 @@ g95_generate_function_code (g95_namespace * ns)
   free_after_compilation (cfun);
 
   /* RTL generation.  */
-  expand_function_body (fndecl);
+  if (! old_context)
+    expand_function_body (fndecl, 0);
+
+  if (old_context)
+    {
+      pop_function_context ();
+      saved_function_decls = saved_parent_function_decls;
+    }
 
   current_function_decl = old_context;
 }
@@ -1316,7 +1414,7 @@ g95_generate_constructors ()
   free_after_parsing (cfun);
   free_after_compilation (cfun);
 
-  expand_function_body (fndecl);
+  expand_function_body (fndecl, 0);
 
   current_function_decl = NULL_TREE;
 }

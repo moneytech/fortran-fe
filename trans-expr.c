@@ -163,8 +163,7 @@ g95_conv_substring (g95_se * se, g95_ref * ref, int kind)
   g95_se end;
 
   type = g95_get_character_type (kind, ref->u.ss.length);
-  if (G95_KNOWN_SIZE_STRING_TYPE (type))
-    type = build_pointer_type (type);
+  type = build_pointer_type (type);
 
   var = NULL_TREE;
   g95_init_se (&start, se);
@@ -178,7 +177,7 @@ g95_conv_substring (g95_se * se, g95_ref * ref, int kind)
   else
     {
       /* Change the start of the string.  */
-      if (G95_KNOWN_SIZE_STRING_TYPE (TREE_TYPE (se->expr)))
+      if (TYPE_STRING_FLAG (TREE_TYPE (se->expr)))
         tmp = se->expr;
       else
         tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (se->expr)), se->expr);
@@ -226,6 +225,21 @@ g95_conv_variable (g95_se * se, g95_expr * expr)
   else
     {
       se->expr = g95_get_symbol_decl (expr->symbol);
+
+      /* Procedure actual arguments.  */
+      if (expr->symbol->attr.flavor == FL_PROCEDURE
+          && se->expr != current_function_decl)
+        {
+          assert (se->want_pointer);
+          if (! expr->symbol->attr.dummy)
+            {
+              assert (TREE_CODE (se->expr) == FUNCTION_DECL
+                      && DECL_EXTERNAL (se->expr));
+              se->expr = build1 (ADDR_EXPR,
+                  build_pointer_type (TREE_TYPE (se->expr)), se->expr);
+            }
+          return;
+        }
 
       /* Special case for assigning the return value of a function.
          Self recursive functions must have an explicit return value.  */
@@ -792,12 +806,6 @@ g95_conv_concat_op (g95_se * se, g95_expr * expr)
 
   type = g95_get_character_type (expr->ts.kind, expr->ts.cl);
   if (G95_KNOWN_SIZE_STRING_TYPE (type))
-    tmp = build_pointer_type (type);
-  else
-    tmp = type;
-  var = create_tmp_var (tmp, "pstr");
-
-  if (G95_KNOWN_SIZE_STRING_TYPE (type))
     {
       len = TYPE_MAX_VALUE (TYPE_DOMAIN (type));
     }
@@ -807,6 +815,10 @@ g95_conv_concat_op (g95_se * se, g95_expr * expr)
                    rse.string_length);
       len = g95_simple_fold (len, &se->pre, &se->pre_tail, NULL);
     }
+
+  type = build_pointer_type (type);
+  var = create_tmp_var (type, "pstr");
+
 
   if (g95_can_put_var_on_stack (len))
     {
@@ -1044,18 +1056,14 @@ g95_conv_function_val (g95_se * se, g95_symbol * sym)
   if (sym->attr.dummy)
     {
       tmp = g95_get_symbol_decl (sym);
-      assert (TREE_CODE (tmp) == POINTER_TYPE
-             && TREE_CODE (TREE_TYPE (tmp)) == FUNCTION_DECL);
+      assert (TREE_CODE (TREE_TYPE (tmp)) == POINTER_TYPE
+             && TREE_CODE (TREE_TYPE (TREE_TYPE (tmp))) == FUNCTION_TYPE);
 
-      se->expr = create_tmp_var (TREE_TYPE (tmp), "fn");
-
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), se->expr, tmp);
-      tmp = build_stmt (EXPR_STMT, tmp);
-      g95_add_stmt_to_pre (se, tmp, tmp);
+      se->expr = tmp;
     }
   else
     {
-      /* TODO: contained procedures.  */
+      /* TODO: We should already have a decl for contained procedures.  */
       tmp = g95_get_extern_function_decl (sym);
 
       assert (TREE_CODE (tmp) == FUNCTION_DECL);
@@ -1305,7 +1313,7 @@ g95_conv_string_length (tree expr)
 
 /* Makes sure se is suitable for passing as a function string parameter.  */
 void
-g95_conv_string_parameter (g95_se *se)
+g95_conv_string_parameter (g95_se * se)
 {
   if (TREE_CODE (se->expr) == STRING_CST)
     {
@@ -1316,8 +1324,12 @@ g95_conv_string_parameter (g95_se *se)
   se->string_length =
     g95_simple_fold (se->string_length, &se->pre, &se->pre_tail, NULL);
 
-  if (G95_KNOWN_SIZE_STRING_TYPE (TREE_TYPE (se->expr)))
-    se->expr = build1 (ADDR_EXPR, pchar_type_node, se->expr);
+  if (TYPE_STRING_FLAG (TREE_TYPE (se->expr)))
+    {
+      assert (TREE_CODE (se->expr) == VAR_DECL);
+      TREE_ADDRESSABLE (se->expr) = 1;
+      se->expr = build1 (ADDR_EXPR, pchar_type_node, se->expr);
+    }
 
   assert (POINTER_TYPE_P (TREE_TYPE (se->expr)));
   se->expr = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, NULL);
@@ -1387,7 +1399,7 @@ g95_trans_assign (g95_code * code)
       /* Initialize the scalarizer.  */
       g95_init_loopinfo (&loop);
 
-      /* Walk the lhs.  */
+      /* Walk the rhs.  */
       rss = g95_walk_expr (g95_ss_terminator, code->expr2);
       if (rss == g95_ss_terminator)
         {
