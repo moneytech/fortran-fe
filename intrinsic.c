@@ -712,6 +712,169 @@ static try check_huge(g95_expr *x) {
 }
 
 
+static try check_iand(g95_expr *i, g95_expr *j) {
+
+    if (j == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (i->ts.type != BT_INTEGER ) {
+    type_error(i);
+    return FAILURE;
+  }
+
+  if (j->ts.type != BT_INTEGER ) {
+    type_error(j);
+    return FAILURE;
+  }
+
+  if (i->ts.kind != j->ts.kind) {
+    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+
+
+static try check_ibclr(g95_expr *i, g95_expr *j) {
+
+    if (j == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (i->ts.type != BT_INTEGER ) {
+    type_error(i);
+    return FAILURE;
+  }
+
+  if (j->ts.type != BT_INTEGER ) {
+    type_error(j);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+
+
+static try check_ibits(g95_expr *i, g95_expr *j, g95_expr *k) {
+
+    if (j == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+    if (k == NULL) {
+    intrinsic_error("Third argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (i->ts.type != BT_INTEGER ) {
+    type_error(i);
+    return FAILURE;
+  }
+
+  if (j->ts.type != BT_INTEGER ) {
+    type_error(j);
+    return FAILURE;
+  }
+
+  if (k->ts.type != BT_INTEGER ) {
+    type_error(k);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+
+
+static try check_ibset(g95_expr *i, g95_expr *j) {
+
+    if (j == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (i->ts.type != BT_INTEGER ) {
+    type_error(i);
+    return FAILURE;
+  }
+
+  if (j->ts.type != BT_INTEGER ) {
+    type_error(j);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+
+
+static try check_ieor(g95_expr *i, g95_expr *j) {
+
+    if (j == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (i->ts.type != BT_INTEGER ) {
+    type_error(i);
+    return FAILURE;
+  }
+
+  if (j->ts.type != BT_INTEGER ) {
+    type_error(j);
+    return FAILURE;
+  }
+
+  if (i->ts.kind != j->ts.kind) {
+    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+
+
+static try check_index(g95_expr *i, g95_expr *j, g95_expr *k) {
+
+    if (j == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (i->ts.type != BT_CHARACTER ) {
+    type_error(i);
+    return FAILURE;
+  }
+
+  if (j->ts.type != BT_CHARACTER ) {
+    type_error(j);
+    return FAILURE;
+  }
+
+  if ( k!=NULL && k->ts.type != BT_LOGICAL ) {
+    type_error(k);
+    return FAILURE;
+  }
+
+  if (i->ts.kind != j->ts.kind) {
+    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+
+/* ifix and idint are relatives of int */
+
 static try check_int(g95_expr *x, g95_expr *kind) {
 
   if (!g95_numeric_ts(&x->ts)) {
@@ -726,6 +889,65 @@ static try check_int(g95_expr *x, g95_expr *kind) {
   }
 
   return SUCCESS;
+}
+
+static try check_ifix(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (x->ts.kind != g95_default_real_kind()) {
+    kind_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+static try check_idint(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (x->ts.kind != g95_default_double_kind()) {
+    kind_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+/* end of ints */
+
+
+static try check_ior(g95_expr *i, g95_expr *j) {
+
+    if (j == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (i->ts.type != BT_INTEGER ) {
+    type_error(i);
+    return FAILURE;
+  }
+
+  if (j->ts.type != BT_INTEGER ) {
+    type_error(j);
+    return FAILURE;
+  }
+
+  if (i->ts.kind != j->ts.kind) {
+    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
 }
 
 
@@ -1034,6 +1256,22 @@ static try check_nint(g95_expr *x, g95_expr *kind) {
 }
 
 
+static try check_idnint(g95_expr *x, g95_expr *kind) {
+
+  if (x->ts.type != BT_REAL) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (x->ts.kind != g95_default_double_kind()) {
+    kind_error(kind);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
 static try check_null(g95_expr *mold) {
 g95_ref *ref;
 
@@ -1161,6 +1399,26 @@ static try check_real(g95_expr *a, g95_expr *kind) {
   return SUCCESS;
 }
 
+static try check_repeat(g95_expr *x, g95_expr *y) {
+
+    if (y == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (x->ts.type != BT_CHARACTER ) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (y->ts.type != BT_INTEGER ) {
+    type_error(y);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
 
 static try check_reshape(g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
@@ -1201,6 +1459,37 @@ static try check_reshape(g95_expr *source, g95_expr *shape,
     if (order->shape == NULL) {
       return FAILURE;
     }
+  }
+
+  return SUCCESS;
+}
+
+
+static try check_scan(g95_expr *x, g95_expr *y, g95_expr *z) {
+
+    if (y == NULL) {
+    intrinsic_error("Second argument of DIM missing at %%L");
+    return FAILURE;
+  }
+
+  if (x->ts.type != BT_CHARACTER ) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (y->ts.type != BT_CHARACTER ) {
+    type_error(y);
+    return FAILURE;
+  }
+
+  if (z!=NULL && z->ts.type != BT_LOGICAL ) {
+    type_error(z);
+    return FAILURE;
+  }
+
+  if (x->ts.kind != y->ts.kind) {
+    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    return FAILURE;
   }
 
   return SUCCESS;
@@ -1905,39 +2194,39 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("iachar", 0, BT_INTEGER, di, g95_simplify_iachar, NULL,
 	     c, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym_f2("iand", 0, BT_INTEGER, di, g95_simplify_iand, NULL,
+  add_sym_f2("iand", 0, BT_INTEGER, di, g95_simplify_iand, check_iand,
 	     i, BT_INTEGER, di, 0,    j, BT_INTEGER, di, 0, NULL);
 
-  add_sym_f2("ibclr", 0, BT_INTEGER, di, g95_simplify_ibclr, NULL,
+  add_sym_f2("ibclr", 0, BT_INTEGER, di, g95_simplify_ibclr, check_ibclr,
 	     i, BT_INTEGER, di, 0,    pos, BT_INTEGER, di, 0, NULL);
 
-  add_sym_f3("ibits", 0, BT_INTEGER, di, g95_simplify_ibits, NULL,
+  add_sym_f3("ibits", 0, BT_INTEGER, di, g95_simplify_ibits, check_ibits,
 	     i, BT_INTEGER, di, 0,   pos, BT_INTEGER, di, 0,
 	     ln, BT_INTEGER, di, 0,  NULL);
 
-  add_sym_f2("ibset", 0, BT_INTEGER, di, g95_simplify_ibset, NULL,
+  add_sym_f2("ibset", 0, BT_INTEGER, di, g95_simplify_ibset, check_ibset,
 	     i, BT_INTEGER, di, 0, pos,   BT_INTEGER, di, 0, NULL);
 
   add_sym_f1("ichar", 0, BT_INTEGER, di, g95_simplify_ichar, NULL,
 	     c, BT_CHARACTER, dc, 0, NULL);
 
-  add_sym_f2("ieor", 0, BT_INTEGER, di, g95_simplify_ieor, NULL,
+  add_sym_f2("ieor", 0, BT_INTEGER, di, g95_simplify_ieor, check_ieor,
 	     i, BT_INTEGER, di, 0,   j, BT_INTEGER, di, 0, NULL);
 
-  add_sym_f3("index", 0, BT_INTEGER, di, g95_simplify_index, NULL,
+  add_sym_f3("index", 0, BT_INTEGER, di, g95_simplify_index, check_index,
 	     stg, BT_CHARACTER, dc, 0,   ssg, BT_CHARACTER, dc, 0,
 	     bck, BT_LOGICAL, dl, 1, NULL);
 
   add_sym_f2("int",   0, BT_INTEGER, di, g95_simplify_int, check_int,
 	     a, BT_REAL, dr, 0, knd,   BT_INTEGER, di, 1, NULL);
 
-  add_sym_f1("ifix",  0, BT_INTEGER, di, g95_simplify_ifix, NULL,
+  add_sym_f1("ifix",  0, BT_INTEGER, di, g95_simplify_ifix, check_ifix,
 	     a, BT_REAL, dr, 0, NULL);
 
-  add_sym_f1("idint", 0, BT_INTEGER, di, g95_simplify_idint, NULL,
+  add_sym_f1("idint", 0, BT_INTEGER, di, g95_simplify_idint, check_idint,
 	     a, BT_REAL, dd, 0, NULL);
 
-  add_sym_f2("ior", 0, BT_INTEGER, di, g95_simplify_ior, NULL,
+  add_sym_f2("ior", 0, BT_INTEGER, di, g95_simplify_ior, check_ior,
 	     i, BT_INTEGER, di, 0, j,   BT_INTEGER, di, 0, NULL);
 
   add_sym_f2("ishft", 0, BT_INTEGER, di, g95_simplify_ishft, NULL,
@@ -2066,7 +2355,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f2("nint",   0, BT_INTEGER, di, g95_simplify_nint, check_nint,
 	     a, BT_REAL, dr, 0,   knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym_f1("idnint", 0, BT_INTEGER, di, g95_simplify_idnint, NULL,
+  add_sym_f1("idnint", 0, BT_INTEGER, di, g95_simplify_idnint, check_idnint,
 	     a, BT_REAL, dd, 0, NULL);
 
   add_sym_f1("not", 0, BT_INTEGER, di, g95_simplify_not, NULL,
@@ -2103,7 +2392,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("sngl",  1, BT_REAL, dr, g95_simplify_sngl, NULL,
 	     a, BT_REAL, dd, 0, NULL);
 
-  add_sym_f2("repeat", 1, BT_CHARACTER, dc, g95_simplify_repeat, NULL,
+  add_sym_f2("repeat", 1, BT_CHARACTER, dc, g95_simplify_repeat, check_repeat,
 	     stg, BT_CHARACTER, dc, 0,   n, BT_INTEGER, di, 0, NULL);
 
   add_sym_f4("reshape", 1, BT_REAL, dr, g95_simplify_reshape, check_reshape,
@@ -2113,7 +2402,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("rrspacing",0, BT_REAL, dr, g95_simplify_rrspacing, NULL,
 	     x, BT_REAL, dr, 0, NULL);
 
-  add_sym_f2("scale", 0, BT_REAL, dr, g95_simplify_scale, NULL,
+  add_sym_f2("scale", 0, BT_REAL, dr, g95_simplify_scale, check_scan,
 	     x, BT_REAL, dr, 0,   i, BT_INTEGER, di, 0, NULL);
 
   add_sym_f3("scan", 0, BT_INTEGER, di, g95_simplify_scan, NULL,
