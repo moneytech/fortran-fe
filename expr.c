@@ -1029,7 +1029,7 @@ not_numeric:
 static try check_numeric_inquiry(g95_expr *e) {
 char *name;
 static const char *inquiry_function[] = {
-  "digits", "epsilon", "huge", "maxexponent", "minexponent",
+  "digits", "epsilon", "huge", "kind", "maxexponent", "minexponent",
   "precision", "radix", "range", "tiny", "bit_size", NULL
 };
 
