@@ -1509,6 +1509,9 @@ g95_expr *e;
     break;
 
   case EXPR_STRUCTURE:
+    mio_symbol_ref(&e->symbol);
+    /* Fall through */
+
   case EXPR_ARRAY:
     mio_constructor(&e->value.constructor);
     break;
