@@ -1691,12 +1691,6 @@ int i;
 	break;
       }
 
-      if (sym->ts.type == BT_UNKNOWN &&
-	  g95_set_default_type(sym, 1, NULL) == FAILURE) {
-	m = MATCH_ERROR;
-	break;
-      }
-
       e->ts = sym->ts;
       m = match_varspec(e, 0);
       break;
