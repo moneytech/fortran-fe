@@ -1360,8 +1360,8 @@ check_substring:
  * We can have at most one full array reference. */
 
 symbol_attribute g95_variable_attr(g95_expr *expr, g95_typespec *ts) {
+int add_array, pointer, target;
 symbol_attribute attr;
-int add_array, pointer;
 g95_ref *ref;
 
   add_array = 0;
@@ -1371,7 +1371,9 @@ g95_ref *ref;
 
   ref = expr->ref;
   attr = expr->symbol->attr;
+
   pointer = expr->symbol->attr.pointer;
+  target = expr->symbol->attr.target;
 
   if (ts != NULL && expr->ts.type == BT_UNKNOWN) *ts = expr->symbol->ts;
 
@@ -1405,6 +1407,7 @@ new_attr:
 
   if (add_array) attr.dimension = 1;
   if (pointer) attr.pointer = 1;
+  if (target) attr.target = 1;
 
   return attr;
 }
