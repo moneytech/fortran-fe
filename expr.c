@@ -1049,6 +1049,7 @@ match m;
 
 static try resolve_unknown(g95_expr *expr) {
 g95_symbol *sym;
+g95_typespec ts;
 
   sym = expr->symbol; 
 
@@ -1068,6 +1069,17 @@ g95_symbol *sym;
 
   sym->attr.proc = PROC_EXTERNAL;
   expr->value.function.name = sym->name;
+
+  /* Type of the expression is the default type of the symbol since we
+   * have nothing better to go on. */
+
+  ts = sym->ns->default_type[sym->name[0] - 'a'];
+
+  if (ts.type == BT_UNKNOWN)
+    g95_error("Function '%s' at %L has no implicit type",
+	      sym->name, &expr->where);
+  else
+    expr->ts = ts;
 
   return SUCCESS;
 }
@@ -1104,16 +1116,6 @@ try t;
   case PTYPE_UNKNOWN:   t = resolve_unknown(expr);   break;
   default:
     g95_internal_error("resolve_function(): bad function type");
-  }
-
-  /* If we still have a function node and it's type is unknown, give
-   * it one. */
-
-  if (t == SUCCESS && expr->expr_type == EXPR_FUNCTION) {
-    if (expr->symbol->ts.type == BT_UNKNOWN)
-      g95_set_default_type(expr->symbol, 1);
-
-    if (expr->ts.type == BT_UNKNOWN) expr->ts = expr->symbol->ts;
   }
 
   return t;
