@@ -179,7 +179,7 @@ match m;
   }
 
   do {
-    m = g95_match_type_spec(&ts, 0, 0, 0); /* A basic type is mandatory here */
+    m = g95_match_type_spec(&ts, 0, 0); /* A basic type is mandatory here */
     if (m == MATCH_ERROR) goto error;
     if (m == MATCH_NO) goto syntax;
 
@@ -260,7 +260,7 @@ int i;
   i = sym->name[0] - 'a';
 
   if (g95_current_ns->default_type[i].type == BT_UNKNOWN) {
-    g95_error("Symbol '%s' at %C has no IMPLICIT type", sym->name);
+    //    g95_error("Symbol '%s' at %C has no IMPLICIT type", sym->name);
     return FAILURE;
   }
 
@@ -1014,7 +1014,7 @@ g95_component *p, *tail;
 
 /* Allocate new component */
 
-  p = g95_getmem(sizeof(g95_component));
+  p = g95_get_component();
 
   if (tail == NULL) sym->components = p;
   else tail->next = p;
@@ -1027,12 +1027,52 @@ g95_component *p, *tail;
 }
 
 
+static void copy_components(g95_symbol *sym, g95_component *src) {
+g95_component *tail, *new;
+
+  tail = NULL;
+
+  for(; src; src=src->next) {    
+    new = g95_get_component();
+
+    *new = *src;
+    g95_copy_array_spec(&new->as, src->as);
+    new->initializer = g95_copy_expr(src->initializer);
+
+    if (tail == NULL)
+      sym->components = new;
+    else
+      tail->next = new;
+
+    tail = new;
+  }
+}
+
+
 /* g95_find_component()-- Given a derived type node and a component
  * name, try to locate the component structure.  Returns the NULL
- * pointer if the component is not found. */
+ * pointer if the component is not found.  If the component has no
+ * components and is not use-associated, we search for a derived type
+ * of the same name in parent program units.  Use-associated derived
+ * types have no component list if the components were PRIVATE in the
+ * module.  If found, we copy the component list, in effect defining
+ * an identical type. */
 
 g95_component *g95_find_component(g95_symbol *sym, char *name) {
+g95_namespace *ns;
 g95_component *p;
+g95_symbol *s;
+
+  if (sym->components == NULL && !sym->attr.use_assoc) {
+    ns = sym->ns->parent;
+    if (ns == NULL) return NULL;
+
+    if (g95_find_symbol(sym->name, ns, 1, &s)) return NULL;
+
+    if (s->attr.flavor != FL_DERIVED) return NULL;
+
+    copy_components(sym, s->components);
+  }
 
   for(p=sym->components; p; p=p->next)
     if (strcmp(p->name, name) == 0) break;
@@ -1632,39 +1672,32 @@ g95_symbol *p;
 }
 
 
-/* g95_find_local_symbol()-- Search for a symbol in a single namespace. */
-
-g95_symbol *g95_find_local_symbol(char *name, g95_namespace *ns) {
-g95_symtree *t;
-
-  if (ns == NULL) ns = g95_current_ns;
-
-  t = find_node(ns, name);
-  if (t != NULL) return t->sym;
-
-  return NULL;
-}
-
-
 /* g95_find_symbol()-- search for a symbol starting in the current
  * namespace, restorting to any parent namespaces if necessary.
- * Returns NULL if we can't find it */
+ * Returns nonzero if the symbol is ambiguous. */
 
-g95_symbol *g95_find_symbol(char *name, g95_namespace *ns, int parent_flag) {
-g95_symbol *s;
+int g95_find_symbol(char *name, g95_namespace *ns, int parent_flag,
+		    g95_symbol **result) {
+g95_symtree *st;
 
   if (ns == NULL) ns = g95_current_ns;
 
   do {
-    s = g95_find_local_symbol(name, ns);
-    if (s != NULL) break;
+    st = find_node(ns, name);
+    if (st != NULL) {
+      if (st->ambiguous) return 1;
+
+      *result = st->sym;
+      return 0;
+    }
 
     if (!parent_flag) break;
 
     ns = ns->parent;
   } while (ns != NULL);
 
-  return s;
+  *result = NULL;
+  return 0;
 }
 
 

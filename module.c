@@ -921,7 +921,7 @@ g95_component *c, *tail;
     for(;;) {
       if (peek_atom() == ATOM_RPAREN) break;
 
-      c = g95_getmem(sizeof(g95_component));
+      c = g95_get_component();
       mio_component(c);
 
       if (tail == NULL)

@@ -573,17 +573,14 @@ done:
 
 
 /* g95_match_type_spec()-- Matches a type specification.  If
- * successful, sets the ts structure to the matched specification.  If
- * the 'forward_flag' is nonzero, then we are allowed to match a
- * derived type before it is defined.  This is necessary for FUNCTION
- * and IMPLICIT statements.
+ * successful, sets the ts structure to the matched specification.
+ * This is necessary for FUNCTION and IMPLICIT statements.
  *
  * If kind_flag is nonzero, then we check for the optional kind
  * specification.  Not doing so is needed for matching an IMPLICIT
  * statement correctly. */
 
-match g95_match_type_spec(g95_typespec *ts, int forward_flag, int kind_flag,
-			  int type_decl) {
+match g95_match_type_spec(g95_typespec *ts, int kind_flag, int type_decl) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 match m;
@@ -634,18 +631,16 @@ match m;
   m = g95_match(" type ( %n )", name);
   if (m != MATCH_YES) return m;
 
-  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
+/* New type names are always created in the current namespace without
+ * searching any parents.  This is necessary because the type might be
+ * actually created in the host at a later time.  If not, we'll copy
+ * the component list from a parent namespace */
 
-  if (sym->attr.flavor != FL_DERIVED) {
-    if (!forward_flag) {
-      g95_error("Derived type '%s' at %C must be defined before declaring "
-		"variables of that type", name);
-      return MATCH_ERROR;
-    }
-    
-    if (g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
-      return MATCH_ERROR;
-  }
+  if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+
+  if (sym->attr.flavor != FL_DERIVED &&
+      g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
+    return MATCH_ERROR;
 
   ts->type = BT_DERIVED;
   ts->kind = 0;
@@ -877,7 +872,7 @@ cleanup:
 match g95_match_data_decl(void) {
 match m;
 
-  m = g95_match_type_spec(&current_ts, 0, 1, 1);
+  m = g95_match_type_spec(&current_ts, 1, 1);
   if (m != MATCH_YES) return m;
 
   m = match_attr_spec();
@@ -930,7 +925,7 @@ int seen_type;
 
 loop:
   if (!seen_type && ts != NULL &&
-      g95_match_type_spec(ts, 1, 1, 0) == MATCH_YES &&
+      g95_match_type_spec(ts, 1, 0) == MATCH_YES &&
       g95_match_space() == MATCH_YES) {
 
     seen_type = 1;
@@ -1986,16 +1981,22 @@ loop:
 
   if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
-  g95_new_block = sym;
-
 /* The symbol may already have the derived attribute without the
  * components.  The only way this can happen is during a function
  * definition.  The first part of the AND clause is true if a the
  * symbol is not the return value of a function. */
 
-  if ((sym->attr.flavor != FL_DERIVED || sym->components != NULL)
-      && (g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE))
+  if (sym->attr.flavor != FL_DERIVED &&
+      g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
     return MATCH_ERROR;
+
+  if (sym->components != NULL) {
+    g95_error("Derived type definition of '%s' at %C has already been defined",
+	      sym->name);
+    return MATCH_ERROR;
+  }
+
+  g95_new_block = sym;
 
   return MATCH_YES;
 }

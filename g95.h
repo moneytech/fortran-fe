@@ -323,6 +323,7 @@ typedef struct g95_component {
   struct g95_component *next;
 } g95_component;
 
+#define g95_get_component() g95_getmem(sizeof(g95_component))
 
 /* Formal argument lists are lists of symbols.  */
 
@@ -986,8 +987,7 @@ g95_namespace *g95_get_namespace(void);
 g95_symtree *g95_get_symtree(char *, int *);
 void g95_free_symbol(g95_symbol *);
 g95_symbol *g95_new_symbol(char *, g95_namespace *);
-g95_symbol *g95_find_symbol(char *, g95_namespace *, int);
-g95_symbol *g95_find_local_symbol(char *, g95_namespace *);
+int g95_find_symbol(char *, g95_namespace *, int, g95_symbol **);
 int g95_get_symbol(char *, g95_namespace *, int, g95_symbol **);
 
 void g95_undo_symbols(void);
@@ -1079,7 +1079,7 @@ extern g95_symbol *g95_new_block;
 
 match g95_match_kind_spec(g95_typespec *);
 match g95_match_old_kind_spec(g95_typespec *);
-match g95_match_type_spec(g95_typespec *, int, int, int);
+match g95_match_type_spec(g95_typespec *, int, int);
 
 match g95_match_end(g95_statement *);
 match g95_match_data_decl(void);
