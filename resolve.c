@@ -256,57 +256,6 @@ try t;
 
 /****************** Expression name resolution ******************/
 
-
-/* procedure_kind()-- Figure out if the procedure is specific, generic
- * or unknown. */
-
-typedef enum { PTYPE_GENERIC=1, PTYPE_SPECIFIC, PTYPE_UNKNOWN } proc_type;
-
-static proc_type procedure_kind(g95_symbol *sym) {
-g95_symbol *s;
-char *name;
-
-  name = sym->name;
-
-  /* Locate symbol in the nearest parent scope */
-
-  s = NULL;
-  if (sym->ns->parent != NULL) g95_find_symbol(name, sym->ns->parent, 1, &s);
-
-  /* See if a symbol is generic */
-
-  if (sym->attr.generic ||
-      (sym->attr.intrinsic && g95_generic_intrinsic(name)))
-    return PTYPE_GENERIC;
-
-  g95_find_symbol(name, sym->ns->parent, 1, &s);
-
-  if (s != NULL && (s->attr.generic ||
-		    (s->attr.intrinsic && g95_generic_intrinsic(name))))
-    return PTYPE_GENERIC;
-
-  /* Not generic, see if it is specific */
-
-  if (sym->attr.if_source == IFSRC_IFBODY || sym->attr.proc == PROC_MODULE ||
-      sym->attr.proc == PROC_INTERNAL || sym->attr.proc == PROC_ST_FUNCTION ||
-      (sym->attr.intrinsic && g95_specific_intrinsic(name)) ||
-      sym->attr.external)
-    return PTYPE_SPECIFIC;
-
-  /* Check parent scopes */
-
-  if (s != NULL && (s->attr.if_source == IFSRC_IFBODY ||
-		    s->attr.proc == PROC_MODULE ||
-		    s->attr.proc == PROC_INTERNAL ||
-		    s->attr.proc == PROC_ST_FUNCTION ||
-		    (s->attr.intrinsic && g95_specific_intrinsic(name)) ||
-		    s->attr.external))
-    return PTYPE_SPECIFIC;
-
-  return PTYPE_UNKNOWN;
-}
-
-
 /* was_declared()-- Returns 0 if a symbol was not declared with a type
  * or attribute declaration statement, nonzero otherwise. */
 
@@ -322,6 +271,57 @@ symbol_attribute a;
       a.access != ACCESS_UNKNOWN || a.intent != INTENT_UNKNOWN) return 1;
 
   return 0;
+}
+
+
+/* generic_symbol()-- Determine if a symbol is generic or not */
+
+static int generic_sym(g95_symbol *sym) {
+g95_symbol *s;
+
+  if (sym->attr.generic ||
+      (sym->attr.intrinsic && g95_generic_intrinsic(sym->name)))
+    return 1;
+
+  if (was_declared(sym) || sym->ns->parent == NULL) return 0;
+
+  g95_find_symbol(sym->name, sym->ns->parent, 1, &s);
+
+  return (s == NULL) ? 0 : generic_sym(s);
+}
+
+
+/* specific_sym()-- Determine if a symbol is specific or not */
+
+static int specific_sym(g95_symbol *sym) {
+g95_symbol *s;
+
+  if (sym->attr.if_source == IFSRC_IFBODY || sym->attr.proc == PROC_MODULE ||
+      sym->attr.proc == PROC_INTERNAL || sym->attr.proc == PROC_ST_FUNCTION ||
+      (sym->attr.intrinsic && g95_specific_intrinsic(sym->name)) ||
+      sym->attr.external)
+    return 1;
+
+  if (was_declared(sym) || sym->ns->parent == NULL) return 0;
+
+  g95_find_symbol(sym->name, sym->ns->parent, 1, &s);
+
+  return (s == NULL) ? 0 : specific_sym(s);
+}
+
+
+typedef enum { PTYPE_GENERIC=1, PTYPE_SPECIFIC, PTYPE_UNKNOWN } proc_type;
+
+/* procedure_kind()-- Figure out if the procedure is specific, generic
+ * or unknown. */
+
+static proc_type procedure_kind(g95_symbol *sym) {
+
+  if (generic_sym(sym)) return PTYPE_GENERIC;
+
+  if (specific_sym(sym)) return PTYPE_SPECIFIC;
+
+  return PTYPE_UNKNOWN;
 }
 
 
@@ -431,17 +431,17 @@ match m;
 
   sym = expr->symbol;
 
-  m = resolve_generic_f0(expr, sym);
-  if (m == MATCH_YES) return SUCCESS;
-  if (m == MATCH_ERROR) return FAILURE;
+  for(;;) {
+    m = resolve_generic_f0(expr, sym);
+    if (m == MATCH_YES) return SUCCESS;
+    if (m == MATCH_ERROR) return FAILURE;
 
-  if (sym->ns->parent != NULL) {
+  generic:
+    if (sym->ns->parent == NULL) break;
     g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
-    if (sym != NULL) {
-      m = resolve_generic_f0(expr, sym);
-      if (m == MATCH_YES) return SUCCESS;
-      if (m == MATCH_ERROR) return FAILURE;
-    }
+
+    if (sym == NULL) break;
+    if (!generic_sym(sym)) goto generic;
   }
 
   /* Last ditch attempt */
@@ -510,16 +510,16 @@ match m;
 
   sym = expr->symbol;
 
-  m = resolve_specific_f0(sym, expr);
-  if (m == MATCH_YES) return SUCCESS;
-  if (m == MATCH_ERROR) return FAILURE;
-
-  g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
-
-  if (sym != NULL) {
+  for(;;) {
     m = resolve_specific_f0(sym, expr);
     if (m == MATCH_YES) return SUCCESS;
     if (m == MATCH_ERROR) return FAILURE;
+
+    if (sym->ns->parent == NULL) break;
+
+    g95_find_symbol(sym->name, sym->ns->parent, 1, &sym);
+
+    if (sym == NULL) break;
   }
 
   g95_error("Unable to resolve the specific function '%s' at %L",
