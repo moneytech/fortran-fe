@@ -377,6 +377,7 @@ g95_expr lvalue;
 
   lvalue.expr_type = EXPR_VARIABLE;
   lvalue.ts = sym->ts;
+  if (sym->as) lvalue.rank = sym->as->rank;
   lvalue.symbol = sym;
   lvalue.where = sym->declared_at;
 
