@@ -1057,11 +1057,9 @@ g95_expr *result;
 
 
 g95_expr *g95_simplify_index(g95_expr *x, g95_expr *y, g95_expr *b) {
-  return NULL;
-  /* FIXME -- this doesn't work yet, will fix it next time
 g95_expr *result;
 int back, len, lensub;
-int i, j, index;
+int i, j, k, count, index, start;
 
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  
     return NULL;
@@ -1098,12 +1096,35 @@ int i, j, index;
       return result;
     }
 
-    index = 0;
-    for ( i=0; i<len; ++i ) {
-      for ( j=0; j<lensub; ++j ) {
-	if ( y->value.character.string[j] == x->value.character.string[i] ) {
-	  index = i+1;
-	  goto done;
+    else if (lensub == 1) {
+      for ( i=0; i<len; ++i ) {
+        for ( j=0; j<lensub; ++j ) {
+    	  if ( y->value.character.string[j] == x->value.character.string[i] ) {
+	    index = i+1;
+	    goto done;
+	  }
+	}
+      }
+    }
+
+    else {
+      index = 0;
+      for ( i=0; i<len; ++i ) {
+        for ( j=0; j<lensub; ++j ) {
+	  if (y->value.character.string[j] == x->value.character.string[i] ) {
+	    start = i;
+	    count = 0;
+	    for (k=0; k<lensub; ++k) {
+    	      if (y->value.character.string[k] ==
+			      x->value.character.string[k+start] ) {
+		  ++count;
+	      }
+	    }
+	    if (count == lensub ) {
+	      index = start+1;
+	      goto done;
+	    }
+	  }
 	}
       }
     }
@@ -1116,14 +1137,41 @@ int i, j, index;
       return result;
     }
 
-    index = 0;
-    for ( i=0; i<len; ++i ) {
-      for ( j=0; j<lensub; ++j ) {
-	if (y->value.character.string[j] == x->value.character.string[len-i]
-	  && y->value.character.string[j+1] == x->value.character.string[len-i+1]) {
-	  index = len-i+1;
-    printf("Test -- c1 is %c, c2 is %c, index is %d\n", y->value.character.string[j],x->value.character.string[len-i], i);
-	  goto done;
+    else if (lensub == 1) {
+      for ( i=index; i<len; ++i ) {
+        for ( j=0; j<lensub; ++j ) {
+	  if (y->value.character.string[j]==x->value.character.string[len-i]) {
+	    index = len-i+1;
+	    goto done;
+	  }
+	}
+      }
+    }
+
+    else {
+
+      index = 0;
+      for ( i=0; i<len; ++i ) {
+        for ( j=0; j<lensub; ++j ) {
+	  if (y->value.character.string[j]==x->value.character.string[len-i]) {
+	    start = len-i;
+	    if ( start <= len-lensub ) {
+	      count = 0;
+	      for (k=0; k<lensub; ++k) {
+    	        if (y->value.character.string[k] ==
+			      x->value.character.string[k+start] ) {
+	  	  ++count;
+	        }
+	      }
+	      if (count == lensub ) {
+	        index = start+1;
+	        goto done;
+	      }
+	    }
+	    else {
+	      continue;
+	    }
+	  }
 	}
       }
     }
@@ -1132,7 +1180,6 @@ int i, j, index;
 done:
     mpz_set_si(result->value.integer,index);
     return result;
-    */
 
 }
 
@@ -1292,6 +1339,7 @@ g95_expr *arg;
   //  return SUCCESS;
 }
 
+/* FIXME */
 /* Caveat: I have not accounted for possibility of non-ASCII character sets
  * in lge, lgt, lle, llt */
 
