@@ -1729,7 +1729,7 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym_f1("exp",  0, BT_REAL, dr, g95_simplify_exp, check_exp,
 	     x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dexp", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,
+  add_sym_f1("dexp", 0, BT_REAL,    dd, g95_simplify_exp, NULL, x, BT_REAL,
 	     dd, 0, NULL);
   add_sym_f1("cexp", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX,
 	     dz, 0, NULL);

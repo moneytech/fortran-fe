@@ -790,7 +790,10 @@ int kx, ky;
 
   kx = g95_validate_kind(x->ts.type, x->ts.kind);
   ky = g95_validate_kind(y->ts.type, y->ts.kind);
-  if (kx != g95_default_real_kind() || ky != g95_default_real_kind()) {
+  if (kx== -1 || ky== -1) g95_internal_error("g95_simplify_dprod(): Bad kind");
+
+  if (x->ts.kind != g95_default_real_kind() || 
+		  y->ts.kind != g95_default_real_kind()) {
     g95_error("Arguments of DPROD at %L must be of default real kind",
 	      x->where);
     return &g95_bad_expr;
@@ -827,13 +830,8 @@ int i;
 }
 
 
-/* simplify_exp */
 g95_expr *g95_simplify_exp(g95_expr *x) {
-  return NULL;
-/* Not ready yet -- extension, will need to flag under pendantic
-   NB allowing an integer argument won't trigger main flag but is itself
-   an extension
-g95_expr *result;
+g95_expr *re, *result;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -844,16 +842,20 @@ g95_expr *result;
   case BT_INTEGER: 
     if (g95_option.pedantic == 1) 
         g95_warning("Integer initialization constant to EXP at %L is nonstandard",&x->where);
-  case BT_REAL: 
+    re = g95_int2real(x,x->ts.kind);
+    exponential(&re->value.real,&result->value.real);
     break;
-
+  case BT_REAL: 
+    exponential(&x->value.real,&result->value.real);
+    break;
   case BT_COMPLEX: 
+    g95_error("Complex exponent at %L has not yet been implemented",x->where);
+    return &g95_bad_expr;
   default:
-    g95_internal_error("g95_simplify_exp(): Bad type");
+    g95_internal_error("in g95_simplify_exp(): Bad type");
   }
 
   return result; 
-*/
 
 }
 
@@ -3038,6 +3040,7 @@ g95_expr *result;
   if (a->expr_type != EXPR_CONSTANT) return NULL;
 
   result = g95_constant_result(BT_REAL, g95_default_double_kind());
+  result->where = a->where;
   mpf_init_set(result->value.real, a->value.real);
 
   return range_check(result, "SNGL");

@@ -131,7 +131,86 @@ mpf_t i10, log10;
   mpf_clear(log10);
 }
 
+unsigned int factorial(int n) {
+unsigned int fac;
 
+  if (n == 1) return(1);
+  fac = factorial(n-1)*n;
+  return fac;
+}
+
+
+void exponential(mpf_t *arg, mpf_t *result) {
+mpf_t two, ln2, power, q, r, num, term, x, xp;
+int i;
+long n;
+unsigned int denom, limit, p, mp;
+
+/* We use a reduction of the form
+ *   x= Nln2 + r
+ *   then obtain exp(r) from the McLaurin series.
+ *   exp(x) is then recovered from the identity 
+ *   exp(x) = 2^N*exp(r) */
+
+  mpf_init_set(x, *arg);
+
+  if ( mpf_cmp_ui(x,0) == 0) {
+    mpf_set_ui(*result,1);
+  }
+
+  else if ( mpf_cmp_ui(x,1) == 0) {
+    mpf_set(*result,e);
+  }
+
+  else {
+    mpf_init_set_ui(two,2);
+    mpf_init(ln2);
+    mpf_init(q);
+    mpf_init(r);
+    mpf_init(power);
+    mpf_init(num);
+    mpf_init(term);
+
+    natural_logarithm(&two, &ln2);
+
+    mpf_div(q,x,ln2);
+    mpf_floor(power,q);
+    mpf_mul(q,power,ln2);
+    mpf_sub(r,x,q);
+
+    mpf_init_set_ui(xp, 1);
+    mpf_init_set_ui(num, 1);
+
+    limit = G95_REAL_BITS/10;
+    for(i=1; i<=limit; i++) {
+      mpf_mul(num, num, r);
+      denom=factorial(i);
+      mpf_div_ui(term,num,denom);
+      mpf_add(xp,xp,term);
+    }
+
+    /* Reconstruction step */
+    n = (long) mpf_get_d(power);
+
+    if ( n > 0 ) {
+      p = (unsigned int) n;
+      mpf_mul_2exp(*result,xp,p);
+    }
+    else {
+      mp = (unsigned int) (-n);
+      mpf_div_2exp(*result,xp,mp);
+    }
+
+    mpf_clear(two);
+    mpf_clear(ln2);
+    mpf_clear(q);
+    mpf_clear(r);
+    mpf_clear(power);
+    mpf_clear(num);
+    mpf_clear(term);
+    mpf_clear(xp);
+  }
+}
 
 /* g95_arith_error()-- Given an arithmetic error code, return a
  * pointer to a string that explains the error. */
