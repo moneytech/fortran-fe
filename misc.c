@@ -52,6 +52,17 @@ void g95_free(void *p) {
 #undef temp
 
 
+/* g95_clear_ts()-- Initialize a typespec to unknown. */
+
+void g95_clear_ts(g95_typespec *ts) {
+
+  ts->type = BT_UNKNOWN;
+  ts->kind = 0;
+  ts->derived = NULL;
+  ts->cl = NULL;
+}
+
+
 /* add_path()-- adds path to the list pointed to by list */
 
 static void add_path(g95_directorylist **list, const char *path) {

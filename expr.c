@@ -33,7 +33,7 @@ g95_expr *e;
 
   e = g95_getmem(sizeof(g95_expr));
 
-  e->ts.type = BT_UNKNOWN;
+  g95_clear_ts(&e->ts);
   e->op1 = NULL;
   e->op2 = NULL;
 
@@ -459,7 +459,6 @@ va_list argp;
   p = g95_get_expr();
   p->expr_type = EXPR_FUNCTION;
   p->symbol = func;
-  p->ts.type = BT_UNKNOWN;
   p->value.function.actual = NULL;
 
   tail = NULL;
@@ -502,7 +501,7 @@ g95_expr *op1, *op2;
   op2 = e->op2;
 
   if (op1->ts.type == BT_UNKNOWN || op2->ts.type == BT_UNKNOWN) {
-    e->ts.type = BT_UNKNOWN;
+    g95_clear_ts(&e->ts);
     return;
   }
 

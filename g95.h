@@ -861,6 +861,7 @@ extern g95_file *g95_current_file;
 
 void *g95_getmem(int);
 void g95_free(void *);
+void g95_clear_ts(g95_typespec *);
 FILE *g95_open_included_file(const char *);
 char *g95_typename(bt);
 void g95_show_typespec(g95_typespec *);

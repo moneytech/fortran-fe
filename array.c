@@ -1044,9 +1044,7 @@ try t;
 try g95_resolve_array_constructor(g95_expr *expr) {
 try t;
 
-  constructor_ts.type = BT_UNKNOWN;
-  constructor_ts.kind = 0;
-  constructor_ts.derived = NULL;
+  g95_clear_ts(&constructor_ts); 
 
   t = resolve_array_list(expr->value.constructor);
 

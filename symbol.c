@@ -54,7 +54,7 @@ void g95_set_implicit_none(void) {
 int i;
 
   for(i='a'; i<='z'; i++) {
-    g95_current_ns->default_type[i - 'a'].type = BT_UNKNOWN;
+    g95_clear_ts(&g95_current_ns->default_type[i - 'a']);
     g95_current_ns->set_flag[i - 'a'] = 1;
   }
 }
@@ -169,7 +169,7 @@ int c, i;
 match m;
 
   for(i=0; i<G95_LETTERS; i++) {
-    new_ts[i].type = BT_UNKNOWN;
+    g95_clear_ts(&new_ts[i]);
     if (new_flag[i]) new_flag[i] = 0;
   }
 
@@ -1667,7 +1667,7 @@ g95_symbol *p;
 
   p = g95_getmem(sizeof(g95_symbol));
 
-  p->ts.type = BT_UNKNOWN;
+  g95_clear_ts(&p->ts);
   g95_clear_attr(&p->attr);
   p->ns = ns;
 

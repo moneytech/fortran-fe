@@ -940,7 +940,7 @@ arith rc;
     /* Insert any necessary type conversions to make the operands compatible */
 
     temp.expr_type = EXPR_OP;
-    temp.ts.type = BT_UNKNOWN;
+    g95_clear_ts(&temp.ts);
     temp.operator = operator;
 
     temp.op1 = op1;

@@ -157,17 +157,6 @@ static int get_proc_name(char *name, g95_symbol **result) {
 }
 
 
-/* clear_ts()-- Initialize a typespec to unknown. */
-
-static void clear_ts(g95_typespec *ts) {
-
-  ts->type = BT_UNKNOWN;
-  ts->kind = 0;
-  ts->derived = NULL;
-  ts->cl = NULL;
-}
-
-
 /* build_sym()-- Function called by variable_decl() that adds a name
  * to the symbol table. */
 
@@ -593,7 +582,7 @@ char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 match m;
 
-  clear_ts(ts); 
+  g95_clear_ts(ts); 
 
   if (g95_match(" integer") == MATCH_YES) {
     ts->type = BT_INTEGER;
@@ -1112,7 +1101,7 @@ match m;
 
   g95_clear_attr(&current_attr);
 
-  clear_ts(&current_ts);
+  g95_clear_ts(&current_ts);
 
   arglist = NULL;
   old_loc = *g95_current_locus();
