@@ -2152,12 +2152,23 @@ syntax:
  * which can be a variable-iterator list. */
 
 static match var_element(g95_data_variable *new) {
+match m;
 
   memset(new, '\0', sizeof(g95_data_variable));
 
   if (g95_match_char('(') == MATCH_YES) return var_list(new);
 
-  return g95_match_variable(&new->expr, 0);
+  m = g95_match_variable(&new->expr, 0);
+  if (m != MATCH_YES) return m;
+
+  if (new->expr->symbol->value != NULL) {
+    g95_error("Variable '%s' at %C already has an initialization",
+	      new->expr->symbol->name);
+    return MATCH_ERROR;
+  }
+
+  new->expr->symbol->attr.data = 1;
+  return MATCH_YES;
 }
 
 

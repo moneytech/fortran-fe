@@ -230,6 +230,12 @@ g95_expr *init;
     }
   } else {
 
+    if (sym->attr.data) {
+      g95_error("Variable '%s' at %C with an initializer already appears "
+		"in a DATA statement", sym->name);
+      return FAILURE;
+    }
+
     /* Checking a derived type parameter has to be put off until later. */
 
     if (sym->ts.type != BT_DERIVED && init->ts.type != BT_DERIVED &&
