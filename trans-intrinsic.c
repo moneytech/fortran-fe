@@ -440,7 +440,7 @@ g95_conv_intrinsic_abs (g95_se * se, g95_expr * expr)
   assert (args && TREE_CHAIN (args) == NULL_TREE);
   val = TREE_VALUE (args);
 
-  switch (expr->ts.type)
+  switch (expr->value.function.actual->expr->ts.type)
     {
     case BT_INTEGER:
     case BT_REAL:

@@ -1,3 +1,9 @@
+2002-09-28  Paul Brook  <paul@nowt.org>
+
+	* trans-const.c (g95_conv_mpf_to_tree): Work around backend bug.
+	* trans-intrinsic.c (g95_conv_intrinsic_abs): Correctly detect complex
+	parameters.
+
 2002-09-24  Paul Brook  <paul@nowt.org>
 
 	* f95-lang.c (listify): Remove declaration.

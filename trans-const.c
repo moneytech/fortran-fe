@@ -253,16 +253,24 @@ g95_conv_mpf_to_tree (mpf_t f, int kind)
       edigits += 3;
     }
 
-  /* We also have two mins signs, 'e', '.' and a null terminator.  */
+  /* We also have two minus signs, "e", "." and a null terminator.  */
   if (digits + edigits + 5 > 128)
-    p = (char *)g95_getmem (digits + edigits + 3);
+    p = (char *)g95_getmem (digits + edigits + 5);
   else
     p = buff;
 
   mpf_get_str (&p[1], &exp, 10, digits , f);
   if (p[1])
     {
+      if (p[1] == '-')
+        {
+          p[0] = '-';
+          p[1] = '.';
+        }
+      else
+        {
       p[0] = '.';
+        }
       strcat (p, "e");
       sprintf (&p[strlen (p)], "%d", (int) exp);
     }
@@ -272,6 +280,13 @@ g95_conv_mpf_to_tree (mpf_t f, int kind)
     }
 
   type = g95_get_real_type (kind);
+  /* REAL_VALUE_ATOF is buggy when dealing with negative values.  */
+  if (p[0] == '-')
+    {
+      res = build_real (type, REAL_VALUE_ATOF (&p[1], TYPE_MODE (type)));
+      res = fold (build1 (NEGATE_EXPR, TREE_TYPE (res), res));
+    }
+  else
   res = build_real (type, REAL_VALUE_ATOF (p, TYPE_MODE (type)));
 
   if (p != buff)
