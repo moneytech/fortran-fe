@@ -1582,7 +1582,7 @@ arith rc;
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
     r->value.constructor = head;
-    r->ts = op->ts;
+    r->ts = head->expr->ts;
     r->where = op->where;
 
     *result = r;
@@ -1618,7 +1618,7 @@ arith rc;
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
     r->value.constructor = head;
-    r->ts = op1->ts;
+    r->ts = head->expr->ts;
     r->where = op1->where;
 
     *result = r;
@@ -1652,7 +1652,7 @@ arith rc;
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
     r->value.constructor = head;
-    r->ts = op2->ts;
+    r->ts = head->expr->ts;
     r->where = op2->where;
 
     *result = r;
@@ -1695,7 +1695,7 @@ arith rc;
     r = g95_get_expr();
     r->expr_type = EXPR_ARRAY;
     r->value.constructor = head;
-    r->ts = op1->ts;
+    r->ts = head->expr->ts;
     r->where = op1->where;
 
     *result = r;
