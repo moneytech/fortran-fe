@@ -1683,7 +1683,7 @@ g95_symbol *sym;
       parse_progunit(ST_NONE);
 
       g95_current_ns->code = s2.head;
-      g95_current_ns = g95_current_ns->parent;
+      g95_current_ns = parent_ns;
 
       pop_state();
       break;
@@ -1693,21 +1693,18 @@ g95_symbol *sym;
     case ST_END_FUNCTION:   case ST_END_MODULE:
     case ST_END_PROGRAM:    case ST_END_SUBROUTINE:
       accept_statement(st);
-      g95_free_namespace(g95_current_ns);
-      g95_current_ns = parent_ns;
       break;
 
     default:
       g95_error("Unexpected %s statement in CONTAINS section at %C", 
  		g95_ascii_statement(st));
       g95_reject_statement();
-
-      g95_free_namespace(g95_current_ns);
-      g95_current_ns = parent_ns;
       break;
     }
   } while(st != ST_END_FUNCTION && st != ST_END_SUBROUTINE &&
 	  st != ST_END_MODULE   && st != ST_END_PROGRAM);
+
+  g95_free_namespace(g95_current_ns);
 
   g95_current_ns = parent_ns;
   pop_state();
