@@ -993,8 +993,8 @@ int i;
   as->type = mio_name(as->type, array_spec_types);
 
   for(i=0; i<as->rank; i++) {
-    mio_expr(&as->shape[i].lower);
-    mio_expr(&as->shape[i].upper);
+    mio_expr(&as->lower[i]);
+    mio_expr(&as->upper[i]);
   }
 
 done:

@@ -32,9 +32,9 @@ void g95_free_array_ref(g95_array_ref *ar) {
 int i;
 
   for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-    g95_free_expr(ar->shape[i].start);
-    g95_free_expr(ar->shape[i].end);
-    g95_free_expr(ar->shape[i].stride);
+    g95_free_expr(ar->start[i]);
+    g95_free_expr(ar->end[i]);
+    g95_free_expr(ar->stride[i]);
   }
 
   g95_free(ar);
@@ -53,9 +53,9 @@ int i;
   dest->rank = src->rank;
 
   for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-    dest->shape[i].start = g95_copy_expr(src->shape[i].start);
-    dest->shape[i].end = g95_copy_expr(src->shape[i].end);
-    dest->shape[i].stride = g95_copy_expr(src->shape[i].stride);
+    dest->start[i] = g95_copy_expr(src->start[i]);
+    dest->end[i] = g95_copy_expr(src->end[i]);
+    dest->stride[i] = g95_copy_expr(src->stride[i]);
   }
 
   dest->offset = g95_copy_expr(src->offset);
@@ -78,17 +78,17 @@ int i;
 
   case AR_SECTION: 
     for(i=0; i<ar->rank; i++) {
-      if (ar->shape[i].start != NULL)
-	g95_show_expr(ar->shape[i].start);
+      if (ar->start[i] != NULL)
+	g95_show_expr(ar->start[i]);
 
       g95_status_char(':');
 
-      if (ar->shape[i].end != NULL)
-	g95_show_expr(ar->shape[i].end);
+      if (ar->end[i] != NULL)
+	g95_show_expr(ar->end[i]);
 
-      if (ar->shape[i].stride != NULL) {
+      if (ar->stride[i] != NULL) {
 	g95_status_char(':');
-	g95_show_expr(ar->shape[i].stride);
+	g95_show_expr(ar->stride[i]);
       }
 
       if (i != ar->rank-1) g95_status(" , ");
@@ -97,7 +97,7 @@ int i;
 
   case AR_ELEMENT:
     for(i=0; i<ar->rank; i++) {
-      g95_show_expr(ar->shape[i].start);
+      g95_show_expr(ar->start[i]);
       if (i != ar->rank - 1) g95_status(" , ");
     }
     break;
@@ -118,34 +118,34 @@ int start_v, end_v, stride_v, lower_v, upper_v, start, end, stride,
     lower, upper;
 g95_expr *e;
 
-  lower = as->shape[i].lower != NULL &&
-    as->shape[i].lower->expr_type == EXPR_CONSTANT;
+  lower = as->lower[i] != NULL &&
+    as->lower[i]->expr_type == EXPR_CONSTANT;
 
-  upper = as->shape[i].upper != NULL &&
+  upper = as->upper[i] != NULL &&
     (((i+1 == as->rank && as->type == AS_ASSUMED_SIZE)) ? 0
-    : as->shape[i].upper->expr_type == EXPR_CONSTANT);
+    : as->upper[i]->expr_type == EXPR_CONSTANT);
 
-  e = ar->shape[i].start;
+  e = ar->start[i];
   start = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
 
-  e = ar->shape[i].end;
+  e = ar->end[i];
   end = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
 
-  e = ar->shape[i].stride;
+  e = ar->stride[i];
   stride = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
 
-  if (lower && g95_extract_int(as->shape[i].lower, &lower_v) != NULL)
+  if (lower && g95_extract_int(as->lower[i], &lower_v) != NULL)
     goto oops;
 
-  if (upper && g95_extract_int(as->shape[i].upper, &upper_v) != NULL)
+  if (upper && g95_extract_int(as->upper[i], &upper_v) != NULL)
     goto oops;
 
-  if (start && g95_extract_int(ar->shape[i].start, &start_v) != NULL)
+  if (start && g95_extract_int(ar->start[i], &start_v) != NULL)
     goto oops;
 
-  if (end && g95_extract_int(ar->shape[i].end, &end_v) != NULL) goto oops;
+  if (end && g95_extract_int(ar->end[i], &end_v) != NULL) goto oops;
 
-  if (stride && g95_extract_int(ar->shape[i].stride, &stride_v) != NULL)
+  if (stride && g95_extract_int(ar->stride[i], &stride_v) != NULL)
     goto oops;
 
 /* Given start, end and stride values, calculate the minimum and
@@ -162,7 +162,7 @@ g95_expr *e;
 
   case AR_SECTION:
     if (stride && stride_v == 0) {
-      g95_error("Illegal stride of zero at %L", &ar->shape[i].where);
+      g95_error("Illegal stride of zero at %L", &ar->c_where[i]);
       return FAILURE;
     }
 
@@ -172,7 +172,7 @@ g95_expr *e;
   return SUCCESS;
 
 bound:
-  g95_warning("Array reference at %L is out of bounds", &ar->shape[i].where);
+  g95_warning("Array reference at %L is out of bounds", &ar->c_where[i]);
   return SUCCESS;
 
 oops:
@@ -220,22 +220,22 @@ int i;
 
   i = ar->rank;
 
-  ar->shape[i].where = *g95_current_locus();
-  ar->shape[i].start = ar->shape[i].end = ar->shape[i].stride = NULL;
+  ar->c_where[i] = *g95_current_locus();
+  ar->start[i] = ar->end[i] = ar->stride[i] = NULL;
 
   if (g95_match(" :") == MATCH_YES) goto end_element;
 
   /* Get start element */
 
   if (init)
-    m = g95_match_init_expr(&ar->shape[i].start);
+    m = g95_match_init_expr(&ar->start[i]);
   else
-    m = g95_match_expr(&ar->shape[i].start);
+    m = g95_match_expr(&ar->start[i]);
 
   if (m == MATCH_NO) g95_error("Expected array subscript at %C");
   if (m != MATCH_YES) return MATCH_ERROR;
 
-  e = ar->shape[i].start;
+  e = ar->start[i];
   if (e->shape != NULL) {
     if (e->shape->rank != 1) {
       g95_error("Vector subscript at %C must have rank of one");
@@ -254,9 +254,9 @@ end_element:
   ar->type = AR_SECTION;
 
   if (init)
-    m = g95_match_init_expr(&ar->shape[i].end);
+    m = g95_match_init_expr(&ar->end[i]);
   else
-    m = g95_match_expr(&ar->shape[i].end);
+    m = g95_match_expr(&ar->end[i]);
 
   if (m == MATCH_ERROR) return MATCH_ERROR;
 
@@ -265,12 +265,12 @@ end_element:
 /* See if we have an optional stride */
 
   if (g95_match(" :") == MATCH_NO)
-    ar->shape[i].stride = g95_int_expr(1);
+    ar->stride[i] = g95_int_expr(1);
   else {
     if (init)
-      m = g95_match_init_expr(&ar->shape[i].stride);
+      m = g95_match_init_expr(&ar->stride[i]);
     else
-      m = g95_match_expr(&ar->shape[i].stride);
+      m = g95_match_expr(&ar->stride[i]);
 
     if (m == MATCH_NO) g95_error("Expected array subscript stride at %C");
     if (m != MATCH_YES) return MATCH_ERROR;
@@ -361,9 +361,9 @@ int i;
 
   t = SUCCESS; 
   for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-    if (resolve_index(ar->shape[i].start) == FAILURE) t = FAILURE;
-    if (resolve_index(ar->shape[i].end) == FAILURE) t = FAILURE;
-    if (resolve_index(ar->shape[i].stride) == FAILURE) t = FAILURE;
+    if (resolve_index(ar->start[i]) == FAILURE) t = FAILURE;
+    if (resolve_index(ar->end[i]) == FAILURE) t = FAILURE;
+    if (resolve_index(ar->stride[i]) == FAILURE) t = FAILURE;
   }
 
   if (compare_spec_to_ref(ar, as) == FAILURE) t = FAILURE;
@@ -383,8 +383,8 @@ int i;
   if (as == NULL) return; 
 
   for(i=0; i<as->rank; i++) {
-    g95_free_expr(as->shape[i].lower);
-    g95_free_expr(as->shape[i].upper);
+    g95_free_expr(as->lower[i]);
+    g95_free_expr(as->upper[i]);
   }
 
   g95_free(as);
@@ -400,7 +400,7 @@ g95_expr *e;
 int i;
 
   for(i=0; i<as->rank; i++) {
-    e = as->shape[i].lower;
+    e = as->lower[i];
 
     if (e != NULL) {
       g95_resolve_expr(e);
@@ -409,7 +409,7 @@ int i;
 		  &e->where);
     }
 
-    e = as->shape[i].upper;
+    e = as->upper[i];
 
     if (e != NULL) {
       g95_resolve_expr(e);
@@ -441,8 +441,8 @@ static array_type match_array_element_spec(g95_array_spec *as) {
 g95_expr **upper, **lower;
 match m;
 
-  lower = &as->shape[as->rank - 1].lower;
-  upper = &as->shape[as->rank - 1].upper;
+  lower = &as->lower[as->rank - 1];
+  upper = &as->upper[as->rank - 1];
 
   if (g95_match(" *") == MATCH_YES) {
     *lower = g95_int_expr(1);
@@ -494,8 +494,8 @@ int i;
   as = g95_get_array_spec();
 
   for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-    as->shape[i].lower = NULL;
-    as->shape[i].upper = NULL;
+    as->lower[i] = NULL;
+    as->upper[i] = NULL;
   }
 
   as->rank = 1;
@@ -567,8 +567,8 @@ int i;
 
   if (as->type == AS_ASSUMED_SHAPE) {
     for(i=0; i<as->rank; i++) {
-      if (as->shape[i].lower == NULL)
-	as->shape[i].lower = g95_int_expr(1);
+      if (as->lower[i] == NULL)
+	as->lower[i] = g95_int_expr(1);
     }
   }
 
@@ -614,8 +614,8 @@ int i;
   *dest = *src;
 
   for(i=0; i<dest->rank; i++) {
-    dest->shape[i].lower = g95_copy_expr(dest->shape[i].lower);
-    dest->shape[i].upper = g95_copy_expr(dest->shape[i].upper);
+    dest->lower[i] = g95_copy_expr(dest->lower[i]);
+    dest->upper[i] = g95_copy_expr(dest->upper[i]);
   }
 
   return dest;
@@ -644,9 +644,9 @@ int i;
     g95_status(" %s ", g95_code2string(array_specs, as->type));
 
     for(i=0; i<as->rank; i++) {
-      g95_show_expr(as->shape[i].lower);
+      g95_show_expr(as->lower[i]);
       g95_status_char(' ');
-      g95_show_expr(as->shape[i].upper);
+      g95_show_expr(as->upper[i]);
       g95_status_char(' ');
     }
   }
@@ -673,12 +673,12 @@ int i, a1, a2;
 
   if (as1->type == AS_EXPLICIT)
     for(i=0; i<as1->rank; i++) {
-      if (g95_extract_int(as1->shape[i].lower, &a1) != NULL) goto error;
-      if (g95_extract_int(as2->shape[i].lower, &a2) != NULL) goto error;
+      if (g95_extract_int(as1->lower[i], &a1) != NULL) goto error;
+      if (g95_extract_int(as2->lower[i], &a2) != NULL) goto error;
       if (a1 != a2) return 0;
 
-      if (g95_extract_int(as1->shape[i].upper, &a1) != NULL) goto error;
-      if (g95_extract_int(as2->shape[i].upper, &a2) != NULL) goto error;
+      if (g95_extract_int(as1->upper[i], &a1) != NULL) goto error;
+      if (g95_extract_int(as2->upper[i], &a2) != NULL) goto error;
       if (a1 != a2) return 0;
     }
 

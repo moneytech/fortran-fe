@@ -110,9 +110,9 @@ int i;
     q = p->next;
 
     for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-      g95_free_expr(p->ar.shape[i].start);
-      g95_free_expr(p->ar.shape[i].end);
-      g95_free_expr(p->ar.shape[i].stride);
+      g95_free_expr(p->ar.start[i]);
+      g95_free_expr(p->ar.end[i]);
+      g95_free_expr(p->ar.stride[i]);
     }
 
     g95_free_expr(p->start);

@@ -311,10 +311,7 @@ typedef struct {
   int rank;          /* A rank of zero means that a variable is a scalar */
   array_type type;
 
-  struct {
-    struct g95_expr *lower, *upper;
-  } shape[G95_MAX_DIMENSIONS];
-
+  struct g95_expr *lower[G95_MAX_DIMENSIONS], *upper[G95_MAX_DIMENSIONS];
 } g95_array_spec;
 
 #define g95_get_array_spec() g95_getmem(sizeof(g95_array_spec))
@@ -554,10 +551,9 @@ typedef struct g95_array_ref {
   locus where;
   g95_array_spec *as;
 
-  struct {
-    locus where;         /* Need this because all expression can be NULL */
-    struct g95_expr *start, *end, *stride;
-  } shape[G95_MAX_DIMENSIONS];
+  locus c_where[G95_MAX_DIMENSIONS];     /* All expressions can be NULL */
+  struct g95_expr *start[G95_MAX_DIMENSIONS], *end[G95_MAX_DIMENSIONS],
+                  *stride[G95_MAX_DIMENSIONS];
 
   struct g95_expr *offset;
 } g95_array_ref;
