@@ -271,6 +271,7 @@ char ch;
   result = g95_constant_result(BT_CHARACTER, e->ts.kind);
   result->where = e->where;
 
+  result->value.character.length = len;
   result->value.character.string = g95_getmem(len+1);
 
   for ( count=0, i=0; i<len; ++i ) {
@@ -310,6 +311,7 @@ char ch;
   result = g95_constant_result(BT_CHARACTER, e->ts.kind);
   result->where = e->where;
 
+  result->value.character.length = len;
   result->value.character.string = g95_getmem(len+1);
 
   for ( count=0, i=len-1; i>=0; --i ) {
@@ -1422,7 +1424,7 @@ g95_expr *result;
 
 g95_expr *g95_simplify_len_trim(g95_expr *e) {
 g95_expr *result;
-int count=0, len, lentrim;
+int count, len, lentrim;
 int i;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
@@ -1437,7 +1439,7 @@ int i;
 
   len = e->value.character.length;
 
-  for (i=1; i<=len; ++i) {
+  for (count=0, i=1; i<=len; ++i) {
     if (e->value.character.string[len-i] == ' ') ++count;
     else break; 
   }
@@ -2001,6 +2003,54 @@ int kind;
 
 }
 
+g95_expr *g95_simplify_repeat(g95_expr *e, g95_expr *n) {
+g95_expr *result;
+int ncopies;
+int i, len, m;
+char *copy;
+
+  if (e->expr_type != EXPR_CONSTANT || n->expr_type != EXPR_CONSTANT)  
+    return NULL;
+
+  if (e->ts.type != BT_CHARACTER ) {
+    g95_error("First argument of REPEAT at %L must be character", &e->where);
+    return &g95_bad_expr;
+  }
+
+  if (n->ts.type != BT_INTEGER ) {
+    g95_error("Second argument of REPEAT at %L must be character", &n->where);
+    return &g95_bad_expr;
+  }
+
+  if (n !=NULL ) {
+    if (g95_extract_int(n, &ncopies) != NULL || ncopies < 0 ) {
+      g95_error("Invalid second argument of REPEAT at %L", &n->where);
+      return &g95_bad_expr;
+    }
+  }
+
+  result = g95_copy_expr(e);
+
+  len    = e->value.character.length;
+
+  if (ncopies == 0) {
+    result->value.character.string='\0';
+    return result;
+  }
+  else {
+    for (i=0; i<ncopies; ++i) {
+      for (m=0; m<len; ++m) {
+        copy[m] = result->value.character.string[m];
+        printf("Test %c\n", copy[m]);
+      }
+      printf("Test2 %d\n", i);
+      strcat(result->value.character.string, copy);
+    }
+    return result;
+  }
+
+}
+
 
 g95_expr *g95_simplify_rrspacing(g95_expr *e) {
 g95_expr *arg;
@@ -2185,80 +2235,77 @@ g95_expr *arg1, *arg2;
 }
 
 
-g95_expr *g95_simplify_sign(g95_expr *e) {
-g95_expr *arg1, *arg2, *rmid, *result;
-int knd1, knd2;
+g95_expr *g95_simplify_sign(g95_expr *x, g95_expr *y) {
+g95_expr *absv, *result;
+mpz_t sgnz;
+mpf_t sgnf;
+int sgn;
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  
+    return NULL;
 
-  arg1 = FIRST_ARG(e);
-  arg2 = SECOND_ARG(e);
-
-/* Type checking */
-
-  if (arg1->ts.type != BT_REAL || arg1->ts.type != BT_INTEGER) {
-    g95_warning("First argument of SIGN at %L must be real or integer",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (x->ts.type != BT_REAL && x->ts.type != BT_INTEGER) {
+    g95_error("First argument of SIGN at %L must be real or integer",
+		&x->where);
+    return &g95_bad_expr;
   }
 
-  if ( (arg2->ts.type != arg1->ts.type) ) {
-    g95_warning("Type of arguments of SET_EXPONENT at %L must agree",
-		&FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if (y->ts.type != BT_REAL && y->ts.type != BT_INTEGER) {
+    g95_error("Second argument of SIGN at %L must be real or integer",
+		&y->where);
+    return &g95_bad_expr;
   }
 
-  knd1 = g95_validate_kind(BT_INTEGER, arg1->ts.type);
-  knd2 = g95_validate_kind(BT_INTEGER, arg2->ts.type);
-
-  if (knd1 != knd2 ) {
-    g95_warning("Kind of arguments of SIGN at %L must agree",
-                 &FIRST_ARG(e)->where);
-    //    return FAILURE;
+  if ( (x->ts.type != y->ts.type) ) {
+    g95_error("Type of arguments of SIGN at %L must agree", &x->where);
+    return &g95_bad_expr;
   }
 
-  //  if (arg1->expr_type != EXPR_CONSTANT || arg2->expr_type != EXPR_CONSTANT)     return FAILURE;
+  if ( (x->ts.kind != y->ts.kind) ) {
+    g95_error("Kind of arguments of SIGN at %L must agree", &x->where);
+    return &g95_bad_expr;
+  }
 
-  result = g95_copy_expr(arg1);
+  absv   = g95_copy_expr(x);
+  result = g95_copy_expr(x);
 
-  switch (arg1->ts.type) {
+  switch (x->ts.type) {
 	case BT_INTEGER:
-        	mpz_init(result->value.integer);
-    		if ( g95_compare_expr(arg2, integer_zero) >= 0 ) {
-		  mpz_abs(result->value.integer, arg1->value.integer);
-		}
-		else {
-		  rmid = g95_get_expr();
-        	  mpz_init(rmid->value.integer);
-		  mpz_abs(rmid->value.integer, arg1->value.integer);
-		  mpz_neg(result->value.integer, rmid->value.integer);
-		  g95_free_expr(rmid);
-		}
-		break;
+        	sgn = mpz_sgn(y->value.integer);
+		mpz_init_set_si(sgnz,sgn);
+		mpz_abs(absv->value.integer,x->value.integer);
+		mpz_mul(result->value.integer, absv->value.integer, sgnz);
+		mpz_clear(sgnz);
+		g95_free(absv);
+		return result;
 	case BT_REAL:
-        	mpf_init(result->value.real);
-    		if ( g95_compare_expr(arg2, real_zero) > 0 ) {
-		  mpf_abs(result->value.real, arg1->value.real);
-		}
-		else if ( g95_compare_expr(arg2, real_zero) < 0 ) {
-		  rmid = g95_get_expr();
-        	  mpf_init(rmid->value.real);
-		  mpf_abs(rmid->value.real, arg1->value.real);
-		  mpf_neg(result->value.real, rmid->value.real);
-		  g95_free_expr(rmid);
-		}
-		else
-		  /* This is not making a distinction between pos and neg zero*/
-		  mpf_init(result->value.real);
-		break;
+        	sgn = mpf_sgn(y->value.real);
+		mpf_abs(absv->value.real,x->value.real);
+		mpf_init_set_si(sgnf,sgn);
+		mpf_mul(result->value.real, absv->value.real, sgnf);
+		mpf_clear(sgnf);
+		g95_free(absv);
+		return result;
 	  default:
 	    ;;
-	    //		return FAILURE;
+	    g95_internal_error("Bad type in g95_simplify_sign");
+	    return &g95_bad_expr;
   }
+}
 
-  g95_replace_expr(e, result);
 
-  //  return SUCCESS;
+g95_expr *g95_simplify_sin(g95_expr *e) {
+/* We don't have an extension to return transcendental functions for constant
+ * arguments yet */
+
+  return NULL;
+}
+
+
+g95_expr *g95_simplify_sinh(g95_expr *e) {
+  /* Ditto */
+
+  return NULL;
 }
 
 
@@ -2287,44 +2334,102 @@ g95_expr *arg;
 
 
 g95_expr *g95_simplify_sqrt(g95_expr *e) {
-g95_expr *arg, *result;
+g95_expr *sroot, *result;
 
-  return NULL; 
+/* Evaluation of sqrt for constant arguments is an extension */
+/* Will do complex case later */
 
-  arg = FIRST_ARG(e);
-
-  //  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
-
-/* Type checking */
-
-  switch (arg->ts.type) {
-  	case BT_REAL:
-	  if (g95_compare_expr(arg, real_zero) == -1) {
-	    g95_warning("Argument of SQRT at %L has a negative value",
-			&FIRST_ARG(e)->where);
-	    //	    return FAILURE;
+  switch (e->ts.type) {
+  	case BT_INTEGER:
+	  if (mpz_cmp_si(e->value.integer,0) < 0) {
+	    g95_error("Argument of SQRT at %L has a negative value", &e->where);
+	    return &g95_bad_expr;
 	  }
 	  else {
-	    result = g95_copy_expr(arg);
-            mpf_sqrt(result->value.real, arg->value.real);
-            g95_replace_expr(e,result);
-	    //            return SUCCESS;
+	    sroot = g95_copy_expr(e);
+            mpz_sqrt(sroot->value.integer, e->value.integer);
+	    result = g95_int2real(sroot, g95_default_real_kind());
+	    g95_free(sroot);
+	    return result;
 	  }
-	  break;
-
+  	case BT_REAL:
+	  if (mpf_cmp_si(e->value.real,0) < 0) {
+	    g95_error("Argument of SQRT at %L has a negative value", &e->where);
+	    return &g95_bad_expr;
+	  }
+	  else {
+	    result = g95_copy_expr(e);
+            mpf_sqrt(result->value.real, e->value.real);
+	    return result;
+	  }
 	case BT_COMPLEX:
-	  /* Need to compute principle value */
+	  // Need to compute principle value
+	  g95_warning("Complex constant sqrt not implemented yet %L",&e->where);
+	  return NULL;
 	  break;
 
         default:
-	    g95_warning("Argument of SQRT at %L must be real or complex",
-			&FIRST_ARG(e)->where);
-	    //	    return FAILURE;
+	    g95_warning("Invalid argument of SQRT at %L", &e->where);
+	    return &g95_bad_expr;
+  }
+}
+
+
+g95_expr *g95_simplify_tan(g95_expr *e) {
+/* We don't have an extension to return transcendental functions for constant
+ * arguments yet */
+
+  return NULL;
+}
+
+
+g95_expr *g95_simplify_tanh(g95_expr *e) {
+  /* Ditto */
+
+  return NULL;
+}
+
+
+g95_expr *g95_simplify_tiny(g95_expr *e) {
+
+  return NULL;
+}
+
+
+g95_expr *g95_simplify_trim(g95_expr *e) {
+g95_expr *result;
+int count, i, len, lentrim;
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  if (e->ts.type != BT_CHARACTER) {
+    g95_error("Argument of TRIM at %L must be character", &e->where);
+    return &g95_bad_expr;
   }
 
-/* If we reach here something went wrong */
-  //  return FAILURE;
+  len = e->value.character.length;
 
+  result = g95_constant_result(BT_CHARACTER, e->ts.kind);
+  result->where = e->where;
+
+  for (count=0, i=1; i<=len; ++i) {
+    if (e->value.character.string[len-i] == ' ') ++count;
+    else break; 
+  }
+
+  lentrim = len-count;
+
+  result->value.character.length = lentrim;
+  result->value.character.string = g95_getmem(lentrim+1);
+
+  for ( i=0; i<lentrim; ++i) {
+    result->value.character.string[i] = e->value.character.string[i];
+  }
+
+  printf("Test %s \n", result->value.character.string);
+  result->value.character.string[lentrim] = '\0';   /* For debugger */
+
+  return result;
 }
 
 

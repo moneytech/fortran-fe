@@ -934,7 +934,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("sngl",  1, BT_REAL, dr, g95_simplify_real, check_sngl,
 	  a, BT_REAL,    dd, 0, knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("repeat", 1, BT_CHARACTER, dc, NULL, NULL,
+  add_sym("repeat", 1, BT_CHARACTER, dc, g95_simplify_repeat, NULL,
 	  stg, BT_CHARACTER, dc, 0, n, BT_INTEGER, di, 0, NULL);
 
 /* KAH Takes any type array, integer arrays, returns array */
@@ -1031,7 +1031,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("transpose", 0, BT_REAL, dr, NULL, not_ready,
 	  m, BT_REAL, dr, 0, NULL);
 
-  add_sym("trim", 1, BT_CHARACTER, dc, NULL, NULL,
+  add_sym("trim", 1, BT_CHARACTER, dc, g95_simplify_trim, NULL,
 	  stg, BT_CHARACTER, dc, 0, NULL);
 
 /* KAH Array function */
