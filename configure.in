@@ -1,5 +1,5 @@
 AC_INIT(g95.h)
-AM_INIT_AUTOMAKE(g95, 0.18)
+AM_INIT_AUTOMAKE(g95, 0.23)
 AM_CONFIG_HEADER(config.h)
 
 #############################################################################
