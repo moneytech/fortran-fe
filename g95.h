@@ -82,6 +82,11 @@ typedef enum { BT_UNKNOWN=1, BT_INTEGER, BT_REAL, BT_COMPLEX,
 	       BT_LOGICAL, BT_CHARACTER, BT_DERIVED, BT_PROCEDURE
 } bt;
 
+/* Expression node types */
+
+typedef enum { EXPR_OP=1, EXPR_FUNCTION, EXPR_CONSTANT, EXPR_VARIABLE,
+	       EXPR_SUBSTRING, EXPR_STRUCTURE, EXPR_ARRAY
+} expr_t;
 
 /* Intent types */
 
@@ -546,9 +551,7 @@ typedef struct g95_ref {
 #include <gmp.h>
 
 typedef struct g95_expr {
-  enum { EXPR_OP=1, EXPR_FUNCTION, EXPR_CONSTANT, EXPR_VARIABLE,
-	 EXPR_SUBSTRING, EXPR_STRUCTURE, EXPR_ARRAY
-  } expr_type;
+  expr_t expr_type;
 
   g95_typespec ts;         /* These three refer to the overall expression   */
   int rank;                /* Duplicates ar->rank, but present for ar==NULL */
