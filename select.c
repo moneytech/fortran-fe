@@ -131,7 +131,7 @@ g95_case c, *cp;
 
   if (g95_match("% default%t") == MATCH_YES) {
     new_st.op = EXEC_SELECT;
-    new_st.expr = g95_get_case();
+    new_st.ext = g95_get_case();
     return MATCH_YES;
   }
 
