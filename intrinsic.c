@@ -190,7 +190,8 @@ g95_constructor *head, *c, *tail=NULL;
     result->ts.kind = kind;
     result->expr_type = EXPR_ARRAY;
     result->value.constructor.head = head;
-    result->value.constructor.shape = e->value.constructor.shape;
+    result->value.constructor.shape = 
+      g95_copy_cons_shape(e->value.constructor.shape, e->rank);
     result->where = e->where;
     result->rank = e->rank;
     break;
