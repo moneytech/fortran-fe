@@ -1677,22 +1677,25 @@ arith rc;
   rc = ARITH_OK;
   d = op2->value.constructor.head;
 
-  if (g95_check_conformance("Elemental binary operation", op1, op2) != SUCCESS)
-    return ARITH_INCOMMENSURATE;
+  if (g95_check_conformance("Elemental binary operation", op1, op2) 
+      != SUCCESS)
+    rc = ARITH_INCOMMENSURATE;
+  else {
 
-  for(c=head; c; c=c->next, d=d->next) {
-    if (d == NULL) {
-      rc = ARITH_INCOMMENSURATE;
-      break;
+    for(c=head; c; c=c->next, d=d->next) {
+      if (d == NULL) {
+	rc = ARITH_INCOMMENSURATE;
+	break;
+      }
+
+      rc = eval(c->expr, d->expr, &r);
+      if (rc != ARITH_OK) break;
+      
+      g95_replace_expr(c->expr, r);
     }
 
-    rc = eval(c->expr, d->expr, &r);
-    if (rc != ARITH_OK) break;
-
-    g95_replace_expr(c->expr, r);
+    if (d != NULL) rc = ARITH_INCOMMENSURATE;
   }
-
-  if (d != NULL) rc = ARITH_INCOMMENSURATE;
 
   if (rc != ARITH_OK)
     g95_free_constructor(head);
