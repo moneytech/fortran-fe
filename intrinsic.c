@@ -232,7 +232,7 @@ g95_expr *new;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
  
-  return (g95_complex2real(&new, e) != ARITH_OK) ? new : &g95_bad_expr;
+  return (g95_complex2real(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
 }
 
 
@@ -241,7 +241,7 @@ g95_expr *new;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_int2complex(&new, e) != ARITH_OK) ? new : &g95_bad_expr;
+  return (g95_int2complex(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
 }
 
 
@@ -250,7 +250,7 @@ g95_expr *new;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_real2complex(&new, e) != ARITH_OK) ? new : &g95_bad_expr;
+  return (g95_real2complex(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
 }
 
 
@@ -259,7 +259,7 @@ g95_expr *new;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  return (g95_real2complex(&new, e) != ARITH_OK) ? new : &g95_bad_expr;
+  return (g95_real2complex(&new, e) == ARITH_OK) ? new : &g95_bad_expr;
 }
 
 

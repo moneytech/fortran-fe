@@ -1189,7 +1189,7 @@ arith rv;
   e->ts.type = BT_COMPLEX;
   e->ts.kind = g95_default_complex_kind();
 
-  mpf_init(e->value.real);
+  mpf_init(e->value.complex.r);
   mpf_set_z(e->value.complex.r, src->value.integer);
   mpf_init_set_ui(e->value.complex.i, 0L);
 
@@ -1250,7 +1250,6 @@ g95_expr *e;
   e->ts.type = BT_COMPLEX;
   e->ts.kind = g95_default_complex_kind();
 
-  mpf_init(e->value.real);
   mpf_init_set(e->value.complex.r, src->value.real);
   mpf_init_set_ui(e->value.complex.i, 0);
 
