@@ -458,6 +458,8 @@ g95_expr temp;
     f->ts = temp.ts;
   }
 
+  f->rank = (a->rank == 2 && b->rank == 2) ? 2 : 1;
+
   f->value.function.name = get_string("__matmul_%c%d",
 				      g95_type_letter(f->ts.type), f->ts.kind);
 }
