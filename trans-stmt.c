@@ -779,7 +779,8 @@ g95_trans_deallocate (g95_code * code)
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_pre (&se, stmt, stmt);
 
-          tmp = tree_cons (NULL_TREE, var, NULL_TREE);
+          tmp = g95_chainon_list (NULL_TREE, var);
+          tmp = g95_chainon_list (tmp, integer_zero_node);
           tmp = g95_build_function_call (g95_fndecl_deallocate, tmp);
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_pre (&se, stmt, stmt);

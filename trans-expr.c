@@ -1047,9 +1047,11 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
 
   g95_init_loopinfo (&loop);
   tmpss = ss;
-  while (tmpss->dimen <= 0)
+  while (tmpss != g95_ss_terminator
+         && tmpss->dimen <= 0)
     tmpss = tmpss->next;
 
+  assert (tmpss != g95_ss_terminator);
   loop.dimen = tmpss->dimen;
 
   /* Add in the pre code for scalar subexpressions.  */
@@ -1073,6 +1075,13 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
   else
     need_tmp = 2;
 
+  if (! need_tmp)
+    loop.array_parameter = 1;
+
+  /* Setup the scalarizing loops and bounds.  */
+  g95_conv_ss_startstride (&loop);
+
+  /* Tell the scalarizer about the array.  */
   if (need_tmp)
    {
      loop.temp_ss = g95_get_ss ();
@@ -1081,11 +1090,7 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
        g95_get_element_type (TREE_TYPE (tmpss->data.info.descriptor));
      loop.temp_ss->dimen = loop.dimen;
    }
-  else
-    loop.array_parameter = 1;
 
-  /* Setup the scalarizing loops and bounds.  */
-  g95_conv_ss_startstride (&loop);
   g95_conv_loopvars (&loop);
 
   if (need_tmp)
@@ -1331,7 +1336,7 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
 
           /* Invaidate the base pointer.  */
           field = g95_get_base_component (type);
-          tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
+          tmp = build (COMPONENT_REF, TREE_TYPE (field), parm, field);
           tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, integer_zero_node);
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_pre (&loop, stmt, stmt);
@@ -1504,9 +1509,6 @@ g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
   g95_ss *ss;
   int n;
   int need_temp;
-
-  for (n = 0; n < loop->dimen; n++)
-      loop->order[n] = n;
 
   loop->temp_ss = NULL;
   need_temp = 0;

@@ -43,10 +43,26 @@ Boston, MA 02111-1307, USA.  */
 /* Strinng constants.  */
 tree g95_strconst_bounds;
 
+static tree
+g95_build_string_const(int length, char *s)
+{
+  tree str;
+  tree len;
+  
+  str = build_string (length, s);
+  len = build_int_2 (length, 0);
+  TREE_TYPE (str) =
+    build_array_type (g95_character1_type_node,
+                     build_range_type (g95_strlen_type_node,
+                                      integer_one_node, len));
+  return str;
+}
+
 void
 g95_init_string_constants ()
 {
-  g95_strconst_bounds = build_string (30, "Array parameter bound mismatch");
+  g95_strconst_bounds =
+    g95_build_string_const (30, "Array parameter bound mismatch");
 }
 
 /*TODO: Maybe get values > 2^31 working.  */
@@ -130,14 +146,9 @@ g95_conv_constant (g95_se * se, g95_expr * expr)
       break;
 
     case BT_CHARACTER:
-      se->expr = build_string (expr->value.character.length,
+      se->expr = g95_build_string_const (expr->value.character.length,
                               expr->value.character.string);
-      se->string_length = build_int_2 (expr->value.character.length, 0);
-      TREE_TYPE (se->expr) =
-        build_array_type (g95_character1_type_node,
-                         build_range_type (g95_strlen_type_node,
-                                          integer_one_node,
-                                          se->string_length));
+      se->string_length = TYPE_MAX_VALUE (TYPE_DOMAIN (TREE_TYPE (se->expr)));
       break;
 
     default:

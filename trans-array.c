@@ -174,7 +174,12 @@ g95_conv_ss_descriptor (g95_loopinfo * loop, g95_ss * ss)
 void
 g95_init_loopinfo (g95_loopinfo * loop)
 {
+  int n;
+
   memset (loop, 0, sizeof(g95_loopinfo));
+
+  for (n = 0; n < G95_MAX_DIMENSIONS; n++)
+    loop->order[n] = n;
 }
 
 /* Copies the loop variable info to a g95_se sructure. Does not copy the SS
@@ -372,7 +377,7 @@ g95_conv_ss_startstride (g95_loopinfo * loop)
           desc = vecss->data.info.descriptor;
 
           /* Calculate the start of the range.  */
-          if (start && start->expr_type == EXPR_CONSTANT)
+          if (start)
             {
               g95_init_se (&se, NULL);
               g95_conv_simple_val_type (&se, start, g95_array_index_type);
@@ -889,7 +894,8 @@ g95_array_deallocate (tree descriptor)
   stmt = build_stmt (EXPR_STMT, tmp);
 
   /* Parameter is address of the data component.  */
-  tmp = tree_cons (NULL_TREE, var, NULL_TREE);
+  tmp = g95_chainon_list (NULL_TREE, var);
+  tmp = g95_chainon_list (tmp, integer_zero_node);
   tmp = g95_build_function_call (g95_fndecl_deallocate, tmp);
   stmt = chainon (stmt, build_stmt (EXPR_STMT, tmp));
 
@@ -1296,11 +1302,21 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
           g95_add_stmt_to_list (&head, &tail, se.pre, se.pre_tail);
 
           /* Check the sizes match.  */
-          if (g95_option.check_array_bounds)
+          if (checkparm)
             {
-              tmp = g95_build_function_call (g95_fndecl_runtime_error,
-                                            g95_strconst_bounds);
+              /* Call __g95_runtine_error.  */
+              g95_start_stmt ();
+
+              repack_stmt = pack_tail = NULL_TREE;
+              
+              tmp = build1 (ADDR_EXPR, pchar_type_node, g95_strconst_bounds);
+              tmp = g95_simple_fold (tmp, &repack_stmt, &pack_tail, NULL);
+              tmp = g95_chainon_list (NULL_TREE, tmp);
+              tmp = g95_build_function_call (g95_fndecl_runtime_error, tmp);
               stmt = build_stmt (EXPR_STMT, tmp);
+              g95_add_stmt_to_list (&repack_stmt, &pack_tail, stmt, stmt);
+
+              stmt = g95_finish_stmt (repack_stmt, pack_tail);
 
               /* Check (ubound(a) - lbound(a) == ubound(b) - lbound(b)).
                        (ubound(a) - lbound(a) + lbound(b) == ubound(b)).  */
@@ -1311,9 +1327,10 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
               tmp = build (PLUS_EXPR, g95_array_index_type, tmp, ref);
               tmp = g95_simple_fold (tmp, &head, &tail, &tmpvar);
 
-              tmp = build (EQ_EXPR, boolean_type_node, tmp, ubound);
+              tmp = build (NE_EXPR, boolean_type_node, tmp, ubound);
 
               stmt = build_stmt (IF_STMT, tmp, stmt, NULL_TREE);
+              g95_add_stmt_to_list (&head, &tail, stmt, stmt);
             }
           ubound = se.expr;
         }
@@ -1327,7 +1344,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
           ubound = g95_simple_fold_tmp (ubound, &head, &tail, &uboundvar);
         }
 
-      /* ubound is now the uppser bound of the temporary.  */
+      /* ubound is now the upper bound of the temporary.  */
       /* Store the new upper bound.  */
       field = g95_get_ubound_component (type, n);
       tmp = build (COMPONENT_REF, g95_array_index_type, tmpdesc, field);
@@ -1396,12 +1413,6 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
 
               repack_stmt = pack_tail = NULL_TREE;
 
-              /* Store the stride.  */
-              ref = build (COMPONENT_REF, TREE_TYPE (field), tmpdesc, field);
-              ref = build (MODIFY_EXPR, TREE_TYPE (ref), ref, oldstride);
-              stmt = build_stmt (EXPR_STMT, ref);
-              g95_add_stmt_to_list (&repack_stmt, &pack_tail, stmt, stmt);
-
               /* Test if the array is already packed.  */
               needpack = build (NE_EXPR, boolean_type_node, stride, oldstride);
               needpack = g95_simple_fold_tmp (needpack, &repack_stmt,
@@ -1411,9 +1422,6 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
 
               stmt = build_stmt (IF_STMT, unpack, repack_stmt, nopack_stmt);
               g95_add_stmt_to_list (&head, &tail, stmt, stmt);
-
-              /* We've already set the stride.  */
-              tmp = NULL_TREE;
             }
           else if (G95_DECL_PACKED_ARRAY (tmpdesc))
             {
@@ -1424,13 +1432,29 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
               needpack =
                 g95_simple_fold_tmp (needpack, &head, &tail, &packedvar);
               tmp = build (TRUTH_OR_EXPR, TREE_TYPE (tmp), needpack, tmp);
-              needpack = build (MODIFY_EXPR, TREE_TYPE (tmp), needpack, tmp);
-
-              /* Store the old stride for now.  */
-              tmp = build (COMPONENT_REF, TREE_TYPE (field), dumdesc, field);
+              tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), needpack, tmp);
+              stmt = build_stmt (EXPR_STMT, tmp);
+              g95_add_stmt_to_list (&head, &tail, stmt, stmt);
             }
           /* For partial packed arrays we just test the first stride.  */
         }
+      else if (n == 0)
+        {
+          tmp = build (MODIFY_EXPR, g95_array_index_type, oldstride,
+                      integer_one_node);
+          stmt = build_stmt (EXPR_STMT, tmp);
+
+          tmp = build (EQ_EXPR, g95_array_index_type, oldstride,
+                      integer_zero_node);
+          stmt = build_stmt (IF_STMT, tmp, stmt, NULL_TREE);
+          g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+        }
+
+      /* Store the stride.  May be overwritten if array is repacked.  */
+      ref = build (COMPONENT_REF, TREE_TYPE (field), tmpdesc, field);
+      ref = build (MODIFY_EXPR, TREE_TYPE (ref), ref, oldstride);
+      stmt = build_stmt (EXPR_STMT, ref);
+      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
 
       /* Calculate the offset.  */
       tmp = build (MULT_EXPR, g95_array_index_type, oldstride, lbound[n]);
@@ -1438,12 +1462,6 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
 
       offset = build (MINUS_EXPR, TREE_TYPE (tmp), offset, tmp);
       offset = g95_simple_fold_tmp (offset, &head, &tail, &offsetvar);
-
-      /* Store the stride.  May be overwritten if array is repacked.  */
-      ref = build (COMPONENT_REF, TREE_TYPE (field), tmpdesc, field);
-      ref = build (MODIFY_EXPR, TREE_TYPE (ref), ref, oldstride);
-      stmt = build_stmt (EXPR_STMT, ref);
-      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
 
       /* Calculate the next stride.  */
       tmp = build (MINUS_EXPR, g95_array_index_type, integer_one_node,
@@ -1511,7 +1529,11 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_list (&repack_stmt, &pack_tail, stmt, stmt);
 
-          tmp = build (MULT_EXPR, g95_array_index_type, strides[n], lbound[n]);
+          if (n == 0)
+            tmp = integer_one_node;
+          else
+            tmp = strides[n - 1];
+          tmp = build (MULT_EXPR, g95_array_index_type, tmp, lbound[n]);
           tmp = g95_simple_fold (tmp, &repack_stmt, &pack_tail,
                                 (n == 0) ? &offsetvar : &tmpvar);
 
@@ -1696,6 +1718,8 @@ g95_walk_variable_expr (g95_ss * ss, g95_expr * expr)
   g95_array_ref *ar;
   g95_ss *newss;
   g95_ss *head;
+  g95_ss *tmp;
+  g95_ss *last;
   int n;
 
   if (!expr->symbol->attr.dimension)
@@ -1767,9 +1791,30 @@ g95_walk_variable_expr (g95_ss * ss, g95_expr * expr)
                   indexss = g95_walk_expr (g95_ss_terminator, ar->start[n]);
                   if (indexss == g95_ss_terminator)
                     internal_error("scalar vector reference???");
+
+                  for (tmp = indexss, last = NULL;
+                       tmp != g95_ss_terminator;
+                       tmp = tmp->next)
+                    {
+                      if (tmp->dimen != 0)
+                        {
+                          assert (tmp->dimen == 1);
+
+                          if (last)
+                            {
+                              last->next = tmp->next;
+                              tmp->next = indexss;
+                              indexss = tmp;
+                            }
+                          break;
+                        }
+                      last = tmp;
+                    }
+                  if (tmp == g95_ss_terminator)
+                    abort();
                   assert (indexss->dimen == 1);
                   indexss->dimen = -1;
-                  newss->data.info.vector[0] = indexss;
+                  newss->data.info.vector[newss->dimen] = indexss;
                   newss->data.info.dim[newss->dimen] = n;
                   newss->dimen++;
                   break;
