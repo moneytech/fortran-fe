@@ -915,6 +915,9 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   g95_ss *argss;
   g95_ss_info *info;
   int byref;
+  tree type;
+  tree var;
+  tree len;
 
   arglist = NULL_TREE;
 
@@ -934,7 +937,7 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
             case G95_SS_FUNCTION:
               if (se->ss->useflags)
                 {
-                  assert (g95_return_by_reference (sym));
+                  assert (g95_return_by_reference (sym) && sym->attr.dimension);
                   assert (se->loop != NULL);
 
                   /* Access the previously obtained result.  */
@@ -956,14 +959,9 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   byref = g95_return_by_reference (sym);
   if (byref)
     {
-      /* Currently we only return arrays by reference, but we may
-         need to do derived types and character strings as well.  */
-      if (! sym->attr.dimension)
-        abort();
-
       if (se->direct_byref)
         arglist = g95_chainon_list (arglist, se->expr);
-      else
+      else if (sym->attr.dimension)
         {
           assert (se->loop && se->ss);
           /* Set the type of the array.  */
@@ -981,6 +979,52 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
           tmp = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (tmp)), tmp);
           arglist = g95_chainon_list (arglist, tmp);
         }
+      else if (sym->ts.type == BT_CHARACTER)
+        {
+          type = g95_get_character_type (sym->ts.kind, sym->ts.cl);
+          assert (G95_KNOWN_SIZE_STRING_TYPE (type));
+          len = TYPE_MAX_VALUE (TYPE_DOMAIN (type));
+          type = build_pointer_type (type);
+
+          if (g95_can_put_var_on_stack (len))
+            {
+              /* Create a temporary variable to hold the result.  */
+              tmp = fold (build (MINUS_EXPR, TREE_TYPE (len), len,
+                          integer_one_node));
+              tmp = build_range_type (g95_array_index_type, integer_zero_node,
+                                      tmp);
+              type = build_array_type (g95_character1_type_node, tmp);
+              tmp = g95_create_var (type, "str");
+              TREE_ADDRESSABLE (tmp) = 1;
+              var = build1 (ADDR_EXPR, build_pointer_type(TREE_TYPE (tmp)),
+                            tmp);
+            }
+          else
+            {
+              tree addr;
+              tree args;
+
+              var = g95_create_var (type, "pstr");
+              TREE_ADDRESSABLE (var) = 1;
+
+              /* Allocate a temporary to hold the result.  */
+              addr = build1 (ADDR_EXPR, ppvoid_type_node, var);
+
+              args = NULL_TREE;
+              args = g95_chainon_list (args, addr);
+              args = g95_chainon_list (args, len);
+              tmp = g95_build_function_call (gfor_fndecl_internal_malloc, args);
+              g95_add_expr_to_block (&se->pre, tmp);
+
+              /* Free the temporary afterwards.  */
+              args = g95_chainon_list (NULL_TREE, addr);
+              tmp = g95_build_function_call (gfor_fndecl_internal_free, args);
+              g95_add_expr_to_block (&se->post, tmp);
+            }
+          arglist = g95_chainon_list (arglist, var);
+        }
+      else /* TODO: derived type function return values.  */
+        abort ();
     }
 
   /* Evaluate the arguments.  */
@@ -1044,15 +1088,25 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
     {
       g95_add_expr_to_block (&se->pre, se->expr);
 
-      if (flag_bounds_check)
+      if (sym->attr.dimension)
         {
-          /* Check the data pointer hasn't been modified.  This would happen
-             in a function returning a pointer.  */
-          tmp = g95_conv_descriptor_data (info->descriptor);
-          tmp = build (NE_EXPR, boolean_type_node, tmp, info->data);
-          g95_trans_runtime_check (tmp, g95_strconst_fault, &se->pre);
+          if (flag_bounds_check)
+            {
+              /* Check the data pointer hasn't been modified.  This would happen
+                 in a function returning a pointer.  */
+              tmp = g95_conv_descriptor_data (info->descriptor);
+              tmp = build (NE_EXPR, boolean_type_node, tmp, info->data);
+              g95_trans_runtime_check (tmp, g95_strconst_fault, &se->pre);
+            }
+          se->expr = info->descriptor;
         }
-      se->expr = info->descriptor;
+      else if (sym->ts.type == BT_CHARACTER)
+        {
+          se->expr = var;
+          se->string_length = len;
+        }
+      else
+        abort ();
     }
 }
 
@@ -1315,7 +1369,8 @@ g95_trans_arrayfunc_assign (g95_expr * expr1, g95_expr * expr2)
   /* The frontend doesn't seem to bother filling in expr->symbol for intrinsic
      functions.  */
   assert (expr2->value.function.isym ||
-          g95_return_by_reference (expr2->symbol));
+          (g95_return_by_reference (expr2->symbol)
+           && expr2->symbol->attr.dimension));
 
   ss = g95_walk_expr (g95_ss_terminator, expr1);
   assert (ss != g95_ss_terminator);

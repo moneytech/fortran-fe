@@ -108,6 +108,7 @@ g95_init_types (void)
   PUSH_TYPE ("complex16", g95_complex16_type_node);
 #endif
 
+/* TODO: build_type_variant doesn't make a copy of the type, so remove it. */
   g95_logical1_type_node = build_type_variant (g95_int1_type_node, 0, 0);
   PUSH_TYPE ("logical1", g95_logical1_type_node);
   g95_logical2_type_node = build_type_variant (g95_int2_type_node, 0, 0);
@@ -491,8 +492,8 @@ g95_build_array_type (tree type, g95_array_spec * as)
               ubound[n] = g95_conv_array_bound (as->upper[n]);
               break;
 	    }
-	  else
-          /* Fall through...  */;
+	  /*else*/
+          /* Fall through...  */
 
         case AS_ASSUMED_SHAPE:
           if (as->lower[n] == NULL)
@@ -857,7 +858,8 @@ g95_sym_type (g95_symbol * sym)
   if (sym->ts.type == BT_CHARACTER)
     {
       if (sym->attr.dimension
-          || sym->attr.pointer || sym->attr.allocatable)
+          || sym->attr.pointer || sym->attr.allocatable
+          || sym->attr.function)
         type = build_pointer_type (type);
     }
 
@@ -1010,7 +1012,7 @@ g95_return_by_reference (g95_symbol * sym)
     return 1;
 
   if (sym->ts.type == BT_CHARACTER)
-    g95_todo_error ("Returning character variables");
+    return 1;
 
   if (sym->ts.type == BT_DERIVED)
     g95_todo_error ("Returning derived types");
@@ -1033,17 +1035,19 @@ g95_get_function_type (g95_symbol * sym)
     return TREE_TYPE (sym->backend_decl);
 
   typelist = NULL_TREE;
-  /* For functions that return arrays we use an extra parameter for the
-     return value.  */
+  /* Some functions we use an extra parameter for the return value.  */
   if (g95_return_by_reference (sym))
     {
       if (sym->result)
         arg = sym->result;
       else
         arg = sym;
-      type = build_reference_type (g95_sym_type (arg));
+      type = g95_sym_type (arg);
+      if (arg->ts.type == BT_DERIVED || arg->attr.dimension)
+        type = build_reference_type (type);
       typelist = g95_chainon_list (typelist, type);
     }
+
   /* Build the argument types for the function */
   for (f = sym->formal; f; f = f->next)
     {

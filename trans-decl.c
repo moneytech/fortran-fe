@@ -766,11 +766,22 @@ g95_build_function_decl (g95_symbol * sym)
       if (g95_return_by_reference (sym))
         {
           type = TREE_VALUE (typelist);
-          parm = build_decl (PARM_DECL, get_identifier ("__return"), type);
+          parm = build_decl (PARM_DECL, get_identifier ("__result"), type);
 
           DECL_CONTEXT (parm) = fndecl;
           DECL_ARG_TYPE (parm) = type;
           TREE_READONLY (parm) = 1;
+          if (sym->ts.type == BT_CHARACTER)
+            {
+              g95_allocate_lang_decl (parm);
+              G95_DECL_STRING (parm) = 1;
+
+              assert (sym->ts.cl && sym->ts.cl->length
+                      && sym->ts.cl->length->expr_type == EXPR_CONSTANT);
+              G95_DECL_STRING_LENGTH (parm) =
+                g95_conv_mpz_to_tree (sym->ts.cl->length->value.integer, 4);
+
+            }
           g95_finish_decl (parm, NULL_TREE);
 
           arglist = chainon (arglist, parm);
@@ -865,7 +876,8 @@ g95_get_fake_result_decl (g95_symbol * sym)
       decl = DECL_ARGUMENTS (sym->backend_decl);
 
       TREE_USED (decl) = 1;
-      decl = g95_build_dummy_array_decl (sym, decl);
+      if (sym->as)
+        decl = g95_build_dummy_array_decl (sym, decl);
     }
   else
     {
@@ -1177,8 +1189,14 @@ g95_trans_deferred_vars (g95_symbol * proc_sym, tree fnbody)
           warning ("Function does not return a value");
           return fnbody;
         }
-      fnbody = g95_trans_dummy_array_bias (proc_sym, current_fake_result_decl,
-                                           fnbody);
+
+      if (proc_sym->as)
+        {
+          fnbody = g95_trans_dummy_array_bias (proc_sym,
+              current_fake_result_decl, fnbody);
+        }
+      else if (proc_sym->ts.type != BT_CHARACTER)
+        g95_todo_error ("Deferred non-array return by reference");
     }
 
   for (sym = proc_sym->tlink; sym != proc_sym; sym = sym->tlink)

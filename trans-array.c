@@ -3880,7 +3880,7 @@ g95_walk_function_expr (g95_ss * ss, g95_expr * expr)
     return g95_walk_intrinsic_function (ss, expr, isym);
 
   /* A function that returns arrays.  */
-  if (g95_return_by_reference (sym))
+  if (g95_return_by_reference (sym) && sym->attr.dimension)
     {
       newss = g95_get_ss();
       newss->type = G95_SS_FUNCTION;

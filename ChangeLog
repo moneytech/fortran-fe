@@ -1,3 +1,19 @@
+2002-11-30  Paul Brook  <paul@nowt.org>
+
+	* trans-array.c (g95_walk_function_expr): Handle non-array return by
+	reference.
+	* trans-dec.c (g95_build_function_decl): Handle character return
+	parammeters.
+	(g95_get_fake_result_decl): Ditto.
+	(g95_trans_deferred_vars): Ditto.
+	* trans-expr.c (g95_conv_function_call): Ditto.
+	(g95_trans_arrayfunc_assign) Limit to array valued functions.
+	* trans-intrinsic.c (g95_conv_intrinsic_char): New function.
+	(g95_conv_intrinsic_function): Use it.
+	* trans-types.c (g95_sym_type): Handle functions returning strings.
+	(g95_return_by_reference): Ditto.
+	(g95_get_function_type): Ditto.
+
 2002-11-18  Paul Brook  <paul@nowt.org>
 
 	* trans-stmt.c (g95_trans_if): Fix IF statements when the condition

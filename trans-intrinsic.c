@@ -655,6 +655,30 @@ g95_conv_intrinsic_dprod (g95_se * se, g95_expr * expr)
   se->expr = build (MULT_EXPR, type, arg, arg2);
 }
 
+/* Return a length one character string containing an ascii character.  */
+static void
+g95_conv_intrinsic_char (g95_se * se, g95_expr * expr)
+{
+  tree arg;
+  tree var;
+  tree type;
+
+  arg = g95_conv_intrinsic_function_args (se, expr);
+  arg = TREE_VALUE (arg);
+
+  /* We currently don't support character types != 1.  */
+  assert (expr->ts.kind == 1);
+  type = g95_get_character_type (expr->ts.kind, expr->ts.cl);
+  var = g95_create_var (type, "char");
+  TREE_ADDRESSABLE (var) = 1;
+
+  arg = convert (g95_character1_type_node, arg);
+  var = build (ARRAY_REF, g95_character1_type_node, var, integer_one_node);
+  g95_add_modify_expr (&se->pre, var, arg);
+  se->expr = build1 (ADDR_EXPR, build_pointer_type (type), var);
+  se->string_length = integer_one_node;
+}
+
 /* Get the minimum/maximum value of all the parameters.
     minmax (a1, a2, a3, ...)
     {
@@ -1646,14 +1670,12 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_NONE:
       abort ();
 
-    case G95_ISYM_ACHAR:
     case G95_ISYM_ADJUSTL:
     case G95_ISYM_ADJUSTR:
     case G95_ISYM_ALLOCATED:
     case G95_ISYM_ANINIT:
     case G95_ISYM_ASSOCIATED:
     case G95_ISYM_CEILING:
-    case G95_ISYM_CHAR:
     case G95_ISYM_CPU_TIME:
     case G95_ISYM_CSHIFT:
     case G95_ISYM_DATE_AND_TIME:
@@ -1705,6 +1727,11 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 
     case G95_ISYM_BTEST:
       g95_conv_intrinsic_btest (se, expr);
+      break;
+
+    case G95_ISYM_ACHAR:
+    case G95_ISYM_CHAR:
+      g95_conv_intrinsic_char (se, expr);
       break;
 
     case G95_ISYM_CONVERSION:
