@@ -275,7 +275,7 @@ match m;
 
   /* The NULL symbol now has to be/become an intrinsic function */
 
-  if (g95_get_symbol("null", NULL, 0, &sym)) {
+  if (g95_findget_symbol("null", NULL, 0, &sym)) {
     g95_error("NULL() initialization at %C is ambiguous");
     return MATCH_ERROR;
   }
@@ -693,12 +693,7 @@ match m;
 
   /* Search for the name but allow the components to be defined later. */
 
-  if (g95_find_symbol(name, NULL, 0, &sym)) {
-    g95_error("Symbol '%s' at %C is an ambiguous reference", sym->name);
-    return MATCH_ERROR;
-  }
-
-  if (sym == NULL && g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+  if (g95_findget_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
 
   if (sym->attr.flavor != FL_DERIVED &&
       g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)

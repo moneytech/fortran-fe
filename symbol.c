@@ -1883,6 +1883,22 @@ g95_symbol *p;
 }
 
 
+/* g95_findget_symbol()-- Subroutine that first does a find on the
+ * symbol, then a get if it doesn't exit.  This prevents us from
+ * generating a host association error that g95_get_symbol() generates
+ * if the symbol already exists.  */
+
+int g95_findget_symbol(const char *name, g95_namespace *ns, int parent_flag,
+		       g95_symbol **result) {
+  
+  if (g95_find_symbol(name, ns, parent_flag, result)) return 1;
+
+  if (*result != NULL) return 0;
+
+  return g95_get_symbol(name, ns, parent_flag, result);
+}
+
+
 /* g95_undo_symbols()-- Undoes all the changes made to symbols in the
  * current statement.  This subroutine is made simpler due to the fact
  * that attributes are never removed once added. */

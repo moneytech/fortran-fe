@@ -1029,7 +1029,7 @@ int c;
 
       e = g95_get_expr();      /* Leave it unknown for now */
 
-      g95_get_symbol(name, NULL, 1, &sym);
+      g95_findget_symbol(name, NULL, 1, &sym);
       e->symbol = sym;
       e->expr_type = EXPR_VARIABLE;
       e->ts.type = BT_UNKNOWN;

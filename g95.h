@@ -1124,6 +1124,7 @@ void g95_free_symbol(g95_symbol *);
 g95_symbol *g95_new_symbol(const char *, g95_namespace *);
 int g95_find_symbol(const char *, g95_namespace *, int, g95_symbol **);
 int g95_get_symbol(const char *, g95_namespace *, int, g95_symbol **);
+int g95_findget_symbol(const char *, g95_namespace *, int, g95_symbol **);
 
 void g95_undo_symbols(void);
 void g95_commit_symbols(void);
