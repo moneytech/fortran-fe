@@ -939,8 +939,9 @@ g95_build_builtin_function_decls (void)
   g95_fndecl_runtime_error =
     g95_build_library_function_decl (get_identifier ("__g95_runtime_error"),
                                     void_type_node,
-                                    1,
-                                    pchar_type_node);
+                                    3,
+                                    pchar_type_node, pchar_type_node,
+                                    g95_int4_type_node);
 
   for (n = 0; n < G95_MAX_DIMENSIONS; n++)
     {

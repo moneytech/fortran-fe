@@ -42,6 +42,9 @@ Boston, MA 02111-1307, USA.  */
 
 /* Strinng constants.  */
 tree g95_strconst_bounds;
+tree g95_strconst_fault;
+tree g95_strconst_wrong_return;
+tree g95_strconst_current_filename;
 
 static tree
 g95_build_string_const(int length, char *s)
@@ -62,7 +65,16 @@ void
 g95_init_string_constants ()
 {
   g95_strconst_bounds =
-    g95_build_string_const (30, "Array parameter bound mismatch");
+    g95_build_string_const (21, "Array bound mismatch");
+
+  g95_strconst_fault =
+    g95_build_string_const (30, "Array reference out of bounds");
+
+  g95_strconst_wrong_return =
+    g95_build_string_const (32, "Incorrect function return value");
+
+  g95_strconst_current_filename =
+    g95_build_string_const (strlen (g95_option.source)+1, g95_option.source);
 }
 
 /*TODO: Maybe get values > 2^31 working.  */

@@ -88,6 +88,7 @@ typedef enum
   G95_SS_REFERENCE,
   G95_SS_SECTION,
   G95_SS_FUNCTION,
+  G95_SS_CONSTRUCTOR,
   G95_SS_VECTOR
 } g95_ss_type;
 
@@ -266,6 +267,9 @@ void g95_get_backend_locus (locus *);
 /* Handle static constructor functions.  */
 tree g95_static_ctors;
 void g95_generate_constructors (void);
+
+/* Generate a runtime error check.  */
+void g95_trans_runtime_check (tree, tree, tree *, tree *);
 
 /* somewhere! */
 tree pushdecl (tree);

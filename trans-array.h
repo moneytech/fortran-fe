@@ -32,7 +32,7 @@ tree g95_array_init_size (tree, int, tree *,
     g95_expr **, g95_expr **, tree *, tree *);
 
 /* Generate code to allocate a temporary array.  */
-void g95_trans_allocate_temp_array (g95_loopinfo *, g95_ss_info *);
+tree g95_trans_allocate_temp_array (g95_loopinfo *, g95_ss_info *, tree);
 
 /* Generate code for allocation of compiler allocated array variables.  */
 tree g95_trans_auto_array_allocation (tree, g95_array_spec *);
@@ -63,7 +63,7 @@ tree g95_trans_scalarizing_loops (g95_loopinfo *, tree);
 void g95_conv_loopvars (g95_loopinfo *);
 
 /* Translate an array reference.  */
-void g95_conv_array_index_ref (g95_se *, tree, tree *, int);
+void g95_conv_array_index_ref (g95_se *, tree, tree *, int, int);
 /* Translate a reference to an array temporary.  */
 void g95_conv_tmp_ref (g95_se *);
 

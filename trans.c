@@ -40,6 +40,8 @@ Boston, MA 02111-1307, USA.  */
 #include "trans.h"
 #include "trans-stmt.h"
 #include "trans-array.h"
+#include "trans-types.h"
+#include "trans-const.h"
 
 /* Naming convention for backend interface code:
    g95_trans_* translate g95_code into STMT trees.
@@ -124,9 +126,7 @@ g95_make_type_writable (tree t)
    up to five characters.  (Java uses ".class".)  */
 
 static inline void
-remove_suffix (name, len)
-     char *name;
-     int len;
+remove_suffix (char * name, int len)
 {
   int i;
 
@@ -423,6 +423,49 @@ g95_build_function_call (tree fndecl, tree arglist)
   TREE_SIDE_EFFECTS (call) = 1;
 
   return call;
+}
+
+/* Generate a runtime error if cond is true.  */
+void
+g95_trans_runtime_check (tree cond, tree msg, tree * phead, tree * ptail)
+{
+  tree head;
+  tree tail;
+  tree tmp;
+  tree args;
+  tree stmt;
+
+  cond = fold (cond);
+
+  if (integer_zerop (cond))
+    return;
+
+  g95_start_stmt ();
+  head = tail = NULL;
+
+  assert (TREE_CODE (msg) == STRING_CST);
+
+  TREE_USED (msg) = 1;
+
+  tmp = build1 (ADDR_EXPR, pchar_type_node, msg);
+  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
+  args = g95_chainon_list (NULL_TREE, tmp);
+
+  tmp = build1 (ADDR_EXPR, pchar_type_node, g95_strconst_current_filename);
+  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
+  args = g95_chainon_list (args, tmp);
+
+  tmp = build_int_2 (lineno, 0);
+  args = g95_chainon_list (args, tmp);
+
+  tmp = g95_build_function_call (g95_fndecl_runtime_error, args);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+
+  head = g95_finish_stmt (head, tail);
+
+  stmt = build_stmt (IF_STMT, cond, head, NULL_TREE);
+  g95_add_stmt_to_list (phead, ptail, stmt, stmt);
 }
 
 /* Chain two stmt chains. PHEAD is the head of the current stmt chain

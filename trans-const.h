@@ -29,4 +29,7 @@ void g95_conv_constant (g95_se *, g95_expr *);
 void g95_init_string_constants (void);
 
 /* Strinng constants.  */
+extern GTY(()) tree g95_strconst_current_filename;
 extern GTY(()) tree g95_strconst_bounds;
+extern GTY(()) tree g95_strconst_fault;
+extern GTY(()) tree g95_strconst_wrong_return;

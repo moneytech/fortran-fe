@@ -34,6 +34,7 @@ Boston, MA 02111-1307, USA.  */
 #include "expr.h"
 #include "real.h"
 #include "tree-simple.h"
+#include "flags.h"
 #include <gmp.h>
 #include <assert.h>
 #define BACKEND_CODE
@@ -182,7 +183,7 @@ g95_conv_vector_array_index (g95_se * se, tree index, g95_ss * ss, tree * pvar)
       }
    }
   /* Get the index from the vector.  */
-  g95_conv_array_index_ref (se, ss->data.info.data, indices, ar->dimen);
+  g95_conv_array_index_ref (se, ss->data.info.data, indices, ar->dimen, 0);
   index = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, pvar);
   /* Put the descriptor back.  */
   se->expr = descsave;
@@ -294,7 +295,7 @@ g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
   else
     pointer = info->data;
 
-  g95_conv_array_index_ref (se, pointer, indices, dimen);
+  g95_conv_array_index_ref (se, pointer, indices, dimen, 0);
 }
 
 static void
@@ -1017,9 +1018,9 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
         abort();
       assert (se->loop != NULL);
       /* Set the type of the array.  */
-      info.descriptor = g95_typenode_for_spec (&sym->ts);
+      tmp = g95_typenode_for_spec (&sym->ts);
       /* Allocate a temporary to store the result.  */
-      g95_trans_allocate_temp_array (se->loop, &info);
+      g95_trans_allocate_temp_array (se->loop, &info, tmp);
 
       /* Zero the forst stride to indicate a temporary.  */
       tmp = g95_get_stride_component (TREE_TYPE (info.descriptor), 0);
@@ -1032,8 +1033,6 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
       tmp = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (tmp)), tmp);
       tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
       arglist = g95_chainon_list (arglist, tmp);
-      /* TODO: Check the function returned the array properly.  Verify the data
-         pointer and stride0==1  */
     }
 
   /* Evaluate the arguments.  */
@@ -1083,6 +1082,29 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
     {
       stmt = build_stmt (EXPR_STMT, se->expr);
       g95_add_stmt_to_pre (se, stmt, stmt);
+      if (flag_bounds_check)
+        {
+          tree field;
+
+          /* Check the stride has been set to 1. */
+          field = g95_get_stride_component (TREE_TYPE (info.descriptor), 0);
+          tmp = build (COMPONENT_REF, TREE_TYPE (field), info.descriptor,
+                       field);
+          tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
+          tmp = build (NE_EXPR, boolean_type_node, tmp, integer_one_node);
+          g95_trans_runtime_check (tmp, g95_strconst_wrong_return, &se->pre,
+                                   &se->pre_tail);
+
+          /* Check the data pointer hasn't been modified.  This would happen
+             in a function returning a pointer.  */
+          field = g95_get_data_component (TREE_TYPE (info.descriptor));
+          tmp = build (COMPONENT_REF, TREE_TYPE (field), info.descriptor,
+                       field);
+          tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
+          tmp = build (NE_EXPR, boolean_type_node, tmp, info.data);
+          g95_trans_runtime_check (tmp, g95_strconst_wrong_return, &se->pre,
+                                   &se->pre_tail);
+        }
       se->expr = info.descriptor;
       se->data_pointer = info.data;
     }
@@ -1121,6 +1143,16 @@ g95_conv_function_expr (g95_se * se, g95_expr * expr)
   g95_conv_function_call (se, psym, expr->value.function.actual);
 }
 
+static void
+g95_conv_array_constructor_expr (g95_se * se, g95_expr * expr)
+{
+  assert (se->ss != NULL && se->ss != g95_ss_terminator);
+  assert (se->ss->expr == expr && se->ss->type == G95_SS_CONSTRUCTOR);
+
+  g95_conv_tmp_ref (se);
+  g95_advance_se_ss_chain (se);
+}
+
 /* Return a SIMPLE expression suitable for the RHS of an assignment.  */
 void
 g95_conv_simple_rhs (g95_se * se, g95_expr * expr)
@@ -1141,6 +1173,10 @@ g95_conv_simple_rhs (g95_se * se, g95_expr * expr)
 
     case EXPR_FUNCTION:
       g95_conv_function_expr (se, expr);
+      break;
+
+    case EXPR_ARRAY:
+      g95_conv_array_constructor_expr (se, expr);
       break;
 
     default:
@@ -1275,7 +1311,6 @@ g95_trans_assign (g95_code * code)
 
       /* Initialize the scalarizer.  */
       g95_init_loopinfo (&loop);
-      loop.dimen = lss_section->data.info.dimen;
 
       /* Walk the lhs.  */
       rss = g95_walk_expr (g95_ss_terminator, code->expr2);
