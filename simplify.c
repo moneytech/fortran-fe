@@ -654,70 +654,64 @@ int c, kind;
 }
 
 
-g95_expr *g95_simplify_cmplx(g95_expr *x, g95_expr *y, g95_expr *k) {
+/* simplify_cmplx()-- Common subroutine for simplifying CMPLX and DCMPLX */
+
+static g95_expr *simplify_cmplx(g95_expr *x, g95_expr *y, int kind,
+				const char *name) {
 g95_expr *result;
+
+  result = g95_constant_result(BT_COMPLEX, kind);
+  result->where = x->where;
+
+  mpf_set_ui(result->value.complex.i, 0);
+
+  switch(x->ts.type) {
+  case BT_INTEGER:
+    mpf_set_z(result->value.complex.r, x->value.integer);
+    break;
+
+  case BT_REAL:
+    mpf_set(result->value.complex.r, x->value.real);
+    break;
+
+  case BT_COMPLEX:
+    mpf_set(result->value.complex.r, x->value.complex.r);
+    mpf_set(result->value.complex.i, x->value.complex.i);
+    break;
+
+  default:
+    g95_internal_error("g95_simplify_dcmplx(): Bad type (x)");
+  }
+
+  if (y != NULL) {
+    switch(y->ts.type) {
+    case BT_INTEGER:
+      mpf_set_z(result->value.complex.i, y->value.integer);
+      break;
+
+    case BT_REAL:
+      mpf_set(result->value.complex.i, y->value.real);
+      break;
+
+    default:
+      g95_internal_error("g95_simplify_dcmplx(): Bad type (y)");
+    }
+  }
+
+  return range_check(result, name);
+}
+
+
+g95_expr *g95_simplify_cmplx(g95_expr *x, g95_expr *y, g95_expr *k) {
 int kind;
+
+  if (x->expr_type != EXPR_CONSTANT ||
+      (y != NULL && y->expr_type != EXPR_CONSTANT)) return NULL;
 
   kind = get_kind(BT_REAL, k, "CMPLX", g95_default_real_kind());
   if (kind == -1) return &g95_bad_expr;
 
-  if (x->expr_type != EXPR_CONSTANT) return NULL;
-
-  if (y != NULL && y->expr_type != EXPR_CONSTANT) return NULL;
-
-  if (y == NULL) {
-    switch (x->ts.type) {
-    case BT_COMPLEX:
-      return range_check(g95_complex2complex(x, kind), "CMPLX");
-
-    case BT_INTEGER:
-      return range_check(g95_int2complex(x, kind), "CMPLX");
-
-    case BT_REAL:
-      return range_check(g95_real2complex(x, kind), "CMPLX");
-
-    default:
-      g95_error("Argument of CMPLX at %L is not a valid type", &x->where);
-      return &g95_bad_expr;
-    }
-  }
-
-  switch (x->ts.type) {
-  case BT_COMPLEX:
-    g95_error("CMPLX at %L cannot take two arguments if the first is complex",
-	      &x->where);
-    return &g95_bad_expr;
-
-  case BT_INTEGER:
-    result = g95_constant_result(BT_COMPLEX, kind);
-    result->where = x->where;
-    mpf_set_z(result->value.complex.r, x->value.integer);
-
-    if (y->ts.type == BT_INTEGER)
-      mpf_set_z(result->value.complex.i, y->value.integer);
-
-    if (y->ts.type == BT_REAL)
-      mpf_set(result->value.complex.i, y->value.real);
-
-    return range_check(result, "CMPLX");
-
-  case BT_REAL:
-    result = g95_constant_result(BT_COMPLEX, kind);
-    result->where = x->where;
-    mpf_set(result->value.complex.r, x->value.real);
-
-    if (y->ts.type == BT_INTEGER)
-      mpf_set_z(result->value.complex.i, y->value.integer);
-
-    if (y->ts.type == BT_REAL)
-      mpf_set(result->value.complex.i, y->value.real);
-
-    return range_check(result, "CMPLX");
-
-  default:
-    g95_error("Argument of CMPLX at %L is not a valid type", &x->where);
-    return &g95_bad_expr;
-  }
+  return simplify_cmplx(x, y, kind, "CMPLX");
 }
 
 
@@ -787,18 +781,12 @@ g95_expr *result;
 
 
 g95_expr *g95_simplify_dcmplx(g95_expr *x, g95_expr *y) {
-g95_expr *result;
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+  if (x->expr_type != EXPR_CONSTANT ||
+      (y != NULL && y->expr_type != EXPR_CONSTANT))
     return NULL;
 
-  result = g95_constant_result(BT_COMPLEX, g95_default_double_kind());
-  result->where = x->where;
-
-  mpf_set(result->value.complex.r, x->value.real);
-  mpf_set(result->value.complex.i, y->value.real);
-
-  return result;
+  return simplify_cmplx(x, y, g95_default_double_kind(), "DCMPLX");
 }
 
 

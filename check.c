@@ -258,6 +258,26 @@ static try dim_check(g95_expr *dim, int n, int optional) {
 
 /***** Check functions *****/
 
+try g95_check_abs(g95_expr *a) {
+
+  if (numeric_check(a, 0) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+/* g95_check_a_kind()-- Check subroutine suitable for aint, anint,
+ * ceiling, floor and nint. */
+
+try g95_check_a_kind(g95_expr *a, g95_expr *kind) {
+
+  if (type_check(a, 0, BT_REAL) == FAILURE) return FAILURE;
+  if (kind_check(kind, 1) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 try g95_check_all_any(g95_expr *mask, g95_expr *dim) {
 
   if (logical_array_check(mask, 0) == FAILURE) return FAILURE;
@@ -278,6 +298,19 @@ try g95_check_allocated(g95_expr *array) {
     must_be(array, 0, "ALLOCATABLE");
     return FAILURE;
   }
+
+  return SUCCESS;
+}
+
+
+/* Common check function where the first arugment must be real or
+ * integer and the second argument must be the same as the first. */
+
+try g95_check_a_p(g95_expr *a, g95_expr *p) {
+
+  if (int_or_real_check(a, 0) == FAILURE) return FAILURE;
+
+  if (same_type_check(a, 0, p, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -308,18 +341,6 @@ symbol_attribute attr;
 }
 
 
-/* g95_check_a_kind()-- Check subroutine suitable for aint, anint,
- * ceiling, floor and nint. */
-
-try g95_check_a_kind(g95_expr *a, g95_expr *kind) {
-
-  if (type_check(a, 0, BT_REAL) == FAILURE) return FAILURE;
-  if (kind_check(kind, 1) == FAILURE) return FAILURE;
-
-  return SUCCESS;
-}
-
-
 try g95_check_atan2(g95_expr *y, g95_expr *x) {
 
   if (type_check(y, 0, BT_REAL) == FAILURE) return FAILURE;
@@ -329,14 +350,6 @@ try g95_check_atan2(g95_expr *y, g95_expr *x) {
     must_be(x, 1, "of the same kind as 'y'");
     return FAILURE;
   }
-
-  return SUCCESS;
-}
-
-
-try g95_check_bit_size(g95_expr *i) {
-
-  if (type_check(i, 0, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -399,6 +412,23 @@ try g95_check_cshift(g95_expr *array, g95_expr *shift, g95_expr *dim) {
   }
 
   if (dim_check(dim, 2, 1) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
+try g95_check_dcmplx(g95_expr *x, g95_expr *y) {
+
+  if (numeric_check(x, 0) == FAILURE) return FAILURE;
+
+  if (y != NULL) {
+    if (numeric_check(y, 1) == FAILURE) return FAILURE;
+
+    if (x->ts.type == BT_COMPLEX) {
+      must_be(y, 1, "not be present if 'x' is COMPLEX");
+      return FAILURE;
+    }
+  }
 
   return SUCCESS;
 }
@@ -473,29 +503,22 @@ try g95_check_eoshift(g95_expr *array, g95_expr *shift, g95_expr *boundary,
 }
 
 
-try g95_check_epsilon(g95_expr *x) {
-
-  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
-
-  g95_intrinsic_extension = 0;
-
-  return SUCCESS;
-}
-
-
-try g95_check_exponent(g95_expr *x) {
-
-  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
-
-  return SUCCESS;
-}
-
 
 try g95_check_huge(g95_expr *x) {
 
   if (int_or_real_check(x, 0) == FAILURE) return FAILURE;
 
   g95_intrinsic_extension = 0;
+
+  return SUCCESS;
+}
+
+
+/* g95_check_i()-- Check that the single argument is an integer */
+
+try g95_check_i(g95_expr *i) {
+
+  if (type_check(i, 0, BT_INTEGER) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -728,16 +751,6 @@ try g95_check_min_max_double(g95_actual_arglist *arg) {
 /* End of min/max family */
 
 
-try g95_check_min_max_exponent(g95_expr *x) {
-
-  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
-
-  g95_intrinsic_extension = 0;
-
-  return SUCCESS;
-}
-
-
 try g95_check_matmul(g95_expr *matrix_a, g95_expr *matrix_b) {
 
   if ((matrix_a->ts.type != BT_LOGICAL) && !g95_numeric_ts(&matrix_b->ts)) {
@@ -834,16 +847,6 @@ try g95_check_merge(g95_expr *tsource, g95_expr *fsource, g95_expr *mask) {
   if (same_type_check(tsource, 0, fsource, 1) == FAILURE) return FAILURE;
 
   if (type_check(mask, 2, BT_LOGICAL) == FAILURE) return FAILURE;
-
-  return SUCCESS;
-}
-
-
-try g95_check_modulo(g95_expr *a, g95_expr *p) {
-
-  if (int_or_real_check(a, 0) == FAILURE) return FAILURE;
-
-  if (same_type_check(a, 0, p, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -961,6 +964,7 @@ try g95_check_range(g95_expr *x) {
   return SUCCESS;
 }
 
+
 /* real, float, sngl */
 try g95_check_real(g95_expr *a, g95_expr *kind) {
 
@@ -1053,9 +1057,6 @@ try g95_check_set_exponent(g95_expr *x, g95_expr *i) {
 
   if (type_check(i, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (kind_value_check(i, 1, g95_default_integer_kind()) == FAILURE)
-    return FAILURE;
-
   return SUCCESS;
 }
 
@@ -1143,16 +1144,6 @@ try g95_check_transpose(g95_expr *matrix) {
 }
 
 
-try g95_check_tiny(g95_expr *x) {
-
-  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
-
-  g95_intrinsic_extension = 0;
-
-  return SUCCESS;
-}
-
-
 try g95_check_ubound(g95_expr *array, g95_expr *dim) {
 
   if (array_check(array, 0) == FAILURE) return FAILURE;
@@ -1188,6 +1179,16 @@ try g95_check_verify(g95_expr *x, g95_expr *y, g95_expr *z) {
   return SUCCESS;
 }
 
+
+/* g95_check_x()-- Common check function for the half a dozen
+ * intrinsics that have a single real argument */
+
+try g95_check_x(g95_expr *x) {
+
+  if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
+
+  return SUCCESS;
+}
 
 
 /************* Check functions for intrinsic subroutines *************/
@@ -1271,4 +1272,5 @@ try g95_check_random_seed(g95_expr *harvest) {
 
   return SUCCESS;
 }
+
 

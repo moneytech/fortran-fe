@@ -27,24 +27,25 @@ extern g95_expr g95_bad_expr;
 /* Check functions for intrinsic functions */
 
 try g95_check_a_kind(g95_expr *, g95_expr *);
+try g95_check_a_p(g95_expr *, g95_expr *);
+try g95_check_abs(g95_expr *);
 
 try g95_check_all_any(g95_expr *, g95_expr *);
 try g95_check_allocated(g95_expr *);
 try g95_check_associated(g95_expr *, g95_expr *);
 try g95_check_atan2(g95_expr *, g95_expr *);
-try g95_check_bit_size(g95_expr *);
 try g95_check_btest(g95_expr *, g95_expr *);
 try g95_check_char(g95_expr *, g95_expr *);
 try g95_check_cmplx(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_count(g95_expr *, g95_expr *);
 try g95_check_cshift(g95_expr *, g95_expr *, g95_expr *);
+try g95_check_dcmplx(g95_expr *, g95_expr *);
 try g95_check_dble(g95_expr *);
 try g95_check_digits(g95_expr *);
 try g95_check_dot_product(g95_expr *, g95_expr *);
-try g95_check_epsilon(g95_expr *);
 try g95_check_eoshift(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
-try g95_check_exponent(g95_expr *);
 try g95_check_huge(g95_expr *);
+try g95_check_i(g95_expr *);
 try g95_check_iand(g95_expr *, g95_expr *);
 try g95_check_ibclr(g95_expr *, g95_expr *);
 try g95_check_ibits(g95_expr *, g95_expr *, g95_expr *);
@@ -63,12 +64,10 @@ try g95_check_min_max(g95_actual_arglist *);
 try g95_check_min_max_integer(g95_actual_arglist *);
 try g95_check_min_max_real(g95_actual_arglist *);
 try g95_check_min_max_double(g95_actual_arglist *);
-try g95_check_min_max_exponent(g95_expr *);
 try g95_check_matmul(g95_expr *, g95_expr *);
 try g95_check_merge(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_minloc_maxloc(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_minval_maxval(g95_expr *, g95_expr *, g95_expr *);
-try g95_check_modulo(g95_expr *, g95_expr *);
 try g95_check_nearest(g95_expr *, g95_expr *);
 try g95_check_null(g95_expr *);
 try g95_check_pack(g95_expr *, g95_expr *, g95_expr *);
@@ -91,10 +90,10 @@ try g95_check_spread(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_sum(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_transfer(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_transpose(g95_expr *);
-try g95_check_tiny(g95_expr *);
 try g95_check_ubound(g95_expr *, g95_expr *);
 try g95_check_unpack(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_verify(g95_expr *, g95_expr *, g95_expr *);
+try g95_check_x(g95_expr *);
 
 /* intrinsic subroutines */
 
@@ -206,21 +205,29 @@ g95_expr *g95_simplify_verify(g95_expr *, g95_expr *, g95_expr *);
 
 /* Resolution functions */
 
+void g95_resolve_abs(g95_expr *, g95_expr *);
 void g95_resolve_all(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_any(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_btest(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_dot_product(g95_expr *, g95_expr *, g95_expr *);
+void g95_resolve_dim(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_exponent(g95_expr *, g95_expr *);
+void g95_resolve_fraction(g95_expr *, g95_expr *);
 void g95_resolve_ishft(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_ishftc(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_max(g95_expr *, g95_expr *);
 void g95_resolve_maxval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_min(g95_expr *, g95_expr *);
 void g95_resolve_minval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
+void g95_resolve_mod(g95_expr *, g95_expr *, g95_expr *);
+void g95_resolve_modulo(g95_expr *, g95_expr *, g95_expr *);
+void g95_resolve_not(g95_expr *, g95_expr *);
 void g95_resolve_reshape(g95_expr *, g95_expr *, g95_expr *, g95_expr *,
 			 g95_expr *);
+void g95_resolve_rrspacing(g95_expr *, g95_expr *);
 void g95_resolve_set_exponent(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_scale(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_shape(g95_expr *, g95_expr *);
+void g95_resolve_spacing(g95_expr *, g95_expr *);
 void g95_resolve_sum(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 

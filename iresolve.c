@@ -20,7 +20,12 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-/* iresolve.c-- assign name and types to intrinsic procedures */
+/* iresolve.c-- assign name and types to intrinsic procedures.  The
+ * first argument to a resolution function is an expression pointer to
+ * the original function node and the rest are pointers to the
+ * arguments of the function call.  The result type and library
+ * subroutine name are generally set accoring to the function
+ * arguments. */
 
 #include <string.h>
 #include <stdarg.h>
@@ -107,6 +112,16 @@ int h;
 /********************** Resolution functions **********************/
 
 
+void g95_resolve_abs(g95_expr *f, g95_expr *a) {
+
+  f->ts = a->ts;
+  if (f->ts.type == BT_COMPLEX) f->ts.type = BT_REAL;
+
+  f->value.function.name =
+    get_string("__abs_%c_%d", g95_type_letter(a->ts.type), a->ts.kind);
+}
+
+
 void g95_resolve_all(g95_expr *f, g95_expr *mask, g95_expr *dim) {
 static char all0[] = "__all0", all1[] = "__all1";
 
@@ -163,6 +178,14 @@ void g95_resolve_btest(g95_expr *f, g95_expr *i, g95_expr *pos) {
 }
 
 
+void g95_resolve_dim(g95_expr *f, g95_expr *x, g95_expr *y) {
+
+  f->ts = x->ts;
+  f->value.function.name =
+    get_string("__dim_%c_%d", g95_type_letter(x->ts.type), x->ts.kind);
+}
+
+
 void g95_resolve_exponent(g95_expr *f, g95_expr *x) {
 
   f->ts.type = BT_INTEGER;
@@ -172,11 +195,18 @@ void g95_resolve_exponent(g95_expr *f, g95_expr *x) {
 }
 
 
+void g95_resolve_fraction(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name = get_string("__fraction_%d", x->ts.kind);
+}
+
+
 void g95_resolve_ishft(g95_expr *f, g95_expr *i, g95_expr *shift) {
 
   f->ts = i->ts;
-  f->value.function.name = get_string("__ishft_%d_%d", i->ts.kind,
-				      shift->ts.kind);
+  f->value.function.name =
+    get_string("__ishft_%d_%d", i->ts.kind, shift->ts.kind);
 }
 
 
@@ -254,10 +284,40 @@ void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
 }
 
 
+void g95_resolve_mod(g95_expr *f, g95_expr *a, g95_expr *p) {
+
+  f->ts = a->ts;
+  f->value.function.name =
+    get_string("__mod_%c_%d", g95_type_letter(a->ts.type), a->ts.kind);
+}
+
+
+void g95_resolve_modulo(g95_expr *f, g95_expr *a, g95_expr *p) {
+
+  f->ts = a->ts;
+  f->value.function.name =
+    get_string("__modulo_%c_%d", g95_type_letter(a->ts.type), a->ts.kind);
+}
+
+
+void g95_resolve_not(g95_expr *f, g95_expr *i) {
+
+  f->ts = i->ts;
+  f->value.function.name = get_string("__not_%d", i->ts.kind);
+}
+
+
 void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
 
   f->ts = source->ts;
+}
+
+
+void g95_resolve_rrspacing(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name = get_string("__rrspacing_%d", x->ts.kind);
 }
 
 
@@ -271,7 +331,8 @@ void g95_resolve_scale(g95_expr *f, g95_expr *x, g95_expr *y) {
 void g95_resolve_set_exponent(g95_expr *f, g95_expr *x, g95_expr *i) {
 
   f->ts = x->ts;
-  f->value.function.name = get_string("__set_exponent_%d", x->ts.kind);
+  f->value.function.name = get_string("__set_exponent_%d_%d",
+				      x->ts.kind, i->ts.kind);
 }
 
 
@@ -280,6 +341,13 @@ void g95_resolve_shape(g95_expr *f, g95_expr *source) {
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
   f->rank = 1;
+}
+
+
+void g95_resolve_spacing(g95_expr *f, g95_expr *x) {
+
+  f->ts = x->ts;
+  f->value.function.name = get_string("__spacing_%d", x->ts.kind);
 }
 
 
@@ -293,7 +361,6 @@ void g95_resolve_sum(g95_expr *f, g95_expr *array, g95_expr *dim,
   f->value.function.name =
     get_string("__sum_%c%d", g95_type_letter(array->ts.type), array->ts.kind);
 }
-
 
 
 
