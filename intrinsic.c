@@ -111,7 +111,7 @@ int i;
 
 static g95_expr *convert_constant(g95_expr *e, bt type, int kind) {
 g95_expr *g, *result, *(*f)(g95_expr *, int);
-g95_constructor *head, *c, *tail;
+g95_constructor *head, *c, *tail=NULL;
 
   switch(e->ts.type) {
   case BT_INTEGER:
