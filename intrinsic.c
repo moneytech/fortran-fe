@@ -569,9 +569,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("achar", 0, BT_CHARACTER, dc, g95_simplify_achar, NULL,
 	  i, BT_INTEGER, di, 0, NULL);
   
-  add_sym("acos",  0, BT_REAL, dr, g95_simplify_acos, not_ready,
+  add_sym("acos",  0, BT_REAL, dr, g95_simplify_acos, NULL,
 	  x, BT_REAL, dr, 0, NULL);
-  add_sym("dacos", 0, BT_REAL, dd, g95_simplify_acos, not_ready,
+  add_sym("dacos", 0, BT_REAL, dd, g95_simplify_acos, NULL,
 	  x, BT_REAL, dd, 0, NULL);
   make_generic("acos");
 
@@ -598,7 +598,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("allocated", 1, BT_LOGICAL, dl, NULL, not_ready,
 	  ar, BT_REAL, dr, 0, NULL);
 
-  add_sym("anint", 0, BT_REAL, dr, g95_simplify_anint, not_ready,
+  add_sym("anint", 0, BT_REAL, dr, g95_simplify_anint, NULL,
 	  a, BT_REAL, dr, 0,  knd, BT_INTEGER, di, 1, NULL);
   add_sym("dnint", 0, BT_REAL, dd, g95_simplify_anint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
@@ -608,9 +608,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("any", 1, BT_LOGICAL, dl, NULL, not_ready,
 	  msk, BT_LOGICAL, dl, 0, dm, BT_INTEGER, di, 1, NULL);
 
-  add_sym("asin",  0, BT_REAL, dr, g95_simplify_asin, not_ready,
+  add_sym("asin",  0, BT_REAL, dr, g95_simplify_asin, NULL,
 	  x, BT_REAL, dr, 0, NULL);
-  add_sym("dasin", 0, BT_REAL, dd, g95_simplify_asin, not_ready,
+  add_sym("dasin", 0, BT_REAL, dd, g95_simplify_asin, NULL,
 	  x, BT_REAL, dd, 0, NULL);
   make_generic("asin");
 
@@ -622,9 +622,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("datan", 0, BT_REAL, dd, NULL, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("atan");
 
-  add_sym("atan2",  0, BT_REAL, dr, g95_simplify_atan2, not_ready,
+  add_sym("atan2",  0, BT_REAL, dr, g95_simplify_atan2, NULL,
 	  y, BT_REAL, dr, 0, x, BT_REAL, dr, 0, NULL);
-  add_sym("datan2", 0, BT_REAL, dd, g95_simplify_atan2, not_ready,
+  add_sym("datan2", 0, BT_REAL, dd, g95_simplify_atan2, NULL,
 	  y, BT_REAL, dd, 0, x, BT_REAL, dd, 0, NULL);
   make_generic("atan2");
 
@@ -632,13 +632,13 @@ int di, dr, dd, dl, dc, dz;
   add_sym("bit_size", 1, BT_INTEGER, di, g95_simplify_bit_size, not_ready,
 	  i, BT_INTEGER, di, 0, NULL);
 
-  add_sym("btest", 0, BT_LOGICAL, dl, g95_simplify_btest, not_ready,
+  add_sym("btest", 0, BT_LOGICAL, dl, g95_simplify_btest, NULL,
 	  i, BT_INTEGER, di, 0, pos, BT_INTEGER, di, 0, NULL);
 
-  add_sym("ceiling", 0, BT_INTEGER, di, g95_simplify_ceiling, not_ready,
+  add_sym("ceiling", 0, BT_INTEGER, di, g95_simplify_ceiling, NULL,
 	  a, BT_REAL, dr, 0,   knd, BT_INTEGER, di, 1, NULL);
 
-  add_sym("char", 0, BT_CHARACTER, dc, g95_simplify_char, not_ready,
+  add_sym("char", 0, BT_CHARACTER, dc, g95_simplify_char, NULL,
 	  i, BT_INTEGER, di, 0,   knd, BT_INTEGER, di, 1, NULL);
 
   add_sym("cmplx", 0, BT_COMPLEX, dz, g95_simplify_cmplx, not_ready,
@@ -647,9 +647,12 @@ int di, dr, dd, dl, dc, dz;
   add_sym("conjg", 0, BT_COMPLEX, dz, g95_simplify_conjg, NULL,
 	  z, BT_COMPLEX, dz, 0, NULL);
 
-  add_sym("cos",  0, BT_REAL,    dr, NULL, NULL, x, BT_REAL,    dr, 0, NULL);
-  add_sym("dcos", 0, BT_REAL,    dd, NULL, NULL, x, BT_REAL,    dd, 0, NULL);
-  add_sym("ccos", 0, BT_COMPLEX, dz, NULL, NULL, x, BT_COMPLEX, dz, 0, NULL);
+  add_sym("cos",  0, BT_REAL,    dr, NULL, not_ready,
+	  x, BT_REAL,    dr, 0, NULL);
+  add_sym("dcos", 0, BT_REAL,    dd, NULL, not_ready,
+	  x, BT_REAL,    dd, 0, NULL);
+  add_sym("ccos", 0, BT_COMPLEX, dz, NULL, not_ready,
+	  x, BT_COMPLEX, dz, 0, NULL);
   make_generic("cos");
 
   add_sym("cosh",  0, BT_REAL, dr, NULL, NULL, x, BT_REAL, dr, 0, NULL);
@@ -700,7 +703,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("epsilon", 1, BT_REAL, dd, g95_simplify_epsilon, NULL,
 	  x, BT_REAL, dd, 0, NULL);
 
-  make_generic("epsilon");
+  make_generic("epsilon");   /* Needs check function */
 
   add_sym("exp",  0, BT_REAL,    dr, g95_simplify_exp, NULL,
 	  x, BT_REAL, dr, 0, NULL);
@@ -711,7 +714,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("exponent", 0, BT_INTEGER, di, g95_simplify_exponent, NULL,
 	  x, BT_REAL, dr, 0, NULL);
 
-  add_sym("floor", 0, BT_INTEGER, di, g95_simplify_floor, not_ready,
+  add_sym("floor", 0, BT_INTEGER, di, g95_simplify_floor, NULL,
 	  a, BT_REAL, dr, 0, knd, BT_INTEGER, di, 1, NULL);
 
   add_sym("fraction", 0, BT_REAL, dr, g95_simplify_fraction, NULL,
@@ -729,7 +732,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("huge", 1, BT_INTEGER, di, g95_simplify_huge, NULL,
 	  x, BT_INTEGER, di, 0,  NULL);
 
-  make_generic("huge");
+  make_generic("huge");  /* Needs check function */
 
   add_sym("iachar", 0, BT_INTEGER, di, g95_simplify_iachar, NULL,
 	  c, BT_CHARACTER, dc, 0, NULL);
@@ -737,17 +740,17 @@ int di, dr, dd, dl, dc, dz;
   add_sym("iand", 0, BT_INTEGER, di, g95_simplify_iand, NULL,
 	  i, BT_INTEGER, di, 0, j, BT_INTEGER, di, 0, NULL);
 
-  add_sym("ibclr", 0, BT_INTEGER, di, g95_simplify_ibclr, not_ready,
+  add_sym("ibclr", 0, BT_INTEGER, di, g95_simplify_ibclr, NULL,
 	  i, BT_INTEGER, di, 0, pos, BT_INTEGER, di, 0, NULL);
 
-  add_sym("ibits", 0, BT_INTEGER, di, g95_simplify_ibits, not_ready,
+  add_sym("ibits", 0, BT_INTEGER, di, g95_simplify_ibits, NULL,
 	  i, BT_INTEGER, di, 0,   pos, BT_INTEGER, di, 0,
 	  ln, BT_INTEGER, di, 0, NULL);
 
-  add_sym("ibset", 0, BT_INTEGER, di, g95_simplify_ibset, not_ready,
+  add_sym("ibset", 0, BT_INTEGER, di, g95_simplify_ibset, NULL,
 	  i, BT_INTEGER, di, 0, pos, BT_INTEGER, di, 0, NULL);
 
-  add_sym("ichar", 0, BT_INTEGER, di, g95_simplify_ichar, not_ready,
+  add_sym("ichar", 0, BT_INTEGER, di, g95_simplify_ichar, NULL,
 	  c, BT_CHARACTER, dc, 0, NULL);
 
   add_sym("ieor", 0, BT_INTEGER, di, g95_simplify_ieor, NULL,
@@ -768,16 +771,16 @@ int di, dr, dd, dl, dc, dz;
   add_sym("ior", 0, BT_INTEGER, di, g95_simplify_ior, NULL,
 	  i, BT_INTEGER, di, 0, j, BT_INTEGER, di, 0, NULL);
 
-  add_sym("ishft", 0, BT_INTEGER, di, g95_simplify_ishft, not_ready,
+  add_sym("ishft", 0, BT_INTEGER, di, g95_simplify_ishft, NULL,
 	  i, BT_INTEGER, di, 0, sh, BT_INTEGER, di, 0, NULL);
 
-  add_sym("ishftc", 0, BT_INTEGER, di, g95_simplify_ishftc, not_ready,
+  add_sym("ishftc", 0, BT_INTEGER, di, g95_simplify_ishftc, NULL,
 	  i, BT_INTEGER, di, 0,  sh, BT_INTEGER, di, 0,
 	  sz, BT_INTEGER, di, 1, NULL);
 
 /* KAH Input can be any type, or an array of any type */
 
-  add_sym("kind", 1, BT_INTEGER, di, g95_simplify_kind, 
+  add_sym("kind", 1, BT_INTEGER, di, g95_simplify_kind,
 	  check_kind_intrinsic, x, BT_REAL, dr, 0, NULL);
 
 /* KAH Array input, output can be an array */
@@ -821,7 +824,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("log10");
 
 /* KAH knd (optional) must be a valid logical kind */
-  add_sym("logical", 0, BT_LOGICAL, dl, g95_simplify_logical, not_ready,
+  add_sym("logical", 0, BT_LOGICAL, dl, g95_simplify_logical, NULL,
 	  l, BT_LOGICAL, dl, 0,	  knd, BT_INTEGER, di, 1, NULL);
 
 /* KAH Takes and returns arrays of any numeric or logical type */
@@ -847,7 +850,7 @@ int di, dr, dd, dl, dc, dz;
 
 /* KAH Takes scalar or array input */
   add_sym("maxexponent", 1, BT_INTEGER, di, g95_simplify_maxexponent,
-	  not_ready, x, BT_REAL, dr, 0, NULL);
+	  NULL, x, BT_REAL, dr, 0, NULL);
 
 /* KAH Takes array argument of type integer or real.  The type of the
  * second argument must be checked to decide if it's dm or msk if called
@@ -908,10 +911,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym("modulo", 0, BT_INTEGER, di, g95_simplify_modulo, not_ready,
 	  a, BT_INTEGER, di, 0, p, BT_INTEGER, di, 0, NULL);
 
-  add_sym("nearest", 0, BT_REAL, dr, g95_simplify_nearest, not_ready,
+  add_sym("nearest", 0, BT_REAL, dr, g95_simplify_nearest, NULL,
 	  x, BT_REAL, dr, 0, s, BT_REAL, dr, 0, NULL);
 
-  add_sym("nint",   0, BT_INTEGER, di, g95_simplify_nint, not_ready,
+  add_sym("nint",   0, BT_INTEGER, di, g95_simplify_nint, NULL,
 	  a, BT_REAL, dr, 0,   knd, BT_INTEGER, di, 1, NULL);
   add_sym("idnint", 0, BT_INTEGER, di, g95_simplify_nint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
@@ -940,7 +943,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("precision",1, BT_INTEGER, di, g95_simplify_precision, NULL,
 	  x, BT_COMPLEX, dd, 0, NULL);
 
-  make_generic("precision");
+  make_generic("precision");  /* Needs check function */
 
 /* KAH Takes any type, including pointer */
   add_sym("present", 1, BT_LOGICAL, dl, NULL, not_ready,
@@ -962,7 +965,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("radix", 1, BT_INTEGER, di, g95_simplify_radix, NULL,
 	  x, BT_REAL, dd, 0, NULL);
 
-  make_generic("radix");
+  make_generic("radix");   /* Needs check function */
 
 
   add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, NULL,
@@ -983,7 +986,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, NULL,
 	  x, BT_COMPLEX, dd, 0, NULL);
 
-  make_generic("range");
+  make_generic("range");   /* Needs check function */
 
 
   add_sym("real",  0, BT_REAL, dr, g95_simplify_real, check_real,
@@ -1009,13 +1012,13 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("scan", 0, BT_INTEGER, di, g95_simplify_scan, not_ready,
 	  stg, BT_CHARACTER, dc, 0,  set, BT_CHARACTER, dc, 0,
-	  bck, BT_LOGICAL, dl, 1, NULL);    
+	  bck, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym("selected_int_kind", 1, BT_INTEGER, di, 
+  add_sym("selected_int_kind", 1, BT_INTEGER, di,
 	  g95_simplify_selected_int_kind, check_selected_int_kind,
 	  r, BT_INTEGER, di, 0, NULL);
 
-  add_sym("selected_real_kind", 1, BT_INTEGER, di, 
+  add_sym("selected_real_kind", 1, BT_INTEGER, di,
 	  g95_simplify_selected_real_kind, check_selected_real_kind,
 	  p, BT_INTEGER, di, 1, r, BT_INTEGER, di, 1, NULL);
 
