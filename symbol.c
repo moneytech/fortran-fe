@@ -2365,16 +2365,17 @@ void g95_traverse_user_op(g95_namespace *ns, void (*func)(g95_user_op *)) {
 
 static void save_symbol(g95_symbol *sym) {
 
-  if (sym->attr.common &&
-      g95_add_saved_common(&sym->attr, NULL) == FAILURE) goto fatal;
+  if (sym->attr.use_assoc) return;
+
+  if (sym->attr.common) {
+    g95_add_saved_common(&sym->attr, NULL);
+    return;
+  }
 
   if (sym->attr.in_common || sym->attr.dummy ||
       sym->attr.flavor != FL_VARIABLE) return;
 
-  if (g95_add_save(&sym->attr, NULL) == SUCCESS) return;
-
-fatal:
-  g95_internal_error("save_symbol(): Tried to save the unsaveable!");
+  g95_add_save(&sym->attr, NULL);
 }
 
 
