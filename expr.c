@@ -1141,13 +1141,19 @@ match m;
 }
 
 
+/* check_intrinsic_op()-- Check an intrinsic arithmetic operation to
+ * see if it is consistent with some type of expression. */
 
-/* check_init_intrinsic()-- Check an intrinsic arithmetic operation to
- * see if it is consistent with an initialization expression. */
+static try check_init_expr(g95_expr *);
+static try check_spec_expr(g95_expr *);
 
-static try check_init_intrinsic(g95_expr *e) {
+static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
+char *expr_type;
+ 
+  if ((*check_function)(e->op1) == FAILURE) return FAILURE;
 
-  if (g95_check_init_expr(e->op1) == FAILURE) return FAILURE;
+  if (check_function == check_init_expr) expr_type = "initialization";
+  if (check_function == check_spec_expr) expr_type = "specification";
 
   switch(e->operator) {
   case INTRINSIC_UPLUS:
@@ -1160,15 +1166,15 @@ static try check_init_intrinsic(g95_expr *e) {
 
   case INTRINSIC_PLUS:    case INTRINSIC_MINUS:  case INTRINSIC_TIMES:
   case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:
-
-    if (g95_check_init_expr(e->op2) == FAILURE) return FAILURE;
+    if ((*check_function)(e->op2) == FAILURE) return FAILURE;
 
     if (g95_numeric_ts(&e->op1->ts) == 0 ||
 	g95_numeric_ts(&e->op2->ts) == 0) goto not_numeric;
 
     if (e->operator != INTRINSIC_POWER) break;
     
-    if (e->op2->ts.type != BT_INTEGER) {
+    if (check_function == check_init_expr &&
+	e->op2->ts.type != BT_INTEGER) {
       g95_error("Exponent at %L must be INTEGER for an initialization "
 		"expression", &e->op2->where);
       return FAILURE;
@@ -1177,11 +1183,11 @@ static try check_init_intrinsic(g95_expr *e) {
     break;
 
   case INTRINSIC_CONCAT:
-    if (g95_check_init_expr(e->op2) == FAILURE) return FAILURE;
+    if ((*check_function)(e->op2) == FAILURE) return FAILURE;
 
     if (e->op1->ts.type != BT_CHARACTER || e->op2->ts.type != BT_CHARACTER) {
-      g95_error("Concatenation operator in initialization expression at %L "
-		"must have two CHARACTER operands", &e->op1->where);
+      g95_error("Concatenation operator in %s expression at %L "
+		"must have two CHARACTER operands", expr_type, &e->op1->where);
       return FAILURE;
     }
 
@@ -1195,8 +1201,8 @@ static try check_init_intrinsic(g95_expr *e) {
 
   case INTRINSIC_NOT:
     if (e->op1->ts.type != BT_LOGICAL) {
-      g95_error(".NOT. operator in initialization expression at %L must have "
-		"a LOGICAL operand", &e->op1->where);
+      g95_error(".NOT. operator in %s expression at %L must have "
+		"a LOGICAL operand", expr_type, &e->op1->where);
       return FAILURE;
     }
 
@@ -1204,33 +1210,33 @@ static try check_init_intrinsic(g95_expr *e) {
 
   case INTRINSIC_AND:    case INTRINSIC_OR:
   case INTRINSIC_EQV:    case INTRINSIC_NEQV:
-    if (g95_check_init_expr(e->op2) == FAILURE) return FAILURE;
+    if ((*check_function)(e->op2) == FAILURE) return FAILURE;
 
     if (e->op1->ts.type != BT_LOGICAL || e->op2->ts.type != BT_LOGICAL) {
-      g95_error("Initialization expression at %L requires LOGICAL operands",
-		&e->where);
+      g95_error("LOGICAL operands are required in %s expression at %L",
+		expr_type, &e->where);
       return FAILURE;
     }
 
     break;
 
   default:
-    g95_error("Initialization expression at %L must use only intrinsic "
-	      "operators", &e->where);
+    g95_error("Only intrinsic operators can be used in %s expression at %L",
+	      expr_type, &e->where);
     return FAILURE;
   }
 
   return SUCCESS;
 
 not_numeric:
-  g95_error("Initialization expression at %L requires numeric operands",
-	    &e->where);
+  g95_error("Numeric operands are required in %s expression at %L",
+	    expr_type, &e->where);
 
   return FAILURE;
 }
 
 
-/* g95_check_init_expr()-- Verify that an expression is an
+/* check_init_expr()-- Verify that an expression is an
  * initialization expression.  A side effect is that the expression
  * tree is reduced to a single constant node if all goes well.  This
  * would normally happen when the expression is constructed but
@@ -1238,7 +1244,7 @@ not_numeric:
  * initialization expressions.  If FAILURE is returned an error
  * message has been generated. */
 
-try g95_check_init_expr(g95_expr *e) {
+static try check_init_expr(g95_expr *e) {
 g95_actual_arglist *ap;
 match m;
 try t;
@@ -1247,7 +1253,7 @@ try t;
 
   switch(e->expr_type) {
   case EXPR_OP:
-    t = check_init_intrinsic(e);
+    t = check_intrinsic_op(e, check_init_expr);
     if (t == SUCCESS) simplify_expr(e);
 
     break;
@@ -1256,7 +1262,7 @@ try t;
     t = SUCCESS;
 
     for(ap=e->value.function.actual; ap; ap=ap->next)
-      if (g95_check_init_expr(ap->expr) == FAILURE) {
+      if (check_init_expr(ap->expr) == FAILURE) {
 	t = FAILURE;
 	break;
       }
@@ -1284,20 +1290,20 @@ try t;
     break;
 
   case EXPR_SUBSTRING:
-    t = g95_check_init_expr(e->op1);
+    t = check_init_expr(e->op1);
     if (t == FAILURE) break;
 
-    t = g95_check_init_expr(e->op2);
+    t = check_init_expr(e->op2);
     if (t == SUCCESS) simplify_expr(e);
 
     break;
 
   case EXPR_STRUCTURE:
-    t = g95_check_constructor(e, 0, g95_check_init_expr);
+    t = g95_check_constructor(e, 0, check_init_expr);
     break;
 
   case EXPR_ARRAY:
-    t = g95_check_constructor(e, 1, g95_check_init_expr);
+    t = g95_check_constructor(e, 1, check_init_expr);
     break;
   }
 
@@ -1315,13 +1321,127 @@ match m;
   m = g95_match_expr(&expr);
   if (m != MATCH_YES) return m;
 
-  if (g95_check_init_expr(expr) == FAILURE) return MATCH_ERROR;
+  if (check_init_expr(expr) == FAILURE) {
+    g95_free_expr(expr);
+    return MATCH_ERROR;
+  }
 
   if (!is_constant_expr(expr))
     g95_internal_error("Initialization expression didn't reduce %C");
 
   *result = expr;
 
+  return MATCH_YES;
+}
+
+
+/* check_spec_expr()-- Verify that an expression is a
+ * specification expression.  Like it's cousin check_init_expr(),
+ * an error message is generated if we return FAILURE. */
+
+try check_spec_expr(g95_expr *e) {
+g95_actual_arglist *ap;
+g95_symbol *sym;
+match m;
+try t;
+
+  if (e == NULL) return SUCCESS;
+
+  switch(e->expr_type) {
+  case EXPR_OP:
+    t = check_intrinsic_op(e, check_spec_expr);
+    if (t == SUCCESS) simplify_expr(e);
+
+    break;
+
+  case EXPR_FUNCTION:
+    t = SUCCESS;
+
+    for(ap=e->value.function.actual; ap; ap=ap->next)
+      if (check_spec_expr(ap->expr) == FAILURE) {
+	t = FAILURE;
+	break;
+      }
+
+    if (t == SUCCESS) {
+      m = g95_intrinsic_func_interface(e);
+
+      if (m == MATCH_NO)
+	g95_error("Function '%s' in specification expression at %L "
+		  "must be an intrinsic function", e->symbol->name, &e->where);
+
+      if (m != MATCH_YES) t = FAILURE;
+    }
+
+    break;
+
+  case EXPR_VARIABLE:
+    sym = e->symbol;
+    t = FAILURE;
+    
+    if (sym->attr.optional) {
+      g95_error("Dummy argument '%s' at %L cannot be OPTIONAL",
+		sym->name, &e->where);
+      break;
+    }
+
+    if (sym->attr.intent == INTENT_OUT) {
+      g95_error("Dummy argument '%s' at %L cannot be INTENT(OUT)",
+		sym->name, &e->where);
+      break;
+    }
+
+    if (sym->attr.use_assoc || sym->ns != g95_current_ns) {
+      t = SUCCESS;
+      break;
+    }
+
+    g95_error("Variable '%s' cannot appear in the specification expression ",
+	      "at %L", sym->name, &e->where);
+
+    break;
+
+  case EXPR_CONSTANT:
+    t = SUCCESS;
+    break;
+
+  case EXPR_SUBSTRING:
+    t = check_spec_expr(e->op1);
+    if (t == FAILURE) break;
+
+    t = check_spec_expr(e->op2);
+    if (t == SUCCESS) simplify_expr(e);
+
+    break;
+
+  case EXPR_STRUCTURE:
+    t = g95_check_constructor(e, 0, check_spec_expr);
+    break;
+
+  case EXPR_ARRAY:
+    t = g95_check_constructor(e, 1, check_spec_expr);
+    break;
+  }
+
+  return t;
+}
+
+
+/* g95_match_spec_expr()-- Match a specification expression. */
+
+match g95_match_spec_expr(g95_expr **result) {
+g95_expr *expr;
+match m;
+
+  m = g95_match_expr(&expr); 
+  if (m != MATCH_YES) return m;
+
+  if (check_spec_expr(expr) == FAILURE) {
+    g95_free_expr(expr);
+    return MATCH_ERROR;
+  }
+
+  *result = expr;
   return MATCH_YES;
 }
 

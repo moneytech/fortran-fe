@@ -1200,8 +1200,6 @@ g95_expr *g95_logical_expr(int, locus *);
 g95_code *g95_build_call(g95_symbol *, ...);
 g95_expr *g95_copy_expr(g95_expr *);
 
-try g95_check_init_expr(g95_expr *);
-
 void g95_show_expr(g95_expr *);
 
 int g95_numeric_ts(g95_typespec *);
