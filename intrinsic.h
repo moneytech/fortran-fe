@@ -66,7 +66,7 @@ try g95_check_min_max_real(g95_actual_arglist *);
 try g95_check_min_max_double(g95_actual_arglist *);
 try g95_check_matmul(g95_expr *, g95_expr *);
 try g95_check_merge(g95_expr *, g95_expr *, g95_expr *);
-try g95_check_minloc_maxloc(g95_expr *, g95_expr *, g95_expr *);
+try g95_check_minloc_maxloc(g95_actual_arglist *);
 try g95_check_minval_maxval(g95_expr *, g95_expr *, g95_expr *);
 try g95_check_nearest(g95_expr *, g95_expr *);
 try g95_check_null(g95_expr *);
@@ -261,6 +261,7 @@ void g95_resolve_minval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_min_max(g95_expr *, g95_intrinsic_sym *, g95_expr *);
 void g95_resolve_mod(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_modulo(g95_expr *, g95_expr *, g95_expr *);
+void g95_resolve_nearest(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_nint(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_not(g95_expr *, g95_expr *);
 void g95_resolve_pack(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
@@ -297,110 +298,6 @@ void g95_resolve_cpu_time(g95_code *);
 void g95_resolve_random_number(g95_code *);
 
 
-/* Enumeration of all the generic intrinsic functions.  Used by the backend
-   for identification of a function.  */
-enum g95_generic_isym_id {
-  /* G95_ISYM_NONE is used for intrinsics which will never be seen by the
-     backend (eg. KIND).  */
-  G95_ISYM_NONE = 0,
-  G95_ISYM_ABS,
-  G95_ISYM_ACHAR,
-  G95_ISYM_ACOS,
-  G95_ISYM_ADJUSTL,
-  G95_ISYM_ADJUSTR,
-  G95_ISYM_AIMAG,
-  G95_ISYM_AINT,
-  G95_ISYM_ANINT,
-  G95_ISYM_ALL,
-  G95_ISYM_ALLOCATED,
-  G95_ISYM_ANINIT,
-  G95_ISYM_ANY,
-  G95_ISYM_ASIN,
-  G95_ISYM_ASSOCIATED,
-  G95_ISYM_ATAN,
-  G95_ISYM_ATAN2,
-  G95_ISYM_BTEST,
-  G95_ISYM_CEILING,
-  G95_ISYM_CHAR,
-  G95_ISYM_CMPLX,
-  G95_ISYM_CONJG,
-  G95_ISYM_COS,
-  G95_ISYM_COSH,
-  G95_ISYM_COUNT,
-  G95_ISYM_CSHIFT,
-  G95_ISYM_DBLE,
-  G95_ISYM_DIM,
-  G95_ISYM_DOT_PRODUCT,
-  G95_ISYM_DPROD,
-  G95_ISYM_EOSHIFT,
-  G95_ISYM_EXP,
-  G95_ISYM_EXPONENT,
-  G95_ISYM_FLOOR,
-  G95_ISYM_FRACTION,
-  G95_ISYM_IACHAR,
-  G95_ISYM_IAND,
-  G95_ISYM_IARGC,
-  G95_ISYM_IBCLR,
-  G95_ISYM_IBITS,
-  G95_ISYM_IBSET,
-  G95_ISYM_ICHAR,
-  G95_ISYM_IEOR,
-  G95_ISYM_INDEX,
-  G95_ISYM_INT,
-  G95_ISYM_IOR,
-  G95_ISYM_ISHFT,
-  G95_ISYM_ISHFTC,
-  G95_ISYM_LBOUND,
-  G95_ISYM_LEN,
-  G95_ISYM_LEN_TRIM,
-  G95_ISYM_LGE,
-  G95_ISYM_LGT,
-  G95_ISYM_LLE,
-  G95_ISYM_LLT,
-  G95_ISYM_LOG,
-  G95_ISYM_LOG10,
-  G95_ISYM_LOGICAL,
-  G95_ISYM_MATMUL,
-  G95_ISYM_MAX,
-  G95_ISYM_MAXLOC,
-  G95_ISYM_MAXVAL,
-  G95_ISYM_MERGE,
-  G95_ISYM_MIN,
-  G95_ISYM_MINLOC,
-  G95_ISYM_MINVAL,
-  G95_ISYM_MOD,
-  G95_ISYM_MODULO,
-  G95_ISYM_NEAREST,
-  G95_ISYM_NINT,
-  G95_ISYM_NOT,
-  G95_ISYM_PACK,
-  G95_ISYM_PRESENT,
-  G95_ISYM_PRODUCT,
-  G95_ISYM_REAL,
-  G95_ISYM_REPEAT,
-  G95_ISYM_RESHAPE,
-  G95_ISYM_SCAN,
-  G95_ISYM_SELECTED_INT_KIND,
-  G95_ISYM_SELECTED_REAL_KIND,
-  G95_ISYM_SET_EXPONENT,
-  G95_ISYM_SHAPE,
-  G95_ISYM_SIGN,
-  G95_ISYM_SIN,
-  G95_ISYM_SINH,
-  G95_ISYM_SIZE,
-  G95_ISYM_SPREAD,
-  G95_ISYM_SQRT,
-  G95_ISYM_SUM,
-  G95_ISYM_TAN,
-  G95_ISYM_TANH,
-  G95_ISYM_TRANSFER,
-  G95_ISYM_TRANSPOSE,
-  G95_ISYM_TRIM,
-  G95_ISYM_UBOUND,
-  G95_ISYM_UNPACK,
-  G95_ISYM_VERIFY,
-  G95_ISYM_CONVERSION
-};
 
 /* The mvbits() subroutine requires the most arguments-- five. */
 

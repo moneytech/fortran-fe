@@ -59,6 +59,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
       N_("Try to layout derived types as compact as possible") },
 { "-fmax-stack-var-size=<n>",
       N_("Size in bytes of the largest array that will be put on the stack") },
+{ "-fbounds-check",
+      N_("Check array bounds at runtime") },
 { "-i8",
       N_("Set the default integer kind to double precision") },
 { "-pedantic",

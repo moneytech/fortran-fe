@@ -54,12 +54,13 @@ STAMP = echo timestamp >
 # this is in addition to th warning flags defined by default
 f95-warn = -Wno-write-strings
 
-F95_PARSER_OBJS = f95/arith.o f95/array.o f95/bbt.o f95/check.o f95/data.o \
-    f95/decl.o f95/error.o f95/expr.o f95/format.o f95/interface.o	   \
-    f95/intrinsic.o f95/io.o f95/iresolve.o f95/match.o f95/matchexp.o	   \
-    f95/misc.o f95/module.o f95/parse.o f95/primary.o f95/options.o	   \
-    f95/resolve.o f95/scalarize.o f95/scanner.o f95/select.o		   \
-    f95/simplify.o f95/st.o f95/symbol.o
+F95_PARSER_OBJS = f95/arith.o f95/array.o f95/assign.o f95/bbt.o	\
+    f95/check.o f95/data.o f95/decl.o f95/error.o f95/expr.o		\
+    f95/format.o f95/interface.o f95/intrinsic.o f95/io.o 		\
+    f95/iresolve.o f95/match.o f95/matchexp.o f95/misc.o f95/module.o	\
+    f95/parse.o f95/primary.o f95/options.o f95/resolve.o		\
+    f95/scalarize.o f95/scanner.o f95/select.o f95/simplify.o f95/st.o	\
+    f95/symbol.o
 
 F95_OBJS = $(F95_PARSER_OBJS)						\
     f95/f95-lang.o f95/support.o f95/convert.o f95/trans.o		\
@@ -216,8 +217,7 @@ $(F95_PARSER_OBJS): f95/g95.h f95/intrinsic.h
 
 G95_TRANS_DEPS = f95/g95.h f95/intrinsic.h f95/trans.h
 
-f95/f95-lang.o: $(G95_TRANS_DEPS) f95/g95-support.h gt-f95-f95-lang.h \
-    gtype-f95.h
+f95/f95-lang.o: $(G95_TRANS_DEPS) f95/g95-support.h gtype-f95.h
 f95/f95-tree.c: f95/g95.h f95/trans.h
 f95/support.o: $(G95_TRANS_DEPS) f95/g95-support.h
 f95/convert.o: $(G95_TRANS_DEPS) f95/g95-support.h
@@ -229,5 +229,5 @@ f95/trans-expr.o: $(G95_TRANS_DEPS)
 f95/trans-stmt.o: $(G95_TRANS_DEPS)
 f95/trans-io.o: $(G95_TRANS_DEPS) gt-f95-trans-io.h
 f95/trans-array.o: $(G95_TRANS_DEPS)
-f95/trans-intrinsic.o: $(G95_TRANS_DEPS) gt-f95-trans-intrinsic.h
+f95/trans-intrinsic.o: $(G95_TRANS_DEPS)
 f95/dependency.o: f95/g95.h f95/dependency.h

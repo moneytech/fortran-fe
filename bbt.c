@@ -1,4 +1,4 @@
- 
+          
 /* Copyright (C) 2000-2002 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
@@ -17,8 +17,8 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */      
-      
+Boston, MA 02111-1307, USA.  */  
+  
 /* bbt.c -- Implement a balanced binary trees using treaps.  The idea
  * is to balance the tree using pseudorandom numbers.  The main
  * constraint on this implementation is that we have several distinct
@@ -35,153 +35,153 @@ Boston, MA 02111-1307, USA.  */
  * know how long the structure is.
  *
  * This implementation is based on Stefan Nilsson's article in the
- * July 1997 Doctor Dobb's Journal, "Treaps in Java". */   
-   
+ * July 1997 Doctor Dobb's Journal, "Treaps in Java". */    
+    
 #include "g95.h"
-
-
-typedef struct g95_treap {          
-  BBT_HEADER(g95_treap)      
+     
+     
+typedef struct g95_treap {   
+  BBT_HEADER(g95_treap)    
 } g95_bbt;        
         
         
-       
-       
-/* rotate_right()-- Rotate the treap right */        
-        
-static g95_bbt *rotate_right(g95_bbt *j) {       
-g95_bbt *t0;       
-       
-  t0 = j->left;         
-  j->left = j->left->right;
-  t0->right = j;  
-  
-  return t0; 
-}   
-   
-   
-     
-     
-/* rotate_left()-- Rotate the treap left */   
-   
-static g95_bbt *rotate_left(g95_bbt *a) {       
-g95_bbt *temp;         
-         
-  temp =  a->right;      
-  a->right = a->right->left;   
-  temp->left = a;   
-   
-  return temp;         
-}    
-    
-    
-
-
-/* insert()-- Recursive insertion function.  Returns the updated treap. */  
-  
-static g95_bbt *insert(g95_bbt *n, g95_bbt *g, int (*compare)()) { 
-int x;
-
-  if (g == NULL) return n; 
- 
-  x = (*compare)(n, g);   
-   
-  if (x < 0) { 
-    g->left = insert(n, g->left, compare);      
-    if (g->priority < g->left->priority) g = rotate_right(g);          
-  }    
-    
-  if (x > 0) {
-    g->right = insert(n, g->right, compare);   
-    if (g->priority < g->right->priority) g = rotate_left(g);        
-  }       
-       
-  if (x == 0) g95_internal_error("insert(): Duplicate key found!"); 
- 
-  return g;      
-}  
   
   
-         
-         
-/* pseudo_random()-- Simple linear congruential pseudorandom number
- * generator.  The period of this generator is 44071, which is plenty
- * for our purposes.  */       
-       
-static int pseudo_random(void) {      
-static int f=5341;      
-      
-  f = (22611*f + 10) % 44071;         
-  return f;
-} 
+/* rotate_left()-- Rotate the treap left */  
+  
+static g95_bbt *rotate_left(g95_bbt *j) {          
+g95_bbt *tmp; 
  
- 
- 
- 
-/* g95_insert_bbt()-- Given root pointer, a new node and a
- * comparison function, insert the new node into the treap.  It is an
- * error to insert a key that already exists. */      
-      
-void g95_insert_bbt(void *root, void *old, int (*compare)()) {   
-g95_bbt **w, *i;         
-         
-  w = (g95_bbt **) root;         
-  i = (g95_bbt *) old;   
-   
-  i->priority = pseudo_random();       
-  *w = insert(i, *w, compare);       
-}     
+  tmp =  j->right;    
+  j->right = j->right->left; 
+  tmp->left = j;     
      
-     
-          
-          
-static g95_bbt *delete_root(g95_bbt *m) { 
-g95_bbt *t0;   
-   
-  if (m->left == NULL) return m->right;  
-  if (m->right == NULL) return m->left; 
- 
-  if (m->left->priority > m->right->priority) {          
-    t0 = rotate_right(m);        
-    t0->right = delete_root(m);         
-  } else {      
-    t0 = rotate_left(m);      
-    t0->left = delete_root(m);     
-  }
-
-  return t0;          
+  return tmp;  
 }       
        
        
+ 
+ 
+/* rotate_right()-- Rotate the treap right */  
+  
+static g95_bbt *rotate_right(g95_bbt *p) { 
+g95_bbt *temp;     
+     
+  temp = p->left; 
+  p->left = p->left->right;         
+  temp->right = p;     
+     
+  return temp; 
+}  
+  
+  
+        
+        
+/* insert()-- Recursive insertion function.  Returns the updated treap. */     
+     
+static g95_bbt *insert(g95_bbt *old, g95_bbt *e, int (*compare)()) {  
+int z;        
+        
+  if (e == NULL) return old; 
+ 
+  z = (*compare)(old, e);     
+     
+  if (z < 0) {  
+    e->left = insert(old, e->left, compare);      
+    if (e->priority < e->left->priority) e = rotate_right(e);  
+  } 
+ 
+  if (z > 0) {          
+    e->right = insert(old, e->right, compare);  
+    if (e->priority < e->right->priority) e = rotate_left(e);          
+  }        
+        
+  if (z == 0) g95_internal_error("insert(): Duplicate key found!");    
+    
+  return e;
+}          
+          
+          
+  
+  
+static g95_bbt *delete_root(g95_bbt *w) {          
+g95_bbt *temp;   
    
-   
+  if (w->left == NULL) return w->right;         
+  if (w->right == NULL) return w->left;         
+         
+  if (w->left->priority > w->right->priority) {
+    temp = rotate_right(w); 
+    temp->right = delete_root(w);  
+  } else {
+    temp = rotate_left(w);     
+    temp->left = delete_root(w);    
+  }    
+    
+  return temp;   
+}         
+         
+         
+     
+     
 /* delete_treap()-- Delete an element from a tree.  The 'old' value
  * does not necessarily have to point to the element to be deleted, it
  * must just point to a treap structure with the key to be deleted.
- * Returns the new root node of the tree. */  
-  
-static g95_bbt *delete_treap(g95_bbt *o, g95_bbt *t,       
-			     int (*compare)()) {   
-int x;          
+ * Returns the new root node of the tree. */          
           
-  if (t == NULL) return NULL;     
-    
-  x = compare(o, t);        
+static g95_bbt *delete_treap(g95_bbt *n, g95_bbt *m,     
+			     int (*compare)()) { 
+int i;      
+      
+  if (m == NULL) return NULL;         
         
-  if (x < 0) t->left = delete_treap(o, t->left, compare);     
-  if (x > 0) t->right = delete_treap(o, t->right, compare);         
-  if (x == 0) t = delete_root(t); 
- 
-  return t;          
-}   
-   
-   
+  i = compare(n, m);    
     
-    
-void g95_delete_bbt(void *root, void *n, int (*compare)()) {         
-g95_bbt **s;     
-     
-  s = (g95_bbt **) root;         
-        
-  *s = delete_treap((g95_bbt *) n, *s, compare);      
+  if (i < 0) m->left = delete_treap(n, m->left, compare);     
+  if (i > 0) m->right = delete_treap(n, m->right, compare);        
+  if (i == 0) m = delete_root(m);      
+      
+  return m;   
 }         
+         
+         
+        
+        
+/* pseudo_random()-- Simple linear congruential pseudorandom number
+ * generator.  The period of this generator is 44071, which is plenty
+ * for our purposes.  */   
+   
+static int pseudo_random(void) {          
+static int f=5341;      
+      
+  f = (22611*f + 10) % 44071;      
+  return f;          
+}
+
+
+         
+         
+/* g95_insert_bbt()-- Given root pointer, a new node and a
+ * comparison function, insert the new node into the treap.  It is an
+ * error to insert a key that already exists. */ 
+ 
+void g95_insert_bbt(void *root, void *old, int (*compare)()) {   
+g95_bbt **w, *e;    
+    
+  w = (g95_bbt **) root; 
+  e = (g95_bbt *) old;          
+          
+  e->priority = pseudo_random();  
+  *w = insert(e, *w, compare);         
+}  
+  
+  
+   
+   
+void g95_delete_bbt(void *root, void *old, int (*compare)()) {   
+g95_bbt **s;        
+        
+  s = (g95_bbt **) root;      
+     
+  *s = delete_treap((g95_bbt *) old, *s, compare);     
+}   

@@ -12,7 +12,9 @@ This file is licensed under the GPL.
   {".f",     "@f95", 0},
   {".F",     "@f95", 0},
   {".f90",   "@f95", 0},
+  {".F90",   "@f95", 0},
   {".f95",   "@f95", 0},
+  {".F95",   "@f95", 0},
   {"@f95",
    "%{!M:%{!MM:%{!E:f951 %i %(cc1_options) %{I*}\
          %{!fsyntax-only:%(invoke_as)}}}}", 0},
