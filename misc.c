@@ -437,6 +437,11 @@ int i;
     return 1;
   }
 
+  if (strcmp(option, "-fpack-derived") == 0) {
+    g95_option.pack_derived = 1;
+    return 1;
+  }
+
   if (strcmp(option, "-i8") == 0) {
     g95_option.i8 = 1;
     return 1;

@@ -43,6 +43,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
       N_("Assume that the source file is fixed form") },
 { "-fqkind=<n>",
       N_("Set the kind for a real with the 'q' exponent") },
+{ "-fpack-derived",
+      N_("Try to layout derived types as compact as possible") },
 { "-i8",
       N_("Set the default integer kind to double precision") },
 { "-pedantic",
