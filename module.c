@@ -885,16 +885,50 @@ g95_charlen *cl;
 }
 
 
+/* get_unique_symtree()-- Return a symtree node with a name that is
+ * guaranteed to be unique within the namespace and corresponds to an
+ * illegal fortran name */
+
+static g95_symtree *get_unique_symtree(void) {
+char name[G95_MAX_SYMBOL_LEN+1]; 
+static int serial=0;
+int dummy;
+
+  sprintf(name, "@%d", serial++); 
+  return g95_get_symtree(name, &dummy);
+}
+
+
+/* check_unique_name()-- See if a name is a generated name. */
+
+static int check_unique_name(const char *name) {
+
+  return *name == '@';
+}
+
+
 static void mio_typespec(g95_typespec *ts) {
+g95_symtree *st;
 
   mio_lparen();
   
   ts->type = mio_name(ts->type, bt_types);
 
-  if (ts->type == BT_DERIVED)
-    mio_symbol_ref(&ts->derived);
-  else
+  if (ts->type != BT_DERIVED)
     mio_integer(&ts->kind);
+  else {
+    mio_symbol_ref(&ts->derived);
+
+    /* Load derived type even if not explicitly USEd */
+
+    if (iomode == IO_INPUT && ts->derived && ts->derived->mark) {
+      st = get_unique_symtree();
+      st->sym = ts->derived;
+      st->sym->attr.use_assoc = 1;
+      st->sym->refs++;
+      st->sym->mark = 0;
+    }
+  }
 
   mio_charlen(&ts->cl);
 
@@ -1580,29 +1614,6 @@ int level;
 }
 
 
-
-/* get_unique_symtree()-- Return a symtree node with a name that is
- * guaranteed to be unique within the namespace and corresponds to an
- * illegal fortran name */
-
-static g95_symtree *get_unique_symtree(void) {
-char name[G95_MAX_SYMBOL_LEN+1]; 
-static int serial=0;
-int dummy;
-
-  sprintf(name, "@%d", serial++); 
-  return g95_get_symtree(name, &dummy);
-}
-
-
-/* check_unique_name()-- See if a name is a generated name. */
-
-static int check_unique_name(const char *name) {
-
-  return *name == '@';
-}
-
-
 static void read_namespace(g95_namespace *ns) {
 int serial, ambiguous, i, new_flag, sym_save, visible_save;
 g95_symbol *sym, **sym_table_save;
@@ -1719,11 +1730,6 @@ g95_symtree *st;
       st->sym = sym_table[i];
       st->sym->refs++;
       st->sym->mark = 0;
-      continue;
-    }
-
-    if (sym_table[i]->mark) {
-      skip_list();
       continue;
     }
 
