@@ -128,7 +128,6 @@ static void free_statement(g95_code *p) {
 
   case EXEC_ALLOCATE:
   case EXEC_DEALLOCATE:
-  case EXEC_NULLIFY:
     g95_free_alloc_list(p->ext.alloc_list);
     break;
 
@@ -430,15 +429,6 @@ int label = 0;
       g95_show_expr(c->expr);
     }
 
-    for(a=c->ext.alloc_list; a; a=a->next) {
-      g95_status_char(' ');
-      g95_show_expr(a->expr);
-    }
-
-    break;
-
-  case EXEC_NULLIFY:
-    g95_status("NULLIFY");
     for(a=c->ext.alloc_list; a; a=a->next) {
       g95_status_char(' ');
       g95_show_expr(a->expr);

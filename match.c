@@ -1427,29 +1427,27 @@ cleanup:
 }
 
 
-/* g95_match_nullify()-- Match a NULLIFY statement */
+/* g95_match_nullify()-- Match a NULLIFY statement. A NULLIFY
+   statement is transformed into a set of pointer assignments to
+   intrinsic NULL(). */
 
 match g95_match_nullify(void) {
-g95_alloc *head, *tail;
 symbol_attribute attr;
+g95_code *tail;
+g95_expr *e, *p;
 match m;
 
-  head = tail = NULL;
+  tail = NULL;
+
   if (g95_match_char('(') != MATCH_YES) goto syntax;
 
   for(;;) {
-    if (head == NULL) 
-      head = tail = g95_get_alloc();
-    else {
-      tail->next = g95_get_alloc();
-      tail = tail->next;
-    }
 
-    m = g95_match_variable(&tail->expr, 0);
+    m = g95_match_variable(&p, 0);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
-    attr = g95_variable_attr(tail->expr, NULL);
+    attr = g95_variable_attr(p, NULL);
     if (attr.pointer == 0) {
       g95_error("Variable in NULLIFY statement at %C must be a POINTER");
       goto cleanup;
@@ -1460,12 +1458,27 @@ match m;
       goto cleanup;
     }
 
+    /* build ' => NULL() ' */
+    e = g95_get_expr();
+    e->where = *g95_current_locus();
+    e->expr_type = EXPR_NULL;
+    e->ts.type = BT_UNKNOWN;
+
+    /* Chain to list */
+    if (tail == NULL)
+      tail = &new_st;
+    else {
+      tail->next = g95_get_code();
+      tail = tail->next;
+    }
+
+    tail->op = EXEC_POINTER_ASSIGN;
+    tail->expr = p;
+    tail->expr2 = e;
+
     if (g95_match_char(')') == MATCH_YES) break;
     if (g95_match_char(',') != MATCH_YES) goto syntax;
   }
-
-  new_st.op = EXEC_NULLIFY;
-  new_st.ext.alloc_list = head;
 
   return MATCH_YES;
 
@@ -1473,7 +1486,7 @@ syntax:
   g95_syntax_error(ST_NULLIFY);
 
 cleanup:
-  g95_free_alloc_list(head);
+  g95_free_statements(tail);
   return MATCH_ERROR;
 }
 
