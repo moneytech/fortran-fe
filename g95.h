@@ -518,7 +518,7 @@ typedef struct g95_namespace {
 
   g95_charlen *cl_list;
 
-  int serial, save_all, seen_save;
+  int save_all, seen_save;
 } g95_namespace;
 
 extern g95_namespace *g95_current_ns;
@@ -1310,13 +1310,12 @@ void g95_show_code(int, g95_code *);
 
 /* resolve.c */
 
+void g95_resolve_formal_arglist(g95_formal_arglist *);
 void g95_resolve_modproc(g95_namespace *);
 try g95_resolve_expr(g95_expr *);
-
 void g95_resolve_code(g95_code *, g95_namespace *);
 void g95_resolve(g95_namespace *);
 try g95_resolve_iterator(g95_iterator *);
-
 
 /* array.c */
 
