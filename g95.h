@@ -1348,6 +1348,7 @@ void g95_start_interface(void);
 void g95_check_operator_interfaces(g95_namespace *);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
 int g95_compare_types(g95_typespec *, g95_typespec *);
+int g95_compare_interfaces(g95_symbol *, g95_symbol *);
 try g95_check_interface(g95_interface *, g95_symbol *);
 g95_symbol *g95_search_interface(g95_interface *, int, g95_actual_arglist *);
 try g95_extend_expr(g95_expr *);

@@ -467,12 +467,12 @@ g95_symbol *sym;
 }
 
 
-/* compare_interface()-- 'Compare' two formal interfaces associated
- * with a pair of symbols.  We return nonzero if there exists an
- * actual argument list that would be ambiguous between the two
- * interfaces, zero otherwise. */
+/* g95_compare_interfaces()-- 'Compare' two formal interfaces
+ * associated with a pair of symbols.  We return nonzero if there
+ * exists an actual argument list that would be ambiguous between the
+ * two interfaces, zero otherwise. */
 
-static int compare_interface(g95_symbol *s1, g95_symbol *s2) {
+int g95_compare_interfaces(g95_symbol *s1, g95_symbol *s2) {
 g95_formal_arglist *f1, *f2;
 
   if ((s1->attr.function == 0 && s1->attr.subroutine == 0) ||
@@ -519,7 +519,7 @@ g95_interface *ip;
 
     if (new->formal == NULL) continue;
 
-    if (compare_interface(new, ip->sym)) {
+    if (g95_compare_interfaces(new, ip->sym)) {
       g95_error("Interface ending at %C is ambiguous with interface at %L",
 		&ip->where);
 
