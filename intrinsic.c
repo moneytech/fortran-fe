@@ -413,7 +413,7 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
       return FAILURE;
     }
     if (x->ts.type == BT_COMPLEX) {
-      intrinsic_error("Second argument to dcmplx at %%L must not be present if first argument is complex");
+      intrinsic_error("Second argument to cmplx at %%L must not be present if first argument is complex");
       return FAILURE;
     }
   }
