@@ -113,14 +113,24 @@ int i;
   for(; p; p=q) {
     q = p->next;
 
-    for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-      g95_free_expr(p->ar.start[i]);
-      g95_free_expr(p->ar.end[i]);
-      g95_free_expr(p->ar.stride[i]);
-    }
+    switch(p->type) {
+    case REF_ARRAY:
+      for(i=0; i<G95_MAX_DIMENSIONS; i++) {
+	g95_free_expr(p->u.ar.start[i]);
+	g95_free_expr(p->u.ar.end[i]);
+	g95_free_expr(p->u.ar.stride[i]);
+      }
 
-    g95_free_expr(p->start);
-    g95_free_expr(p->end);
+      break;
+
+    case REF_SUBSTRING:
+      g95_free_expr(p->u.ss.start);
+      g95_free_expr(p->u.ss.end);
+      break;
+
+    case REF_COMPONENT:
+      break;
+    }
 
     g95_free(p);
   }
@@ -251,14 +261,25 @@ g95_ref *dest;
   if (src == NULL) return NULL; 
 
   dest = g95_get_ref();
-  *dest = *src;
+  dest->type = src->type;
 
-  ar = g95_copy_array_ref(&src->ar);
-  dest->ar = *ar;
-  g95_free(ar);
+  switch(src->type) {
+  case REF_ARRAY:
+    ar = g95_copy_array_ref(&src->u.ar);
+    dest->u.ar = *ar;
+    g95_free(ar);
+    break;
 
-  dest->start = g95_copy_expr(src->start);
-  dest->end = g95_copy_expr(src->end);
+  case REF_COMPONENT:
+    dest->u.c = src->u.c;
+    break;
+
+  case REF_SUBSTRING:
+    dest->u.ss.start = g95_copy_expr(src->u.ss.start);
+    dest->u.ss.end = g95_copy_expr(src->u.ss.end);
+    break;
+  }
+
   dest->next = copy_ref(src->next);
 
   return dest;
@@ -1267,18 +1288,18 @@ static void show_ref(g95_ref *p) {
   for(; p; p=p->next)
     switch(p->type) {
     case REF_ARRAY:
-      g95_show_array_ref(&p->ar);
+      g95_show_array_ref(&p->u.ar);
       break;
 
     case REF_COMPONENT:
-      g95_status(" %% %s", p->component->name);
+      g95_status(" %% %s", p->u.c.component->name);
       break;
 
     case REF_SUBSTRING:
       g95_status_char('(');
-      g95_show_expr(p->start);
+      g95_show_expr(p->u.ss.start);
       g95_status_char(':');
-      g95_show_expr(p->end);
+      g95_show_expr(p->u.ss.end);
       g95_status_char(')');
       break;
 

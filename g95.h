@@ -615,11 +615,20 @@ typedef struct g95_array_ref {
 typedef struct g95_ref {
   enum { REF_ARRAY, REF_COMPONENT, REF_SUBSTRING } type;
 
-  struct g95_array_ref ar;
-  g95_component *component;
-  g95_symbol *sym;
+  union {
+    struct g95_array_ref ar;
 
-  struct g95_expr *start, *end;       /* Substring */
+    struct {
+      g95_component *component;
+      g95_symbol *sym;
+    } c;
+
+    struct {
+      struct g95_expr *start, *end;       /* Substring */
+      g95_charlen *length;
+    } ss;
+
+  } u;
 
   struct g95_ref *next;
 } g95_ref;
@@ -900,7 +909,6 @@ typedef struct g95_data_variable {
   g95_expr *expr;
   g95_iterator iter;
   struct g95_data_variable *list, *next;
-
 } g95_data_variable;
 
 
@@ -915,6 +923,7 @@ typedef struct g95_data_value {
 typedef struct g95_data {
   g95_data_variable *var;
   g95_data_value *value;
+  locus where;
 
   struct g95_data *next;
 } g95_data;
@@ -1333,7 +1342,6 @@ match g95_match_target(void);
 
 /* primary.c */
 
-match g95_match_substring(g95_ref **, int);
 match g95_match_rvalue(g95_expr **);
 match g95_match_variable(g95_expr **, int);
 match g95_match_actual_arglist(int, g95_actual_arglist **);

@@ -445,6 +445,79 @@ cleanup:
 }
 
 
+/* match_substring()-- Match a substring reference */
+
+static match match_substring(g95_charlen *cl, int init, g95_ref **result) {
+g95_expr *start, *end;
+locus old_loc;
+g95_ref *ref;
+match m;
+
+  start = NULL;
+  end = NULL;
+
+  old_loc = *g95_current_locus();
+
+  m = g95_match_char('(');
+  if (m != MATCH_YES) return MATCH_NO;
+
+  if (g95_match_char(':') != MATCH_YES) {
+    if (init)
+      m = g95_match_init_expr(&start);
+    else
+      m = g95_match_expr(&start);
+
+    if (m != MATCH_YES) {
+      m = MATCH_NO;
+      goto cleanup;
+    }
+
+    m = g95_match_char(':');
+    if (m != MATCH_YES) goto cleanup;
+  }
+
+  if (g95_match_char(')') != MATCH_YES) {
+    if (init)
+      m = g95_match_init_expr(&end);
+    else
+      m = g95_match_expr(&end);
+
+    if (m == MATCH_NO) goto syntax;
+    if (m == MATCH_ERROR) goto cleanup;
+
+    m = g95_match_char(')');
+    if (m == MATCH_NO) goto syntax;
+  }
+
+/* Optimize away the (:) reference */
+
+  if (start == NULL && end == NULL)
+    ref = NULL;
+  else {
+    ref = g95_get_ref();
+
+    ref->type = REF_SUBSTRING;
+    ref->u.ss.start = start;
+    ref->u.ss.end = end;
+    ref->u.ss.length = cl;
+  }
+
+  *result = ref;
+  return MATCH_YES;
+
+syntax:
+  g95_error("Syntax error in SUBSTRING specification at %C");
+  m = MATCH_ERROR;
+
+cleanup:
+  g95_free_expr(start);
+  g95_free_expr(end);
+
+  g95_set_locus(&old_loc);
+  return m;
+}
+
+
 /* g95_next_string_char()-- Reads the next character of a string constant,
  * taking care to return doubled delimiters on the input as a single
  * instance of the delimiter.  Special return values are:
@@ -659,7 +732,7 @@ got_delim:
   if (g95_next_string_char(delimiter) != -1)
     g95_internal_error("match_string_constant(): Delimiter not found");
 
-  if (g95_match_substring(&e->ref, 0) != MATCH_NO)
+  if (match_substring(NULL, 0, &e->ref) != MATCH_NO)
     e->expr_type = EXPR_SUBSTRING;
 
   *result = e;
@@ -1205,78 +1278,6 @@ static g95_ref *extend_ref(g95_expr *primary, g95_ref *tail) {
 }
 
 
-/* g95_match_substring()-- Match a substring reference */
-
-match g95_match_substring(g95_ref **result, int init) {
-g95_expr *start, *end;
-locus old_loc;
-g95_ref *ref;
-match m;
-
-  start = NULL;
-  end = NULL;
-
-  old_loc = *g95_current_locus();
-
-  m = g95_match_char('(');
-  if (m != MATCH_YES) return MATCH_NO;
-
-  if (g95_match_char(':') != MATCH_YES) {
-    if (init)
-      m = g95_match_init_expr(&start);
-    else
-      m = g95_match_expr(&start);
-
-    if (m != MATCH_YES) {
-      m = MATCH_NO;
-      goto cleanup;
-    }
-
-    m = g95_match_char(':');
-    if (m != MATCH_YES) goto cleanup;
-  }
-
-  if (g95_match_char(')') != MATCH_YES) {
-    if (init)
-      m = g95_match_init_expr(&end);
-    else
-      m = g95_match_expr(&end);
-
-    if (m == MATCH_NO) goto syntax;
-    if (m == MATCH_ERROR) goto cleanup;
-
-    m = g95_match_char(')');
-    if (m == MATCH_NO) goto syntax;
-  }
-
-/* Optimize away the (:) reference */
-
-  if (start == NULL && end == NULL)
-    ref = NULL;
-  else {
-    ref = g95_get_ref();
-
-    ref->type = REF_SUBSTRING;
-    ref->start = start;
-    ref->end = end;
-  }
-
-  *result = ref;
-  return MATCH_YES;
-
-syntax:
-  g95_error("Syntax error in SUBSTRING specification at %C");
-  m = MATCH_ERROR;
-
-cleanup:
-  g95_free_expr(start);
-  g95_free_expr(end);
-
-  g95_set_locus(&old_loc);
-  return m;
-}
-
-
 /* match_varspec()-- Match any additional specifications associated
  * with the current variable like member references or substrings. */
 
@@ -1295,7 +1296,7 @@ match m;
     tail = extend_ref(primary, tail);
     tail->type = REF_ARRAY;
 
-    m = g95_match_array_ref(&tail->ar, primary->symbol->as, equiv_flag);
+    m = g95_match_array_ref(&tail->u.ar, primary->symbol->as, equiv_flag);
     if (m != MATCH_YES) return m;
   }
 
@@ -1318,8 +1319,8 @@ match m;
     tail = extend_ref(primary, tail);
     tail->type = REF_COMPONENT;
 
-    tail->component = component;
-    tail->sym = sym;
+    tail->u.c.component = component;
+    tail->u.c.sym = sym;
 
     primary->ts = component->ts;
 
@@ -1327,7 +1328,7 @@ match m;
       tail = extend_ref(primary, tail);
       tail->type = REF_ARRAY;
 
-      m = g95_match_array_ref(&tail->ar, component->as, equiv_flag);
+      m = g95_match_array_ref(&tail->u.ar, component->as, equiv_flag);
       if (m != MATCH_YES) return m;
     }
 
@@ -1339,7 +1340,7 @@ match m;
 
 check_substring:
   if (primary->ts.type == BT_CHARACTER) {
-    switch(g95_match_substring(&substring, equiv_flag)) {
+    switch(match_substring(primary->ts.cl, equiv_flag, &substring)) {
     case MATCH_YES:
       if (tail == NULL) 
 	primary->ref = substring;
@@ -1406,8 +1407,8 @@ new_attr:
       break;
 
     case REF_COMPONENT:
-      g95_get_component_attr(&attr, ref->component);
-      if (ts != NULL) *ts = ref->component->ts;
+      g95_get_component_attr(&attr, ref->u.c.component);
+      if (ts != NULL) *ts = ref->u.c.component->ts;
       ref = ref->next;
 
       goto new_attr;
@@ -1676,7 +1677,7 @@ match m;
     e->symbol = sym;
 
     if ((sym->ts.type == BT_UNKNOWN || sym->ts.type == BT_CHARACTER) &&
-	g95_match_substring(&e->ref, 0) == MATCH_YES) {
+	match_substring(sym->ts.cl, 0, &e->ref) == MATCH_YES) {
 
       e->expr_type = EXPR_VARIABLE;
 
@@ -1814,3 +1815,4 @@ match m;
   *result = expr;
   return MATCH_YES;
 }
+

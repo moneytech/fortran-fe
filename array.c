@@ -1306,8 +1306,8 @@ g95_ref *ref;
     for(ref=shape->ref; ref; ref=ref->next) {
       if (ref->type != REF_ARRAY) continue;
 
-      if (ref->ar.type == AR_FULL) return size_from_spec(ref->ar.as);
-      if (ref->ar.type == AR_SECTION) return size_from_ref(&ref->ar);
+      if (ref->u.ar.type == AR_FULL) return size_from_spec(ref->u.ar.as);
+      if (ref->u.ar.type == AR_SECTION) return size_from_ref(&ref->u.ar);
     }
 
     return size_from_spec(shape->symbol->as);

@@ -927,43 +927,46 @@ bad_op:
 
 /************** Array resolution subroutines **************/
 
+
+typedef enum { CMP_LT, CMP_EQ, CMP_GT, CMP_UNKNOWN } comparison;
+
+/* compare_bound()-- Compare two integer expressions to see if a<b.
+ * Returns nonzero if this is so, zero if not so.  If either a or b is
+ * indeterminate at compile time, zero is returned. */
+
+static comparison compare_bound(g95_expr *a, g95_expr *b) {
+int i;
+
+  if (a == NULL || a->expr_type != EXPR_CONSTANT ||
+      b == NULL || b->expr_type != EXPR_CONSTANT) return CMP_UNKNOWN;
+
+  i = mpz_cmp(a->value.integer, b->value.integer);
+
+  if (i < 0) return CMP_LT;
+  if (i > 0) return CMP_GT;
+  return CMP_EQ;
+}
+
+
+/* compare_bound_int()-- Compare an integer expression with an integer. */
+
+static int compare_bound_int(g95_expr *a, int b) {
+int i;
+
+  if (a == NULL || a->expr_type != EXPR_CONSTANT) return CMP_UNKNOWN;
+
+  i = mpz_cmp_si(a->value.integer, b);
+
+  if (i < 0) return CMP_LT;
+  if (i > 0) return CMP_GT;
+  return CMP_EQ;
+}
+
+
 /* check_dimension()-- Compare a single dimension of an array
  * reference to the array specification. */
 
 static try check_dimension(int i, g95_array_ref *ar, g95_array_spec *as) {
-int start_v, end_v, stride_v, lower_v, upper_v, start, end, stride,
-    lower, upper;
-g95_expr *e;
-
-  lower = as->lower[i] != NULL &&
-    as->lower[i]->expr_type == EXPR_CONSTANT;
-
-  upper = as->upper[i] != NULL &&
-    (((i+1 == as->rank && as->type == AS_ASSUMED_SIZE)) ? 0
-    : as->upper[i]->expr_type == EXPR_CONSTANT);
-
-  e = ar->start[i];
-  start = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
-
-  e = ar->end[i];
-  end = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
-
-  e = ar->stride[i];
-  stride = (e != NULL) && (e->expr_type == EXPR_CONSTANT);
-
-  if (lower && g95_extract_int(as->lower[i], &lower_v) != NULL)
-    goto oops;
-
-  if (upper && g95_extract_int(as->upper[i], &upper_v) != NULL)
-    goto oops;
-
-  if (start && g95_extract_int(ar->start[i], &start_v) != NULL)
-    goto oops;
-
-  if (end && g95_extract_int(ar->end[i], &end_v) != NULL) goto oops;
-
-  if (stride && g95_extract_int(ar->stride[i], &stride_v) != NULL)
-    goto oops;
 
 /* Given start, end and stride values, calculate the minimum and
  * maximum referenced indexes. */
@@ -973,15 +976,19 @@ g95_expr *e;
     break;
 
   case AR_ELEMENT:
-    if (lower && start && start_v < lower_v) goto bound;
-    if (upper && start && start_v > upper_v) goto bound;
+    if (compare_bound(ar->start[i], as->lower[i]) == CMP_LT) goto bound;
+    if (compare_bound(ar->start[i], as->upper[i]) == CMP_GT) goto bound;
+
     break;
 
   case AR_SECTION:
-    if (stride && stride_v == 0) {
+    if (compare_bound_int(ar->stride[i], 0) == CMP_EQ) {
       g95_error("Illegal stride of zero at %L", &ar->c_where[i]);
       return FAILURE;
     }
+
+    /* TODO: More complicated range check in which the sign of the
+     * stride figures */
 
     break;
 
@@ -994,10 +1001,6 @@ g95_expr *e;
 bound:
   g95_warning("Array reference at %L is out of bounds", &ar->c_where[i]);
   return SUCCESS;
-
-oops:
-  g95_internal_error("check_dimension(): Bad integer conversion");
-  return FAILURE;
 }
 
 
@@ -1095,6 +1098,57 @@ int i;
 }
 
 
+try resolve_substring(g95_ref *ref) {
+
+  if (ref->u.ss.start != NULL) {
+    if (g95_resolve_expr(ref->u.ss.start) == FAILURE) return FAILURE;
+
+    if (ref->u.ss.start->ts.type != BT_INTEGER) {
+      g95_error("Substring start index at %L must be of type INTEGER",
+		&ref->u.ss.start->where);
+      return FAILURE;
+    }
+
+    if (ref->u.ss.start->rank != 0) {
+      g95_error("Substring start index at %L must be scalar",
+		&ref->u.ss.start->where);
+      return FAILURE;
+    }
+
+    if (compare_bound_int(ref->u.ss.start, 1) == CMP_LT) {
+      g95_error("Substring start index at %L is less than one",
+		&ref->u.ss.start->where);
+      return FAILURE;
+    }
+  }
+
+  if (ref->u.ss.end != NULL) {
+    if (g95_resolve_expr(ref->u.ss.end) == FAILURE) return FAILURE;
+
+    if (ref->u.ss.end->ts.type != BT_INTEGER) {
+      g95_error("Substring end index at %C must be of type INTEGER",
+		&ref->u.ss.end->where);
+      return FAILURE;
+    }
+
+    if (ref->u.ss.end->rank != 0) {
+      g95_error("Substring end index at %L must be scalar",
+		&ref->u.ss.end->where);
+      return FAILURE;
+    }
+
+    if (ref->u.ss.length != NULL &&
+	compare_bound(ref->u.ss.end, ref->u.ss.length->length) == CMP_GT) {
+      g95_error("Substring end index at %L is out of bounds",
+		&ref->u.ss.start->where);
+      return FAILURE;
+    }
+  }
+
+  return SUCCESS;
+}
+
+
 /* resolve_ref()-- Resolve subtype references */
 
 static try resolve_ref(g95_expr *expr) {
@@ -1103,29 +1157,14 @@ g95_ref *ref;
   for(ref=expr->ref; ref; ref=ref->next)
     switch(ref->type) {
     case REF_ARRAY:
-      if (resolve_array_ref(&ref->ar) == FAILURE) return FAILURE;
+      if (resolve_array_ref(&ref->u.ar) == FAILURE) return FAILURE;
       break;
 
     case REF_COMPONENT:
       break;
 
     case REF_SUBSTRING:
-      if (g95_resolve_expr(ref->start) == FAILURE) return FAILURE;
-
-      if (ref->start != NULL && ref->start->ts.type != BT_INTEGER) {
-	g95_error("Substring start index at %C must be of type INTEGER",
-		  &ref->start->where);
-	return FAILURE;
-      }
-
-      if (g95_resolve_expr(ref->end) == FAILURE) return FAILURE;
-
-      if (ref->end != NULL && ref->end->ts.type != BT_INTEGER) {
-	g95_error("Substring end index at %C must be of type INTEGER",
-		  &ref->end->where);
-	return FAILURE;
-      }
-
+      resolve_substring(ref);
       break;
     }
 
@@ -1159,17 +1198,17 @@ int i, rank;
   for(ref=e->ref; ref; ref=ref->next) {
     if (ref->type != REF_ARRAY) continue;
 
-    if (ref->ar.type == AR_FULL) {
-      rank = ref->ar.rank;
+    if (ref->u.ar.type == AR_FULL) {
+      rank = ref->u.ar.rank;
       break;
     }
 
-    if (ref->ar.type == AR_SECTION) { /* Figure out the rank of the section */
+    if (ref->u.ar.type == AR_SECTION) {/* Figure out the rank of the section */
       if (rank != 0) g95_internal_error("expression_rank(): Two array specs");
 
-      for(i=0; i<ref->ar.rank; i++)
-	if (ref->ar.dimen_type[i] == DIMEN_RANGE ||
-	    ref->ar.dimen_type[i] == DIMEN_VECTOR) rank++;
+      for(i=0; i<ref->u.ar.rank; i++)
+	if (ref->u.ar.dimen_type[i] == DIMEN_RANGE ||
+	    ref->u.ar.dimen_type[i] == DIMEN_VECTOR) rank++;
 
       break;
     }
@@ -1577,6 +1616,48 @@ static void resolve_symbol(g95_symbol *sym) {
 }
 
 
+
+/************* Resolve DATA statements *************/
+
+
+#if 0
+static struct {
+  g95_data_value *vnode;
+  int left;
+} values;
+
+
+/* traverse_data_node()-- Type resolve variables in the variable list
+ * of a DATA statement. */
+
+static try traverse_data_node(g95_data_variable *var) {
+
+  if ()
+
+}
+
+
+/* resolve_data()-- Resolve a single DATA statement.  We implement
+ * this by storing a pointer to the value list into static variables,
+ * and then recursively traversing the variables list, expanding
+ * iterators and such.  */
+
+static void resolve_data(g95_data *d) {
+
+  values.vnode = d->value;
+  values.left = (d->value == NULL) ? 0 : d->value.repeat;
+
+  if (traverse_data_node(d->var) == FAILURE) return;
+
+  /* At this point, we better not have any values left */
+
+  if (values.vnode != NULL)
+    g95_error("DATA statement at %L has more values than variables",
+	      &d->where);
+}
+#endif
+
+
 /* g95_resolve()-- This function is called after a complete program
  * unit has been compiled.  Its purpose is to examine all of the
  * expressions associated with a program unit, assign types to all
@@ -1587,6 +1668,9 @@ static void resolve_symbol(g95_symbol *sym) {
 void g95_resolve(g95_namespace *ns) {
 g95_namespace *old_ns, *n;
 g95_charlen *cl;
+#if 0
+g95_data *d;
+#endif
 
   old_ns = g95_current_ns;
   g95_current_ns = ns;
@@ -1600,10 +1684,6 @@ g95_charlen *cl;
 
   g95_check_interfaces(ns);
 
-  g95_traverse_ns(ns, resolve_values);
-
-  if (ns->save_all) g95_save_all(ns);
-
   for(cl=ns->cl_list; cl; cl=cl->next) {
     if (cl->length == NULL || g95_resolve_expr(cl->length) == FAILURE)
       continue;
@@ -1612,6 +1692,15 @@ g95_charlen *cl;
       g95_error("Character length specification at %L must be of type INTEGER",
 		&cl->length->where);
   }
+
+  g95_traverse_ns(ns, resolve_values);
+
+  if (ns->save_all) g95_save_all(ns);
+
+#if 0
+  for(d=ns->data; d; d=d->next)
+    resolve_data(d);
+#endif
 
   g95_resolve_code(ns->code, ns);
 
