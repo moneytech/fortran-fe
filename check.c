@@ -937,7 +937,7 @@ try g95_check_product(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
   if (numeric_check(array, 0) == FAILURE) return FAILURE;
 
-  if (dim_check(dim, 1, 0) == FAILURE) return FAILURE;
+  if (dim_check(dim, 1, 1) == FAILURE) return FAILURE;
 
   if (mask != NULL && logical_array_check(mask, 2) == FAILURE) return FAILURE;
 
