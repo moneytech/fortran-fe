@@ -200,7 +200,7 @@ match m;
   m = g95_match(" %n :", name);
   if (m != MATCH_YES) return m;
 
-  g95_new_block = g95_get_symbol(name, NULL);
+  if (g95_get_symbol(name, NULL, 0, &g95_new_block)) return MATCH_ERROR;
 
   if (g95_new_block->attr.flavor != FL_LABEL &&
       g95_add_flavor(&g95_new_block->attr, FL_LABEL, NULL) == FAILURE)
@@ -338,7 +338,8 @@ char buffer[G95_MAX_SYMBOL_LEN+1];
 match m;
 
   m = g95_match_name(buffer);
-  if (m == MATCH_YES) *matched_symbol = g95_get_symbol(buffer, NULL);
+  if (m == MATCH_YES && g95_get_symbol(buffer, NULL, 1, matched_symbol))
+    m = MATCH_ERROR;
 
   return m;
 }
@@ -1541,7 +1542,7 @@ int i;
   if (m == MATCH_NO) goto syntax;
   if (m != MATCH_YES) return m;
 
-  if (!sym->attr.subroutine &&
+  if (sym->attr.flavor != FL_GENERIC && !sym->attr.subroutine &&
       g95_add_subroutine(&sym->attr, NULL) == FAILURE) return MATCH_ERROR;
 
   if (g95_match_eos() != MATCH_YES) {
@@ -1717,7 +1718,8 @@ match m;
   m = g95_match(" %n%t", &name);
   if (m != MATCH_YES) return MATCH_ERROR;
 
-  sym = g95_get_symbol(name, NULL);
+  if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+
   if (g95_add_flavor(&sym->attr, FL_BLOCK_DATA, NULL) == FAILURE)
     return MATCH_ERROR;
 

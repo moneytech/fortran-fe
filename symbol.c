@@ -423,6 +423,7 @@ void g95_show_attr(symbol_attribute *attr) {
   if (attr->entry)        g95_status(" ENTRY");
 
   if (attr->data)         g95_status(" DATA");
+  if (attr->use_assoc)    g95_status(" USE-ASSOC");
   if (attr->in_namelist)  g95_status(" IN-NAMELIST");
   if (attr->in_common)    g95_status(" IN-COMMON");
   if (attr->saved_common) g95_status(" SAVED-COMMON");
@@ -1569,8 +1570,6 @@ g95_symbol *s;
 }
 
 
-
-
 /* mark_new_symbol()-- Take care of bookkeeping that lets us mark new
  * symbols for possible undoing later. */
 
@@ -1600,30 +1599,44 @@ static g95_symbol *mark_new_symbol(g95_symbol *p, char *name,
 
 /* g95_get_symbol()-- Given a name, search the current namespace on up
  * for the symbol.  If we don't find it anywhere, create the symbol in
- * the current space. */
+ * the current space.  The flag returned indicates whether the symbol
+ * reference was ambiguous or not.  If it was, an error was issued.  */
 
-g95_symbol *g95_get_symbol(char *name, g95_namespace *ns) {
+int g95_get_symbol(char *name, g95_namespace *ns, int parent_flag,
+		   g95_symbol **result) {
+g95_namespace *current_ns;
+g95_symtree *st;
 g95_symbol *p;
 
   if (ns == NULL) ns = g95_current_ns;
+  current_ns = ns;
 
-  p = g95_find_symbol(name, ns);
-  p = mark_new_symbol(p, name, ns);
-  return p;
-}
+  for(;;) {
+    st = find_node(current_ns, name);
+    if (st != NULL) break;
 
+    if (!parent_flag) break;
 
-/* get_local_symbol()-- Given a name, search the local namespace for
- * the symbol, creating it if not found. */
+    current_ns = current_ns->parent;
+    if (current_ns == NULL) break;
+  }
 
-g95_symbol *get_local_symbol(char *name, g95_namespace *ns) {
-g95_symbol *p;
+  if (current_ns == NULL) current_ns = ns;
 
-  if (ns == NULL) ns = g95_current_ns;
+  if (st != NULL)
+    p = st->sym;
+  else
+    p = NULL;
 
-  p = g95_find_local_symbol(name, ns);
-  p = mark_new_symbol(p, name, ns);
-  return p;
+  *result = mark_new_symbol(p, name, current_ns);
+
+  if (st == NULL) return 0;
+
+  if (st->ambiguous)
+    g95_error("Name '%s' is an ambiguous reference to '%s' from module '%s'",
+	      name, st->sym->name, st->sym->module);
+
+  return st->ambiguous;
 }
 
 
@@ -1846,6 +1859,15 @@ g95_symbol *s;
 }
 
 
+/* show_symtree()-- Worker function to display the symbol tree */
+
+static void show_symtree(g95_symtree *st) {
+
+  g95_status("symtree: %s  Ambig %d\n", st->name, st->ambiguous);
+  g95_show_symbol(st->sym);
+}
+
+
 /* clear_sym_mark()-- Clear mark bits from symbol nodes associated
  * with a symtree node */
 
@@ -1983,7 +2005,9 @@ int i;
 
     g95_status(")\n");
 
-    g95_traverse_ns(ns, g95_show_symbol);
+    g95_traverse_symtree(ns, clear_sym_mark);
+
+    g95_traverse_symtree(ns, show_symtree);
 
     g95_status(" (");
     g95_traverse_ns(ns, show_generics);   /* Generic interfaces */

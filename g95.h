@@ -187,8 +187,7 @@ typedef enum {
 
 /************************* Structures *****************************/
 
-/* Symbol attribute structure.  It's 32 bits wide at the moment, so it
- * should fit into a single int. */
+/* Symbol attribute structure. */
 
 typedef struct {
 
@@ -198,7 +197,8 @@ typedef struct {
            save:1,        target:1,    dummy:1,     common:1,
            result:1,      entry:1;
 
-  unsigned data:1;        /* Symbol is named in a DATA statement */
+  unsigned data:1,        /* Symbol is named in a DATA statement */
+           use_assoc:1;   /* Symbol has been use-associated */
 
   unsigned in_namelist:1, in_common:1, saved_common:1;
   unsigned function:1, subroutine:1;
@@ -994,8 +994,7 @@ g95_symtree *g95_get_symtree(char *, int *);
 void g95_free_symbol(g95_symbol *);
 g95_symbol *g95_find_symbol(char *, g95_namespace *);
 g95_symbol *g95_find_local_symbol(char *, g95_namespace *);
-g95_symbol *g95_get_symbol(char *, g95_namespace *);
-g95_symbol *g95_get_local_symbol(char *, g95_namespace *);
+int g95_get_symbol(char *, g95_namespace *, int, g95_symbol **);
 
 void g95_undo_symbols(void);
 void g95_commit_symbols(void);

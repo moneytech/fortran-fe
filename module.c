@@ -339,7 +339,7 @@ char *p;
 
   atom_string = p = g95_getmem(len+1);
 
-  while(len > 0) {
+  for(;len>0; len--) {
     c = module_char();
     if (c == '\'') module_char();  /* Guaranteed to be another \' */
     *p++ = c;
@@ -580,7 +580,7 @@ int len;
  * subroutine concentrate on the actual format of the data being written. */
 
 static void mio_expr(g95_expr **);
-
+static void mio_symbol_ref(g95_symbol **);
 
 /* mio_name()-- Read or write an enumerated value.  On writing, we
  * return the input value for the convenience of callers.  We avoid
@@ -787,16 +787,12 @@ atom_type t;
 }
 
 
-
-
-/* BT_UNKNOWN has been omitted from this list on purpose-- it should
- * never appear in an expression being written. */
-
 static mstring bt_types[] = {
   minit("INTEGER",    BT_INTEGER),      minit("REAL",       BT_REAL),
   minit("COMPLEX",    BT_COMPLEX),      minit("LOGICAL",    BT_LOGICAL),
   minit("CHARACTER",  BT_CHARACTER),    minit("DERIVED",    BT_DERIVED),
-  minit("PROCEDURE",  BT_PROCEDURE),    minit(NULL, -1)
+  minit("PROCEDURE",  BT_PROCEDURE),    minit("UNKNOWN",    BT_UNKNOWN),
+  minit(NULL, -1)
 };
 
 
@@ -806,8 +802,11 @@ static void mio_typespec(g95_typespec *ts) {
   
   ts->type = mio_name(ts->type, bt_types);
 
-  mio_integer(&ts->kind);
-  
+  if (ts->type == BT_DERIVED)
+    mio_symbol_ref(&ts->derived);
+  else
+    mio_integer(&ts->kind);
+
   /* Store symbol pointers */
 
   /* mio_expr(&ts->charlen); */
@@ -1246,7 +1245,7 @@ g95_expr *e;
 
     if (t != ATOM_NAME) bad_module("Expected expression type");
 
-    e = *ep;
+    e = *ep = g95_get_expr();
     e->expr_type = find_enum(expr_types);
   }
 
@@ -1335,8 +1334,6 @@ g95_expr *e;
 }
 
 
-
-
 /* mio_symbol()-- Unlike most other routines, the address of the
  * symbol node is already fixed on input and the name/module has
  * already been filled in */
@@ -1346,8 +1343,8 @@ static void mio_symbol(g95_symbol *sym) {
   mio_lparen();
   mio_integer(&sym->serial);
 
-  mio_typespec(&sym->ts);
   mio_symbol_attribute(&sym->attr);
+  mio_typespec(&sym->ts);
 
   mio_interface(&sym->operator);
   mio_interface(&sym->interface);
@@ -1420,8 +1417,8 @@ int level;
 
 static void read_module(void) {
 int serial, ambiguous, i, n, new_flag;
-g95_symbol *sym, new;
 g95_use_rename *u;
+g95_symbol *sym;
 g95_symtree *st;
 
   mio_lparen(); 
@@ -1513,14 +1510,8 @@ g95_symtree *st;
     if (sym_table[i]->mark)
       skip_list();
     else {
-      memset(&new, '\0', sizeof(g95_symbol));
-      mio_symbol(&new);
-
-      strcpy(new.name, sym_table[i]->name);
-      strcpy(new.module, sym_table[i]->module);
-
-      new.mark = 0;
-      *sym_table[i] = new;
+      mio_symbol(sym_table[i]);
+      sym_table[i]->attr.use_assoc = 1;
     }
   }
 

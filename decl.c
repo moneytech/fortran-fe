@@ -119,7 +119,7 @@ syntax:
  * the name of the interface (located in another namespace).  If so,
  * return that symbol.  If not, use g95_get_symbol(). */
 
-static g95_symbol *find_special(char *name) {
+static int find_special(char *name, g95_symbol **result) {
 g95_state_data *s;
 
   if (g95_current_state() != COMP_SUBROUTINE &&
@@ -131,10 +131,13 @@ g95_state_data *s;
   if (s->state != COMP_INTERFACE) goto normal;
   if (s->sym == NULL) goto normal;   /* Nameless interface */
 
-  if (strcmp(name, s->sym->name ) == 0) return s->sym;
+  if (strcmp(name, s->sym->name ) == 0) {
+    *result = s->sym;
+    return 0;
+  }
 
 normal:
-  return g95_get_symbol(name, NULL);
+  return g95_get_symbol(name, NULL, 0, result);
 }
 
 
@@ -148,7 +151,7 @@ g95_symbol *sym;
 g95_expr *init;
 
   init = *initp;
-  sym = find_special(name);
+  if (find_special(name, &sym)) return FAILURE;
 
 /* Start updating the symbol table.  Add basic type attribute if present */
 
@@ -309,7 +312,7 @@ try t;
  * always refers to function calls.  Therefore, the name is not
  * allowed to appear in specification statements. */
 
-  if (g95_current_state() == COMP_FUNCTION &&
+  if (g95_current_state() == COMP_FUNCTION && g95_current_block() != NULL &&
       g95_current_block()->result != NULL &&
       strcmp(g95_current_block()->name, name) == 0) {
     g95_error("Function name '%s' not allowed at %C", name);
@@ -616,7 +619,7 @@ match m;
   m = g95_match(" type ( %n )", name);
   if (m != MATCH_YES) return m;
 
-  sym = g95_get_symbol(name, NULL);
+  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
   if (sym->attr.flavor != FL_DERIVED) {
     if (!forward_flag) {
@@ -1047,7 +1050,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  r = g95_get_symbol(name, NULL);
+  if (g95_get_symbol(name, NULL, 0, &r)) return MATCH_ERROR;
 
   if (g95_add_flavor(&r->attr, FL_VARIABLE, NULL) == FAILURE ||
       g95_add_result(&r->attr, NULL) == FAILURE) return MATCH_ERROR;
@@ -1064,6 +1067,7 @@ match g95_match_function_decl(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_formal_arglist *arglist;
 g95_symbol *sym, *result;
+g95_namespace *ns;
 locus old_loc;
 match m;
 
@@ -1085,8 +1089,10 @@ match m;
     return MATCH_NO;
   }
 
-  sym = g95_get_symbol(name, (g95_current_state() == COMP_INTERFACE) ?
-				current_interface.parent_ns : NULL);
+  ns = (g95_current_state() == COMP_INTERFACE) ?
+    current_interface.parent_ns : NULL;
+
+  if (g95_get_symbol(name, ns, 0, &sym)) return MATCH_ERROR;
 
   m = g95_match_formal_arglist(sym, 1);
   if (m == MATCH_NO)
@@ -1115,8 +1121,8 @@ match m;
   }
 
   if (g95_current_state() == COMP_INTERFACE || current_attr.recursive) {
-    if (g95_add_function(&current_attr, NULL) == FAILURE ||
-	g95_missing_attr(&current_attr, NULL) == FAILURE) goto cleanup;
+    if (g95_add_function(&sym->attr, NULL) == FAILURE ||
+	g95_missing_attr(&sym->attr, NULL) == FAILURE) goto cleanup;
   } else {
     if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) goto cleanup;
   }
@@ -1215,6 +1221,7 @@ exec_construct:
 match g95_match_subroutine(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
 symbol_attribute attr;
+g95_namespace *ns;
 g95_symbol *sym;
 locus old_loc;
 match m;
@@ -1231,8 +1238,11 @@ match m;
     return m;
   }
 
-  sym = g95_get_symbol(name, (g95_current_state() == COMP_INTERFACE) ?
-				current_interface.parent_ns : NULL);
+  ns = (g95_current_state() == COMP_INTERFACE) ?
+    current_interface.parent_ns : NULL;
+
+  if (g95_get_symbol(name, ns, 1, &sym)) return MATCH_ERROR;
+
   g95_new_block = sym;
 
   if (g95_add_subroutine(&sym->attr, NULL) == FAILURE) {
@@ -1427,7 +1437,7 @@ match m;
   m = g95_match_name(name);
   if (m != MATCH_YES) goto cleanup;
 
-  sym = find_special(name);
+  if (find_special(name, &sym)) return MATCH_ERROR;
 
   var_locus = *g95_current_locus();
 
@@ -1846,7 +1856,9 @@ loop:
     return MATCH_ERROR;
   }
 
-  g95_new_block = sym = g95_get_symbol(name, NULL);
+  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
+
+  g95_new_block = sym;
 
 /* The symbol may already have the derived attribute without the
  * components.  The only way this can happen is during a function
