@@ -161,7 +161,7 @@ typedef enum { ARITH_OK=1, ARITH_OVERFLOW, ARITH_UNDERFLOW,
 
 /* Statements */
 
-typedef enum { 
+typedef enum {
   ST_ARITHMETIC_IF, ST_ALLOCATE, ST_ATTR_DECL, ST_BACKSPACE, ST_BLOCK_DATA,
   ST_CALL, ST_CASE, ST_CLOSE, ST_COMMON, ST_CONTINUE, ST_CONTAINS, ST_CYCLE,
   ST_DATA, ST_DATA_DECL, ST_DEALLOCATE, ST_DO, ST_ELSE, ST_ELSEIF,
@@ -288,7 +288,7 @@ typedef struct g95_file {
   char filename[PATH_MAX+1];
   g95_source_form form;
   struct g95_file *included_by, *next;
-  locus loc; 
+  locus loc;
   struct linebuf *start;
 } g95_file;
 
@@ -406,7 +406,7 @@ typedef void * tree; /* Just a dummy place holder. */
 
 typedef struct g95_st_label {
   int value;
-  
+
   g95_sl_type defined, referenced;
 
   char *format;
@@ -577,7 +577,7 @@ typedef struct g95_state_data {
  * completely, but I guess we can use the union anyway. Just sanitize
  * parse.c :-)  */
   union {
-    g95_st_label * end_do_label; 
+    g95_st_label * end_do_label;
   } ext;
 } g95_state_data;
 
@@ -749,7 +749,7 @@ typedef struct {
   int kind, radix, digits, min_exponent, max_exponent;
 
   int range, precision;
-  mpf_t epsilon, huge, tiny;  
+  mpf_t epsilon, huge, tiny;
 } g95_real_info;
 
 extern g95_real_info g95_real_kinds[];
@@ -779,7 +779,7 @@ typedef struct g95_case {
   char cache;		 /* used during insertion in AVL tree */
 
   int label;             /* used during character select resolution */
- 
+
 } g95_case;
 
 #define g95_get_case() g95_getmem(sizeof(g95_case))
@@ -857,7 +857,7 @@ typedef enum {
   EXEC_RETURN, EXEC_STOP, EXEC_CONTINUE,
   EXEC_IF, EXEC_ARITHMETIC_IF, EXEC_DO, EXEC_DO_WHILE, EXEC_SELECT,
   EXEC_FORALL, EXEC_WHERE, EXEC_CYCLE, EXEC_EXIT,
-  EXEC_ALLOCATE, EXEC_DEALLOCATE, 
+  EXEC_ALLOCATE, EXEC_DEALLOCATE,
   EXEC_OPEN, EXEC_CLOSE, EXEC_READ, EXEC_WRITE, EXEC_IOLENGTH,
   EXEC_BACKSPACE, EXEC_ENDFILE, EXEC_INQUIRE, EXEC_REWIND
 } g95_exec_op;
@@ -884,7 +884,7 @@ typedef struct g95_code {
     g95_inquire *inquire;
     g95_dt *dt;
     g95_forall_iterator *forall_iterator;
-    struct g95_code *whichloop; 
+    struct g95_code *whichloop;
   } ext;     /* Points to additional structures required by statement */
 
   /* Backend_decl is used for cycle and break labels in do loops, and
@@ -927,7 +927,7 @@ typedef struct g95_data {
 
 typedef struct g95_directorylist {
   char *path;
-  struct g95_directorylist *next; 
+  struct g95_directorylist *next;
 } g95_directorylist;
 
 /* Structure for holding compile options */
@@ -935,8 +935,8 @@ typedef struct g95_directorylist {
 typedef struct {
   char *source, *object;
   int verbose, pedantic, surprising, aliasing, line_truncation, implicit_none,
-    fixed_line_length, module_access_private, fmode, dollar, q_kind, 
-    quiet, r8, i8, d8, l1, pack_derived;
+    fixed_line_length, module_access_private, fmode, dollar, q_kind,
+    quiet, r8, i8, d8, l1, pack_derived, max_stack_var_size;
   g95_directorylist *include_dirs;
   char *module_dir;
   g95_source_form form;
@@ -1079,8 +1079,8 @@ char *g95_arith_error(arith);
 void g95_arith_init_1(void);
 void g95_arith_done_1(void);
 
-void natural_logarithm(mpf_t *, mpf_t *); 
-void common_logarithm(mpf_t *, mpf_t *); 
+void natural_logarithm(mpf_t *, mpf_t *);
+void common_logarithm(mpf_t *, mpf_t *);
 void exponential(mpf_t *, mpf_t *);
 void sine(mpf_t *, mpf_t *);
 void cosine(mpf_t *, mpf_t *);

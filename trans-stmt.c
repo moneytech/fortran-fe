@@ -34,11 +34,14 @@ Boston, MA 02111-1307, USA.  */
 #include "function.h"
 #include "expr.h"
 #include "real.h"
+#include <assert.h>
 #include <gmp.h>
 #define BACKEND_CODE
 #include "g95.h"
 #include "trans.h"
 #include "trans-stmt.h"
+#include "trans-types.h"
+#include "trans-array.h"
 
 tree
 g95_trans_label_here (g95_code *code)
@@ -53,9 +56,23 @@ g95_trans_goto (g95_code *code)
 }
 
 tree
-g95_trans_call (g95_code *code ATTRIBUTE_UNUSED)
+g95_trans_call (g95_code *code)
 {
-  g95_todo_error ("Statement not implemented: CALL");
+  g95_se se;
+  tree stmt;
+
+  g95_start_stmt ();
+
+  g95_init_se (&se, NULL);
+
+  g95_conv_function_call (&se, code->sym, code->ext.actual);
+
+  TREE_SIDE_EFFECTS (se.expr) = 1;
+  stmt = build_stmt (EXPR_STMT, se.expr);
+  g95_add_stmt_to_pre (&se, stmt, stmt);
+  g95_add_stmt_to_pre (&se, se.post, se.post_tail);
+
+  return g95_finish_stmt (se.pre, se.pre_tail);
 }
 
 tree
@@ -69,9 +86,36 @@ g95_trans_return (g95_code *code ATTRIBUTE_UNUSED)
 }
 
 tree
-g95_trans_stop (g95_code *code ATTRIBUTE_UNUSED)
+g95_trans_stop (g95_code *code)
 {
-  g95_todo_error ("Statement not implemented: STOP");
+  g95_se se;
+  tree arg;
+  tree tmp;
+
+  g95_start_stmt ();
+
+  g95_init_se (&se, NULL);
+  if (code->label != NULL)
+    {
+      if (code->expr != NULL)
+        {
+          g95_conv_simple_val (&se, code->expr);
+          arg = se.expr;
+        }
+      else
+        arg = build_int_2 (code->label->value, 0);
+    }
+  else
+    arg = integer_zero_node;
+
+  arg = tree_cons (NULL_TREE, arg, NULL_TREE);
+  tmp = g95_build_function_call (g95_fndecl_stop, arg);
+  tmp = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_pre (&se, tmp, tmp);
+
+  tmp = g95_finish_stmt (se.pre, se.pre_tail);
+
+  return tmp;
 }
 
 
@@ -183,6 +227,28 @@ g95_trans_arithmetic_if (g95_code *code ATTRIBUTE_UNUSED)
   g95_todo_error ("Statement not implemented: ARITHMETIC IF");
 }
 
+/* Compare two values.  Return true if they are the same variable.  */
+static int
+g95_is_same_var (tree val1, tree val2)
+{
+  if (val1 == val2)
+    return 1;
+
+  if (val1 == NULL_TREE || val2 == NULL_TREE)
+    return 0;
+
+  /* ignore NON_LAVALUE_EXPR.  */
+  if (TREE_CODE (val1) == NON_LVALUE_EXPR)
+    val1 = TREE_OPERAND (val1, 0);
+  if (TREE_CODE (val1) == NON_LVALUE_EXPR)
+    val1 = TREE_OPERAND (val1, 0);
+
+  if (TREE_CODE (val1) != VAR_DECL || TREE_CODE (val2) != VAR_DECL)
+    return 0;
+
+  return (val1 == val2);
+}
+
 /* Currently calculates the loop count before entering the loop, but
    it may be possible to optimize if step is a constant. The main
    advantage is that the loop test is a single SIMPLE node
@@ -212,10 +278,10 @@ cycle_label:
 exit_label:
 
    Some optimization is done for empty do loops. We can't just let
-   dovar=to because it's possible for to+range*(to-from)!=to.  Anyone
+   dovar=to because it's possible for from+range*loopcount!=to.  Anyone
    who writes empty DO deserves sub-optimal (but correct) code anyway.
 
-   TODO:
+   TODO: Large loop counts
    Does not work loop counts which do not fit into a signed integer kind,
    ie. Does not work for loop counts > 2^31 for integer(kind=4) variables
    We must support the full range.  */
@@ -229,8 +295,9 @@ g95_trans_do (g95_code * code)
   tree body;
   tree expr;
   tree count;
-  tree range;
+  tree countvar;
   tree init;
+  tree init_tail;
   tree type;
   tree cond;
   tree stmt;
@@ -251,35 +318,58 @@ g95_trans_do (g95_code * code)
   g95_init_se (&step, NULL);
   g95_conv_simple_val (&step, code->ext.iterator->step);
 
-  /* We don't want this changing half way through the loop.  */
+  /* We don't want this changing part way through.  */
   g95_make_safe_expr (&step);
 
   type = TREE_TYPE (dovar.expr);
 
-  range = g95_create_tmp_var (type);
-  count = g95_create_tmp_var (type);
+  countvar = NULL_TREE;
+  init = init_tail = NULL_TREE;
 
   /* Initialise loop count. This code is executed before we enter the
-     loop body. We generate:
+     loop body. We generate: count = (to + step - from)  */
 
-     range = to - from;
-     range = range + step;
-     count = range / step;  */
-  tmp = build (MINUS_EXPR, type, to.expr, from.expr);
-  tmp = build (MODIFY_EXPR, type, range, tmp);
-  init = build_stmt (EXPR_STMT, tmp);
+  count = build (MINUS_EXPR, type, step.expr, from.expr);
+  count = g95_simple_fold (count, &init, &init_tail, &countvar);
 
-  tmp = build (PLUS_EXPR, type, range, step.expr);
-  tmp = build (MODIFY_EXPR, type, range, tmp);
-  init = chainon (init, build_stmt (EXPR_STMT, tmp));
+  count = build (PLUS_EXPR, type, to.expr, count);
+  count = g95_simple_fold (count, &init, &init_tail, &countvar);
 
-  tmp = build (TRUNC_DIV_EXPR, type, range, step.expr);
-  tmp = build (MODIFY_EXPR, type, count, tmp);
-  init = chainon (init, build_stmt (EXPR_STMT, tmp));
+  for_init = tmp = NULL_TREE;
+  count = build (TRUNC_DIV_EXPR, type, count, step.expr);
+  count = g95_simple_fold (count, &init, &init_tail, &countvar);
 
-  /* Initialise the DO variable: just dovar = from.  */
-  for_init = build_stmt (EXPR_STMT,
-			build (MODIFY_EXPR, type, dovar.expr, from.expr));
+  /* We use the last assignment as the initial expression for the for loop.  */
+  if (! g95_is_same_var (count,  countvar))
+    {
+      /* Count needs to be a temporary variable. */
+      if (countvar == NULL_TREE)
+        countvar = g95_create_tmp_var (type);
+      tmp = build (MODIFY_EXPR, type, countvar, count);
+      for_init = build_stmt (EXPR_STMT, tmp);
+      count = countvar;
+    }
+  else
+    {
+      assert (init != NULL_TREE);
+      /* The last assignment is the for loop init statement.  */
+
+      for_init = init_tail;
+      if (init == for_init)
+          init = init_tail = NULL_TREE;
+      else
+        {
+          init_tail = init;
+          while (TREE_CHAIN (init_tail) != for_init)
+            init_tail = TREE_CHAIN (init_tail);
+          TREE_CHAIN (init_tail) = NULL_TREE;
+        }
+    }
+
+  /* Initialise the DO variable: dovar = from.  */
+  tmp = build (MODIFY_EXPR, type, dovar.expr, from.expr);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&init, &init_tail, stmt, stmt);
 
   /* Loop until count <= 0.  */
   cond = build (GT_EXPR, boolean_type_node, count, integer_zero_node);
@@ -300,7 +390,7 @@ g95_trans_do (g95_code * code)
 
       /* Put these labels where they can be found later. We put the
          labels in a TREE_LIST node (because TREE_CHAIN is already
-         used?). cycle_label goes in TREE_PURPOSE (backend_decl), exit
+         used). cycle_label goes in TREE_PURPOSE (backend_decl), exit
          label in TREE_VALUE (backend_decl).  */
       code->block->backend_decl = tree_cons (cycle_label, exit_label, NULL);
 
@@ -346,12 +436,11 @@ g95_trans_do (g95_code * code)
   g95_add_stmt_to_pre (&dovar, from.pre, from.pre_tail);
   g95_add_stmt_to_pre (&dovar, to.pre, to.pre_tail);
   g95_add_stmt_to_pre (&dovar, step.pre, step.pre_tail);
-  g95_add_stmt_to_pre (&dovar, init, NULL_TREE);
+  g95_add_stmt_to_pre (&dovar, init, init_tail);
   g95_add_stmt_to_pre (&dovar, stmt, NULL_TREE);
 
   /* Add label for exit if one exists.  */
   if ((code->block->next != NULL)
-      && exit_label
       && TREE_USED (exit_label))
     {
       TREE_CHAIN (dovar.pre_tail) = build_stmt (LABEL_STMT, exit_label);
@@ -493,14 +582,143 @@ g95_trans_exit (g95_code *code)
 }
 
 tree
-g95_trans_allocate (g95_code *code ATTRIBUTE_UNUSED)
+g95_trans_allocate (g95_code *code)
 {
-  g95_todo_error ("Statement not implemented: ALLOCATE");
+  g95_alloc *al;
+  g95_expr *expr;
+  g95_se se;
+  tree tmp;
+  tree parm;
+  tree stmt;
+  g95_ref *ref;
+  tree head;
+
+  g95_start_stmt ();
+
+  head = NULL_TREE;
+
+  for (al = code->ext.alloc_list ; al != NULL ; al = al->next)
+    {
+      g95_start_stmt ();
+
+      expr = al->expr;
+
+      g95_init_se (&se, NULL);
+      se.want_pointer = 1;
+      g95_conv_simple_rhs (&se, expr);
+      assert (se.post == NULL_TREE);
+
+      ref = expr->ref;
+
+      /* Find the last reference in the chain.  */
+      while (ref->next != NULL)
+        {
+          assert (ref->type != REF_ARRAY || ref->u.ar.type == AR_ELEMENT);
+          ref = ref->next;
+        }
+
+      if (ref->type != REF_ARRAY)
+        ref = NULL;
+
+      if (ref != NULL)
+        {
+          /* TODO: allocation stat variables.  */
+          g95_array_allocate (&se, ref, NULL);
+        }
+      else
+        {
+          tree val;
+
+          /*TODO: allocation of derived types containing arrays.  */
+          val = g95_create_tmp_var (ppvoid_type_node);
+          tmp = build1 (ADDR_EXPR, TREE_TYPE (val), se.expr);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (val), val, tmp);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (&se, stmt, stmt);
+
+          tmp = TYPE_SIZE_UNIT (TREE_TYPE (se.expr));
+          parm = tree_cons(NULL_TREE, tmp, NULL_TREE);
+          parm = tree_cons(NULL_TREE, val, NULL_TREE);
+          tmp = g95_build_function_call (g95_fndecl_allocate, parm);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (&se, stmt, stmt);
+        }
+
+      stmt = g95_finish_stmt (se.pre, se.pre_tail);
+      head = chainon (head, stmt);
+    }
+
+  /* Only create the outer scope if there's more than one variable.  */
+  if (TREE_CHAIN (head) == NULL_TREE)
+    {
+      assert (TREE_CODE (head) == COMPOUND_STMT);
+      g95_merge_stmt ();
+    }
+  else
+    head = g95_finish_stmt (head, NULL_TREE);
+
+  return head;
 }
 
 tree
-g95_trans_deallocate (g95_code *code ATTRIBUTE_UNUSED)
+g95_trans_deallocate (g95_code *code)
 {
-  g95_todo_error ("Statement not implemented: DEALLOCATE");
+  g95_se se;
+  g95_alloc *al;
+  g95_expr *expr;
+  tree stmt;
+  tree head;
+  tree var;
+  tree tmp;
+  tree type;
+
+  g95_start_stmt ();
+  head = NULL_TREE;
+
+  for (al = code->ext.alloc_list ; al != NULL ; al = al->next)
+    {
+      g95_start_stmt ();
+
+      expr = al->expr;
+      assert (expr->expr_type == EXPR_VARIABLE);
+
+      g95_init_se (&se, NULL);
+      se.want_pointer = 1;
+      g95_conv_simple_rhs (&se, expr);
+      assert (se.post == NULL_TREE);
+
+      if (expr->symbol->attr.dimension)
+        {
+          stmt = g95_array_deallocate (se.expr);
+          g95_add_stmt_to_pre (&se, stmt, NULL_TREE);
+        }
+      else
+        {
+          type = build_pointer_type (TREE_TYPE (se.expr));
+          var = g95_create_tmp_var (type);
+          tmp = build1 (ADDR_EXPR, type, se.expr);
+          tmp = build (MODIFY_EXPR, type, var, tmp);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (&se, stmt, stmt);
+
+          tmp = tree_cons (NULL_TREE, var, NULL_TREE);
+          tmp = g95_build_function_call (g95_fndecl_deallocate, tmp);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (&se, stmt, stmt);
+        }
+      stmt = g95_finish_stmt (se.pre, se.pre_tail);
+      head = chainon (head, stmt);
+    }
+
+  /* Only create the outer scope if there's more than one variable.  */
+  if (TREE_CHAIN (head) == NULL_TREE)
+    {
+      assert (TREE_CODE (head) == COMPOUND_STMT);
+      g95_merge_stmt ();
+    }
+  else
+    head = g95_finish_stmt (head, NULL_TREE);
+
+  return head;
 }
 

@@ -50,6 +50,7 @@ tree g95_trans_forall (g95_code *);
 tree g95_trans_where (g95_code *);
 tree g95_trans_allocate (g95_code *);
 tree g95_trans_deallocate (g95_code *);
+tree g95_trans_deallocate_array (tree);
 
 /* trans-io.c */
 tree g95_trans_open(g95_code *);

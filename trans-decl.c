@@ -24,6 +24,7 @@ Boston, MA 02111-1307, USA.  */
 #include "config.h"
 #include "system.h"
 #include "tree.h"
+#include "tree-simple.h"
 #include <stdio.h>
 #include "c-common.h"
 #include "ggc.h"
@@ -37,6 +38,7 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "trans.h"
 #include "trans-types.h"
+#include "trans-array.h"
 /* Only for g95_trans_code.  Souldn't neet to include this.  */
 #include "trans-stmt.h"
 
@@ -51,10 +53,15 @@ static GTY(()) tree current_function_return_label;
 static GTY (()) tree saved_function_decls = NULL_TREE;
 
 /* Function declarations for builtin library functions.  */
-static GTY(()) tree g95_fndecl_push_context;
-static GTY(()) tree g95_fndecl_pop_context;
-static GTY(()) tree g95_fndecl_internal_alloc;
-static GTY(()) tree g95_fndecl_array_mismatch;
+tree g95_fndecl_push_context;
+tree g95_fndecl_pop_context;
+tree g95_fndecl_array_mismatch;
+tree g95_fndecl_internal_malloc;
+tree g95_fndecl_internal_malloc64;
+tree g95_fndecl_allocate;
+tree g95_fndecl_allocate64;
+tree g95_fndecl_deallocate;
+tree g95_fndecl_stop;
 
 /* TODO : - Move generic build functions to either trans.c or a renamed
             and cleanded up support.c */
@@ -232,23 +239,11 @@ g95_finish_decl (tree decl, tree init)
         }
     }
 
-#if 0
-  /* Output the assembler code and/or RTL code for variables and functions,
-     unless the type is an undefined structure or union. If not, it will get
-     done when the type is completed.  */
-
-  if (TREE_CODE (decl) == VAR_DECL
-      || TREE_CODE (decl) == FUNCTION_DECL || TREE_CODE (decl) == TYPE_DECL)
-  {
-    rest_of_decl_compilation (decl, NULL, DECL_CONTEXT (decl) == 0, 0);
-  }
-#endif
 }
 
-/* Return the decl for a g95_symbol, create it if it doesn't allready
+/* Return the decl for a g95_symbol, create it if it doesn't already
    exist.  */
 /* TODO : - sanitize.
-          - this function should *only* be used for variables.
           - also see all those todo_errors...  */
 tree
 g95_get_symbol_decl (g95_symbol * sym)
@@ -271,10 +266,14 @@ g95_get_symbol_decl (g95_symbol * sym)
   else if (sym->attr.intrinsic)
     g95_todo_error ("intrinsics");
 
+  /* Catch external function declarations.  */
+  assert (! (sym->attr.function || sym->attr.subroutine));
+
   decl = build_decl (VAR_DECL,
                      g95_sym_identifier (sym),
                      g95_sym_type (sym));
-  /* TREE_ADDRESSABLE meand the address of this variable is acualy needed.
+
+  /* TREE_ADDRESSABLE means the address of this variable is acualy needed.
      This is the equivalent of the TARGET variables.
      We also need to set this if the variable is passed by reference in a
      CALL statement.  */
@@ -282,10 +281,6 @@ g95_get_symbol_decl (g95_symbol * sym)
     TREE_ADDRESSABLE (decl)=1;
   /* If it wasn't used we wouldn't be getting it.  */
   TREE_USED (decl)=1;
-
-  /* Mark symbol as external if it's declared external in the parser.  */
-  if (sym->attr.external)
-    DECL_EXTERNAL (decl) = 1;
 
   /* If a variable is USE associated, it's always external, and
      its assembler name should be manged.  */
@@ -320,7 +315,50 @@ g95_get_symbol_decl (g95_symbol * sym)
   return decl;
 }
 
-/* Get a function declaration.  Create it if if deosn't exist.  */
+/* Get a basic decl for an external function.  */
+tree
+g95_get_extern_function_decl (g95_symbol *sym)
+{
+  tree type;
+  tree fndecl;
+
+  if (sym->backend_decl)
+    return sym->backend_decl;
+
+  type = g95_get_function_type (sym);
+  fndecl = build_decl (FUNCTION_DECL, g95_sym_identifier (sym), type);
+
+  /* If the return type is a pointer, avoid alias issues by setting
+     DECL_IS_MALLOC to nonzero. This means that the function should be
+     treated as if it were a malloc, meaning it returns a pointer that
+     is not an alias.  */
+  if (POINTER_TYPE_P (type))
+    DECL_IS_MALLOC (fndecl) = 1;
+
+  /* Set up all attributes for the function.  */
+  DECL_CONTEXT (fndecl) = current_function_decl;
+  DECL_EXTERNAL (fndecl) = 1;
+
+  /* This specifies if a function is globaly addressable, ie. it is
+     the opposite of decalring static  in C.  */
+  TREE_PUBLIC (fndecl) = 1;
+
+  /* Set attributes for PURE functions. A call to PURE function in the
+     Fortran 95 sense is both pure and without side effects in the C
+     sense.  */
+  if (sym->attr.pure || sym->attr.elemental)
+    {
+      DECL_IS_PURE (fndecl) = 1;
+      TREE_SIDE_EFFECTS (fndecl) = 0;
+    }
+
+  sym->backend_decl = fndecl;
+
+  return fndecl;
+}
+
+/* Get a function declaration.  Create it if it doesn't exist.  For external
+   functions (int the C sense) use g95_get_extern_function_decl.  */
 tree
 g95_get_function_decl (g95_symbol * sym)
 {
@@ -331,54 +369,20 @@ g95_get_function_decl (g95_symbol * sym)
   if (sym->backend_decl)
     return sym->backend_decl;
 
-  /* make sure this symbol is a function or a subroutine.  */
-  assert (sym->attr.function || sym->attr.subroutine);
+  assert (! sym->attr.external);
 
-  /* Allow only one nesting level.  */
-  /* We may need two for external declarations  within nested functions.  */
+  /* Allow only one nesting level.  Allow external declarations.  */
   assert (current_function_decl == NULL_TREE
           || DECL_CONTEXT (current_function_decl) == NULL_TREE);
 
-  type = NULL_TREE;
-  typelist = NULL_TREE;
-  /* Build the argument types for the function */
-  for (f = sym->formal; f; f = f->next)
-    {
-      if (f->sym)
-        {
-          type = g95_sym_type (f->sym);
-          /* Parameter Passing Convention
-
-             We currently pass all parameters by reference.
-             Parameters with INTENT(IN) voud be passed by value.
-             The problem arises if a function is called vai and implicit
-             prototypes. In this situation the INTENT is not known.
-             For this reason all parameters to global functions must be
-             passed by reference.  Passing by valie would potentialy
-             generate bad code, worse there would be no way of telling that
-             this code wad bed, except that it would give incorrect results.
-
-             Module and contained procedures could pass by value as these are
-             never used without and explicit interface.
-           */
-          typelist = chainon (typelist, listify (type));
-        }
-    }
-
-  typelist = chainon (typelist, listify (void_type_node));
-
-  if (sym->attr.subroutine)
-    type=void_type_node;
-  else
-    type=g95_sym_type (sym);
-
-  type = build_function_type (type, typelist);
+  type = g95_get_function_type (sym);
   fndecl = build_decl (FUNCTION_DECL, g95_sym_identifier (sym), type);
 
   /* Figure out the return type of the declared function, and build a
      RESULT_DECL for it.  If this is subroutine with alternate
      returns, build a RESULT_DECL for it.  */
   attr = sym->attr;
+
   result_decl = NULL_TREE;
   if (attr.function)
     {
@@ -422,13 +426,16 @@ g95_get_function_decl (g95_symbol * sym)
 
   /* Set up all attributes for the function.  */
   DECL_CONTEXT (fndecl) = current_function_decl;
-  DECL_EXTERNAL (fndecl) = sym->attr.external;
+  DECL_EXTERNAL (fndecl) = 0;
 
   /* This specifies if a function is globaly addressable, ie. it is
      the opposite of decalring static  in C.  */
-  TREE_PUBLIC (fndecl) = (DECL_CONTEXT (fndecl) == NULL_TREE);
-  /* This should be 0 for external declarations.  */
-  TREE_STATIC (fndecl) = 1;
+  if (DECL_CONTEXT (fndecl) == NULL_TREE || attr.external)
+    TREE_PUBLIC (fndecl) = 1;
+
+  /* TREE_STATIC means the function body is defined here.  */
+  if (! attr.external)
+    TREE_STATIC (fndecl) = 1;
 
   /* Set attributes for PURE functions. A call to PURE function in the
      Fortran 95 sense is both pure and without side effects in the C
@@ -441,49 +448,48 @@ g95_get_function_decl (g95_symbol * sym)
 
   /* Layout the function declaration and put it in the binding level
      of the current function.  */
-  /* not done for FUNCTION_DECL nades
-  layout_decl (fndecl, 0);*/
-  pushdecl (fndecl);
-
-  /* Build formal argument list. Make sure that their TREE_CONTEXT is
-     the new FUNCTION_DECL node.  */
-  current_function_decl = fndecl;
-  arglist = NULL_TREE;
-  typelist = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
-  for (f = sym->formal; f; f = f->next)
+  if (! attr.external)
     {
-      if (f->sym != NULL)       /* ignore alternate returns. */
+      pushdecl (fndecl);
+      /* Build formal argument list. Make sure that their TREE_CONTEXT is
+         the new FUNCTION_DECL node.  */
+      current_function_decl = fndecl;
+      arglist = NULL_TREE;
+      typelist = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
+      for (f = sym->formal; f; f = f->next)
         {
-          tree parm;
+          if (f->sym != NULL)       /* ignore alternate returns. */
+            {
+              tree parm;
 
-          type = TREE_VALUE (typelist);
-          /* Build a the argument declaration.  */
-          parm = build_decl (PARM_DECL,
-                             g95_sym_identifier (f->sym),
-                             type);
+              type = TREE_VALUE (typelist);
+              /* Build a the argument declaration.  */
+              parm = build_decl (PARM_DECL,
+                                 g95_sym_identifier (f->sym),
+                                 type);
 
-          /* Fill in arg stuff.  */
-          DECL_CONTEXT (parm) = fndecl;
-          DECL_ARG_TYPE (parm) = type;
-          DECL_ARG_TYPE_AS_WRITTEN (parm) = type;
-          /* All implementation args are read-only.  */
-          TREE_READONLY (parm) = 1;
+              /* Fill in arg stuff.  */
+              DECL_CONTEXT (parm) = fndecl;
+              DECL_ARG_TYPE (parm) = type;
+              DECL_ARG_TYPE_AS_WRITTEN (parm) = type;
+              /* All implementation args are read-only.  */
+              TREE_READONLY (parm) = 1;
 
-          //parm = pushdecl (parm);
-          g95_finish_decl (parm, NULL_TREE);
+              //parm = pushdecl (parm);
+              g95_finish_decl (parm, NULL_TREE);
 
-          f->sym->backend_decl=parm;
+              f->sym->backend_decl=parm;
 
-          arglist = chainon (arglist, parm);
-          typelist = TREE_CHAIN (typelist);
+              arglist = chainon (arglist, parm);
+              typelist = TREE_CHAIN (typelist);
+            }
         }
+
+      DECL_ARGUMENTS (fndecl) = arglist;
+
+      /* Restore the old context.  */
+      current_function_decl = DECL_CONTEXT (fndecl);
     }
-
-  DECL_ARGUMENTS (fndecl) = arglist;
-
-  /* Restore the old context.  */
-  current_function_decl = DECL_CONTEXT (fndecl);
-
   sym->backend_decl = fndecl;
 
   return fndecl;
@@ -518,533 +524,6 @@ g95_get_fake_result_decl (void)
   current_fake_result_decl = decl;
 
   return decl;
-}
-
-/* Build a CALL_EXPR.  */
-static tree
-g95_build_function_call (tree fndecl, tree arglist)
-{
-  tree fn;
-  tree call;
-
-  fn = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (fndecl)), fndecl);
-  call = build (CALL_EXPR, TREE_TYPE (fndecl), fn, arglist);
-  TREE_SIDE_EFFECTS (call) = 1;
-
-  return call;
-}
-
-/* Generates setup and cleanup code for arrays, and adds it to function body.
-   End result is something like:
-
-    subroutine foo (...)
-    {
-      __g95_push_context ()
-      foreach (local_array)
-        {
-          array.bounds = <calculated bounds of array>
-          array.stride = <clculated stride>
-          size = <number of elements in array> * <size of single array element>
-          __g95_internal_alloc (array.<data|block>, size);
-    #ifdef g95_use_gcc_arrays
-          array.data = &array.block[-sum(array.lbound[]*array.stride[])]
-    #endif
-        }
-      foreach (non-pointer array parameter)
-        {
-          <adjust bounds to match assumed lower bound>
-        }
-
-      <function body code>
-    __return_foo:
-      foreach (non-pointer array parameter)
-        {
-          <restore bounds>
-        }
-      __g95_pop_context ()
-    }
-
-   TODO: Place small arrays on the stack rather than the heap.  */
-/* Helper Macro. Adds a STMT_EXPR to list(head, tail).  */
-#define ADD_EXPR_STMT(expr) {tree stmt__tmp = build_stmt (EXPR_STMT, expr); \
-                    g95_add_stmt_to_list (&head, &tail, stmt__tmp, stmt__tmp);}
-
-static tree
-g95_trans_auto_array_allocation (g95_symbol * sym)
-{
-  g95_se ubound;
-  g95_se lbound;
-  int n;
-  tree head;
-  tree tail;
-  tree size;
-  tree num;
-  tree tmp;
-  tree type;
-  tree data_pointer_type;
-  tree element_type;
-  tree field;
-  tree stride;
-  tree offset;
-
-  g95_start_stmt ();
-
-  head = tail = NULL_TREE;
-
-  /* Work out types that we will need later.  */
-  type = TREE_TYPE (sym->backend_decl);
-  assert (TREE_CODE (type) == RECORD_TYPE);
-
-  field = g95_get_data_component (type);
-  data_pointer_type = TREE_TYPE (field);
-
-  /* Temp vars to hold and calculate the size of the array data.  */
-  size=g95_create_tmp_var (g95_array_index_type);
-  num = g95_create_tmp_var (g95_array_index_type);
-  if (g95_use_gcc_arrays)
-    {
-      stride = NULL_TREE;
-      offset = NULL_TREE;
-    }
-  else
-    {
-      stride = g95_create_tmp_var(g95_array_index_type);
-      offset = g95_create_tmp_var(g95_array_index_type);
-    }
-
-  /* Calculate the number of elements in the array.  Also fill in the
-     descriptor lbound and ubound members.  */
-  for (n = 0 ; n < sym->as->rank ; n++)
-    {
-      g95_init_se (&lbound, NULL);
-      g95_conv_simple_val (&lbound, sym->as->lower[n]);
-      g95_init_se (&ubound, NULL);
-      g95_conv_simple_val (&ubound, sym->as->upper[n]);
-
-      /* Store the lower bound of the array in the descriptor.  */
-      g95_add_stmt_to_list (&head, &tail, lbound.pre, lbound.pre_tail);
-      field = g95_get_lbound_component (type, n);
-      tmp = build (COMPONENT_REF, g95_array_index_type,
-                    sym->backend_decl, field);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, tmp, lbound.expr);
-      ADD_EXPR_STMT (tmp);
-
-      /* Do the same for the upper bound.  */
-      g95_add_stmt_to_list (&head, &tail, ubound.pre, ubound.pre_tail);
-      field = g95_get_ubound_component (type, n);
-      tmp = build (COMPONENT_REF, g95_array_index_type,
-                    sym->backend_decl, field);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, tmp, ubound.expr);
-      ADD_EXPR_STMT (tmp);
-
-      /* Number of elements in this dimension = ubound + 1 - lbound  */
-      /*TODO: constant folding - This may be done by the backend anyway.  */
-      tmp = build (MINUS_EXPR, g95_array_index_type,
-                    integer_one_node, lbound.expr);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-      /* num = 1 - lbound */
-      ADD_EXPR_STMT (tmp);
-
-      tmp = build (PLUS_EXPR, g95_array_index_type, ubound.expr, num);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-      /* num = ubound + num */
-      ADD_EXPR_STMT (tmp);
-
-      if (n == 0)
-        tmp = num;
-      else
-        tmp = build (PLUS_EXPR, g95_array_index_type, size, num);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, size, tmp);
-      /* size = size + num */
-      ADD_EXPR_STMT (tmp);
-
-      if (! g95_use_gcc_arrays)
-        {
-          /* Work out the array stride.  */
-          if (n == 0)
-            tmp = integer_one_node;
-          else
-            tmp = build (MULT_EXPR, g95_array_index_type, stride, num);
-          tmp = build (MODIFY_EXPR, g95_array_index_type, stride, tmp);
-          ADD_EXPR_STMT (tmp);
-          /* Save it in the descriptor.  */
-          field = g95_get_stride_component (type, n);
-          tmp = build (COMPONENT_REF, g95_array_index_type,
-                        sym->backend_decl, field);
-          tmp = build (MODIFY_EXPR, g95_array_index_type, tmp, stride);
-          ADD_EXPR_STMT (tmp);
-
-          if (n > 0)
-            {
-              /* Calculate the offset (stride*lbound).  */
-              tmp = build (MULT_EXPR, g95_array_index_type,
-                            stride, lbound.expr);
-              tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-              ADD_EXPR_STMT (tmp);
-
-              /* Add to the total offset.  */
-              tmp = build (PLUS_EXPR, g95_array_index_type, offset, num);
-            }
-          else
-            tmp = lbound.expr;
-
-          /* Set the new offset.  */
-          tmp = build (MODIFY_EXPR, g95_array_index_type, offset, tmp);
-          ADD_EXPR_STMT (tmp);
-        }
-    } /* For (rank).  */
-
-  /* Get the type of a sigle element.  */
-  element_type = TREE_TYPE (data_pointer_type);
-  while (TREE_CODE (element_type) == ARRAY_TYPE)
-    element_type = TREE_TYPE (element_type);
-
-  /* Multiply by the size of a single element.  */
-  tmp = build (MULT_EXPR, g95_array_index_type, size,
-          TYPE_SIZE_UNIT (element_type));
-  tmp = build (MODIFY_EXPR, g95_array_index_type, size, tmp);
-  ADD_EXPR_STMT (tmp);
-
-  /* For GCC arrays store the pointer in the first component (data),
-     otherwise use the last component (block).  */
-  if (g95_use_gcc_arrays)
-    type = g95_get_data_component (type);
-  else
-    field = g95_get_block_component (type);
-  /* Now allocate the memory.  Parameters to __g95_internal_alloc
-     are address of data pointer and size of block.  */
-  tmp = build (COMPONENT_REF, data_pointer_type,
-                sym->backend_decl, field);
-  tmp = build1 (ADDR_EXPR,
-                build_pointer_type (build_pointer_type (void_type_node)),
-                tmp);
-  tmp = tree_cons (NULL_TREE, tmp, NULL_TREE);
-  tmp = chainon (tmp, tree_cons (NULL_TREE, size, NULL_TREE));
-  tmp = g95_build_function_call (g95_fndecl_internal_alloc, tmp);
-  /* __g95_internal_alloc (&descriptor->data, size) */
-  ADD_EXPR_STMT (tmp);
-
-  /* For Type B arrays we need to bias the data pointer.  */
-  if (! g95_use_gcc_arrays)
-    {
-      tree ref;
-      tree pointer;
-
-      assert (TREE_TYPE( TREE_TYPE (data_pointer_type)) == element_type);
-      /* offset = -offset */
-      tmp = build1 (NEGATE_EXPR, g95_array_index_type, offset);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, offset, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      /* pointer = array.block */
-      pointer = g95_create_tmp_var (data_pointer_type);
-      tmp = build (COMPONENT_REF, data_pointer_type,
-                    sym->backend_decl, field);
-      tmp = build (MODIFY_EXPR, data_pointer_type, num, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      /* array.data = &pointer[offset] */
-      field = g95_get_data_component (type);
-      tmp = build1 (INDIRECT_REF, TREE_TYPE (data_pointer_type), pointer);
-      tmp = build (ARRAY_REF, element_type, tmp, offset);
-      tmp = build1 (ADDR_EXPR, data_pointer_type, tmp);
-      ref = build (COMPONENT_REF, data_pointer_type,
-                    sym->backend_decl, field);
-      tmp = build (MODIFY_EXPR, data_pointer_type, ref, tmp);
-      ADD_EXPR_STMT (tmp);
-    }
-
-  /* That's all the initialisation code for this array.  */
-  head = g95_finish_stmt (head, tail);
-
-  return head;
-}
-
-/* Modify the descriptor for an array parameter so that it has the
-   correct lower bound.  Also move the upper bound accordingly
-   Bias the data pointer for Type B arrays.  */
-/* TODO: Check that the bounds match for AS_EXPLICIT parameters.  */
-static tree
-g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
-{
-  tree stmt;
-  tree saved;
-  tree type;
-  tree descriptor;
-  tree tmp;
-  tree offset;
-  tree num;
-  tree delta;
-  tree head;
-  tree tail;
-  tree field;
-  tree saved_field;
-  tree dest;
-  g95_se lbound;
-  int n;
-
-  assert (TREE_CODE (TREE_TYPE (sym->backend_decl)) = REFERENCE_TYPE);
-  /* Descriptor type.  */
-  type = TREE_TYPE (TREE_TYPE (sym->backend_decl));
-  assert (TREE_CODE (type) == RECORD_TYPE);
-
-  saved = g95_create_tmp_var (g95_get_descriptorsave_type (sym->as->rank));
-  saved_field = TYPE_FIELDS (TREE_TYPE (saved));
-  descriptor = build1 (INDIRECT_REF, type, sym->backend_decl);
-
-  /* Wrap up the initialisation in its own scope.  Note that saved must be
-     created outside this block so that it has function scope.  */
-  g95_start_stmt ();
-
-  head = tail = NULL_TREE;
-
-  num = g95_create_tmp_var (g95_array_index_type);
-  delta = g95_create_tmp_var (g95_array_index_type);
-  if (! g95_use_gcc_arrays)
-    offset = g95_create_tmp_var (g95_array_index_type);
-  else
-    offset = NULL_TREE;
-
-  /* First check that it's the corret type of descriptor.  If we will  call
-     __g95_array_mismatch () which throws a runtime error.  */
-  /* num = descriptor.stride00 */
-  field = g95_get_stride_component(type, 0);
-  tmp = build (COMPONENT_REF, g95_array_index_type, descriptor, field);
-  tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-  ADD_EXPR_STMT (tmp);
-
-  tmp = g95_build_function_call (g95_fndecl_array_mismatch, NULL_TREE);
-  stmt = build_stmt (EXPR_STMT, tmp);
-
-  tmp = build (NE_EXPR, boolean_type_node, num,
-                g95_use_gcc_arrays ? integer_zero_node : integer_one_node);
-  stmt = build_stmt (IF_STMT, tmp, stmt, NULL_TREE);
-  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
-
-  if (! g95_use_gcc_arrays)
-    {
-      /* Save the data pointer.  */
-      field = g95_get_data_component (type);
-      assert (TREE_CODE (TREE_TYPE (saved_field)) == POINTER_TYPE);
-
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
-      dest = build (COMPONENT_REF, TREE_TYPE (field), saved, saved_field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), dest, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      saved_field = TREE_CHAIN (saved_field);
-    }
-
-  for (n = 0 ; n < sym->as->rank ; n++)
-    {
-      g95_init_se (&lbound, NULL);
-
-      g95_conv_simple_val (&lbound, sym->as->lower[n]);
-      g95_make_safe_expr (&lbound);
-      g95_add_stmt_to_list (&head, &tail, lbound.pre, lbound.pre_tail);
-
-      /* Get passed lower bound.  */
-      field = g95_get_lbound_component (type, n);
-      tmp = build (COMPONENT_REF, g95_array_index_type, descriptor, field);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      /* How much do we need to change the bound, store in delta.  */
-      tmp = build (MINUS_EXPR, g95_array_index_type, lbound.expr, num);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, delta, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      /* Save this.  */
-      tmp = build (COMPONENT_REF, g95_array_index_type, saved, saved_field);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, tmp, delta);
-      ADD_EXPR_STMT (tmp);
-
-      saved_field = TREE_CHAIN (saved_field);
-
-      /* Store the new bound.  */
-      field = g95_get_lbound_component (type, n);
-      tmp = build (COMPONENT_REF, g95_array_index_type, descriptor, field);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, tmp, lbound.expr);
-      ADD_EXPR_STMT (tmp);
-
-      /* Get the upper bound.  */
-      field = g95_get_ubound_component (type, n);
-      tmp = build (COMPONENT_REF, g95_array_index_type, descriptor, field);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      /* Adjust and store back.  */
-      tmp = build (PLUS_EXPR, g95_array_index_type, num, delta);
-      dest = build (COMPONENT_REF, g95_array_index_type, descriptor, field);
-      tmp = build (MODIFY_EXPR, g95_array_index_type, dest, tmp);
-      ADD_EXPR_STMT (tmp);
-
-
-      /* For Type A arrays data is correct.  For Type B arrays we need to bias
-         the data pointer.  */
-      if (! g95_use_gcc_arrays)
-        {
-          /* Stride == 1 for first dimension.  */
-          if (n > 0)
-            {
-              /* Get the stide.  */
-              field = g95_get_stride_component (type, n);
-              tmp = build (COMPONENT_REF, g95_array_index_type,
-                            descriptor, field);
-              tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-              ADD_EXPR_STMT (tmp);
-
-              /* Multiply by delta */
-              tmp = build (MULT_EXPR, g95_array_index_type, delta, num);
-              tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-              ADD_EXPR_STMT (tmp);
-
-              /* Add to total offset.  */
-              tmp = build (PLUS_EXPR, g95_array_index_type, offset, num);
-            }
-          else
-            tmp = delta;
-          /* Store offset.  */
-          tmp = build (MODIFY_EXPR, g95_array_index_type, offset, tmp);
-          ADD_EXPR_STMT (tmp);
-        }
-    }
-
-  if (! g95_use_gcc_arrays)
-    {
-      tree pointer;
-
-      /* Get the data component.  */
-      field = g95_get_data_component (type);
-      pointer = g95_create_tmp_var (TREE_TYPE (field));
-
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), pointer, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      /* array->data = &array->data[offset] */
-      tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pointer)), pointer);
-      tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
-      tmp = build1 (ADDR_EXPR, TREE_TYPE (pointer), tmp);
-      dest = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), dest, tmp);
-      ADD_EXPR_STMT (tmp);
-    }
-
-  /* Add code to start of function.  */
-  head = g95_finish_stmt (head, tail);
-  body = chainon (head, body);
-
-  /* Cleanup.  */
-  g95_start_stmt ();
-
-  head = tail = NULL_TREE;
-  num = g95_create_tmp_var (g95_array_index_type);
-  delta = g95_create_tmp_var (g95_array_index_type);
-
-  saved_field = TYPE_FIELDS (TREE_TYPE (saved));
-
-  if (! g95_use_gcc_arrays)
-    {
-      /* Restore the data pointer.  */
-      field = g95_get_data_component (type);
-      dest = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), saved, saved_field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), dest, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      saved_field = TREE_CHAIN (saved_field);
-    }
-
-  /* Restore the bounds.  */
-  for (n = 0 ; n < sym->as->rank ; n++)
-    {
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), saved, saved_field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), delta, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      /* Get lower bound.  */
-      field = g95_get_lbound_component (type, n);
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), num, tmp);
-      ADD_EXPR_STMT (tmp);
-      /* Adjust and store back.  */
-      tmp = build (MINUS_EXPR, TREE_TYPE (field), num, delta);
-      dest = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), dest, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      /* Same for upper bound.  */
-      field = g95_get_ubound_component (type, n);
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), num, tmp);
-      ADD_EXPR_STMT (tmp);
-      tmp = build (MINUS_EXPR, TREE_TYPE (field), num, delta);
-      dest = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (field), dest, tmp);
-      ADD_EXPR_STMT (tmp);
-
-      saved_field = TREE_CHAIN (saved_field);
-    }
-
-  /* Add cleanup code to end of function.  */
-  head = g95_finish_stmt (head, tail);
-  body = chainon (body, head);
-
-  return body;
-}
-
-static tree
-g95_trans_array_vars (g95_symbol * sym, tree body)
-{
-  tree tmp;
-  tree stmt;
-
-  for ( ; sym ; sym = sym->tlink)
-    {
-      switch (sym->as->type)
-        {
-        case AS_EXPLICIT:
-          if (sym->attr.dummy)
-            body = g95_trans_dummy_array_bias (sym, body);
-          else
-            {
-              stmt = g95_trans_auto_array_allocation (sym);
-
-              /* Add to the start of the function body.  */
-              body = chainon (stmt, body);
-            }
-          break;
-
-        case AS_ASSUMED_SHAPE:
-        case AS_ASSUMED_SIZE:
-          /* Must be dummy parameters.  */
-          assert (sym->attr.dummy);
-
-          body = g95_trans_dummy_array_bias (sym, body);
-          break;
-
-        default:
-          g95_todo_error("Array type %d initialisation", sym->as->type);
-          break;
-        }
-    }
-
-  /* Build a call to __g95_push_context ().  */
-  tmp = g95_build_function_call (g95_fndecl_push_context, NULL_TREE);
-  stmt = build_stmt (EXPR_STMT, tmp);
-
-  /* Add to start of function body.  */
-  body = chainon (stmt, body);
-
-  /* Build a call to __g95_pop_context ().  */
-  tmp = g95_build_function_call (g95_fndecl_pop_context, NULL_TREE);
-  stmt = build_stmt (EXPR_STMT, tmp);
-
-  /* Add to end of function body.  */
-  body = chainon (body, stmt);
-
-  return body;
 }
 
 /* Builds a function decl.  The remaining parameters are the types of the
@@ -1091,21 +570,23 @@ g95_build_library_function_decl VPARAMS((tree name, tree rettype, int nargs, ...
   return fndecl;
 }
 
-/* Make prototypes for runtime library functions.
-
-   void __g95_push_context ()
-   void __g95_pop_context ()
-   void __g95_internal_alloc (void **, size_t)
-*/
+/* Make prototypes for runtime library functions.  */
 void
 g95_build_builtin_function_decls (void)
 {
-  g95_fndecl_internal_alloc = g95_build_library_function_decl (
-            get_identifier ("__g95_internal_alloc"),
+  g95_fndecl_internal_malloc = g95_build_library_function_decl (
+            get_identifier ("__g95_internal_malloc"),
             void_type_node,
             2,
-            build_pointer_type (build_pointer_type (void_type_node)),
-            g95_array_index_type);
+            ppvoid_type_node,
+            g95_int4_type_node);
+
+  g95_fndecl_internal_malloc64 = g95_build_library_function_decl (
+            get_identifier ("__g95_internal_malloc64"),
+            void_type_node,
+            2,
+            ppvoid_type_node,
+            g95_int8_type_node);
 
   g95_fndecl_push_context = g95_build_library_function_decl (
             get_identifier ("__g95_push_context"),
@@ -1121,9 +602,95 @@ g95_build_builtin_function_decls (void)
             get_identifier ("__g95_array_mismatch"),
             void_type_node,
             0);
+
+  g95_fndecl_allocate = g95_build_library_function_decl (
+            get_identifier ("__g95_allocate"),
+            void_type_node,
+            2,
+            ppvoid_type_node,
+            g95_int4_type_node);
+
+  g95_fndecl_allocate64 = g95_build_library_function_decl (
+            get_identifier ("__g95_allocate64"),
+            void_type_node,
+            2,
+            ppvoid_type_node,
+            g95_int8_type_node);
+
+  g95_fndecl_deallocate = g95_build_library_function_decl (
+            get_identifier ("__g95_deallocate"),
+            void_type_node,
+            1,
+            ppvoid_type_node);
+
+  g95_fndecl_stop = g95_build_library_function_decl (
+            get_identifier ("__g95_stop"),
+            void_type_node,
+            1,
+            g95_int4_type_node);
 }
 
-/* This should really be in trans.c.  */
+static tree
+g95_trans_deferred_vars (g95_symbol * sym, tree body)
+{
+  tree tmp;
+  tree stmt;
+
+  for ( ; sym ; sym = sym->tlink)
+    {
+      /* For now this is only array variables, but may get extended to
+         derived types.  */
+      assert (sym->attr.dimension);
+
+      switch (sym->as->type)
+        {
+        case AS_EXPLICIT:
+          if (sym->attr.dummy)
+            body = g95_trans_dummy_array_bias (sym, body);
+          else
+            {
+              stmt = g95_trans_auto_array_allocation (sym);
+
+              /* Add to the start of the function body.  */
+              body = chainon (stmt, body);
+            }
+          break;
+
+        case AS_ASSUMED_SHAPE:
+        case AS_ASSUMED_SIZE:
+          /* Must be dummy parameters.  */
+          assert (sym->attr.dummy);
+
+          body = g95_trans_dummy_array_bias (sym, body);
+          break;
+
+        case AS_DEFERRED:
+          body = g95_trans_deferred_array (sym, body);
+          break;
+
+        default:
+          g95_todo_error("Array type %d initialisation", sym->as->type);
+          break;
+        }
+    }
+
+  /* Build a call to __g95_push_context ().  */
+  tmp = g95_build_function_call (g95_fndecl_push_context, NULL_TREE);
+  stmt = build_stmt (EXPR_STMT, tmp);
+
+  /* Add to start of function body.  */
+  body = chainon (stmt, body);
+
+  /* Build a call to __g95_pop_context ().  */
+  tmp = g95_build_function_call (g95_fndecl_pop_context, NULL_TREE);
+  stmt = build_stmt (EXPR_STMT, tmp);
+
+  /* Add to end of function body.  */
+  body = chainon (body, stmt);
+
+  return body;
+}
+
 /* Generate code for a function.  */
 void
 g95_generate_function_code (g95_namespace * ns)
@@ -1206,7 +773,7 @@ g95_generate_function_code (g95_namespace * ns)
   /* Add code to create and cleanup arrays.  */
   if (sym->tlink != NULL)
     {
-      body = g95_trans_array_vars (sym->tlink, body);
+      body = g95_trans_deferred_vars (sym->tlink, body);
       sym->tlink = NULL;
     }
 
@@ -1232,7 +799,7 @@ g95_generate_function_code (g95_namespace * ns)
 
   /* Add all the decls we created during processing.  */
   body = chainon (saved_function_decls, body);
-  saved_function_decls = NULL_TREE;
+  saved_function_decls = NULL;
 
   body = g95_finish_stmt (body, NULL_TREE);
 
@@ -1245,15 +812,23 @@ g95_generate_function_code (g95_namespace * ns)
   /* Output the SIMPLE tree.  */
   {
     FILE *dump_file;
-    int dump_flags;
+    static int dump_flags = 0;
+    /* TODO: make this a commandline switch.  */
+#if 1
+    static int first = 0;
+    if (! first)
+      {
+        dump_switch_p ("dump-tree-simple");
+        first = 1;
+      }
+#endif
 
-    dump_switch_p ("dump-tree-simple");
     dump_file = dump_begin (TDI_simple, &dump_flags);
     if (dump_file)
       {
-        warning ("dumping %s", ns->proc_name->name);
         fprintf (dump_file, "dumping %s\n", ns->proc_name->name);
         print_c_tree (dump_file, DECL_SAVED_TREE (fndecl));
+        dump_node (DECL_SAVED_TREE (fndecl), dump_flags, dump_file);
         dump_end (TDI_simple, dump_file);
       }
   }

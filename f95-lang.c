@@ -26,6 +26,7 @@ Boston, MA 02111-1307, USA.  */
 #include "config.h"
 #include "system.h"
 #include "tree.h"
+#include "tree-simple.h"
 #include "output.h"
 #include <stdio.h>
 #include "debug.h"
@@ -40,6 +41,8 @@ Boston, MA 02111-1307, USA.  */
 #include "expr.h"
 #include "errors.h"
 #include "timevar.h"
+#include "flags.h"
+#include "tree-optimize.h"
 #include <assert.h>
 #define BACKEND_CODE
 #include "g95.h"
@@ -247,6 +250,14 @@ expand_function_body (tree fndecl)
 
   timevar_push (TV_EXPAND);
 
+  if (is_simple_stmt (DECL_SAVED_TREE (fndecl)))
+    {
+      if (flag_tree_ssa)
+        optimize_function_tree (fndecl);
+    }
+  else
+    warning ("Internal failure: Function is not SIMPLE. Optimization inhibited.");
+
   /* create RTL for startup code of function, such as saving registers */
   expand_function_start (fndecl, 0);
 
@@ -278,7 +289,7 @@ expand_function_body (tree fndecl)
    but we optimize comparisons, &&, ||, and !.
 
    The resulting type should always be `boolean_type_node'.  */
-/*TODO: this needs optimization*/
+/*TODO: fix truthvalue_conversion.  */
 
 tree
 g95_truthvalue_conversion (tree expr ATTRIBUTE_UNUSED)
@@ -725,17 +736,16 @@ int ggc_p = 1;
    See tree.h for its possible values.
 
    If LIBRARY_NAME is nonzero, use that for DECL_ASSEMBLER_NAME,
-   the name to be called if we can't opencode the function.
-
-   copied from gcc/c-decl.c by Tim Josling
-
-*/
+   the name to be called if we can't opencode the function.  If
+   ATTRS is nonzero, use that for the function's attribute list.  */
 
 tree
 builtin_function (const char *name,
 		  tree type,
 		  int function_code,
-		  enum built_in_class class, const char *library_name)
+		  enum built_in_class class,
+                  const char *library_name,
+                  tree attrs ATTRIBUTE_UNUSED)
 {
   tree decl = build_decl (FUNCTION_DECL, get_identifier (name), type);
   DECL_EXTERNAL (decl) = 1;

@@ -33,6 +33,7 @@ Boston, MA 02111-1307, USA.  */
 #include "expr.h"
 #include "real.h"
 #include <gmp.h>
+#include <assert.h>
 #define BACKEND_CODE
 #include "g95.h"
 #include "trans.h"
@@ -79,9 +80,23 @@ convert_mpf_to_tree (mpf_t f, int kind)
   return (res);
 }
 
+/* Translate a scalar constant.  Constants never have pre or post chains.  */
 void
 g95_conv_constant (g95_se * se, g95_expr * expr)
 {
+  assert (expr->expr_type == EXPR_CONSTANT);
+
+  if (se->ss != NULL)
+    {
+      assert (se->ss != g95_ss_terminator);
+      assert (se->ss->dimen == 0);
+      assert (se->ss->expr == expr);
+
+      se->expr = se->ss->data.se.expr;
+      g95_advance_se_ss_chain (se);
+      return;
+    }
+
   switch (expr->ts.type)
     {
     case BT_INTEGER:

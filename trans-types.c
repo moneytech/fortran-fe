@@ -58,6 +58,7 @@ tree g95_type_nodes[NUM_F95_TYPES];
 
 int g95_array_index_kind;
 tree g95_array_index_type;
+tree ppvoid_type_node;
 
 
 /* Create the backend type nodes. We map them to their
@@ -68,6 +69,9 @@ void
 g95_init_types (void)
 {
   int n;
+
+  ppvoid_type_node = build_pointer_type (build_pointer_type (void_type_node));
+
   /* Name the types.  */
 #define PUSH_TYPE(name, node)                   \
   pushdecl (build_decl (TYPE_DECL, get_identifier (name), node))
@@ -80,7 +84,6 @@ g95_init_types (void)
   PUSH_TYPE ("int4", g95_int4_type_node);
   g95_int8_type_node = g95_type_for_size (64, 0 /*unsigned*/);
   PUSH_TYPE ("int8", g95_int8_type_node);
-
 #if (G95_USE_TYPES16 && (HOST_BITS_PER_WIDE_INT >= 64))
   /* I can't find the standard size for a 128 bit int */
   g95_int16_type_node = g95_type_for_size (128, 0 /*unsigned*/);
@@ -120,6 +123,7 @@ g95_init_types (void)
   PUSH_TYPE ("logical16", g95_logical16_type_node);
 #endif
 
+  PUSH_TYPE ("byte", unsigned_char_type_node);
 #undef PUSH_TYPE
 
   g95_array_index_kind = TYPE_PRECISION (integer_type_node) / 8;
@@ -426,6 +430,19 @@ g95_get_block_component (tree type)
   return field;
 }
 
+/* Creates a type with the given size.  Used for holding array data.  */
+tree
+g95_get_stack_array_type (tree size)
+{
+  tree type;
+  tree bounds;
+
+  bounds = build_range_type (g95_array_index_type, integer_one_node, size);
+  type = build_array_type (unsigned_char_type_node, bounds);
+
+  return type;
+}
+
 /* Build an array. This function is called from g95_sym_type().
    Actualy returns array descriptor type.
 
@@ -631,9 +648,13 @@ g95_build_array_type (tree type, g95_array_spec * as)
 
 /* Build an pointer. This function is called from g95_sym_type().  */
 static tree
-g95_build_pointer_type (tree type ATTRIBUTE_UNUSED)
+g95_build_pointer_type (g95_symbol * sym, tree type)
 {
-  g95_todo_error ("Pointers not implemented yet...");
+  /* Array pointer types aren't actualy pointers.  */
+  if (sym->attr.dimension)
+    return type;
+  else
+    return build_pointer_type (type);
 }
 
 /* Return the type for a symbol.
@@ -650,7 +671,7 @@ g95_sym_type (g95_symbol * sym)
 
   if (sym->backend_decl)
   {
-    if (sym->attr.function)
+    if (sym->attr.function || sym->attr.subroutine)
       return TREE_TYPE (TREE_TYPE (sym->backend_decl));
     else
       return TREE_TYPE (sym->backend_decl);
@@ -662,7 +683,7 @@ g95_sym_type (g95_symbol * sym)
       type = g95_build_array_type (type, sym->as);
 
   if (sym->attr.allocatable || sym->attr.pointer)
-    type = g95_build_pointer_type (type);
+    type = g95_build_pointer_type (sym, type);
 
   /* We currently pass all parameters by reference.
      See f95_get_function_decl.  */
@@ -674,7 +695,7 @@ g95_sym_type (g95_symbol * sym)
 
 /* This is used by g95_get_derived_type.  Not sure what it was meant to do.  */
 static void
-g95_set_decl_attributes (tree type, symbol_attribute * attr)
+g95_set_decl_attributes (tree type ATTRIBUTE_UNUSED, symbol_attribute * attr ATTRIBUTE_UNUSED)
 {
 }
 
@@ -704,12 +725,14 @@ g95_get_derived_type (g95_symbol * derived)
 
       field_type = g95_typenode_for_spec (&c->ts);
 
-      /* This returns an array descriptor type.
-         Initialisation is required.  */
+      /* This returns an array descriptor type.  Initialisation may be
+         required.  */
       if (c->dimension)
 	  field_type = g95_build_array_type (field_type, c->as);
 
-      if (c->pointer)
+      /* Pointers to arrays aren't actualy pointer types.  The descriptors
+         are seperate, but the data is common.  */
+      else if (c->pointer)
 	field_type = build_pointer_type (field_type);
 
       field = build_decl (FIELD_DECL,
@@ -739,6 +762,60 @@ g95_get_derived_type (g95_symbol * derived)
   derived->backend_decl = typenode;
 
   return typenode;
+}
+
+tree
+g95_get_function_type (g95_symbol * sym)
+{
+  tree type, typelist;
+  g95_formal_arglist *f;
+  /* make sure this symbol is a function or a subroutine.  */
+  assert (sym->attr.function || sym->attr.subroutine);
+
+  if (sym->backend_decl)
+    return TREE_TYPE (sym->backend_decl);
+
+  typelist = NULL_TREE;
+  /* Build the argument types for the function */
+  for (f = sym->formal; f; f = f->next)
+    {
+      if (f->sym)
+        {
+          if (f->sym->attr.function || f->sym->attr.subroutine)
+            {
+              type = g95_get_function_type (f->sym);
+              type = build_pointer_type (type);
+            }
+          else
+            type = g95_sym_type (f->sym);
+          /* Parameter Passing Convention
+
+             We currently pass all parameters by reference.
+             Parameters with INTENT(IN) voud be passed by value.
+             The problem arises if a function is called vai and implicit
+             prototypes. In this situation the INTENT is not known.
+             For this reason all parameters to global functions must be
+             passed by reference.  Passing by valie would potentialy
+             generate bad code, worse there would be no way of telling that
+             this code wad bed, except that it would give incorrect results.
+
+             Module and contained procedures could pass by value as these are
+             never used without and explicit interface.
+           */
+          typelist = chainon (typelist, listify (type));
+        }
+    }
+
+  typelist = chainon (typelist, listify (void_type_node));
+
+  if (sym->attr.subroutine)
+    type=void_type_node;
+  else
+    type=g95_sym_type (sym);
+
+  type = build_function_type (type, typelist);
+
+  return type;
 }
 
 /* Routines for getting integer type nodes */

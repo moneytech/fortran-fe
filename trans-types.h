@@ -27,6 +27,7 @@ extern GTY(()) tree g95_type_nodes[NUM_F95_TYPES];
 
 extern int g95_array_index_kind;
 extern GTY(()) tree g95_array_index_type;
+extern GTY(()) tree ppvoid_type_node;
 
 #define g95_int1_type_node  g95_type_nodes[F95_INT1_TYPE]
 #define g95_int2_type_node  g95_type_nodes[F95_INT2_TYPE]
@@ -53,7 +54,7 @@ extern GTY(()) tree g95_array_index_type;
 /* be-function.c */
 void g95_convert_function_code (g95_namespace *);
 
-/* types.c */
+/* trans-types.c */
 void g95_init_types (void);
 
 tree g95_get_int_type (int);
@@ -61,8 +62,14 @@ tree g95_get_real_type (int);
 tree g95_get_complex_type (int);
 tree g95_get_logical_type (int);
 tree g95_get_character_type (int);
+/* For holding array data on the stack.  */
+tree g95_get_stack_array_type (tree);
 
-tree g95_type_spec (g95_typespec * spec);
+tree g95_sym_type (g95_symbol *);
+tree g95_typenode_for_spec (g95_typespec *);
+
+tree g95_type_spec (g95_typespec *);
+tree g95_get_function_type (g95_symbol *);
 
 tree g95_type_for_size (unsigned, int);
 tree g95_type_for_mode (enum machine_mode, int);

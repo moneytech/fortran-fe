@@ -31,7 +31,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-static struct 
+static struct
 {
   char *option;
   char *description;
@@ -59,7 +59,7 @@ g95_option_t g95_option;
 void *g95_getmem(size_t n) {
 void *p;
 
-  if (n == 0) return NULL; 
+  if (n == 0) return NULL;
 
   p = calloc(n, 1);
   if (p == NULL) g95_fatal_error("Out of memory-- malloc() failed");
@@ -96,11 +96,11 @@ static void add_path(g95_directorylist **list, char *path) {
 g95_directorylist *dir;
 char *p;
 
-  p = path; 
+  p = path;
   while (*p == ' ' || *p == '\t') /* someone might do 'g95 "-I include"' */
     if (*p++ == '\0') return;
 
-  dir = *list; 
+  dir = *list;
   if (!dir) {
     dir = *list = g95_getmem(sizeof(g95_directorylist));
   } else {
@@ -114,7 +114,7 @@ char *p;
   dir->next = NULL;
   dir->path = g95_getmem(strlen(p)+2);
   strcpy(dir->path, p);
-  strcat(dir->path, "/");     /* make '/' last character */ 
+  strcat(dir->path, "/");     /* make '/' last character */
 }
 
 
@@ -286,7 +286,7 @@ static mstring intents[] = {
   minit(NULL, -1)
 };
 
-  return g95_code2string(intents, i); 
+  return g95_code2string(intents, i);
 }
 
 
@@ -368,7 +368,7 @@ int g95_parse_arg(int argc, char *argv[]) {
 char *option;
 int i;
 
-  option = argv[0]; 
+  option = argv[0];
 
   if (strcmp(option, "-v") == 0) {
     g95_option.verbose = 1;
@@ -454,6 +454,13 @@ int i;
 
   if (strcmp(option, "-fpack-derived") == 0) {
     g95_option.pack_derived = 1;
+    return 1;
+  }
+
+  if (strncmp(option, "-fmax-stack-var-size=", 21) == 0) {
+    i = atoi(option+21);
+
+    g95_option.max_stack_var_size = i;
     return 1;
   }
 
@@ -558,6 +565,7 @@ void g95_init_options(void) {
   g95_option.r8 = 0;
   g95_option.d8 = 0;
   g95_option.l1 = g95_default_logical_kind();
+  g95_option.max_stack_var_size = -1;
 }
 
 

@@ -24,6 +24,7 @@ Boston, MA 02111-1307, USA.  */
 #include "config.h"
 #include "system.h"
 #include "tree.h"
+#include "tree-simple.h"
 #include <stdio.h>
 #include "c-common.h"
 #include "ggc.h"
@@ -38,6 +39,7 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "trans.h"
 #include "trans-stmt.h"
+#include "trans-array.h"
 
 /* Naming convention for backend interface code:
    g95_trans_* translate g95_code into STMT trees.
@@ -147,6 +149,47 @@ g95_create_tmp_var (tree type)
   return tmp_var;
 }
 
+/* SIMPLE constant folding helper, returns a simple_val.  If tmpvar does
+   not point to an existing temporary a new one will be created as neccessary.
+   The expression should already be a simple_rhs.  */
+tree
+g95_simple_fold(tree expr, tree * phead, tree * ptail, tree *tmpvar)
+{
+  tree tmp;
+  tree var;
+  tree stmt;
+
+  assert (is_simple_rhs (expr));
+
+  tmp = fold (expr);
+  if (is_simple_val (tmp))
+    return tmp;
+
+  if (! is_simple_rhs (expr))
+      warning ("Internal inconsistancy: fold broke SIMPLE");
+
+  if (tmpvar != NULL)
+    {
+      var = *tmpvar;
+      assert (var == NULL_TREE || TREE_CODE (var) == VAR_DECL);
+    }
+  else
+    var = NULL_TREE;
+
+  if (var == NULL_TREE)
+    {
+      var = g95_create_tmp_var (TREE_TYPE (tmp));
+      if (tmpvar != NULL)
+        *tmpvar = var;
+    }
+
+  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), var, tmp);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (phead, ptail, stmt, stmt);
+
+  return var;
+}
+
 /* Create a new scope/binding level.  */
 void
 g95_start_stmt (void)
@@ -247,6 +290,20 @@ g95_finish_stmt (tree body, tree tail)
   return build_stmt (COMPOUND_STMT, head);
 }
 
+/* Build a CALL_EXPR.  */
+tree
+g95_build_function_call (tree fndecl, tree arglist)
+{
+  tree fn;
+  tree call;
+
+  fn = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (fndecl)), fndecl);
+  call = build (CALL_EXPR, TREE_TYPE (TREE_TYPE (fndecl)), fn, arglist);
+  TREE_SIDE_EFFECTS (call) = 1;
+
+  return call;
+}
+
 /* Chain two stmt chains. PHEAD is the head of the current stmt chain
    (or 0 if HEAD is the new phead), HEAD is the chain you want to link
    to it. PTAIL is the new tail of the current stmt chain. It's set to
@@ -302,6 +359,9 @@ g95_trans_code (g95_code * code)
 
   if (! code)
     return (NULL_TREE);
+
+  g95_start_stmt ();
+
   head = NULL_TREE;
   tail = NULL_TREE;
 
@@ -452,13 +512,23 @@ g95_trans_code (g95_code * code)
         }
     }
 
+  /* Abort empty chains.  */
+  if (! head)
+    {
+      g95_merge_stmt();
+      return NULL_TREE;
+    }
+
   /* We now have translated the full g95_code chain passed to us.  If
      the resulting stmt tree is not a single tree but a chain, put it
-     in its own compound.  */
-  if (! head)
-    return NULL_TREE;
+     in its own scope.  */
+  assert (TREE_CHAIN (tail) == NULL_TREE);
+  if (head == tail && TREE_CODE (head) == COMPOUND_STMT)
+    g95_merge_stmt ();
+  else
+    head = g95_finish_stmt (head, tail);
 
-  return build_stmt (COMPOUND_STMT, head);
+  return head;
 }
 
 /* These functions still need a bit of work to support everything,  */
@@ -498,8 +568,8 @@ g95_generate_code (g95_namespace * ns)
   if (! ns->proc_name)
     {
       /* Lots of things get upset if a subroutine doesn't have a symbol, so we
-          make one now.  */
-      g95_get_symbol ("__main", ns, 0, &main_program);
+          make one now.  Hopefully we've set all the required fields.  */
+      g95_get_symbol ("__fortran_main", ns, 0, &main_program);
       attr.flavor = FL_PROCEDURE;
       attr.proc = PROC_UNKNOWN;
       attr.subroutine = 1;
@@ -536,11 +606,10 @@ void
 g95_generate_module_code (g95_namespace * ns)
 {
   g95_namespace *n;
-  tree fndecl;
 
   for (n = ns->contained ; n ; n = n->sibling)
     {
-      g95_get_function_decl (n);
+      g95_get_function_decl (n->proc_name);
       g95_generate_function_code (n);
     }
 }
