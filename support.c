@@ -74,6 +74,7 @@ tree decl_constant_value PARAMS((tree));
 static void warn_for_assignment PARAMS((const char *, const char *, tree, int));
 int lvalue_or_else PARAMS((tree, const char *));
 int lvalue_p PARAMS((tree));
+static tree tree_last_decl PARAMS((tree));
 
 /*dunno if/when this should be set*/
 static int skip_evaluation = 0;
@@ -212,7 +213,16 @@ tree
 create_tmp_var (type)
      tree type;
 {
-  g95_create_tmp_var (type);
+  return g95_create_tmp_var (type);
+}
+
+/*  Create a new temporary alias variable declaration of type TYPE.  Returns the
+    newly created decl. Does NOT push it into the current binding.  */
+tree
+create_tmp_alias_var (type)
+     tree type;
+{
+  return g95_create_tmp_alias_var (type);
 }
 
 /** Declares all the variables in VARS in SCOPE.  Returns the last

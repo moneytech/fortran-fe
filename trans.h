@@ -141,9 +141,11 @@ void g95_init_se(g95_se *, g95_se *);
    Used by g95_add_stmt_to_(pre|post).  */
 void g95_add_stmt_to_list(tree *, tree *, tree, tree);
 
-/* create a temporary variable
- * should not be used for array temporaries */
+/* create a temporary variable in the current scope.  */
 tree g95_create_tmp_var(tree);
+
+/* create a temporary variable, but do NOT put it in the current scope.  */
+tree g95_create_tmp_alias_var(tree);
 
 /* store the result of an expression on a temp variable so it can be used
  * repeatedly even if the original changes */

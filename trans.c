@@ -114,6 +114,21 @@ g95_make_type_writable (tree t)
 tree
 g95_create_tmp_var (tree type)
 {
+  tree tmp_var;
+
+  /* Get the tempoary. */
+  tmp_var = g95_create_tmp_var (type);
+  
+  /* Put the new variable in the current scope.  */
+  pushdecl (tmp_var);
+
+  return tmp_var;
+}
+
+/* Like g95_create_tmp_var() but don't add the decl to the current scope.  */
+tree
+g95_create_tmp_alias_var (tree type)
+{
   static unsigned int tmp_num = 1; /* 2^32 temporaries should be enough.  */
   tree tmp_var;
   char *tmp_name;
@@ -142,9 +157,6 @@ g95_create_tmp_var (tree type)
 
   /* Make the type of the variable writable.  */
   g95_make_type_writable (tmp_var);
-
-  /* Put the new variable in the current scope.  */
-  pushdecl (tmp_var);
 
   return tmp_var;
 }
