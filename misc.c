@@ -341,12 +341,13 @@ void g95_done_2(void) {
 /* display_help()-- Display help message and exit */
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
-#define WO 25
-#define WD 52
 
 static void display_help(void) {
-int i, lo, ld, pld, no, nd, seennl; 
+int i, lo, ld, pld, no, nd, seennl, WO, WD; 
 const char *co, *cd, *cdp;
+
+  WO = 25;
+  WD = 80 - WO - 3;
 
   g95_status("GNU Fortran 95 Compiler " G95_VERSION
     " (C) 2000-2002 Free Software Foundation\n"
@@ -411,8 +412,6 @@ const char *co, *cd, *cdp;
 	nd = -1;
 
     } while(no >=0 || nd >=0);
-#undef WO
-#undef WD
   }
 
   g95_status("\nSee http://g95.sourceforge.net for more information.\n");
