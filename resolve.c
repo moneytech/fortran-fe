@@ -1994,7 +1994,7 @@ try t;
     switch(code->op) {
     case EXEC_NOP:       case EXEC_CYCLE:     case EXEC_IOLENGTH:
     case EXEC_STOP:      case EXEC_EXIT:      case EXEC_CONTINUE:
-    case EXEC_WHERE:
+    case EXEC_WHERE:     case EXEC_DT_END:    case EXEC_TRANSFER:
       break;
 
     case EXEC_GOTO:

@@ -23,14 +23,12 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include <stdio.h>
 #include "ggc.h"
 #include "toplev.h"
 #include "target.h"
-#include "tm.h"
 #include "function.h"
 #include "errors.h"
 #include <assert.h>
@@ -1513,12 +1511,6 @@ g95_generate_function_code (g95_namespace * ns)
           tmp = build_v (RETURN_EXPR, tmp);
           g95_add_expr_to_block (&block, tmp);
         }
-    }
-
-  if (g95_current_io_state)
-    {
-      g95_add_decl_to_function (g95_current_io_state);
-      g95_current_io_state = NULL_TREE;
     }
 
   /* Add all the decls we created during processing.  */

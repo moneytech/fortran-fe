@@ -23,10 +23,9 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
-static g95_st_label format_asterisk_ =
+g95_st_label format_asterisk =
   { -1, ST_LABEL_FORMAT, ST_LABEL_FORMAT, NULL, 0 };
 
-static g95_st_label * format_asterisk = &format_asterisk_;
 
 typedef struct {
   char *name, *spec;
@@ -563,7 +562,7 @@ g95_st_label *label;
   if (g95_match_char('*') == MATCH_YES) {
     if (dt->format_expr != NULL || dt->format_label != NULL) goto conflict;
 
-    dt->format_label = format_asterisk;
+    dt->format_label = &format_asterisk;
     return MATCH_YES;
   }
 
@@ -733,12 +732,12 @@ g95_expr *e;
   }
 
   if (dt->rec != NULL) {
-    if (dt->end != 0) {
+    if (dt->end != NULL) {
       g95_error("REC tag at %L is incompatible with END tag", &dt->rec->where);
       return FAILURE;
     }
 
-    if (dt->format_label == format_asterisk) {
+    if (dt->format_label == &format_asterisk) {
       g95_error("END tag at %L is incompatible with list directed format (*)",
 		&dt->end_where);
       return FAILURE;
@@ -751,7 +750,7 @@ g95_expr *e;
     }
   }
 
-  if (dt->advance != NULL && dt->format_label == format_asterisk) {
+  if (dt->advance != NULL && dt->format_label == &format_asterisk) {
     g95_error("ADVANCE tag at %L is incompatible with list directed "
 	      "format (*)", &dt->advance->where);
     return FAILURE;
@@ -798,88 +797,6 @@ char *name;
   }
 
   return name;
-}
-
-
-/* gen_io_pointer()-- Given an expression, generate code structure(s)
- * that call the IO library with a pointer(s) to the correct thing.
- * This possibly generates a store to a temporary */
-
-static g95_code *gen_io_pointer(io_kind k, g95_expr *e) {
-g95_code *c;
-
-/* The IO library currently handles reads and writes seperately, and
-   the type can be deduced from the expression.  The old system also
-   didn't take account of different types.  */
-  switch (k){
-  case M_READ:
-    c = g95_build_call("_io_read", e, NULL);
-    break;
-
-  case M_WRITE:
-    c = g95_build_call("_io_write", e, NULL);
-    break;
-
-  case M_INQUIRE:
-    c = g95_build_call("_io_inquire", e, NULL);
-    break;
-
-  case M_PRINT:
-    c = g95_build_call("_io_print", e, NULL);
-    break;
-
-  default:
-    g95_internal_error("gen_io_pointer(): bad IO kind");
-  }
-
-  return c;
-#if 0
-  switch(e->ts.type) {
-  case BT_UNKNOWN:
-    c = g95_build_call("_io_unknown", e, NULL);
-    break;
-
-  case BT_INTEGER:
-    c = g95_build_call("_io_integer", e, NULL);
-    break;
-
-  case BT_REAL:
-    c = g95_build_call("_io_real", e, NULL);
-    break;
-
-  case BT_LOGICAL:
-    c = g95_build_call("_io_logical", e, NULL);
-    break;
-
-  case BT_CHARACTER:
-    c = g95_build_call("_io_character", e, NULL);
-    break;
-
-/* We can't just call io_real twice here because complex numbers
- * require special formatting for list-directed IO */
-
-  case BT_COMPLEX:
-    c = g95_build_call("_io_complex", e, NULL);
-    break;
-
-  case BT_DERIVED:
-    /* TODO: We have to be careful for derived types as well.  In
-     * particular, we don't want to recompute the base address for
-     * each component.  The idea will be to calculate the base of the
-     * structure, save it to a temp and then traverse the component
-     * list, calling the various subroutines with the base+offset for
-     * each member. */
-
-    c = g95_build_call("_io_unknown", e, NULL);
-    break;
-
-  default:
-    g95_internal_error("gen_io_pointer(): Bad type");
-
-  }
-
-  return c;
-#endif
 }
 
 
@@ -965,13 +882,14 @@ cleanup:
 /* match_io_element()-- Match a single element of an IO list, which is
  * either a single expression or an IO Iterator */
 
-static match match_io_element(io_kind k, g95_code **c) {
+static match match_io_element(io_kind k, g95_code **cpp) {
 g95_expr *expr;
+g95_code *cp;
 match m;
 
   expr = NULL;
 
-  m = match_io_iterator(k, c);
+  m = match_io_iterator(k, cpp);
   if (m == MATCH_YES) return MATCH_YES;
 
   if (k == M_READ) {
@@ -1021,7 +939,11 @@ match m;
     return MATCH_ERROR;
   }
 
-  *c = gen_io_pointer(k, expr);
+  cp = g95_get_code();
+  cp->op = EXEC_TRANSFER;
+  cp->expr = expr;
+
+  *cpp = cp;
   return MATCH_YES;
 }
 
@@ -1060,39 +982,16 @@ cleanup:
 }
 
 
-/* terminate_io()-- Generate a call that ends this I/O statement and
- * append it to the current list.  */
+/* terminate_io()-- Attach the data transfer end node */
 
-static void terminate_io(io_kind k, g95_code **io_code) {
-g95_code *term;
+static void terminate_io(g95_code *io_code) {
+g95_code *c;
 
-  switch (k)
-    {
-    case M_READ:
-      term = g95_build_call("_gforio_read_end", NULL);
-      break;
+  c = g95_get_code();
+  c->op = EXEC_DT_END;
+  c->ext.dt = new_st.ext.dt;     /* Point to structure that is already there */
 
-    case M_WRITE:
-      term = g95_build_call("_gforio_write_end", NULL);
-      break;
-
-    case M_PRINT:
-      term = g95_build_call("_gforio_print_end", NULL);
-      break;
-
-    case M_INQUIRE:
-      term = g95_build_call("_gforio_inquire_end", NULL);
-      break;
-
-    default:
-      g95_internal_error ("terminate_io(): Bad IO kind");
-      return;
-    }
-
-  if (*io_code == NULL)
-    *io_code = term;
-  else
-    g95_append_code(*io_code, term);
+  g95_append_code(io_code, c);
 }
 
 
@@ -1186,8 +1085,6 @@ get_io_list:
     if (m == MATCH_NO) goto syntax;
   }
 
-  terminate_io(k, &io_code);
-
 /* A full IO statement has been matched */
 
   if (dt->io_unit->expr_type == EXPR_VARIABLE && k == M_WRITE &&
@@ -1215,6 +1112,8 @@ get_io_list:
   new_st.op = (k == M_READ) ? EXEC_READ : EXEC_WRITE;
   new_st.ext.dt = dt;
   new_st.next = io_code;
+
+  terminate_io(io_code);
 
   return MATCH_YES;
 
@@ -1351,7 +1250,7 @@ match m;
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
-    terminate_io(M_INQUIRE, &code);
+    terminate_io(code);
 
     new_st.op = EXEC_IOLENGTH;
     new_st.expr = inquire->iolength;

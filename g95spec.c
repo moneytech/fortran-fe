@@ -25,13 +25,13 @@ Boston, MA 02111-1307, USA.  */
    unless explicitly overridden by the user in certain ways, ensure
    that the needs of the language supported by this wrapper are met.
 
-   For GNU Fortran 95(g95), we do the following to the argument list
+   For GNU Fortran 95 (g95), we do the following to the argument list
    before passing it to `gcc':
 
-   1.  Make sure `-lgfor -lm' is at the end of the list.
+   1.  Make sure `-lf95 -lm' is at the end of the list.
 
-   2.  Make sure each time `-lgfor' or `-lm' is seen, it forms
-       part of the series `-lgfor -lm'.
+   2.  Make sure each time `-lf95' or `-lm' is seen, it forms
+       part of the series `-lf95 -lm'.
 
    #1 and #2 are not done if `-nostdlib' or any option that disables
    the linking phase is present, or if `-xfoo' is in effect.  Note that
@@ -57,7 +57,7 @@ Boston, MA 02111-1307, USA.  */
 #endif
 
 #ifndef FORTRAN_LIBRARY
-#define FORTRAN_LIBRARY "-lgfor"
+#define FORTRAN_LIBRARY "-lf95"
 #endif
 
 /* Options this driver needs to recognize, not just know how to
@@ -96,8 +96,6 @@ static void append_arg PARAMS ((const char *));
 /* The new argument list will be built here.  */
 static int g77_newargc;
 static const char **g77_newargv;
-
-const struct spec_function lang_specific_spec_functions[] = {0,0};
 
 /* --- This comes from gcc.c (2.8.1) verbatim: */
 
@@ -285,7 +283,7 @@ lang_specific_driver (in_argc, in_argv, in_added_libraries)
 
   /* 0 => initial/reset state
      1 => FORTRAN_INIT linked in */
-  int use_init = 0;
+  int use_init = 1;
 
   /* By default, we throw on the math library if we have one.  */
   int need_math = (MATH_LIBRARY[0] != '\0');

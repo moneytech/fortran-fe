@@ -24,7 +24,6 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include <stdio.h>
@@ -60,13 +59,6 @@ g95_trans_call (g95_code *code)
   g95_se se;
   g95_symbol sym;
   g95_symbol *psym;
-
-  /* IO functions need special handling.  */
-  if (strncmp (code->sub_name, "_io_", 4) == 0)
-    return g95_trans_io_call (code);
-
-  if (strncmp (code->sub_name, "_gforio_", 8) == 0)
-    return g95_trans_iostate_call (code);
 
   g95_init_se (&se, NULL);
   g95_start_block (&se.pre);

@@ -23,7 +23,6 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include "coretypes.h"
 #include "tree.h"
 #include <stdio.h>
 #include "c-common.h"
@@ -146,7 +145,8 @@ g95_init_types (void)
     n = sizeof(HOST_WIDE_INT) * 8;
   n += G95_DTYPE_SIZE_SHIFT;
   g95_max_array_element_size = (~(unsigned HOST_WIDE_INT)0) >> n;
-  size_type_node = g95_array_index_type;
+
+  c_size_type_node = g95_array_index_type;
 }
 
 /* Get a type node for an integer kind */
@@ -348,7 +348,7 @@ g95_get_element_type (tree type)
 /* Build an array. This function is called from g95_sym_type().
    Actualy returns array descriptor type.
 
-   Format of array descriptors:
+   Format of array descriptors is as follows:
 
     struct g95_array_descriptor
     {
@@ -383,8 +383,7 @@ g95_get_element_type (tree type)
    use of PLACEHOLDER_EXPR/WITH_RECORD_EXPR, which isn't part of SIMPLE
    grammar.  Also, There is no way to explicitly set the array stride, so
    all data must be packed(1).  I've tried to mark all the functions which
-   would require modification with a GCC ARRAYS comment.  Note that this was
-   some time ago, and there may be important bits which are not marked.
+   would require modification with a GCC ARRAYS comment.
 
    The data component points to the first element in the array.
    The base component points to the origin (ie. array(0, 0...)).  If the array
@@ -407,27 +406,25 @@ g95_get_element_type (tree type)
    base[(index0-lbound0)*stride0 + (index1-lobound1)*stride1]
    Obviously this is much slower.  I will make this a compile time option,
    something like -fsmall-array-offsets.  Mixing code compiled with and without
-   this switch will work.  N.B. This hasn't been implemented at all yet.
+   this switch will work.
 
    (1) This can be worked around by modifying the upper bound of the previous
    dimension.  This requires extra fields in the descriptor (both real_ubound
    and fake_ubound).  In tree.def there is mention of TYPE_SEP, which
    may allow us to do this, however I can't find mention of this anywhere else.
 
-   Array parameter calling convention, and packed arrays:
-
-   Array data is passed as is, without repacking. If an array section is passed
-   or the array does not have a descriptor then a new descriptor is created,
-   otherwise the existing one wil be passed.  Thus a procedure cannot assume
-   its parameters are packed.  Any repacking of array data is done in function
-   entry and exit code.  Where an array is known to be packed, more efficient
-   code can be generated.  The -f[no-]repack-arrays commandline switches are
-   used to determice if an array should be repacked.  Repacking an already
-   packed array is detected at runtime, so the overhead will be small when
-   whole arrays are passed.  Repacking an array section may still be a loss if
-   the data is only accessed once, or only a few elements are accessed.
+   Arrays of character strings are stored as an array of string pointers. This
+   is slightly inefficient mut makes things much simpler.
+   The string data immediately follows this block of pointers.
+    CHARACTER(LEN=20), DIMENSION(5)
+    struct character_array_data
+    {
+      char * pstr[5];
+      char data[100];
+    } data;
+    for (i = 0; i < 5; i++)
+      data.pstr[i] = data.data[i * 20];
  */
- /* TODO: Specify array packing per-parameter (requires frontend support)  */
 
 /* Resurns true if the array sym does not require a descriptor.  */
 static int

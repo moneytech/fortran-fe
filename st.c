@@ -121,8 +121,9 @@ static void free_statement(g95_code *p) {
   case EXEC_NOP:      case EXEC_ASSIGN:     case EXEC_GOTO:  case EXEC_CYCLE:
   case EXEC_RETURN:   case EXEC_IF:         case EXEC_STOP:  case EXEC_EXIT: 
   case EXEC_WHERE:    case EXEC_IOLENGTH:   case EXEC_POINTER_ASSIGN:
-  case EXEC_DO_WHILE: case EXEC_ARITHMETIC_IF:   
-  case EXEC_CONTINUE:
+  case EXEC_DO_WHILE: case EXEC_CONTINUE:   case EXEC_TRANSFER:
+
+case EXEC_ARITHMETIC_IF:   
     break;
 
   case EXEC_CALL:
@@ -163,6 +164,10 @@ static void free_statement(g95_code *p) {
   case EXEC_READ:
   case EXEC_WRITE:
     g95_free_dt(p->ext.dt);
+    break;
+
+  case EXEC_DT_END:
+    /* The ext.dt member is a duplicate pointer and doesn't need to be freed */
     break;
 
   case EXEC_FORALL:
@@ -290,7 +295,8 @@ g95_dt *dt;
   case EXEC_ARITHMETIC_IF:
     g95_status("IF ");
     g95_show_expr(c->expr);
-    g95_status(" %d, %d, %d", c->label->value, c->label2->value, c->label3->value);
+    g95_status(" %d, %d, %d",
+	       c->label->value, c->label2->value, c->label3->value);
     break;
 
   case EXEC_IF:
@@ -567,16 +573,28 @@ g95_dt *dt;
     if (dt->format_expr) {
       g95_status(" FMT="); g95_show_expr(dt->format_expr); }
 
-    if (dt->format_label != NULL) g95_status(" FMT=%d", dt->format_label->value);
+    if (dt->format_label != NULL)
+      g95_status(" FMT=%d", dt->format_label->value);
     if (dt->namelist) g95_status(" NML=%s", dt->namelist->name);
     if (dt->iostat) { g95_status(" IOSTAT="); g95_show_expr(dt->iostat); }
     if (dt->size) { g95_status(" SIZE="); g95_show_expr(dt->size); }
     if (dt->rec) { g95_status(" REC="); g95_show_expr(dt->rec); }
     if (dt->advance) { g95_status(" ADVANCE="); g95_show_expr(dt->advance); }
+
+    break;
+
+  case EXEC_TRANSFER:
+    g95_status("TRANSFER ");
+    g95_show_expr(c->expr);
+    break;
+
+  case EXEC_DT_END:
+    g95_status("DT_END");
+    dt = c->ext.dt;
+
     if (dt->err != NULL) g95_status(" ERR=%d", dt->err->value);
     if (dt->end != NULL) g95_status(" END=%d", dt->end->value);
     if (dt->eor != NULL) g95_status(" EOR=%d", dt->eor->value);
-
     break;
 
   default:    
@@ -585,7 +603,6 @@ g95_dt *dt;
 
   g95_status_char('\n');
 }
-
 
 
 /* g95_show_code()-- Show a list of code structures. */

@@ -24,14 +24,13 @@ Boston, MA 02111-1307, USA.  */
 /* declare required prototypes: */
 
 #include "config.h"
+#include "ansidecl.h"
 #include "system.h"
-#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include "langhooks.h"
 #include "langhooks-def.h"
 #include "timevar.h"
-#include "tm.h"
 #include "function.h"
 #include "ggc.h"
 #include "toplev.h"

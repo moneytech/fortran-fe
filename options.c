@@ -24,7 +24,6 @@ Boston, MA 02111-1307, USA.  */
 #ifdef IN_GCC
 #include "config.h"
 #include "system.h"
-#include "coretypes.h"
 #include "tree.h"
 #include "flags.h"
 #include "intl.h"

@@ -23,7 +23,6 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include <stdio.h>
@@ -488,6 +487,14 @@ g95_trans_code (g95_code * code)
         case EXEC_REWIND:
           res = g95_trans_rewind (code);
           break;
+
+	case EXEC_TRANSFER:
+	  res = g95_trans_transfer(code);
+	  break;
+
+	case EXEC_DT_END:
+	  res = g95_trans_dt_end(code);
+	  break;
 
         default:
           internal_error ("g95_trans_code(): Bad statement code");

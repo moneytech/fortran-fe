@@ -328,9 +328,6 @@ void g95_build_io_library_fndecls (void);
 tree g95_build_library_function_decl VPARAMS((tree name, tree rettype,
                                               int nargs, ...));
 
-/* We have a single io state for a procedure.  */
-extern GTY(()) tree g95_current_io_state;
-
 /* somewhere! */
 tree pushdecl (tree);
 void pushlevel (int);

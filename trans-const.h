@@ -27,6 +27,8 @@ tree g95_conv_mpf_to_tree (mpf_t, int);
 /* Translate a constant value.  Must be an EXPR_CONSTANT.  */
 void g95_conv_constant (g95_se *, g95_expr *);
 
+tree g95_build_string_const(int, char *);
+
 /* Translate a string constant for a static initializer.  */
 tree g95_conv_string_init (tree, g95_expr *);
 

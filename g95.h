@@ -77,6 +77,10 @@ char *alloca ();
 #define NULL ((void *) 0)
 #endif
 
+#ifndef IN_GCC
+typedef void *tree; /* Just a dummy place holder. */
+#endif
+
 /* Stringization */
 
 #define stringize(x) expand_macro(x)
@@ -350,9 +354,6 @@ typedef struct {
 
 #define g95_get_array_spec() g95_getmem(sizeof(g95_array_spec))
 
-#ifndef BACKEND_CODE
-typedef void *tree; /* Just a dummy place holder. */
-#endif
 
 /* Components of derived types */
 
@@ -853,7 +854,8 @@ typedef enum {
   EXEC_IF, EXEC_ARITHMETIC_IF, EXEC_DO, EXEC_DO_WHILE, EXEC_SELECT,
   EXEC_FORALL, EXEC_WHERE, EXEC_CYCLE, EXEC_EXIT,
   EXEC_ALLOCATE, EXEC_DEALLOCATE,
-  EXEC_OPEN, EXEC_CLOSE, EXEC_READ, EXEC_WRITE, EXEC_IOLENGTH,
+  EXEC_OPEN, EXEC_CLOSE,
+  EXEC_READ, EXEC_WRITE, EXEC_IOLENGTH, EXEC_TRANSFER, EXEC_DT_END,
   EXEC_BACKSPACE, EXEC_ENDFILE, EXEC_INQUIRE, EXEC_REWIND
 } g95_exec_op;
 

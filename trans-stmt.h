@@ -21,7 +21,8 @@ Boston, MA 02111-1307, USA.  */
 
 /* Statement translators (g95_trans_*) return a fully translated tree.
    Calls g95_trans_*.  */
-tree g95_trans_code (g95_code *);
+
+tree g95_trans_code(g95_code *);
 
 /* All other g95_trans_* should only need be called by g95_trans_code */
 
@@ -30,35 +31,35 @@ tree g95_trans_assign(g95_code *);
 tree g95_trans_pointer_assign(g95_code *);
 
 /* trans-stmt.c */
-tree g95_trans_cycle (g95_code *);
-tree g95_trans_exit (g95_code *);
+tree g95_trans_cycle(g95_code *);
+tree g95_trans_exit(g95_code *);
 tree g95_trans_label_here(g95_code *);
-tree g95_trans_goto (g95_code *);
-tree g95_trans_stop (g95_code *);
-tree g95_trans_call (g95_code *);
-tree g95_trans_return (g95_code *);
-tree g95_trans_if (g95_code *);
-tree g95_trans_arithmetic_if (g95_code *);
-tree g95_trans_do (g95_code *);
-tree g95_trans_do_while (g95_code *);
-tree g95_trans_select (g95_code *);
-tree g95_trans_forall (g95_code *);
-tree g95_trans_where (g95_code *);
-tree g95_trans_allocate (g95_code *);
-tree g95_trans_deallocate (g95_code *);
-tree g95_trans_deallocate_array (tree);
+tree g95_trans_goto(g95_code *);
+tree g95_trans_stop(g95_code *);
+tree g95_trans_call(g95_code *);
+tree g95_trans_return(g95_code *);
+tree g95_trans_if(g95_code *);
+tree g95_trans_arithmetic_if(g95_code *);
+tree g95_trans_do(g95_code *);
+tree g95_trans_do_while(g95_code *);
+tree g95_trans_select(g95_code *);
+tree g95_trans_forall(g95_code *);
+tree g95_trans_where(g95_code *);
+tree g95_trans_allocate(g95_code *);
+tree g95_trans_deallocate(g95_code *);
+tree g95_trans_deallocate_array(tree);
 
 /* trans-io.c */
-tree g95_trans_open (g95_code *);
-tree g95_trans_close (g95_code *);
-tree g95_trans_read (g95_code *);
-tree g95_trans_write (g95_code *);
-tree g95_trans_iolength (g95_code *);
-tree g95_trans_backspace (g95_code *);
-tree g95_trans_endfile (g95_code *);
-tree g95_trans_inquire (g95_code *);
-tree g95_trans_rewind (g95_code *);
+tree g95_trans_open(g95_code *);
+tree g95_trans_close(g95_code *);
+tree g95_trans_read(g95_code *);
+tree g95_trans_write(g95_code *);
+tree g95_trans_iolength(g95_code *);
+tree g95_trans_backspace(g95_code *);
+tree g95_trans_endfile(g95_code *);
+tree g95_trans_inquire(g95_code *);
+tree g95_trans_rewind(g95_code *);
 
-tree g95_trans_io_call (g95_code *);
-tree g95_trans_iostate_call (g95_code *);
+tree g95_trans_transfer(g95_code *);
+tree g95_trans_dt_end(g95_code *);
 

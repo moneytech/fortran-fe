@@ -23,7 +23,6 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include "coretypes.h"
 #include "tree.h"
 #include <stdio.h>
 #include "ggc.h"
@@ -75,7 +74,7 @@ g95_build_const (tree type, tree intval)
   return val;
 }
 
-static tree
+tree
 g95_build_string_const(int length, char *s)
 {
   tree str;

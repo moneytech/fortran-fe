@@ -23,13 +23,18 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include <stdio.h>
+#include "c-common.h"
 #include "ggc.h"
+#include "rtl.h"
 #include "toplev.h"
+#include "function.h"
+#include "expr.h"
 #include "real.h"
+#include "tree-inline.h"
+
 #include <assert.h>
 #include <gmp.h>
 #define BACKEND_CODE
@@ -38,474 +43,858 @@ Boston, MA 02111-1307, USA.  */
 #include "trans-stmt.h"
 #include "trans-array.h"
 #include "trans-types.h"
+#include "trans-const.h"
 
-static GTY(()) tree gforio_pstate_type_node;
-static GTY(()) tree gforio_state_unit;
-static GTY(()) tree gforio_state_adv;
-static GTY(()) tree gforio_state_advlen;
-static GTY(()) tree gforio_state_fmt;
-static GTY(()) tree gforio_state_fmtlen;
-static GTY(()) tree gforio_state_rec;
-static GTY(()) tree gforio_state_err;
-static GTY(()) tree gforio_state_iostat;
 
-tree g95_current_io_state = NULL_TREE;
+static GTY(()) tree g95_pint4_type_node;
 
-/* External IO function decls.  */
-struct GTY(()) gforio_fndecl_t
-{
-  char *name;
-  tree *ptype;
-  tree GTY(()) write;
-  tree GTY(()) read;
-};
+/* Members of the ioparm structure */
 
-typedef struct gforio_fndecl_t gforio_fndecl_t;
+static GTY(()) tree ioparm_unit;
+static GTY(()) tree ioparm_err;
+static GTY(()) tree ioparm_end;
+static GTY(()) tree ioparm_eor;
+static GTY(()) tree ioparm_list_format;
+static GTY(()) tree ioparm_library_return;
+static GTY(()) tree ioparm_iostat;
+static GTY(()) tree ioparm_exist;
+static GTY(()) tree ioparm_opened;
+static GTY(()) tree ioparm_number;
+static GTY(()) tree ioparm_named;
+static GTY(()) tree ioparm_rec;
+static GTY(()) tree ioparm_nextrec;
+static GTY(()) tree ioparm_size;
+static GTY(()) tree ioparm_recl_in;
+static GTY(()) tree ioparm_recl_out;
+static GTY(()) tree ioparm_file;
+static GTY(()) tree ioparm_file_len;
+static GTY(()) tree ioparm_status;
+static GTY(()) tree ioparm_status_len;
+static GTY(()) tree ioparm_access;
+static GTY(()) tree ioparm_access_len;
+static GTY(()) tree ioparm_form;
+static GTY(()) tree ioparm_form_len;
+static GTY(()) tree ioparm_blank;
+static GTY(()) tree ioparm_blank_len;
+static GTY(()) tree ioparm_position;
+static GTY(()) tree ioparm_position_len;
+static GTY(()) tree ioparm_action;
+static GTY(()) tree ioparm_action_len;
+static GTY(()) tree ioparm_delim;
+static GTY(()) tree ioparm_delim_len;
+static GTY(()) tree ioparm_pad;
+static GTY(()) tree ioparm_pad_len;
+static GTY(()) tree ioparm_format;
+static GTY(()) tree ioparm_format_len;
+static GTY(()) tree ioparm_advance;
+static GTY(()) tree ioparm_advance_len;
+static GTY(()) tree ioparm_name;
+static GTY(()) tree ioparm_name_len;
+static GTY(()) tree ioparm_internal_unit;
+static GTY(()) tree ioparm_internal_unit_len;
+static GTY(()) tree ioparm_sequential;
+static GTY(()) tree ioparm_sequential_len;
+static GTY(()) tree ioparm_direct;
+static GTY(()) tree ioparm_direct_len;
+static GTY(()) tree ioparm_formatted;
+static GTY(()) tree ioparm_formatted_len;
+static GTY(()) tree ioparm_unformatted;
+static GTY(()) tree ioparm_unformatted_len;
+static GTY(()) tree ioparm_read;
+static GTY(()) tree ioparm_read_len;
+static GTY(()) tree ioparm_write;
+static GTY(()) tree ioparm_write_len;
+static GTY(()) tree ioparm_readwrite;
+static GTY(()) tree ioparm_readwrite_len;
 
-/* This must be consistent with gforio_fndecls.  */
-typedef enum
-{
-  GFORIO_FNDECL_INT4=0,
-  GFORIO_FNDECL_INT8,
-  GFORIO_FNDECL_REAL4,
-  GFORIO_FNDECL_REAL8,
-  GFORIO_FNDECL_COMPLEX4,
-  GFORIO_FNDECL_COMPLEX8,
-  /* We convert all logical values to kind=4 before passing to IO.  */
-  GFORIO_FNDECL_LOGICAL,
-  GFORIO_NUM_FNDECLS
-} gforio_fndecl_enum;
+/* The global I/O variables */
 
-/* These must be consistent with gforio_fndecl_enum.  */
-static GTY(()) gforio_fndecl_t gforio_fndecls[GFORIO_NUM_FNDECLS] =
-{
-  {"int4", &g95_int4_type_node, NULL_TREE, NULL_TREE},
-  {"int8", &g95_int8_type_node, NULL_TREE, NULL_TREE},
-  {"real4", &g95_real4_type_node, NULL_TREE, NULL_TREE},
-  {"real8", &g95_real8_type_node, NULL_TREE, NULL_TREE},
-  {"complex4", &g95_complex4_type_node, NULL_TREE, NULL_TREE},
-  {"complex8", &g95_complex8_type_node, NULL_TREE, NULL_TREE},
-  {"logical4", &g95_logical4_type_node, NULL_TREE, NULL_TREE}
-};
+static GTY(()) tree ioparm_var;
+static GTY(()) tree locus_file;
+static GTY(()) tree locus_line;
 
-/* IO library decls.  */
-static GTY(()) tree gforio_fndecl_state_get;
-static GTY(()) tree gforio_fndecl_write_begin;
-static GTY(()) tree gforio_fndecl_write_end;
-static GTY(()) tree gforio_fndecl_write_character;
 
-static tree
-gforio_addfield (tree stype, char * name, tree type)
-{
-  tree decl;
+/* Library I/O subroutines */
 
-  decl = build_decl (FIELD_DECL, get_identifier (name), type);
-  DECL_CONTEXT (decl) = stype;
-  DECL_INITIAL (decl) = 0;
-  DECL_ALIGN (decl) = 0;
-  DECL_USER_ALIGN (decl) = 0;
-  TYPE_FIELDS (stype) = chainon (TYPE_FIELDS (stype), decl);
+static GTY(()) tree iocall_read;
+static GTY(()) tree iocall_read_done;
+static GTY(()) tree iocall_write;
+static GTY(()) tree iocall_write_done;
+static GTY(()) tree iocall_x_integer;
+static GTY(()) tree iocall_x_logical;
+static GTY(()) tree iocall_x_character;
+static GTY(()) tree iocall_x_real;
+static GTY(()) tree iocall_x_complex;
+static GTY(()) tree iocall_open;
+static GTY(()) tree iocall_close;
+static GTY(()) tree iocall_inquire;
+static GTY(()) tree iocall_rewind;
+static GTY(()) tree iocall_backspace;
+static GTY(()) tree iocall_endfile;
+
+/* Variable for keeping track of what the last data transfer statement
+ * was.  Used for deciding which subroutine to call when the data
+ * transfer is complete. */
+
+static enum { READ, WRITE } last_dt;
+
+
+/* add_field()-- Add a field to the ioparm structure. */
+
+static tree add_field(tree stype, char *name, tree type) {
+tree decl;
+
+  decl = build_decl(FIELD_DECL, get_identifier(name), type);
+
+  DECL_CONTEXT(decl) = stype;
+  DECL_INITIAL(decl) = 0;
+  DECL_ALIGN(decl) = 0;
+  DECL_USER_ALIGN(decl) = 0;
+  TYPE_FIELDS(stype) = chainon(TYPE_FIELDS(stype), decl);
 
   return decl;
 }
 
-static void
-g95_init_io_state_type (void)
-{
-  tree type;
 
-  type = make_node (RECORD_TYPE);
-  TYPE_NAME (type) = get_identifier ("gforio_state");
+#define PREFIX "_g95_"
 
-  gforio_state_unit = gforio_addfield (type, "unit", g95_int4_type_node);
-  gforio_state_adv = gforio_addfield (type, "advance", pchar_type_node);
-  gforio_state_advlen =
-    gforio_addfield (type, "advance_len", g95_strlen_type_node);
-  gforio_state_fmt = gforio_addfield (type, "format", pchar_type_node);
-  gforio_state_fmtlen =
-    gforio_addfield (type, "format_len", g95_strlen_type_node);
-  gforio_state_rec = gforio_addfield (type, "rec", g95_array_index_type);
-  gforio_state_err = gforio_addfield (type, "err", g95_int4_type_node);
-  gforio_state_iostat = gforio_addfield (type, "iostat", g95_int4_type_node);
+#define ADD_FIELD(name, type) \
+  ioparm_ ## name = add_field(ioparm_type, stringize(name), type)
 
-  g95_finish_type (type);
+#define ADD_STRING(name) \
+  ioparm_ ## name = add_field(ioparm_type, stringize(name), pchar_type_node);\
+  ioparm_ ## name ## _len = \
+        add_field(ioparm_type, stringize(name) "_len", g95_int4_type_node)
 
-  gforio_pstate_type_node = build_pointer_type (type);
-}
 
 /* Create function decls for IO library functions.  */
-void
-g95_build_io_library_fndecls (void)
-{
-  int i;
-  char name[G95_MAX_SYMBOL_LEN+1];
 
-  g95_init_io_state_type ();
+void g95_build_io_library_fndecls (void) {
+tree ioparm_type;
 
-  for (i = 0; i < GFORIO_NUM_FNDECLS; i++)
-    {
-      sprintf (name, "_gforio_write_%s", gforio_fndecls[i].name);
-      gforio_fndecls[i].write =
-        g95_build_library_function_decl (get_identifier (name),
-                                        void_type_node,
-                                        2, gforio_pstate_type_node,
-                                        *gforio_fndecls[i].ptype);
-      sprintf (name, "_gforio_read_%s", gforio_fndecls[i].name);
-      gforio_fndecls[i].read =
-        g95_build_library_function_decl (get_identifier (name),
-                                        void_type_node,
-                                        2, gforio_pstate_type_node,
-                                        *gforio_fndecls[i].ptype);
-    }
-  gforio_fndecl_state_get =
-    g95_build_library_function_decl (get_identifier ("_gforio_state_get"),
-                                    gforio_pstate_type_node, 0);
-  gforio_fndecl_write_begin =
-    g95_build_library_function_decl (get_identifier ("_gforio_write_begin"),
-                                    void_type_node,
-                                    1, gforio_pstate_type_node);
-  gforio_fndecl_write_end =
-    g95_build_library_function_decl (get_identifier ("_gforio_write_end"),
-                                    void_type_node,
-                                    1, gforio_pstate_type_node);
-  gforio_fndecl_write_character =
-    g95_build_library_function_decl (get_identifier ("_gforio_write_character"),
-                                    void_type_node,
-                                    2, gforio_pstate_type_node,
-                                    g95_strlen_type_node, pchar_type_node);
+  g95_pint4_type_node = build_pointer_type(g95_int4_type_node);
+
+/* Build the st_parameter structure.  Information associated with I/O
+ * calls are transferred here.  This must match the one defined in the
+ * library exactly. */
+
+  ioparm_type = make_node(RECORD_TYPE);
+  TYPE_NAME(ioparm_type) = get_identifier("_g95_ioparm");
+
+  ADD_FIELD(unit,            g95_int4_type_node);
+  ADD_FIELD(err,             g95_int4_type_node);
+  ADD_FIELD(end,             g95_int4_type_node);
+  ADD_FIELD(eor,             g95_int4_type_node);
+  ADD_FIELD(list_format,     g95_int4_type_node);
+  ADD_FIELD(library_return,  g95_int4_type_node);
+
+  ADD_FIELD(iostat,    g95_pint4_type_node);
+  ADD_FIELD(exist,     g95_pint4_type_node);
+  ADD_FIELD(opened,    g95_pint4_type_node);
+  ADD_FIELD(number,    g95_pint4_type_node);
+  ADD_FIELD(named,     g95_pint4_type_node);
+  ADD_FIELD(rec,       g95_pint4_type_node);
+  ADD_FIELD(nextrec,   g95_pint4_type_node);
+  ADD_FIELD(size,      g95_pint4_type_node);
+
+  ADD_FIELD(recl_in,   g95_pint4_type_node);
+  ADD_FIELD(recl_out,  g95_pint4_type_node);
+
+  ADD_STRING(file);
+  ADD_STRING(status);
+
+  ADD_STRING(access);
+  ADD_STRING(form);
+  ADD_STRING(blank);
+  ADD_STRING(position);
+  ADD_STRING(action);
+  ADD_STRING(delim);
+  ADD_STRING(pad);
+  ADD_STRING(format);
+  ADD_STRING(advance);
+  ADD_STRING(name);
+  ADD_STRING(internal_unit);
+  ADD_STRING(sequential);
+
+  ADD_STRING(direct);
+  ADD_STRING(formatted);
+  ADD_STRING(unformatted);
+  ADD_STRING(read);
+  ADD_STRING(write);
+  ADD_STRING(readwrite);
+
+  g95_finish_type(ioparm_type);
+
+  ioparm_var = build_decl(VAR_DECL, get_identifier(PREFIX "ioparm"),
+			  ioparm_type);
+  DECL_EXTERNAL(ioparm_var) = 1;
+
+  locus_line = build_decl(VAR_DECL, get_identifier(PREFIX "line"),
+			  g95_int4_type_node);
+  DECL_EXTERNAL(locus_line) = 1;
+
+  locus_file = build_decl(VAR_DECL, get_identifier(PREFIX "filename"),
+			  pchar_type_node);
+  DECL_EXTERNAL(locus_file) = 1;
+
+  /* Define the transfer functions */
+
+  iocall_x_integer =
+    g95_build_library_function_decl(get_identifier(PREFIX "transfer_integer"),
+						   void_type_node, 2,
+						   pvoid_type_node,
+						   g95_int4_type_node);
+
+  iocall_x_logical =
+    g95_build_library_function_decl(get_identifier(PREFIX "transfer_logical"),
+						   void_type_node, 2,
+						   pvoid_type_node,
+						   g95_int4_type_node);
+
+  iocall_x_character =
+    g95_build_library_function_decl(
+	      get_identifier(PREFIX "transfer_character"),
+						   void_type_node, 2,
+						   pvoid_type_node,
+						   g95_int4_type_node);
+
+  iocall_x_real =
+    g95_build_library_function_decl(get_identifier(PREFIX "transfer_real"),
+						 void_type_node, 2,
+						 pvoid_type_node,
+						 g95_int4_type_node);
+
+  iocall_x_complex =
+    g95_build_library_function_decl(get_identifier(PREFIX "transfer_complex"),
+						   void_type_node, 2,
+						   pvoid_type_node,
+						   g95_int4_type_node);
+
+  /* Library entry points */
+
+  iocall_read =
+    g95_build_library_function_decl(get_identifier(PREFIX "st_read"),
+						   void_type_node, 0);
+
+  iocall_write =
+    g95_build_library_function_decl(get_identifier(PREFIX "st_write"),
+						   void_type_node, 0);
+  iocall_open =
+    g95_build_library_function_decl(get_identifier(PREFIX "st_open"),
+						   g95_int4_type_node, 0);
+
+  iocall_close =
+    g95_build_library_function_decl(get_identifier(PREFIX "st_close"),
+						   g95_int4_type_node, 0);
+
+  iocall_inquire =
+    g95_build_library_function_decl(get_identifier(PREFIX "st_inquire"),
+						   g95_int4_type_node, 0);
+
+  iocall_rewind =
+    g95_build_library_function_decl(get_identifier(PREFIX "st_rewind"),
+						   g95_int4_type_node, 0);
+
+  iocall_backspace =
+    g95_build_library_function_decl(get_identifier(PREFIX "st_backspace"),
+						   g95_int4_type_node, 0);
+
+  iocall_endfile =
+    g95_build_library_function_decl(get_identifier(PREFIX "st_endfile"),
+						   g95_int4_type_node, 0);
+  /* Library helpers */
+
+  iocall_read_done = 
+    g95_build_library_function_decl(get_identifier(PREFIX "st_read_done"),
+						   g95_int4_type_node, 0);
+
+  iocall_write_done = 
+    g95_build_library_function_decl(get_identifier(PREFIX "st_write_done"),
+						   g95_int4_type_node, 0);
 }
 
-tree
-g95_trans_open (g95_code * code ATTRIBUTE_UNUSED)
-{
-  g95_todo_error ("IO statement not implemented: OPEN");
+
+/* set_parameter_value()-- Generate code to store an non-string I/O
+ * parameter into the ioparm structure.  This is a pass by value. */
+
+static void set_parameter_value(stmtblock_t *block, tree var, g95_expr *e) {
+g95_se se;
+tree tmp;
+
+  g95_init_se(&se, NULL);
+  g95_conv_expr_type(&se, e, TREE_TYPE(var));
+  g95_add_block_to_block(block, &se.pre);
+
+  tmp = build(COMPONENT_REF, TREE_TYPE(var), ioparm_var, var);
+  tmp = build(MODIFY_EXPR, TREE_TYPE(var), tmp, se.expr);
+  g95_add_expr_to_block(block, tmp);
 }
 
-tree
-g95_trans_close (g95_code * code ATTRIBUTE_UNUSED)
-{
-  g95_todo_error ("IO statement not implemented: CLOSE");
+
+/* set_parameter_ref()-- Generate code to store an non-string I/O
+ * parameter into the ioparm structure.  This is pass by reference. */
+
+static void set_parameter_ref(stmtblock_t *block, tree var, g95_expr *e) {
+g95_se se;
+tree tmp;
+
+  g95_init_se(&se, NULL);
+  se.want_pointer = 1;
+
+  g95_conv_expr_type(&se, e, TREE_TYPE(var));
+  g95_add_block_to_block(block, &se.pre);
+
+  tmp = build(COMPONENT_REF, TREE_TYPE(var), ioparm_var, var);
+  tmp = build(MODIFY_EXPR, TREE_TYPE(var), tmp, se.expr);
+  g95_add_expr_to_block(block, tmp);
 }
 
-tree
-g95_trans_read (g95_code * code ATTRIBUTE_UNUSED)
-{
-  g95_todo_error ("IO statement not implemented: READ");
+
+/* set_string()-- Generate code to store a string and its length into
+ * the ioparm structure. */
+
+static void set_string(stmtblock_t *block, stmtblock_t *postblock, tree var,
+		       tree var_len, g95_expr *e) {
+g95_se se;
+tree tmp;
+
+  g95_init_se(&se, NULL);
+  g95_conv_expr(&se, e);
+  g95_conv_string_parameter(&se);
+
+  g95_add_block_to_block(block, &se.pre);
+  g95_add_block_to_block(postblock, &se.post);
+
+  tmp = build(COMPONENT_REF, TREE_TYPE(var), ioparm_var, var);
+  tmp = build(MODIFY_EXPR, TREE_TYPE(tmp), tmp, se.expr);
+  g95_add_expr_to_block(block, tmp);
+
+  tmp = build(COMPONENT_REF, TREE_TYPE(var_len), ioparm_var, var_len);
+  tmp = build(MODIFY_EXPR, TREE_TYPE(tmp), tmp, se.string_length);
+  g95_add_expr_to_block(block, tmp);
 }
 
-tree
-g95_trans_write (g95_code * code)
-{
-  /* The IO library is still in the very early stages of development.  */
-  tree args;
-  unsigned long flags;
-  g95_dt *dt;
-  g95_se se;
-  stmtblock_t block;
-  stmtblock_t postblock;
-  tree tmp;
-  tree pstate;
-  tree state;
-  tree field;
 
-  g95_start_block (&block);
-  g95_init_block (&postblock);
+/* add_case()-- Add a case to a IO-result switch */
 
+static void add_case(int label_value, g95_st_label *label, stmtblock_t *body) {
+tree tmp, value;
+
+  if (label == NULL) return;   /* No label, no case */
+
+  value = build_int_2(label_value, 0);
+
+  tmp = build_v(CASE_LABEL_EXPR, value, NULL_TREE);
+  g95_add_expr_to_block(body, tmp);
+
+  tmp = build_v(GOTO_EXPR, g95_get_label_decl(label));
+  g95_add_expr_to_block(body, tmp);
+}
+
+
+/* io_result()-- Generate a switch statement that branches to the
+ * correct I/O result label.  The last statement of an I/O call stores
+ * the result into a variable because there is often cleanup that must
+ * be done before the switch, so a temporary would have to be created
+ * anyway. */
+
+static void io_result(stmtblock_t *block, g95_st_label *err_label,
+		      g95_st_label *end_label, g95_st_label *eor_label) {
+stmtblock_t body;
+tree tmp, rc;
+
+  /* If no labels are specified, ignore the result instead of building
+   * an empty switch. */
+
+  if (err_label == NULL && end_label == NULL && eor_label == NULL) return;
+
+  /* Build a switch statement */
+
+  g95_start_block(&body);
+
+  /* The label values here must be the same as the values in the
+   * library_return enum in the runtime library */
+
+  add_case(1, err_label, &body);
+  add_case(2, end_label, &body);
+  add_case(3, eor_label, &body);
+
+  tmp = g95_finish_block(&body);
+
+  rc = build(COMPONENT_REF, TREE_TYPE(ioparm_library_return), ioparm_var,
+	     ioparm_library_return);
+
+  tmp = build_v(SWITCH_EXPR, rc, tmp, NULL_TREE);
+
+  g95_add_expr_to_block(block, tmp);
+}
+
+
+/* set_runtime_locus()-- Store the current file and line number to
+ * variables so that if a library call goes awry, we can tell the user
+ * where the problem is. */
+
+static void set_error_locus(stmtblock_t *block, locus *where) {
+g95_file *f;
+tree tmp;
+int line;
+
+  f = where->file;
+  tmp = g95_build_string_const(strlen(f->filename)+1, f->filename);
+
+  tmp = build1(ADDR_EXPR, pchar_type_node, tmp);
+  tmp = build(MODIFY_EXPR, pchar_type_node, locus_file, tmp);
+  g95_add_expr_to_block(block, tmp);
+
+  line = where->lp->start_line + where->line;
+  tmp = build(MODIFY_EXPR, g95_int4_type_node, locus_line,
+	      build_int_2(line, 0));
+
+  g95_add_expr_to_block(block, tmp);
+}
+
+
+/* g95_trans_open()-- Translate an OPEN statement */
+
+tree g95_trans_open(g95_code *code) {
+stmtblock_t block, post_block;
+g95_open *p;
+tree tmp;
+
+  g95_init_block(&block);
+  g95_init_block(&post_block);
+
+  set_error_locus(&block, &code->loc);
+  p = code->ext.open;
+
+  if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
+
+  if (p->file) set_string(&block, &post_block, ioparm_file, ioparm_file_len,
+			  p->file);
+
+  if (p->status) set_string(&block, &post_block, ioparm_status,
+			    ioparm_status_len, p->status);
+
+  if (p->access) set_string(&block, &post_block, ioparm_access,
+			    ioparm_access_len, p->access);
+
+  if (p->form) set_string(&block, &post_block, ioparm_form, ioparm_form_len,
+			  p->form);
+
+  if (p->recl) set_parameter_ref(&block, ioparm_recl_in, p->recl);
+
+  if (p->blank) set_string(&block, &post_block, ioparm_blank, ioparm_blank_len,
+			   p->blank);
+
+  if (p->position) set_string(&block, &post_block, ioparm_position,
+			      ioparm_position_len, p->position);
+
+  if (p->action) set_string(&block, &post_block, ioparm_action,
+			    ioparm_action_len, p->action);
+
+  if (p->delim) set_string(&block, &post_block, ioparm_delim, ioparm_delim_len,
+			   p->delim);
+
+  if (p->pad) set_string(&block, &post_block, ioparm_pad, ioparm_pad_len,
+			 p->pad);
+
+  if (p->iostat) set_parameter_ref(&block, ioparm_iostat, p->iostat);
+
+  tmp = g95_build_function_call(iocall_open, NULL_TREE);
+  g95_add_expr_to_block(&block, tmp);
+
+  g95_add_block_to_block(&block, &post_block);
+
+  io_result(&block, p->err, NULL, NULL);
+
+  return g95_finish_block(&block);
+}
+
+
+/* g95_trans_close()-- Translate a CLOSE statement */
+
+tree g95_trans_close(g95_code *code) {
+stmtblock_t block, post_block;
+g95_close *p;
+tree tmp;
+
+  g95_init_block(&block);
+  g95_init_block(&post_block);
+
+  set_error_locus(&block, &code->loc);
+  p = code->ext.close;
+
+  if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
+
+  if (p->status) set_string(&block, &post_block, ioparm_status,
+			    ioparm_status_len, p->status);
+
+  if (p->iostat) set_parameter_ref(&block, ioparm_iostat, p->iostat);
+
+  tmp = g95_build_function_call(iocall_close, NULL_TREE);
+  g95_add_expr_to_block(&block, tmp);
+
+  g95_add_block_to_block(&block, &post_block);
+
+  io_result(&block, p->err, NULL, NULL);
+
+  return g95_finish_block(&block);
+}
+
+
+/* build_filepos()-- Common subroutine for building a file positioning
+ * statement */
+
+static tree build_filepos(tree function, g95_code *code) {
+stmtblock_t block;
+g95_filepos *p;
+tree tmp;
+
+  p = code->ext.filepos; 
+
+  g95_init_block(&block);
+
+  set_error_locus(&block, &code->loc);
+
+  if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
+
+  if (p->iostat) set_parameter_ref(&block, ioparm_iostat, p->iostat);
+
+  tmp = g95_build_function_call(function, NULL);
+  g95_add_expr_to_block(&block, tmp);
+
+  io_result(&block, p->err, NULL, NULL);
+
+  return g95_finish_block(&block);
+}
+
+
+/* g95_trans_backspace()-- Translate a BACKSPACE statement */
+
+tree g95_trans_backspace(g95_code *code) {
+
+  return build_filepos(iocall_backspace, code);
+}
+
+
+/* g95_trans_endfile()-- Translate an ENDFILE statement */
+
+tree g95_trans_endfile(g95_code *code) {
+
+  return build_filepos(iocall_endfile, code);
+}
+
+
+/* g95_trans_rewind()-- Translate a REWIND statement */
+
+tree g95_trans_rewind(g95_code *code) {
+
+  return build_filepos(iocall_rewind, code);
+}
+
+
+/* g95_trans_inquire()-- Translate the non-IOLENGTH form of an INQUIRE
+ * statement */
+
+tree g95_trans_inquire(g95_code *code) {
+stmtblock_t block, post_block;
+g95_inquire *p;
+tree tmp;
+
+  g95_init_block(&block);
+  g95_init_block(&post_block);
+
+  set_error_locus(&block, &code->loc);
+  p = code->ext.inquire;
+
+  if (p->unit) set_parameter_value(&block, ioparm_unit, p->unit);
+
+  if (p->file) set_string(&block, &post_block, ioparm_file, ioparm_file_len,
+			  p->file);
+
+  if (p->iostat) set_parameter_ref(&block, ioparm_iostat, p->iostat);
+
+  if (p->exist) set_parameter_ref(&block, ioparm_exist, p->exist);
+
+  if (p->opened) set_parameter_ref(&block, ioparm_opened, p->opened);
+
+  if (p->number) set_parameter_ref(&block, ioparm_number, p->number);
+
+  if (p->named) set_parameter_ref(&block, ioparm_named, p->named);
+
+  if (p->name) set_string(&block, &post_block, ioparm_name, ioparm_name_len,
+			  p->name);
+
+  if (p->access) set_string(&block, &post_block, ioparm_access,
+			    ioparm_access_len, p->access);
+
+  if (p->sequential) set_string(&block, &post_block, ioparm_sequential,
+				ioparm_sequential_len, p->sequential);
+
+  if (p->direct) set_string(&block, &post_block, ioparm_direct,
+			    ioparm_direct_len, p->direct);
+
+  if (p->form) set_string(&block, &post_block, ioparm_form, ioparm_form_len,
+			  p->form);
+
+  if (p->formatted) set_string(&block, &post_block, ioparm_formatted,
+			       ioparm_formatted_len, p->formatted);
+
+  if (p->unformatted) set_string(&block, &post_block, ioparm_unformatted,
+				 ioparm_unformatted_len, p->unformatted);
+
+  if (p->recl) set_parameter_ref(&block, ioparm_recl_out, p->recl);
+
+  if (p->nextrec) set_parameter_ref(&block, ioparm_nextrec, p->nextrec);
+
+  if (p->blank) set_string(&block, &post_block, ioparm_blank, ioparm_blank_len,
+			   p->blank);
+
+  if (p->position) set_string(&block, &post_block, ioparm_position,
+			      ioparm_position_len, p->position);
+
+  if (p->action) set_string(&block, &post_block, ioparm_action,
+			    ioparm_action_len, p->action);
+
+  if (p->read) set_string(&block, &post_block, ioparm_read, ioparm_read_len,
+			  p->read);
+
+  if (p->write) set_string(&block, &post_block, ioparm_write,
+			   ioparm_write_len, p->write);
+
+  if (p->readwrite) set_string(&block, &post_block, ioparm_readwrite,
+			       ioparm_readwrite_len, p->readwrite);
+
+  if (p->delim) set_string(&block, &post_block, ioparm_delim, ioparm_delim_len,
+			   p->delim);
+
+  tmp = g95_build_function_call(iocall_inquire, NULL);
+  g95_add_expr_to_block(&block, tmp);
+
+  g95_add_block_to_block(&block, &post_block);
+
+  io_result(&block, p->err, NULL, NULL);
+
+  return g95_finish_block(&block);
+}
+
+
+/* g95_trans_iolength()-- Translate the IOLENGTH form of an INQUIRE
+ * statement.  We treat this a third sort of data transfer statement,
+ * except that lengths are summed instead of actually transfering any
+ * data. */
+
+tree g95_trans_iolength(g95_code *c) {
+
+  return NULL_TREE;
+}
+
+
+/* build_dt()-- Create a data transfer statement.  Not all of the
+ * fields are valid for both reading and writing, but improper use has
+ * been filtered out by now. */
+
+extern g95_st_label format_asterisk;
+
+static tree build_dt(tree *function, g95_code *code) {
+stmtblock_t block, post_block;
+g95_expr *unity;
+g95_dt *dt;
+tree tmp;
+
+  g95_init_block(&block); 
+  g95_init_block(&post_block);
+
+  set_error_locus(&block, &code->loc);
   dt = code->ext.dt;
-  args = NULL_TREE;
-  flags = 0;
 
-  tmp = g95_build_function_call (gforio_fndecl_state_get, NULL_TREE);
-  if (! g95_current_io_state)
-    g95_current_io_state = g95_create_var_np (TREE_TYPE (tmp), "iostate");
+  if (dt->io_unit) set_parameter_value(&block, ioparm_unit, dt->io_unit);
 
-  pstate = g95_current_io_state;
-  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), pstate, tmp);
-  g95_add_expr_to_block (&block, tmp);
-
-  state = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pstate)), pstate);
-/* TODO: IO error status codes.  */
-  if (dt->io_unit)
-    {
-      field = gforio_state_unit;
-      g95_init_se (&se, NULL);
-      g95_conv_expr_type (&se, dt->io_unit, TREE_TYPE (field));
-      g95_add_block_to_block (&block, &se.pre);
-
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      g95_add_expr_to_block (&block, tmp);
-    }
-
-  if (dt->rec)
-    {
-      field = gforio_state_rec;
-      g95_init_se (&se, NULL);
-      g95_conv_expr_type (&se, dt->rec, TREE_TYPE (field));
-      g95_add_block_to_block (&block, &se.pre);
-
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      g95_add_expr_to_block (&block, tmp);
-    }
+  if (dt->rec) set_parameter_ref(&block, ioparm_rec, dt->rec);
 
   if (dt->advance)
-    {
-      field = gforio_state_adv;
-      g95_init_se (&se, NULL);
-      g95_conv_expr (&se, dt->advance);
-      g95_conv_string_parameter (&se);
-      g95_add_block_to_block (&block, &se.pre);
-      g95_add_block_to_block (&postblock, &se.post);
-
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      g95_add_expr_to_block (&block, tmp);
-
-      field = gforio_state_advlen;
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.string_length);
-      g95_add_expr_to_block (&block, tmp);
-    }
+    set_string(&block, &post_block, ioparm_advance, ioparm_advance_len,
+	       dt->advance);
 
   if (dt->format_expr)
-    {
-      field = gforio_state_fmt;
-      g95_init_se (&se, NULL);
-      g95_conv_expr (&se, dt->format_expr);
-      g95_conv_string_parameter (&se);
-      g95_add_block_to_block (&block, &se.pre);
-      g95_add_block_to_block (&postblock, &se.post);
+    set_string(&block, &post_block, ioparm_format, ioparm_format_len,
+	       dt->format_expr);
 
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      g95_add_expr_to_block (&block, tmp);
+  if (dt->format_label) {   /* Create the format string and point to it */
 
-      field = gforio_state_fmtlen;
-      tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.string_length);
-      g95_add_expr_to_block (&block, tmp);
-    }
+  }
 
-  if (dt->size)
-    g95_todo_error ("SIZE qualifier on write statement");
+  if (dt->format_expr == NULL &&
+      (dt->format_label == NULL || dt->format_label == &format_asterisk)) {
+    unity = g95_int_expr(1);
+    set_parameter_value(&block, ioparm_list_format, unity);
+    g95_free_expr(unity);
+  }
 
-  args = g95_chainon_list (NULL_TREE, pstate);
-  tmp = g95_build_function_call (gforio_fndecl_write_begin, args);
-  g95_add_expr_to_block (&block, tmp);
+  if (dt->iostat) set_parameter_ref(&block, ioparm_iostat, dt->iostat);
 
-  g95_add_block_to_block (&block, &postblock);
+  if (dt->size) set_parameter_ref(&block, ioparm_size, dt->size);
 
-  return g95_finish_block (&block);
+  tmp = g95_build_function_call(*function, NULL_TREE);
+  g95_add_expr_to_block(&block, tmp);
+
+  g95_add_block_to_block(&block, &post_block);
+
+  return g95_finish_block(&block);
 }
 
-tree
-g95_trans_iolength (g95_code * code ATTRIBUTE_UNUSED)
-{
-  g95_todo_error ("IO statement not implemented: IOLENGTH");
+
+/* g95_trans_read()-- Translate a READ statement */
+
+tree g95_trans_read(g95_code *code) {
+
+  last_dt = READ;
+  return build_dt(&iocall_read, code);
 }
 
-tree
-g95_trans_backspace (g95_code * code ATTRIBUTE_UNUSED)
-{
-  g95_todo_error ("IO statement not implemented: BACKSPACE");
+
+/* g95_trans_write()-- Translate a WRITE statement */
+
+tree g95_trans_write(g95_code *code) {
+ 
+  last_dt = WRITE;
+  return build_dt(&iocall_write, code);
 }
 
-tree
-g95_trans_endfile (g95_code * code ATTRIBUTE_UNUSED)
-{
-  g95_todo_error ("IO statement not implemented: ENDFILE");
+
+/* g95_trans_dt_end()-- Finish a data transfer statement */
+
+tree g95_trans_dt_end(g95_code *code) {
+tree function, tmp;
+stmtblock_t block;
+
+  g95_init_block(&block);
+
+  function = (last_dt == READ) ? iocall_read_done : iocall_write_done;
+
+  tmp = g95_build_function_call(function, NULL);
+  g95_add_expr_to_block(&block, tmp);
+
+  io_result(&block, code->ext.dt->err, code->ext.dt->end, code->ext.dt->eor);
+
+  return g95_finish_block(&block);
 }
 
-tree
-g95_trans_inquire (g95_code * code ATTRIBUTE_UNUSED)
-{
-  g95_todo_error ("IO statement not implemented: INQUIRE");
-}
 
-tree
-g95_trans_rewind (g95_code * code ATTRIBUTE_UNUSED)
-{
-  g95_todo_error ("IO statement not implemented: REWIND");
-}
+/* transfer_expr()-- Generate the call for a scalar transfer node. */
 
-tree
-g95_trans_iostate_call (g95_code * code)
-{
-  tree tmp;
+static void transfer_expr(g95_se *se, g95_typespec *ts) {
+tree args, tmp, function, arg2;
+int kind;
 
-  if (strcmp (code->sub_name, "_gforio_write_end") == 0)
-    {
-      assert (g95_current_io_state);
-      tmp = g95_chainon_list (NULL_TREE, g95_current_io_state);
-      tmp = g95_build_function_call (gforio_fndecl_write_end, tmp);
-      return tmp;
-    }
-  else
-    internal_error ("Unknown IO state call %s\n", code->sub_name);
-}
-
-/* Generate the IO statements for an expression.  */
-static void
-g95_trans_expr_io (g95_se * se, g95_typespec * ts, int mode)
-{
-  tree args;
-  tree tmp;
-  int kind;
-  tree fndecl;
-  gforio_fndecl_enum fn;
-
-  fndecl = NULL_TREE;
-  fn = GFORIO_NUM_FNDECLS;
   kind = ts->kind;
-  switch (ts->type)
-    {
-    case BT_INTEGER:
-      if (kind == 4)
-        fn = GFORIO_FNDECL_INT4;
-      else if (kind == 8)
-        fn = GFORIO_FNDECL_INT8;
-      else
-        fatal_error ("Can't do integer kind=%d IO", kind);
-      break;
+  function = NULL;
+  arg2 = NULL;
 
-    case BT_REAL:
-      if (kind == 4)
-        fn = GFORIO_FNDECL_REAL4;
-      else if (kind == 8)
-        fn = GFORIO_FNDECL_REAL8;
-      else
-        fatal_error ("Can't do real kind=%d IO", kind);
-      break;
+  switch(ts->type) {
+  case BT_INTEGER:
+    arg2 = build_int_2(kind, 0);
+    function = iocall_x_integer;
+    break;
 
-    case BT_COMPLEX:
-      if (kind == 4)
-        fn = GFORIO_FNDECL_COMPLEX4;
-      else if (kind == 8)
-        fn = GFORIO_FNDECL_COMPLEX8;
-      else
-        fatal_error ("Can't do complex kind=%d IO", kind);
-      break;
+  case BT_REAL:
+    arg2 = build_int_2(kind, 0);
+    function = iocall_x_real;
+    break;
 
-    case BT_LOGICAL:
-      fn = GFORIO_FNDECL_LOGICAL;
-      break;
+  case BT_COMPLEX:
+    arg2 = build_int_2(kind, 0);
+    function = iocall_x_complex;
+    break;
 
-    case BT_CHARACTER:
-      if (kind == 1)
-        fndecl = gforio_fndecl_write_character;
-      else
-        fatal_error ("Can't do character kind=%d IO", kind);
-      break;
+  case BT_LOGICAL:
+    arg2 = build_int_2(kind, 0);
+    function = iocall_x_logical;
+    break;
 
-    case BT_DERIVED:
-      g95_todo_error ("IO of derived types");
-      break;
+  case BT_CHARACTER:
+    arg2 = se->string_length;
+    function = iocall_x_character;
+    break;
 
-    default:
-      internal_error ("Bad IO basetype (%d)", ts->type);
-    }
+  case BT_DERIVED:
+    g95_todo_error("IO of derived types");
 
-  if (fndecl == NULL_TREE)
-    {
-      if (mode == 'r')
-        fndecl = gforio_fndecls[fn].read;
-      else if (mode == 'w')
-        fndecl = gforio_fndecls[fn].write;
-      else
-        g95_todo_error ("IO mode %c", mode);
-    }
+    /* Store the address to a temporary, then recurse for each element
+     * of the type. */
 
-  assert (g95_current_io_state);
-  args = g95_chainon_list (NULL_TREE, g95_current_io_state);
-  switch (ts->type)
-    {
-    case BT_CHARACTER:
-      g95_conv_string_parameter (se);
+    break;
 
-      args = g95_chainon_list (args, se->string_length);
-      args = g95_chainon_list (args, se->expr);
-      break;
+  default:
+    internal_error("Bad IO basetype (%d)", ts->type);
+  }
 
-    case BT_LOGICAL:
-      /* Logical kinds are always passed as kind=4.  */
-      if (kind != 4)
-        se->expr = convert (g95_logical4_type_node, se->expr);
+  args = g95_chainon_list(NULL_TREE, se->expr);
+  args = g95_chainon_list(args, arg2);
 
-      /* Fall through.  */
-
-    default:
-      args = g95_chainon_list (args, se->expr);
-      break;
-    }
-
-  tmp = g95_build_function_call (fndecl, args);
-  g95_add_expr_to_block (&se->pre, tmp);
-  g95_add_block_to_block (&se->pre, &se->post);
+  tmp = g95_build_function_call(function, args);
+  g95_add_expr_to_block(&se->pre, tmp);
+  g95_add_block_to_block(&se->pre, &se->post);
 }
 
-tree
-g95_trans_io_call (g95_code * code)
-{
-  g95_ss *ss;
-  g95_se se;
-  g95_expr *expr;
-  g95_loopinfo loop;
-  tree tmp;
-  stmtblock_t block;
-  stmtblock_t body;
 
-  g95_start_block (&block);
+/* g95_trans_transfer()-- Translate a TRANSFER code node */
 
-  expr = code->ext.actual->expr;
-  ss = g95_walk_expr (g95_ss_terminator, expr);
+tree g95_trans_transfer(g95_code *code) {
+stmtblock_t block, body;
+g95_loopinfo loop;
+g95_expr *expr;
+g95_ss *ss;
+g95_se se;
+tree tmp;
 
-  g95_init_se (&se, NULL);
+  g95_start_block(&block);
 
-  if (ss != g95_ss_terminator)
-    {
-      /* Initialize the scalarizer.  */
-      g95_init_loopinfo (&loop);
-      g95_add_ss_to_loop (&loop, ss);
+  expr = code->expr;
+  ss = g95_walk_expr(g95_ss_terminator, expr);
 
-      /* Initialize the loop.  */
-      g95_conv_ss_startstride (&loop);
-      g95_conv_loop_setup (&loop);
+  g95_init_se(&se, NULL);
 
-      /* The main loop body.  */
-      g95_mark_ss_chain_used (ss, 1);
-      g95_start_scalarized_body (&loop, &body);
+  if (ss == g95_ss_terminator)
+    g95_init_block(&body);
+  else {
+    /* Initialize the scalarizer.  */
+    g95_init_loopinfo(&loop);
+    g95_add_ss_to_loop(&loop, ss);
 
-      g95_copy_loopinfo_to_se (&se, &loop);
-      se.ss = ss;
-    }
-  else
-    g95_init_block (&body);
+    /* Initialize the loop.  */
+    g95_conv_ss_startstride(&loop);
+    g95_conv_loop_setup(&loop);
 
-  g95_conv_expr (&se, expr);
+    /* The main loop body.  */
+    g95_mark_ss_chain_used(ss, 1);
+    g95_start_scalarized_body(&loop, &body);
 
-  g95_trans_expr_io (&se, &expr->ts, code->sub_name[4]);
+    g95_copy_loopinfo_to_se(&se, &loop);
+    se.ss = ss;
+  }
 
-  g95_add_block_to_block (&body, &se.pre);
-  g95_add_block_to_block (&body, &se.post);
+  g95_conv_expr_reference(&se, expr);
 
-  if (se.ss)
-    {
-      assert (se.ss == g95_ss_terminator);
-      g95_trans_scalarizing_loops (&loop, &body);
+  transfer_expr(&se, &expr->ts);
 
-      g95_add_block_to_block (&loop.pre, &loop.post);
+  g95_add_block_to_block(&body, &se.pre);
+  g95_add_block_to_block(&body, &se.post);
 
-      tmp = g95_finish_block (&loop.pre);
-      g95_add_expr_to_block (&block, tmp);
-    }
-  else
-    {
-      tmp = g95_finish_block (&body);
-      g95_add_expr_to_block (&block, tmp);
-    }
+  if (se.ss == NULL)
+    tmp = g95_finish_block(&body);
+  else {
+    assert(se.ss == g95_ss_terminator);
+    g95_trans_scalarizing_loops(&loop, &body);
 
-  return g95_finish_block (&block);;
+    g95_add_block_to_block(&loop.pre, &loop.post);
+
+    tmp = g95_finish_block(&loop.pre);
+  }
+
+  g95_add_expr_to_block(&block, tmp);
+
+  return g95_finish_block(&block);;
 }
 
 #include "gt-f95-trans-io.h"
