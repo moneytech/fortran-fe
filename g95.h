@@ -464,7 +464,8 @@ typedef struct g95_symbol {
  * the old symbol. */
 
   struct g95_symbol *old_symbol, *tlink;
-  int mark, serial, refs;
+  unsigned mark:1, written:1;
+  int serial, refs;
   struct g95_namespace *ns;    /* namespace containing this symbol */
 
 } g95_symbol;

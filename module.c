@@ -33,7 +33,6 @@ Boston, MA 02111-1307, USA.  */
  * The first line of a module is a line warning people not to edit the
  * module.  The rest of the module looks like:
  *
- * <Maximum number of symbols>
  * ( ( <Interface info for UPLUS> )
  *   ( <Interface info for UMINUS> )
  *   ...
@@ -60,6 +59,7 @@ Boston, MA 02111-1307, USA.  */
 #include <ctype.h>
 #include <errno.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "g95.h"
 
@@ -98,6 +98,13 @@ typedef struct g95_use_rename {
 
 #define g95_get_use_rename() g95_getmem(sizeof(g95_use_rename))
 
+/* Stack for storing lists of symbols that need to be written */
+
+typedef struct sym_stack {
+  g95_symbol *sym;
+  struct sym_stack *next;
+} sym_stack;
+
 
 /* Local variables */
 
@@ -108,6 +115,10 @@ static int module_line, module_column, sym_num, only_flag;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
 
 static g95_use_rename *g95_rename_list;
+static sym_stack *write_stack;
+
+#define ST_NIL &g95_st_sentinel
+extern g95_symtree g95_st_sentinel;
 
 
 /* g95_free_rename()-- Free the rename list left behind by a USE
@@ -1197,13 +1208,21 @@ g95_formal_arglist *f, *tail;
  * already been written. */
 
 static void mio_symbol_ref(g95_symbol **symp) {
+sym_stack *p;
 int i;
 
   if (iomode == IO_OUTPUT) {
     if (*symp != NULL) {
       i = (*symp)->serial;
 
-      if (i == -1) (*symp)->serial = i = sym_num++;
+      if (i == -1) {   /* Assign new number, save on the stack */
+	(*symp)->serial = i = sym_num++;
+	p = g95_getmem(sizeof(sym_stack));
+	p->sym = *symp;
+	p->next = write_stack;
+	write_stack = p;
+      }
+
       if (i < 0 || i >= sym_num) bad_module("Symbol number out of range");
 
       write_atom(ATOM_INTEGER, &i);
@@ -1608,20 +1627,6 @@ static void mio_symbol(g95_symbol *sym) {
 
 /************************* Top level subroutines *************************/
 
-static char *search_name, *search_module;
-static g95_symbol *search_result;
-
-static void find_true_name(g95_symtree *symtree) {
-g95_symbol *sym;
-
-  sym = symtree->sym;
-
-  if (strcmp(sym->name, search_name) == 0 &&
-      strcmp(sym->module, search_module) == 0) 
-    search_result = sym;
-}
-
-
 /* skip_list()-- Skip a list between balenced left and right parens. */
 
 static void skip_list(void) {
@@ -1650,23 +1655,85 @@ int level;
 }
 
 
+
+/* bf_search()-- Recursive function to search a namespace for a symbol
+ * by name and module.  Returns a pointer to the symbol node if found,
+ * NULL if not found. */
+
+static g95_symbol *bf_search(g95_symtree *st, symbol_info *info) {
+g95_symbol *result;
+
+  if (st == ST_NIL) return NULL;
+
+  result = st->sym;
+
+  if (strcmp(result->name, info->true_name) == 0 &&
+      strcmp(result->module, info->module) == 0)
+    return result;
+
+  result = bf_search(st->left, info);
+  if (result != NULL) return result;
+
+  return bf_search(st->right, info);
+}
+
+
+/* bf_sym_search()-- Given a sym_info pointer, search the current and
+ * parent namespaces for the symbol's true name.  Because of renaming,
+ * the symbol might be named something different or be inaccessible,
+ * so a brute-force traversal is required.  Returns a pointer to the
+ * symbol, or NULL if not found. */
+
+static g95_symbol *bf_sym_search(symbol_info *info) {
+g95_symbol *result;
+g95_namespace *ns;
+
+  if (!check_module(info->module)) return NULL; /* Module not loaded */
+
+  for(ns=g95_current_ns; ns; ns=ns->parent) {
+    result = bf_search(ns->root, info);
+    if (result != NULL) return result;
+  }
+
+  return NULL;
+}
+
+
+
 static void read_namespace(g95_namespace *ns) {
-module_locus operator_interfaces;
+module_locus operator_interfaces, symbols;
 char name[G95_MAX_SYMBOL_LEN+1];
 int i, flag, ambiguous, symbol;
 g95_interface *head, *tail;
 symbol_info *info;
 g95_use_rename *u;
 g95_symtree *st;
-
-  mio_integer(&sym_num);
+g95_symbol *sym;
 
   get_module_locus(&operator_interfaces);  /* Skip these for now */
   skip_list();
 
-  sym_table = g95_getmem(sym_num*sizeof(symbol_info));
+  /* Figure out what the largest symbol number is */
 
   mio_lparen();
+
+  get_module_locus(&symbols);
+
+  sym_num = 0;
+
+  while(peek_atom()!=ATOM_RPAREN) {
+    require_atom(ATOM_INTEGER);
+    if (atom_int > sym_num) sym_num = atom_int;
+
+    require_atom(ATOM_STRING);
+    require_atom(ATOM_STRING);
+    skip_list();
+  }
+
+  sym_num++;
+  sym_table = g95_getmem(sym_num*sizeof(symbol_info));
+
+  set_module_locus(&symbols);
 
   while(peek_atom()!=ATOM_RPAREN) {
     require_atom(ATOM_INTEGER);
@@ -1689,19 +1756,12 @@ g95_symtree *st;
      * If so, we reference the existing symbol and prevent it from
      * being loaded again. */
 
-    if (check_module(info->module)) {  /* Search via brute force traversal */
-      search_name = info->true_name;
-      search_module = info->module;
-      search_result = NULL;
-
-      g95_traverse_symtree(ns, find_true_name);
-
-      if (search_result != NULL) {
-	info->state = USED;
-	info->sym = search_result;
-	info->referenced = 1;
-	continue;
-      }
+    sym = bf_sym_search(info);
+    if (sym != NULL) {
+      info->state = USED;
+      info->sym = sym;
+      info->referenced = 1;
+      continue;
     }
 
     info->sym = g95_new_symbol(info->true_name, ns);
@@ -1877,45 +1937,39 @@ static int check_access(g95_access specific_access,
 }
 
 
-/* write_symbol()-- Write a symbol to the module.  If the symbol is
- * unreferenced, we check the access settings to see if we should
- * write it. */
-
-static int *symbol_written;    /* Array of flags */
+/* write_symbol()-- Write a symbol to the module. */
 
 static void write_symbol(g95_symbol *sym) {
-g95_formal_arglist *f;
 
   if (sym->attr.flavor == FL_UNKNOWN || sym->attr.flavor == FL_LABEL)
     g95_internal_error("write_symbol(): bad module symbol '%s'", sym->name);
+
+  if (sym->written) return;
+  sym->written = 1;
+
+  mio_integer(&sym->serial);
+  mio_internal_string(sym->name);
+
+  if (sym->module[0] == '\0') strcpy(sym->module, module_name);
+  mio_internal_string(sym->module);
+
+  mio_symbol(sym);
+  write_char('\n');
+}
+
+
+/* write_symbol0()-- Function called by recursive traversal to write
+ * the initial set of symbols to the module.  We check to see if the
+ * symbol should be written according to the access specification. */
+
+static void write_symbol0(g95_symbol *sym) {
 
   if (sym->serial == -1) {
     if (!check_access(sym->attr.access, sym->ns->default_access)) return;
     sym->serial = sym_num++;
   }
 
-  if (symbol_written[sym->serial]) return;
-  symbol_written[sym->serial] = 1;
-
-  mio_integer(&sym->serial);
-
-  mio_internal_string(sym->name);
-  mio_internal_string(sym->module);
-  mio_symbol(sym);
-  write_char('\n');
-
-  /* Writing the formal argument list caused the symbols of the list
-   * to be marked as referenced.  If they are in another namespace, we
-   * recurse there to write them. */
-
-  if (sym->formal_ns != NULL)
-    g95_traverse_ns(sym->formal_ns, write_symbol);
-  else {
-    for(f=sym->formal; f; f=f->next) {
-      if (f->sym->ns == sym->ns) break;
-      write_symbol(f->sym);
-    }
-  }
+  write_symbol(sym);
 }
 
 
@@ -1934,50 +1988,12 @@ g95_symbol *sym;
 }
 
 
-/* count_symbols()-- Work function to count symbols and initialize the
- * serial number and possibly module name. */
-
-static void count_symbols(g95_symbol *sym) {
-g95_formal_arglist *f;
-
-  sym_num++;
-  sym->serial = -1;
-  if (sym->module[0] == '\0') strcpy(sym->module, module_name);
-
-  /* If there is a formal argument list, the symbols can be in another
-   * namespace and need to be marked.  If there is a namespace from an
-   * interface block, we write everything.  Otherwise we just mark the
-   * symbols, treating them as if they were in the module namespace */
-
-  if (sym->formal_ns != NULL)
-    g95_traverse_ns(sym->formal_ns, count_symbols);
-  else {
-    for(f=sym->formal; f; f=f->next) {
-      if (f->sym->ns == sym->ns) break;
-      count_symbols(f->sym);
-    }
-  }
-}
-
-
 static void write_namespace(g95_namespace *ns) {
-module_locus m1, m2;
+g95_symbol *sym;
+sym_stack *p;
 int i;
 
-  sym_num = 0;
-
-  g95_traverse_ns(ns, count_symbols);
-
-  mio_integer(&sym_num);
-
-  symbol_written = g95_getmem(sym_num * sizeof(int));
-
-  for(i=0; i<sym_num; i++)
-    symbol_written[i] = 0;
-
-  write_char('\n');  write_char('\n');
-
-  sym_num = 0;     /* This is now the counter for new symbol numbers */
+  sym_num = 0;     /* Counter for new symbol numbers */
 
   /* Write the operator interfaces */
 
@@ -1991,26 +2007,29 @@ int i;
 
   write_char('\n');  write_char('\n');
 
-  /* Write symbol information.  We do a loop that traverses the
-   * namespace writing symbols that need to be written.  Sometimes
-   * writing one symbol will cause another to need to be written, so
-   * we keep looping until we do a full traversal without writing any
-   * symbols.  The reading algorithm doesn't care what order the
-   * symbols appear in. */
+  /* Write symbol information.  First we traverse all symbols in the
+   * primary namespace, writing those that need to be written.
+   * Sometimes writing one symbol will cause another to need to be
+   * written.  A list of these symbols ends up on the write stack, and
+   * we end by popping the bottom of the stack and writing the symbol
+   * until the stack is empty.  */
 
   mio_lparen();
-  get_module_locus(&m1);
 
-  for(;;) {
-    g95_traverse_ns(ns, write_symbol);
+  write_stack = NULL;
 
-    get_module_locus(&m2);
-    if (m1.line == m2.line && m1.column == m2.column) break;
-    m1 = m2;
+  g95_traverse_ns(ns, write_symbol0);
+
+  while(write_stack != NULL) {
+    sym = write_stack->sym;
+    p = write_stack;
+    write_stack = write_stack->next;
+    g95_free(p);
+
+    write_symbol(sym);
   }
 
   mio_rparen();
-  g95_free(symbol_written);
 
   write_char('\n');  write_char('\n');
 
@@ -2025,7 +2044,9 @@ int i;
  * and we delete the module file, even if it was already there. */
 
 void g95_dump_module(const char *name, int dump_flag) {
-char filename[PATH_MAX];
+char filename[PATH_MAX], *p;
+g95_file *g;
+time_t now;
 
   filename[0] = '\0';
   if (g95_option.module_dir != NULL) strcpy(filename, g95_option.module_dir);
@@ -2043,8 +2064,18 @@ char filename[PATH_MAX];
     g95_fatal_error("Can't open module file '%s' for writing: %s", 
 		    filename, strerror(errno));
 
-  fputs("G95 Module: If you edit this, you'll get what you deserve.\n\n",
-	module_fp);
+  /* Find the top level filename */
+
+  g = g95_current_file;
+  while(g->next)
+    g = g->next;
+
+  now = time(NULL);
+  p = ctime(&now);
+  *strchr(p, '\n') = '\0';
+
+  fprintf(module_fp, "G95 module created by %s on %s\n", g->filename, p);
+  fputs("If you edit this, you'll get what you deserve.\n\n", module_fp);
 
   iomode = IO_OUTPUT;
   strcpy(module_name, name);
@@ -2064,7 +2095,7 @@ char filename[PATH_MAX];
 void g95_use_module() {
 char filename[G95_MAX_SYMBOL_LEN+5];
 g95_state_data *p;
-int c;
+int c, line;
 
   strcpy(filename, module_name);
   strcat(filename, MODULE_EXTENSION);
@@ -2078,12 +2109,13 @@ int c;
   module_line = 1;
   module_column = 1;
 
-/* Skip the first line of the module */
+  /* Skip the first two lines of the module */
 
-  for(;;) {
+  line = 0;
+  while(line < 2) {
     c = module_char();
     if (c == EOF) bad_module("Unexpected end of module");
-    if (c == '\n') break;
+    if (c == '\n') line++;
   }
 
   /* Make sure we're not reading the same module that we may be building */

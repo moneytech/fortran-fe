@@ -1396,8 +1396,8 @@ done:
  * this case, that symbol has been used as a host associated variable
  * at some previous time.  */
 
-#define NIL &sentinel           /* all leaves are sentinels */
-static g95_symtree sentinel = { { '\0' }, 0, NULL, NIL, NIL, NIL, BLACK };
+#define NIL &g95_st_sentinel           /* all leaves are sentinels */
+g95_symtree g95_st_sentinel = { { '\0' }, 0, NULL, NIL, NIL, NIL, BLACK };
 
 #define CompLT(a,b) (strcmp(a,b) < 0)
 #define CompEQ(a,b) (strcmp(a,b) == 0)
@@ -1763,7 +1763,11 @@ g95_symbol *p;
 
   if (strlen(name) > G95_MAX_SYMBOL_LEN)
     g95_internal_error("new_symbol(): Symbol name too long");
+
   strcpy(p->name, name);
+
+  p->serial = -1;
+  p->written = 0;
 
   return p;
 }
