@@ -278,7 +278,7 @@ try t;
 
   m = g95_match_array_spec(&as);
   if (m == MATCH_ERROR) goto cleanup;
-  if (m == MATCH_NO) g95_copy_array_spec(&as, current_as);
+  if (m == MATCH_NO) as = g95_copy_array_spec(current_as);
 
   char_len = NULL;
   cl = NULL;
@@ -398,7 +398,7 @@ char *msg;
   if (n == MATCH_NO) g95_error("Expected initialization expression at %C");
   if (n != MATCH_YES) return MATCH_ERROR;
 
-  if (e->ar != NULL) {
+  if (e->as != NULL) {
     g95_error("Expected scalar initialization expression at %C");
     m = MATCH_ERROR;
     goto no_match;
@@ -1978,7 +1978,8 @@ loop:
     return MATCH_ERROR;
   }
 
-  if (g95_add_access(&sym->attr, attr.access, NULL) == FAILURE)
+  if (attr.access != ACCESS_UNKNOWN &&
+      g95_add_access(&sym->attr, attr.access, NULL) == FAILURE)
     return MATCH_ERROR;
 
   g95_new_block = sym;
