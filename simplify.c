@@ -1009,29 +1009,28 @@ int index;
 /* Argument must be of length 1; its value must be representable by the 
  * processor */
 
-  if (e->ts.type != BT_CHARACTER ) {
-    g95_error("Argument of ICHAR at %L must be character and of length one", &e->where);
+  if (e->ts.type != BT_CHARACTER) {
+    g95_error("Argument of ICHAR at %L must be character and of length one",
+	      &e->where);
     return &g95_bad_expr;
   }
 
-  if (e->value.character.length != 1 ) {
+  if (e->value.character.length != 1) {
     g95_error("Argument of ICHAR at %L must be of length one", &e->where);
     return &g95_bad_expr;
   }
 
-  index = (int) e->value.character.string[0];
+  index = (unsigned) e->value.character.string[0];
 
-  if ( index < CHAR_MIN || index > CHAR_MAX ) {
-    g95_error("Argument of ICHAR at %L out of range of this processor", &e->where);
+  if (index < CHAR_MIN || index > CHAR_MAX) {
+    g95_error("Argument of ICHAR at %L out of range of this processor",
+	      &e->where);
     return &g95_bad_expr;
   }
 
-  result = g95_constant_result(BT_REAL, e->ts.kind);
+  result = g95_int_expr(index);
   result->where = e->where;
-
-  mpz_set_si(result->value.integer, index);
   return result;
-
 }
 
 
