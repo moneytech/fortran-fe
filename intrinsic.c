@@ -1682,9 +1682,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("conjg", 0, BT_COMPLEX, dz, g95_simplify_conjg, NULL,
 	     z, BT_COMPLEX, dz, 0, NULL);
 
-  add_sym_f1("cos",  0, BT_REAL,    dr, NULL, NULL,
+  add_sym_f1("cos",  0, BT_REAL,    dr, g95_simplify_cos, NULL,
 	     x, BT_REAL,    dr, 0, NULL);
-  add_sym_f1("dcos", 0, BT_REAL,    dd, NULL, NULL,
+  add_sym_f1("dcos", 0, BT_REAL,    dd, g95_simplify_cos, NULL,
 	     x, BT_REAL,    dd, 0, NULL);
   add_sym_f1("ccos", 0, BT_COMPLEX, dz, NULL, NULL,
 	     x, BT_COMPLEX, dz, 0, NULL);
@@ -1993,8 +1993,8 @@ int di, dr, dd, dl, dc, dz;
 	     a, BT_REAL, dd, 0,   b, BT_REAL, dd, 0, NULL);
   make_generic("sign");
 
-  add_sym_f1("sin",  1, BT_REAL,    dr, NULL, NULL,   x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dsin", 1, BT_REAL,    dd, NULL, NULL,   x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("sin",  1, BT_REAL,    dr, g95_simplify_sin, NULL,   x, BT_REAL, dr, 0, NULL);
+  add_sym_f1("dsin", 1, BT_REAL,    dd, g95_simplify_sin, NULL,   x, BT_REAL, dd, 0, NULL);
   add_sym_f1("csin", 1, BT_COMPLEX, dz, NULL, NULL,
 	     x, BT_COMPLEX, dz, 0, NULL);
   make_generic("sin");

@@ -670,11 +670,37 @@ g95_expr *result;
 }
 
 
-g95_expr *g95_simplify_cos(g95_expr *e) {
-/* We don't have an extension to return mathematical functions for constant
- * arguments yet */
+g95_expr *g95_simplify_cos(g95_expr *x) {
+g95_expr *re, *result;
+int i;
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  switch (x->ts.type) {
+  case BT_INTEGER: 
+    if (g95_option.pedantic == 1) 
+        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
+    re = g95_int2real(x,x->ts.kind);
+    cosine(&re->value.real,&result->value.real);
+    break;
+  case BT_REAL: 
+    cosine(&x->value.real,&result->value.real);
+    break;
+  case BT_COMPLEX: 
+    g95_error("Complex sin at %L has not yet been implemented",&x->where);
+    return &g95_bad_expr;
+  default:
+    g95_internal_error("in g95_simplify_exp(): Bad type");
+  }
+
+  return range_check(result, "SIN");
+
 }
 
 
@@ -3041,11 +3067,37 @@ int sgn;
 }
 
 
-g95_expr *g95_simplify_sin(g95_expr *e) {
-/* We don't have an extension to return transcendental functions for constant
- * arguments yet */
+g95_expr *g95_simplify_sin(g95_expr *x) {
+g95_expr *re, *result;
+int i;
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  switch (x->ts.type) {
+  case BT_INTEGER: 
+    if (g95_option.pedantic == 1) 
+        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
+    re = g95_int2real(x,x->ts.kind);
+    sine(&re->value.real,&result->value.real);
+    break;
+  case BT_REAL: 
+    sine(&x->value.real,&result->value.real);
+    break;
+  case BT_COMPLEX: 
+    g95_error("Complex sin at %L has not yet been implemented",&x->where);
+    return &g95_bad_expr;
+  default:
+    g95_internal_error("in g95_simplify_exp(): Bad type");
+  }
+
+  return range_check(result, "SIN");
+
 }
 
 

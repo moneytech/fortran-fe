@@ -28,6 +28,10 @@ Boston, MA 02111-1307, USA.  */
 #include <string.h>
 
 static mpf_t e;
+static mpf_t pi;
+static mpf_t hpi;
+static mpf_t thpi;
+static mpf_t tpi;
 
 
 /* The g95_(integer|real)_kinds[] structures have everything the front
@@ -220,7 +224,113 @@ unsigned long p, mp;
 }
 
 void sine(mpf_t *arg, mpf_t *result) {
-/* In preparation */
+mpf_t factor, q, r, num, denom, term, x, xp;
+int i, sign;
+
+/* We use a reduction of the form
+ *   x= N*2pi + r
+ *   then obtain sin(r) from the McLaurin series. */
+
+  mpf_init_set(x, *arg);
+
+/* Special case (we do not treat multiples of pi due to roundoff issues) */
+  if ( mpf_cmp_ui(x,0) ==  0) {
+    mpf_set_ui(*result,0);
+  }
+
+  else {
+    mpf_init(q);
+    mpf_init(r);
+    mpf_init(factor);
+    mpf_init(num);
+    mpf_init(denom);
+    mpf_init(term);
+
+    mpf_div(q,x,tpi);
+    mpf_floor(factor,q);
+    mpf_mul(q,factor,tpi);
+    mpf_sub(r,x,q);
+
+    mpf_init_set_ui(xp, 0);
+    mpf_init_set_ui(num, 1);
+    mpf_init_set_ui(denom, 1);
+
+    sign = -1;
+    for(i=1; i<100; i++) {
+      mpf_mul(num,num,r);
+      mpf_mul_ui(denom,denom,i);
+      if ( i%2 != 0 ) {
+        sign = sign*(-1);
+        mpf_div(term,num,denom);
+        if ( sign > 0) mpf_add(xp,xp,term);
+        else mpf_sub(xp,xp,term);
+      }
+    }
+    mpf_set(*result,xp);
+
+    mpf_clear(q);
+    mpf_clear(r);
+    mpf_clear(factor);
+    mpf_clear(num);
+    mpf_clear(denom);
+    mpf_clear(term);
+    mpf_clear(x);
+    mpf_clear(xp);
+  }
+}
+
+void cosine(mpf_t *arg, mpf_t *result) {
+mpf_t factor, q, r, num, denom, term, x, xp;
+int i, sign;
+
+/* Similar to sine routine */
+
+  mpf_init_set(x, *arg);
+
+/* Special case (we do not treat multiples of pi due to roundoff issues) */
+  if ( mpf_cmp_ui(x,0) ==  0) {
+    mpf_set_ui(*result,1);
+  }
+
+  else {
+    mpf_init(q);
+    mpf_init(r);
+    mpf_init(factor);
+    mpf_init(num);
+    mpf_init(denom);
+    mpf_init(term);
+
+    mpf_div(q,x,tpi);
+    mpf_floor(factor,q);
+    mpf_mul(q,factor,tpi);
+    mpf_sub(r,x,q);
+
+    mpf_init_set_ui(xp, 1);
+    mpf_init_set_ui(num, 1);
+    mpf_init_set_ui(denom, 1);
+
+    sign = 1;
+    for(i=1; i<100; i++) {
+      mpf_mul(num,num,r);
+      mpf_mul_ui(denom,denom,i);
+      if ( i%2 == 0 ) {
+        sign = sign*(-1);
+        mpf_div(term,num,denom);
+        if ( sign > 0) mpf_add(xp,xp,term);
+        else mpf_sub(xp,xp,term);
+      }
+    }
+    mpf_set(*result,xp);
+
+    mpf_clear(q);
+    mpf_clear(r);
+    mpf_clear(factor);
+    mpf_clear(num);
+    mpf_clear(denom);
+    mpf_clear(term);
+    mpf_clear(x);
+    mpf_clear(xp);
+  }
 }
 
 /* g95_arith_error()-- Given an arithmetic error code, return a
@@ -247,9 +357,9 @@ const char *p;
 void g95_arith_init_1(void) {
 g95_integer_info *int_info;
 g95_real_info *real_info;
-mpf_t a, b;
+mpf_t a, b, term1, term2;
 mpz_t r;
-int i;
+int i, sign;
 
 /* Calculate e, needed by the natural_logarithm() subroutine. */
 
@@ -262,7 +372,37 @@ int i;
     mpf_div_ui(a, a, i);
   }
 
-/* Calculate pi, needed for evaluating (scaling) trigonometric functions */
+/* Calculate pi, 2pi, pi/2, and 3pi/2, needed for trigonometric functions 
+ * Using slow arctan method (about one decimal digit per iteration) */
+
+  mpf_init_set_ui(pi,0);
+  mpf_init_set_ui(term1,0);
+  mpf_init_set_ui(term2,0);
+  mpf_set_ui(a,1);
+  mpf_set_ui(b,1);
+
+  mpf_init(tpi);
+  mpf_init(hpi);
+  mpf_init(thpi);
+
+  sign = -1;
+  for(i=1; i<100; i++) {
+    mpf_mul_ui(a,a,5);
+    mpf_mul_ui(b,b,239);
+    if ( i%2 != 0 ) {
+      sign = sign*(-1);
+      mpf_ui_div(term1,4,a);
+      mpf_ui_div(term2,1,b);
+      mpf_sub(term1,term1,term2);
+      mpf_div_ui(term1,term1,i);
+      if ( sign > 0) mpf_add(pi,pi,term1);
+      else mpf_sub(pi,pi,term1);
+    }
+  }
+  mpf_mul_ui(hpi,pi,2);
+  mpf_mul_ui(thpi,hpi,3);
+  mpf_mul_ui(pi,pi,4);
+  mpf_mul_ui(tpi,pi,2);
 
 /* Convert the minimum/maximum values for each kind into their Gnu MP
  * representation. */
@@ -348,6 +488,8 @@ int i;
   mpz_clear(r);
   mpf_clear(a);
   mpf_clear(b);
+  mpf_clear(term1);
+  mpf_clear(term2);
 }
 
 
