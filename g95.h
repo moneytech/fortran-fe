@@ -356,6 +356,7 @@ typedef struct g95_formal_arglist {
 typedef struct g95_actual_arglist {
   char name[G95_MAX_SYMBOL_LEN+1];
   int arg_number;
+  int label;    /* Alternate return label when the expr member is null */
   struct g95_expr *expr;
   struct g95_actual_arglist *next;
 } g95_actual_arglist;
@@ -372,15 +373,6 @@ typedef struct g95_namelist {
 } g95_namelist;
 
 #define g95_get_namelist() g95_getmem(sizeof(g95_namelist))
-
-
-/* g95_label_list holds a singly linked list of alternate return
- * labels for an actual argument list.  */
-
-typedef struct g95_label_list {
-  int label;
-  struct g95_label_list *next;
-} g95_label_list;
 
 
 /* The g95_st_label structure is a singly linked list attached to a
@@ -1207,7 +1199,6 @@ match g95_match_allocate(void);
 match g95_match_nullify(void);
 match g95_match_deallocate(void);
 match g95_match_return(void);
-void g95_free_label_list(g95_label_list *);
 match g95_match_call(void);
 match g95_match_common(void);
 match g95_match_block_data(void);
@@ -1263,7 +1254,7 @@ match g95_match_rvalue(g95_expr **);
 match g95_match_variable(g95_expr **, int);
 match g95_match_expr_type(bt, g95_expr **);
 match g95_match_scalar_expr(g95_expr **);
-match g95_match_actual_arglist(int, g95_actual_arglist **, g95_label_list **);
+match g95_match_actual_arglist(int, g95_actual_arglist **);
 void g95_free_actual_arglist(g95_actual_arglist *);
 int g95_next_string_char(char);
 match g95_match_literal_constant(g95_expr **, int);

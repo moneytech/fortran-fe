@@ -62,6 +62,9 @@ g95_symbol *sym;
 
   for(; f; f=f->next) {
     sym = f->sym;
+
+    if (sym == NULL) continue;  /* Alternate return placeholder */
+
     if (sym->ts.type == BT_UNKNOWN) g95_set_default_type(sym, 1, sym->ns);
 
     /* If the flavor is unknown at this point, it has to be a variable.

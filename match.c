@@ -1494,18 +1494,6 @@ done:
 }
 
 
-/* g95_free_label_list()-- Free a list of alternate return labels */
-
-void g95_free_label_list(g95_label_list *p) {
-g95_label_list *q;
-
-  for(; p; p=q) {
-    q = p->next;
-    g95_free(p);
-  }
-}
-
-
 /* g95_match_call()-- Match a CALL statement.  The tricky part here
  * are possible alternate return specifiers.  We handle these by
  * having all "subroutines" actually return an integer via a register
@@ -1515,8 +1503,7 @@ g95_label_list *q;
 
 match g95_match_call(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_label_list *head, *current;
-g95_actual_arglist *arglist;
+g95_actual_arglist *a, *arglist;
 g95_case *new_case;
 g95_symbol *sym;
 g95_code *c;
@@ -1524,7 +1511,6 @@ match m;
 int i;
 
   arglist = NULL;
-  head = NULL;
 
   m = g95_match("% %n", name);
   if (m == MATCH_NO) goto syntax;
@@ -1538,7 +1524,7 @@ int i;
     return MATCH_ERROR;
 
   if (g95_match_eos() != MATCH_YES) {
-    m = g95_match_actual_arglist(1, &arglist, &head);
+    m = g95_match_actual_arglist(1, &arglist);
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
 
@@ -1548,13 +1534,20 @@ int i;
 /* If any alternate return labels were found, construct a SELECT
  * statement that will jump to the right place */
 
-  if (head != NULL) {
+  i = 0;
+  for(a=arglist; a; a=a->next)
+    if (a->expr == NULL) i = 1;
+
+  if (i) {
     new_st.next = c = g95_get_code();
     c->op = EXEC_SELECT;
     c->expr = g95_int_expr(0);  /* For now */
 
-    i = 1;
-    for(current=head; current; current=current->next, i++) {
+    i = 0;
+    for(a=arglist; a; a=a->next) {
+      if (a->expr != NULL) continue;
+      i++;
+
       c->block = g95_get_code();
       c = c->block;
       c->op = EXEC_SELECT;
@@ -1565,12 +1558,10 @@ int i;
 
       c->next = g95_get_code();
       c->next->op = EXEC_GOTO;
-      c->next->label = current->label;
+      c->next->label = a->label;
 
-      g95_reference_st_label(current->label, ST_LABEL_TARGET);
+      g95_reference_st_label(a->label, ST_LABEL_TARGET);
     }
-
-    g95_free_label_list(head);
   }
 
   new_st.op = EXEC_CALL;
@@ -1584,8 +1575,6 @@ syntax:
 
 cleanup:
   g95_free_actual_arglist(arglist);
-  g95_free_label_list(head);
-
   return MATCH_ERROR;
 }
 

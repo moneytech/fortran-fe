@@ -712,19 +712,27 @@ int i, n, na;
   for(a=actual; a; a=a->next, f=f->next) {
     if (a->name[0] != '\0') {
       i = 0;
-      for(f=formal; f; f=f->next, i++)
+      for(f=formal; f; f=f->next, i++) {
+	if (f->sym == NULL) continue;
 	if (strcmp(f->sym->name, a->name) == 0) break;
+      }
 
       if (f == NULL) return 0;       /* Keyword not found */
 
       if (new[i] != NULL) return 0;  /* Actual already matched to formal */
     }
 
-    if (f == NULL ||
-	g95_symbol_rank(f->sym) != actual->expr->rank ||
+    if (f == NULL) return 0;
+
+    if (f->sym == NULL && a->expr == NULL) goto match;
+
+    if (f->sym == NULL || a->expr == NULL) return 0;
+
+    if (g95_symbol_rank(f->sym) != actual->expr->rank ||
 	g95_compare_types(&f->sym->ts, &a->expr->ts) == 0)
       return 0;
 
+  match:
     if (a == actual) na = i;
 
     new[i++] = a;

@@ -1067,11 +1067,9 @@ int c;
  * procedure has an implicit interface or not.  We make sure keywords
  * are unique. */
 
-match g95_match_actual_arglist(int sub_flag, g95_actual_arglist **argp,
-			       g95_label_list **labels) {
+match g95_match_actual_arglist(int sub_flag, g95_actual_arglist **argp) {
 
 g95_actual_arglist *a, *actual, *actual_tail;
-g95_label_list *label_head, *label_tail;
 int arg_number, label, seen_keyword;
 char name[G95_MAX_SYMBOL_LEN+1];
 locus old_loc, name_locus;
@@ -1079,7 +1077,6 @@ match m;
 
   *argp = actual_tail = NULL;
   old_loc = *g95_current_locus();
-  label_head = label_tail = NULL;
 
   arg_number = 1;
   seen_keyword = 0;
@@ -1090,19 +1087,19 @@ match m;
   actual = NULL;
 
   for(;;) {
+    if (actual == NULL)
+      actual = actual_tail = g95_get_actual_arglist();
+    else {
+      actual_tail->next = g95_get_actual_arglist();
+      actual_tail = actual_tail->next;
+    }
+
     if (sub_flag && g95_match(" *") == MATCH_YES) {
       m = g95_match_st_label(&label);
       if (m == MATCH_NO) g95_error("Expected alternate return label at %C");
       if (m != MATCH_YES) goto cleanup;
 
-      if (label_head == NULL)
-	label_head = label_tail = g95_getmem(sizeof(g95_label_list));
-      else {
-	label_tail->next = g95_getmem(sizeof(g95_label_list));
-	label_tail = label_tail->next;
-      }
-
-      label_tail->label = label;
+      actual_tail->label = label;
       goto next;
     }
 
@@ -1126,7 +1123,6 @@ match m;
 	g95_error("Missing keyword argument in actual argument list at %C");
 	goto cleanup;
       }
-
     } else {   /* See if we have the first keyword argument */
       if (m == MATCH_YES && g95_match(" =") == MATCH_YES)
 	seen_keyword = 1;
@@ -1147,13 +1143,6 @@ match m;
 	}
     }
 
-    if (actual == NULL)
-      actual = actual_tail = g95_get_actual_arglist();
-    else {
-      actual_tail->next = g95_get_actual_arglist();
-      actual_tail = actual_tail->next;
-    }
-
     strcpy(actual_tail->name, name);
     actual_tail->arg_number = arg_number++;
 
@@ -1169,15 +1158,12 @@ match m;
   }
 
   *argp = actual;
-  if (label_head != NULL) *labels = label_head;
-
   return MATCH_YES;
 
 syntax:
   g95_error("Syntax error in argument list at %C");
 
 cleanup:
-  g95_free_label_list(label_head);
   g95_free_actual_arglist(actual);
   g95_set_locus(&old_loc);
 
@@ -1608,7 +1594,7 @@ match m;
     /* Match a function reference */
 
   function0:
-    m = g95_match_actual_arglist(0, &actual_arglist, NULL);
+    m = g95_match_actual_arglist(0, &actual_arglist);
     if (m == MATCH_NO) {
       if (sym->attr.proc == PROC_ST_FUNCTION)
 	g95_error("Statement function '%s' requires argument list at %C",
@@ -1723,7 +1709,7 @@ match m;
       break;
     }
 
-    m = g95_match_actual_arglist(0, &e->value.function.actual, NULL);
+    m = g95_match_actual_arglist(0, &e->value.function.actual);
     if (m == MATCH_NO)
       g95_error("Missing argument list in function '%s' at %C", sym->name);
 
@@ -1747,7 +1733,7 @@ match m;
     e->symbol = sym;
     e->expr_type = EXPR_FUNCTION;
 
-    m = g95_match_actual_arglist(0, &e->value.function.actual, NULL);
+    m = g95_match_actual_arglist(0, &e->value.function.actual);
     break;
 
   default:
