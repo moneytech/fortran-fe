@@ -29,9 +29,7 @@ Boston, MA 02111-1307, USA.  */
 extern g95_integer_info g95_integer_kinds[];
 extern g95_real_info g95_real_kinds[];
 
-#define FIRST_ARG(e) (e->value.function.actual->expr)
-#define SECOND_ARG(e) (e->value.function.actual->next->expr)
-#define THIRD_ARG(e) (e->value.function.actual->next->next->expr)
+extern g95_expr *g95_current_function;
 
 static g95_expr *integer_zero, *real_zero;
 static mpf_t mpf_zero, mpf_half, mpf_one, mpf_pi, mpf_hpi, mpf_nhpi;
@@ -48,11 +46,13 @@ g95_expr g95_bad_expr;
  *
  *   A new expression node corresponding to the simplified arguments.
  *   The original arguments are destroyed by the caller, and must not
- *   be a part of the new expression.  Use g95_copy_expr() if
- *   necessary.
+ *   be a part of the new expression.
  *
  *   NULL pointer indicating that no simplification was possible and
- *   the original expression should remain intact.
+ *   the original expression should remain intact.  If the
+ *   simplification function sets the type and/or the function name
+ *   via the pointer g95_simple_expression, then this type is
+ *   retained.
  *
  *   An expression pointer to g95_bad_expr (a static placeholder)
  *   indicating that some error has prevented simplification.  For
@@ -66,8 +66,7 @@ g95_expr g95_bad_expr;
  * subroutine may have to look at the type of an argument as part of
  * its processing.
  *
- * Array arguments are never passed to these subroutines.
- */
+ * Array arguments are never passed to these subroutines.  */
 
 /* Static table for converting non-ascii character sets to ascii.
  * The xascii_table[] is the inverse table. */
@@ -392,21 +391,17 @@ int kind;
 
 g95_expr *g95_simplify_all(g95_expr *mask, g95_expr *dim) {
 static char all0[] = "__all0", all1[] = "__all1";
-g95_expr *result;
 
-  result = g95_build_funcall(NULL, g95_copy_expr(mask),
-			     g95_copy_expr(dim), NULL);
-
-  result->ts = mask->ts;
+  g95_current_function->ts = mask->ts;
 
   if (dim == NULL || mask->rank == 1)
-    result->value.function.name = all0;
+    g95_current_function->value.function.name = all0;
   else {
-    result->value.function.name = all1;
-    result->rank = mask->rank - 1;
+    g95_current_function->value.function.name = all1;
+    g95_current_function->rank = mask->rank - 1;
   }
 
-  return result;
+  return NULL;
 }
 
 
@@ -488,21 +483,17 @@ int cmp;
 
 g95_expr *g95_simplify_any(g95_expr *mask, g95_expr *dim) {
 static char any0[] = "__any0", any1[] = "__any1";
-g95_expr *result;
 
-  result = g95_build_funcall(NULL, g95_copy_expr(mask),
-			     g95_copy_expr(dim), NULL);
-
-  result->ts = mask->ts;
+  g95_current_function->ts = mask->ts;
 
   if (dim == NULL || mask->rank == 1)
-    result->value.function.name = any0;
+    g95_current_function->value.function.name = any0;
   else {
-    result->value.function.name = any1;
-    result->rank = mask->rank - 1;
+    g95_current_function->value.function.name = any1;
+    g95_current_function->rank = mask->rank - 1;
   }
 
-  return result;
+  return NULL;
 }
 
 
@@ -926,28 +917,23 @@ static char buffer[25];
  * a resolved call to the right subroutine. */
 
 g95_expr *g95_simplify_dot_product(g95_expr *a, g95_expr *b) {
-g95_expr temp, *result;
-
-  a = g95_copy_expr(a);
-  b = g95_copy_expr(b);
-
-  result = g95_build_funcall(NULL, a, b, NULL);
+g95_expr temp;
 
   if (a->ts.type == BT_LOGICAL && b->ts.type == BT_LOGICAL) {
-    result->ts.type = BT_LOGICAL;
-    result->ts.kind = g95_default_logical_kind();
+    g95_current_function->ts.type = BT_LOGICAL;
+    g95_current_function->ts.kind = g95_default_logical_kind();
   } else {
     temp.op1 = a;
     temp.op2 = b;
     g95_type_convert_binary(&temp);
-
-    result->ts = temp.ts;
+    g95_current_function->ts = temp.ts;
   }
 
-  result->value.function.name =
-    g95_get_string(dot_name(result->ts.type, result->ts.kind));
+  g95_current_function->value.function.name =
+    g95_get_string(dot_name(g95_current_function->ts.type,
+			    g95_current_function->ts.kind));
 
-  return result;
+  return NULL;
 }
 
 
@@ -2403,8 +2389,11 @@ g95_expr *e;
 
   if (source->expr_type != EXPR_ARRAY || shape_exp->expr_type != EXPR_ARRAY ||
       (pad != NULL && pad->expr_type != EXPR_ARRAY) ||
-      (order_exp != NULL && order_exp->expr_type != EXPR_ARRAY))
-      return NULL;
+      (order_exp != NULL && order_exp->expr_type != EXPR_ARRAY)) {
+
+    g95_current_function->ts = source->ts;
+    return NULL;
+  }
 
   mpz_init(index);
   rank = 0;
@@ -2657,13 +2646,14 @@ g95_expr *result;
 
   if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT) {
     result = g95_build_funcall(NULL, g95_copy_expr(x), g95_copy_expr(i), NULL);
-    result->ts = x->ts;
-    result->where = x->where;
 
-    result->value.function.name =
+    g95_current_function->ts = x->ts;
+    g95_current_function->where = x->where;
+
+    g95_current_function->value.function.name =
       g95_get_string(scale_name(x->ts.kind, i->ts.kind));
 
-    return result;
+    return NULL;
   }
 
   result = g95_constant_result(BT_REAL, x->ts.kind);
@@ -2867,19 +2857,12 @@ unsigned long exp2;
 
 
 g95_expr *g95_simplify_shape(g95_expr *source) {
-static char shape[] = "__shape";
-g95_expr *result;
 
-  result = g95_build_funcall(NULL, g95_copy_expr(source), NULL);
+  g95_current_function->ts.type = BT_INTEGER;
+  g95_current_function->ts.kind = g95_default_integer_kind();
+  g95_current_function->rank = 1;
 
-  result->ts.type = BT_INTEGER;
-  result->ts.type = g95_default_integer_kind();
-
-  result->value.function.name = shape;
-
-  result->rank = 1;
-
-  return result;
+  return NULL;
 }
 
 

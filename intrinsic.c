@@ -39,6 +39,8 @@ extern g95_real_info g95_real_kinds[];
 
 static int intrinsic_extension;
 
+g95_expr *g95_current_function;      /* Expression being simplified */
+
 
 /* If a validation of an intrinsic symbol/interface fails for some
  * reason, the text of the reason is here. */
@@ -530,15 +532,9 @@ static try check_dim(g95_expr *x, g95_expr *y) {
 
 static try check_dot_product(g95_expr *vector_a, g95_expr *vector_b) {
 
-  if ((vector_a->ts.type != BT_LOGICAL) && !g95_numeric_ts(&vector_a->ts)) {
-    type_error(vector_a);
-    return FAILURE; 
-  }
-
-  if ((vector_b->ts.type != BT_LOGICAL) && !g95_numeric_ts(&vector_b->ts)) {
-    type_error(vector_b);
+  if ((vector_a->ts.type != BT_LOGICAL || vector_b->ts.type != BT_LOGICAL) &&
+      (!g95_numeric_ts(&vector_a->ts) || !g95_numeric_ts(&vector_b->ts)))
     return FAILURE;
-  }
 
   if (vector_a->rank != 1) return FAILURE;
   if (vector_b->rank != 1) return FAILURE;
@@ -2971,6 +2967,8 @@ static try do_simplify(intrinsic_sym *specific, g95_expr *e) {
 g95_expr *result, *a1, *a2, *a3, *a4, *a5;
 g95_actual_arglist *arg;
 
+  g95_current_function = e;
+
 /* Max and min require special handling due to the variable number of args */
 
   if (specific->check_function == check_max   ||
@@ -3041,18 +3039,18 @@ g95_actual_arglist *arg;
     }
   }
 
-
  finish:
   if (result == &g95_bad_expr) return FAILURE;
 
-  if (result == NULL) {     /* Must call at run-time */
-    e->value.function.name =
-      (lib_name != NULL) ? lib_name : specific->lib_name;
+  if (result != NULL) 
+    g95_replace_expr(e, result);
+  else {         /* Must call at run-time */
+    if (e->value.function.name == NULL)
+      e->value.function.name = (lib_name != NULL)
+	? lib_name : specific->lib_name;
 
     if (e->ts.type == BT_UNKNOWN) e->ts = specific->ts;
-  } else
-    g95_replace_expr(e, result);
-
+  }
 
   return SUCCESS;
 }
