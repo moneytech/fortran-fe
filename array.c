@@ -1537,6 +1537,7 @@ int d;
 
 try g95_array_dimen_size(g95_expr *array, int dimen, mpz_t *result) {
 g95_ref *ref;
+int i;
 
   if (dimen > array->rank - 1)
     g95_internal_error("g95_array_dimen_size(): Bad dimension");
@@ -1555,8 +1556,12 @@ g95_ref *ref;
       if (ref->u.ar.type == AR_FULL)
 	return spec_dimen_size(ref->u.ar.as, dimen, result);
 
-      if (ref->u.ar.type == AR_SECTION)
-	return ref_dimen_size(&ref->u.ar, dimen, result);
+      if (ref->u.ar.type == AR_SECTION) {
+	for(i=0; dimen>=0; i++)
+	  if (ref->u.ar.dimen_type[i] != DIMEN_ELEMENT) dimen--;
+
+	return ref_dimen_size(&ref->u.ar, i-1, result);
+      }
     }
 
     if (spec_dimen_size(array->symbol->as, dimen, result) == FAILURE)
