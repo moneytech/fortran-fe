@@ -646,6 +646,7 @@ conflict:
 }
 
 #undef conf
+#undef conf2
 
 
 /* check_used()-- Common subroutine called by attribute
@@ -1372,7 +1373,7 @@ static int next_label = 100000; /* only initialized at startup! */
  * and referenced correctly. */
 
 void g95_define_st_label(int label, locus *label_locus,
-                         int block_no, g95_sl_type type) {
+                         g95_sl_type type) {
 g95_st_label *lp;
 
   lp = get_st_label(label);
@@ -1390,7 +1391,6 @@ g95_st_label *lp;
   }
 
   lp->where = *label_locus;
-  lp->block_no = block_no;
 
   switch(type) {
   case ST_LABEL_FORMAT:

@@ -401,7 +401,6 @@ typedef struct g95_namelist {
 
 typedef struct g95_st_label {
   int label;
-  int block_no;
   
   g95_sl_type defined, referenced;
 
@@ -415,15 +414,17 @@ typedef struct g95_st_label {
 #define g95_get_st_label() g95_getmem(sizeof(g95_st_label))
 
 
-/* Stack of block numbers for validating GOTO statements */
+/* Stack of block entry points for validating GOTO statements.
+   The idea here is to keep a stack of all the labels that are
+   in the back path of the parse tree in the current namespace.
+   See resolve_goto() in resolve.c for details. */
 
-typedef struct g95_block_stack {
-  int block_no;
-  struct g95_block_stack *prev;
-} g95_block_stack;
+typedef struct g95_code_stack {
+  struct g95_code *code;
+  struct g95_code_stack *prev;
+} g95_code_stack;
 
-#define g95_get_block_stack() g95_getmem(sizeof(g95_block_stack))
-
+#define g95_get_code_stack() g95_getmem(sizeof(g95_code_stack))
 
 /* g95_interface()-- Interfaces are lists of symbols strung together */
 
@@ -574,7 +575,6 @@ extern g95_interface_info current_interface;
 typedef struct g95_state_data {
   g95_compile_state state;
   g95_symbol *sym;            /* Block name associated with this level */
-  int this_block_no;
   struct g95_code *head, *tail;
   struct g95_state_data *previous;
 } g95_state_data;
@@ -865,7 +865,7 @@ typedef struct g95_forall_iterator {
 
 typedef enum {
   EXEC_NOP=1, EXEC_ASSIGN, EXEC_POINTER_ASSIGN, EXEC_GOTO, EXEC_CALL,
-  EXEC_RETURN, EXEC_STOP,
+  EXEC_RETURN, EXEC_STOP, EXEC_CONTINUE,
   EXEC_IF, EXEC_ARITHMETIC_IF, EXEC_DO, EXEC_DO_WHILE, EXEC_SELECT,
   EXEC_FORALL, EXEC_WHERE, EXEC_CYCLE, EXEC_EXIT,
   EXEC_ALLOCATE, EXEC_DEALLOCATE, EXEC_NULLIFY,
@@ -878,7 +878,6 @@ typedef struct g95_code {
 
   struct g95_code *block, *next;
   locus loc;
-  int block_no;
 
   int here, label, label2, label3;
   g95_symbol *sym;
@@ -899,6 +898,9 @@ typedef struct g95_code {
   } ext;     /* Points to additional structures required by statement */
 
 } g95_code;
+
+#define g95_get_code() g95_getmem(sizeof(g95_code))
+
 
 extern g95_code new_st;
 
@@ -1204,7 +1206,7 @@ void g95_show_components(g95_symbol *);
 
 void g95_check_st_labels(g95_namespace *);
 int g95_new_internal_label();
-void g95_define_st_label(int, locus *, int, g95_sl_type);
+void g95_define_st_label(int, locus *, g95_sl_type);
 try g95_reference_st_label(int, g95_sl_type);
 
 g95_namespace *g95_get_namespace(void);
@@ -1387,7 +1389,6 @@ int g95_kind_max(g95_expr *, g95_expr *);
 extern g95_code new_st, *program_tail;
 
 void g95_clear_new_st(void);
-g95_code *g95_get_code(void);
 g95_code *g95_new_level(g95_code *);
 g95_code *g95_add_statement(void);
 g95_code *g95_append_code(g95_code *, g95_code *);
@@ -1404,6 +1405,8 @@ int g95_impure_variable(g95_symbol *);
 int g95_pure(g95_symbol *);
 int g95_elemental(g95_symbol *);
 try g95_resolve_iterator(g95_iterator *);
+void g95_push_code(g95_code *);  /* I'd rather not have these here, but */
+void g95_pop_code();             /* we need them in select.c            */
 
 /* array.c */
 

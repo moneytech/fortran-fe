@@ -35,19 +35,6 @@ void g95_clear_new_st(void) {
 
   memset(&new_st, '\0', sizeof(new_st));
   new_st.op = EXEC_NOP;
-  new_st.block_no = g95_state_stack->this_block_no;
-}
-
-
-/* g95_get_code() -- get a new code node */
-
-g95_code *g95_get_code(void) {
-g95_code *p;
-
-  p = g95_getmem(sizeof(g95_code));
-  p->block_no = g95_state_stack->this_block_no;
-
-  return p;
 }
 
 
@@ -124,6 +111,7 @@ static void free_statement(g95_code *p) {
   case EXEC_RETURN:   case EXEC_IF:         case EXEC_STOP:  case EXEC_EXIT: 
   case EXEC_WHERE:    case EXEC_IOLENGTH:   case EXEC_POINTER_ASSIGN:
   case EXEC_DO_WHILE: case EXEC_ARITHMETIC_IF:   
+  case EXEC_CONTINUE:
     break;
 
   case EXEC_CALL:
@@ -240,8 +228,13 @@ g95_dt *dt;
   code_indent(level, c->here); 
 
   switch(c->op) {
+
   case EXEC_NOP:
     g95_status("NOP");
+    break;
+
+  case EXEC_CONTINUE:
+    g95_status("CONTINUE");
     break;
 
   case EXEC_ASSIGN:
@@ -611,6 +604,5 @@ void g95_show_code(int level, g95_code *c) {
   for(;c ; c=c->next)
     g95_show_code_node(level, c);
 }
-
 
 #endif

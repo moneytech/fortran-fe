@@ -482,7 +482,9 @@ try t;
   overlap = 0;
  
   for(body=code->block; body; body=body->block) {
+    g95_push_code(body->next);
     g95_resolve_code(body->next,ns);
+    g95_pop_code();
 
     if (t == FAILURE) continue;
 

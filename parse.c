@@ -35,15 +35,6 @@ int g95_statement_label;
 static locus label_locus;
 static jmp_buf eof;
 
-
-/* Current block no. We use this to make sure branching statements
- * are conforming. A unique number is assigned to each block. The
- * main parser function initializes this to 0 for each new file.
- * Note that this number has nothing to do with g95_current_block,
- * which is a g95_symbol associated with the current block */
-
-int g95_new_block_no;
-
 g95_state_data *g95_state_stack;
 
 static void check_statement_label(g95_statement);
@@ -489,7 +480,6 @@ static void push_state(g95_state_data *p, g95_compile_state new_state,
 
   p->state = new_state;
   p->previous = g95_state_stack;
-  p->this_block_no = ++g95_new_block_no;
   p->sym = sym;
   p->head = p->tail = NULL;
 
@@ -545,8 +535,7 @@ g95_sl_type type;
     break;
   }
 
-  g95_define_st_label(g95_statement_label, &label_locus,
-		      g95_state_stack->this_block_no, type);
+  g95_define_st_label(g95_statement_label, &label_locus, type);
 }
 
 
@@ -708,11 +697,13 @@ static void accept_statement(g95_statement st) {
     g95_current_ns->proc_name = g95_new_block;
     break;
 
-  case ST_ENDDO:  case ST_ENDIF:    case ST_END_SELECT:
+  case ST_ENDIF:
+  case ST_ENDDO:
+  case ST_END_SELECT:
     if (g95_statement_label == 0) break;
-
     new_st.op = EXEC_NOP;
-
+    /* Fall through */
+ 
   case_executable:
   case_exec_markers:
     g95_add_statement();
@@ -1374,7 +1365,6 @@ int seen_else;
       break;
 
     case ST_ENDIF:
-      accept_statement(st);
       break;
 
     default:
@@ -1384,6 +1374,7 @@ int seen_else;
   } while(st != ST_ENDIF);
 
   pop_state();
+  accept_statement(st);
 }
 
 
@@ -1451,7 +1442,6 @@ g95_select s;
       break;
 
     case ST_END_SELECT:
-      accept_statement(st);
       break;
 
 /* Can't have an executable statement because of parse_executable() */
@@ -1463,6 +1453,7 @@ g95_select s;
   } while(st != ST_END_SELECT);
 
   pop_state();
+  accept_statement(st);
 }
 
 
@@ -1530,7 +1521,7 @@ loop:
   case ST_ENDDO:
     if (s.label != 0 && s.label != g95_statement_label)
       g95_error("Statement label in ENDDO at %C doesn't match DO label");
-    /* fall throught */
+    /* Fall through */
 
   case ST_IMPLIED_ENDDO:
     break;
@@ -1541,6 +1532,7 @@ loop:
   }
 
   pop_state();
+  accept_statement(st);
 }
 
 
@@ -1835,7 +1827,6 @@ locus prog_locus;
   g95_clear_new_st();
 
   g95_statement_label = 0;
-  g95_new_block_no = 0;
 
   if (setjmp(eof)) return FAILURE;   /* Come here on unexpected EOF */
 

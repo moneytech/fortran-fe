@@ -889,6 +889,7 @@ got_match:
   p = g95_get_code();
   p->next = g95_get_code();
   *p->next = new_st;
+  p->next->loc = *g95_current_locus();
 
   p->expr = expr;
   p->op = EXEC_IF;
@@ -1212,7 +1213,7 @@ match g95_match_continue(void) {
     return MATCH_ERROR;
   }
 
-  new_st.op = EXEC_NOP;
+  new_st.op = EXEC_CONTINUE;
   return MATCH_YES;
 }
 
@@ -1286,11 +1287,11 @@ match m;
       tail->block = g95_get_code();
       tail = tail->block;
     }
-    tail->label = label;
-    tail->op = EXEC_SELECT;
 
     cp = g95_get_case();
     cp->low = cp->high = g95_int_expr(i++);
+
+    tail->op = EXEC_SELECT;
     tail->ext.case_list = cp;
 
     tail->next = g95_get_code();

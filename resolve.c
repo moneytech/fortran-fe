@@ -23,7 +23,11 @@ Boston, MA 02111-1307, USA.  */
 #include <string.h>
 #include "g95.h"
 
-static g95_block_stack *block_stack;
+
+/* Stack to push the current if we descend into a block during
+   resolution.  See resolve_goto() and g95_resovle_code().  */
+
+static g95_code_stack *code_stack = NULL;
 
 
 /* namespace_kind()-- Given a namespace, figure out what kind it is.
@@ -1561,35 +1565,131 @@ g95_component *c;
 }
 
 
+/* resolve_goto()-- Given a namespace, a block of code, figure out if
+   a GOTO statement is conforming.  */
+
+void g95_resolve_goto(g95_code *code, g95_namespace *ns) {
+g95_code_stack *stack;
+g95_code *block, *found;
+g95_st_label *lp;
+
+  /* Step one: find the label in this namespace */
+  for(lp=ns->st_labels; lp; lp=lp->next)
+    if (lp->label == code->label) break; /* always in list */
+
+  /* Step two: is this a valid branching target? */
+  if ((lp->defined == ST_LABEL_BAD_TARGET) ||
+      (lp->defined == ST_LABEL_UNKNOWN)) return; /* don't waste effort */
+
+  if (lp->defined != ST_LABEL_TARGET) {
+    g95_error("Statement at %L is not a valid branch target statement "
+	      "for the GOTO statement at %L", &lp->where, &code->loc);
+    return;
+  }
+
+  /* Step three: make sure this GOTO is not a GOTO to itself ;-) */
+  if (code->here == code->label) {
+    g95_warning("GOTO at %L causes an infinite loop",&code->loc);
+    return;
+  }
+
+  /* Step four: Try to find the label in the parse tree. To do this,
+     we traverse the tree block-by-block: first the block that
+     contains this GOTO, then the block that it is nested in, etc.  We
+     can ignore other blocks because branching into another block is
+     not allowed.  */
+  found = NULL;
+
+  for(stack=code_stack; stack; stack=stack->prev) {
+    for(block=stack->code; block; block=block->next) {
+      if (block->here == code->label) {
+        found = block;
+        break;
+      }
+    }
+  }
+
+  if (found == NULL) {
+    for(block = ns->code; block; block=block->next) {
+      if (block->here == code->label) {
+        found = block;
+        break;
+      }
+    }
+  }
+
+  if (found == NULL) {    /* still nothing, so illegal.  */
+    g95_error_now("Label at %L is not in the same block as the "
+                  "GOTO statement at %L", &lp->where, &code->loc);
+    return;
+  }
+
+  /* Step five: Make sure that the branching target is legal if
+     the statement is an END {SELECT,DO,IF}. */
+  if (found->op == EXEC_NOP) {
+    for (stack = code_stack; stack; stack = stack->prev) {
+      if (stack->code->next == found) break;
+    }
+    if (stack == NULL) {
+      g95_error("GOTO at %L cannot jump to END of construct at %L",
+                &found->loc, &code->loc);
+    }
+  }
+} 
+
+
+/* g95_push_code()-- Put a g95_code on the block stack. Used in
+   g95_resolve_code() and g95_resolve_select() to store the start of a
+   block.  */
+void g95_push_code(g95_code *code) {
+  if (code_stack != NULL) {
+    g95_code_stack *tmp = g95_get_code_stack(); 
+    tmp->prev = code_stack;
+    code_stack = tmp;
+  } else code_stack = g95_get_code_stack();
+  code_stack->code = code;
+}
+
+
+/* g95_pop_code()-- because you should always pop what you push...  */
+void g95_pop_code() {
+  if (code_stack != NULL) {
+    g95_code_stack *tmp = code_stack;
+    code_stack = tmp->prev;
+    g95_free(tmp);
+  } else g95_internal_error("g95_pop_block(): Code stack empty");
+}
+
+
+/* g95_resolve_constuct_blocks()-- Resolve all blocks in a construct
+   top-down, given a pointer to the top of the construct. There's a 
+   special resolution routine for the SELECT CASE construct... */
+
+void g95_resolve_construct_blocks(g95_code *construct, g95_namespace *ns) {
+g95_code *block;
+
+  for (block=construct->block; block; block=block->block) {
+     g95_push_code(block->next);
+     g95_resolve_code(block->next,ns);
+     g95_pop_code();
+  }
+}
+
+
 /* g95_resolve_code()-- Given a block of code, recursively resolve
  * everything pointed to by this code block */
 
 void g95_resolve_code(g95_code *code, g95_namespace *ns) {
-g95_block_stack *s;
-g95_st_label *lp;
 g95_alloc *a;
 try t;
 
   for(; code; code=code->next) {
 
-    for(s=block_stack; s; s=s->prev)
-      if (s->block_no == code->block_no) break;
-
-    if (s == NULL) {
-      s = g95_get_block_stack();
-      s->block_no = code->block_no;
-      s->prev = block_stack;
-      block_stack = s;
-    } else {
-      while (s != block_stack) {
-	g95_block_stack *t = block_stack;
-	block_stack = block_stack->prev;
-	g95_free(t);
-      }
+    if (code->op != EXEC_SELECT && code->block != NULL) {
+      g95_push_code(code);
+      g95_resolve_construct_blocks(code,ns);
+      g95_pop_code();
     }
-
-    if (code->op != EXEC_SELECT && code->block != NULL)
-      g95_resolve_code(code->block,ns);
 
     t = g95_resolve_expr(code->expr);
     if (g95_resolve_expr(code->expr2) == FAILURE) t = FAILURE;
@@ -1597,23 +1697,11 @@ try t;
     switch(code->op) {
     case EXEC_NOP:  case EXEC_CYCLE:  case EXEC_IOLENGTH:
     case EXEC_STOP: case EXEC_NULLIFY: case EXEC_EXIT:
+    case EXEC_CONTINUE:
       break;
 
     case EXEC_GOTO:
-      for(lp=ns->st_labels; lp; lp=lp->next)
-        if (lp->label == code->label) break; /* always in list */
-
-      for(s = block_stack; s; s = s->prev)
-        if (s->block_no == lp->block_no) break;
-
-      if (lp->defined == ST_LABEL_TARGET && s == NULL) {
-        g95_error("Label at %L is not in the same block as the "
-                  "GOTO statement at %L", &lp->where, &code->loc);
-      } else if (lp->defined == ST_LABEL_BAD_TARGET) {
-        g95_error("Statement at %L is not a valid branch target statement "
-                  "for the GOTO statement at %L", &lp->where, &code->loc);
-      } /* else: deal with undefined or FORMAT labels later */
-
+      g95_resolve_goto(code,ns);
       break;
 
     case EXEC_RETURN:
@@ -1678,7 +1766,9 @@ try t;
       break;
 
     case EXEC_SELECT:
+      g95_push_code(code);
       g95_resolve_select(code, ns);      /* Select is complicated */
+      g95_pop_code();
       break;
 
     case EXEC_DO:
