@@ -1576,8 +1576,10 @@ g95_st_label *lp;
 
   /* Step one: find the label in this namespace */
 
-  for(lp=ns->st_labels; lp; lp=lp->next)
-    if (lp->label == label) break; /* always in list */
+  lp = g95_find_st_label (label);
+  if (lp == NULL) /* should never happen becayse label should in the list */
+    g95_internal_error("resolve_branch(): a referenced statement label is "
+                       "missing from the label list");
 
   /* Step two: is this a valid branching target? */
 

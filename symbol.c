@@ -1348,6 +1348,17 @@ g95_st_label *l2;
   }
 }
 
+/* g95_find_st_label()-- Given a label number, look up the label in the
+ * label list of the current namespace. Return NULL if the label isn't
+ * in the list. */
+g95_st_label *g95_find_st_label(int label) {
+g95_st_label *lp;
+
+  for(lp=g95_current_ns->st_labels; lp; lp=lp->next)
+    if (lp->label == label) return lp;
+
+  return NULL;
+}
 
 /* get_st_label()-- Given a label number, search for and return a
  * pointer to the label structure, creating it if it does not exist. */
@@ -1355,8 +1366,8 @@ g95_st_label *l2;
 static g95_st_label *get_st_label(int label) {
 g95_st_label *lp;
 
-  for(lp=g95_current_ns->st_labels; lp; lp=lp->next)
-    if (lp->label == label) return lp;
+  lp = g95_find_st_label(label);
+  if (lp != NULL) return lp;
 
   lp = g95_get_st_label();
 

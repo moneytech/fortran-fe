@@ -1229,6 +1229,7 @@ g95_component *g95_find_component(g95_symbol *, const char *);
 void g95_show_components(g95_symbol *);
 
 int g95_new_internal_label(void);
+g95_st_label *g95_find_st_label(int);
 void g95_define_st_label(int, locus *, g95_sl_type);
 try g95_reference_st_label(int, g95_sl_type);
 
