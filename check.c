@@ -886,7 +886,7 @@ try g95_check_nearest(g95_expr *x, g95_expr *s) {
 
   if (type_check(x, 0, BT_REAL) == FAILURE) return FAILURE;
 
-  if (type_check(s, 0, BT_REAL) == FAILURE) return FAILURE;
+  if (type_check(s, 1, BT_REAL) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }

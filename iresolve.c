@@ -640,8 +640,7 @@ void g95_resolve_nint(g95_expr *f, g95_expr *a, g95_expr *kind) {
     : mpz_get_ui(kind->value.integer);
 
   f->value.function.name =
-    get_string("__nint_%d_%c%d", f->ts.kind, g95_type_letter(a->ts.type),
-	       a->ts.kind);
+    get_string("__nint_%d_%d", f->ts.kind, a->ts.kind);
 }
 
 
