@@ -1201,7 +1201,7 @@ g95_statement st;
       d->op = EXEC_WHERE;
       d->expr = new_st.expr;
 
-      g95_clear_new_st();
+      accept_statement(ST_ELSEWHERE);
       break;
 
     case ST_END_WHERE:

@@ -2229,7 +2229,7 @@ g95_expr *expr;
 match m;
 
   if (g95_current_state() != COMP_WHERE) {
-    g95_error("ELSEWHERE statement not enclosed in WHERE block");
+    g95_error("ELSEWHERE statement at %C not enclosed in WHERE block");
     return MATCH_ERROR;
   }
 
