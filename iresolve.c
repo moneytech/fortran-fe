@@ -644,7 +644,6 @@ char *name;
 
 void g95_resolve_minval(g95_expr *f, g95_expr *array, g95_expr *dim,
 			     g95_expr *mask) {
-char *name;
 
   f->ts = array->ts;
 
