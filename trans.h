@@ -47,15 +47,19 @@ typedef struct g95_se
   /* The length of a character string value.  */
   tree string_length;
 
-  /* If not set 95_conv_variable will return an expression for the array
+  /* If not set g95_conv_variable will return an expression for the array
      descriptor.  Otherwise it will substitute scalarizing variables.  If no
      scalarizing variables have been setup, it will throw an error.  */
   unsigned descriptor_only:1;
-  /* When this is set the address or descriptor of a variable is returned.
-     Only applies to EXPR_VARIABLE nodes.  */
+  /* When this is set g95_conv_expr returns the address or descriptor of a
+     variable.  Only applies to EXPR_VARIABLE nodes.
+     Also used by g95_conv_array_parameter. When set this indicates a pointer
+     to the descriptor should be returned, rather than the descriptor itself.
+   */
   unsigned want_pointer:1;
 
-  /* An array function call returning without a temporary.  */
+  /* An array function call returning without a temporary.  Also used for array
+     pointer assignments.  */
   unsigned direct_byref:1;
 
   /* Ignore absent optional arguments.  Used for some intrinsics.  */

@@ -1,3 +1,16 @@
+2003-12-02  Paul Brook  <paul@nowt.org>
+
+	* trans-array.c (g95_reverse_ss): Make static and don't use.
+	(g95_conv_ss_descriptor): Don't use g95_loopinfo
+	(g95_conv_array_parameters): Modify for pointer assignments.
+	(g95_walk_subexpr): New function.
+	(g95_walk_expr*): Use it.
+	* trans-array.h (g95_reverse_ss): Remove prototype.
+	* trans-expr.c (g95_trans_pointer_assign): Implement.
+	(Many): Set se.want_pointer before calling g95_conv_array_parameter.
+	* trans-intrinsic.c: Sync with scalarizer changes.
+	* trans-io.c: Ditto.
+
 2002-12-29  Paul Brook  <paul@nowt.org>
 
 	* trans-array.c: Document calling convention for arrays.

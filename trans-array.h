@@ -53,8 +53,6 @@ void g95_cleanup_loop (g95_loopinfo *);
 void g95_add_ss_to_loop (g95_loopinfo *, g95_ss *);
 /* Mark a SS chain as used in this loop.  */
 void g95_mark_ss_chain_used (g95_ss *, unsigned);
-/* Reverse a SS chain.  */
-g95_ss * g95_reverse_ss (g95_ss *);
 
 /* Calculates the lower bound and stride of array sections.  */
 void g95_conv_ss_startstride (g95_loopinfo *);

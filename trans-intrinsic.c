@@ -820,7 +820,6 @@ g95_conv_intrinsic_anyall (g95_se * se, g95_expr * expr, int op)
   /* Walk the arguments.  */
   arrayss = g95_walk_expr (g95_ss_terminator, actual->expr);
   assert (arrayss != g95_ss_terminator);
-  arrayss = g95_reverse_ss (arrayss);
 
   /* Initialize the scalarizer.  */
   g95_init_loopinfo (&loop);
@@ -904,7 +903,6 @@ g95_conv_intrinsic_count (g95_se * se, g95_expr * expr)
   /* Walk the arguments.  */
   arrayss = g95_walk_expr (g95_ss_terminator, actual->expr);
   assert (arrayss != g95_ss_terminator);
-  arrayss = g95_reverse_ss (arrayss);
 
   /* Initialize the scalarizer.  */
   g95_init_loopinfo (&loop);
@@ -978,7 +976,6 @@ g95_conv_intrinsic_arith (g95_se * se, g95_expr * expr, int op)
   arrayexpr = actual->expr;
   arrayss = g95_walk_expr (g95_ss_terminator, arrayexpr);
   assert (arrayss != g95_ss_terminator);
-  arrayss = g95_reverse_ss (arrayss);
 
   actual = actual->next->next;
   assert (actual);
@@ -987,7 +984,6 @@ g95_conv_intrinsic_arith (g95_se * se, g95_expr * expr, int op)
     {
       maskss = g95_walk_expr (g95_ss_terminator, maskexpr);
       assert (maskss != g95_ss_terminator);
-      maskss = g95_reverse_ss (maskss);
     }
   else
     maskss = NULL;
@@ -1110,7 +1106,6 @@ g95_conv_intrinsic_minmaxloc (g95_se * se, g95_expr * expr, int op)
   arrayexpr = actual->expr;
   arrayss = g95_walk_expr (g95_ss_terminator, arrayexpr);
   assert (arrayss != g95_ss_terminator);
-  arrayss = g95_reverse_ss (arrayss);
 
   actual = actual->next->next;
   assert (actual);
@@ -1119,7 +1114,6 @@ g95_conv_intrinsic_minmaxloc (g95_se * se, g95_expr * expr, int op)
     {
       maskss = g95_walk_expr (g95_ss_terminator, maskexpr);
       assert (maskss != g95_ss_terminator);
-      maskss = g95_reverse_ss (maskss);
     }
   else
     maskss = NULL;
@@ -1259,7 +1253,6 @@ g95_conv_intrinsic_minmaxval (g95_se * se, g95_expr * expr, int op)
   arrayexpr = actual->expr;
   arrayss = g95_walk_expr (g95_ss_terminator, arrayexpr);
   assert (arrayss != g95_ss_terminator);
-  arrayss = g95_reverse_ss (arrayss);
 
   actual = actual->next->next;
   assert (actual);
@@ -1268,7 +1261,6 @@ g95_conv_intrinsic_minmaxval (g95_se * se, g95_expr * expr, int op)
     {
       maskss = g95_walk_expr (g95_ss_terminator, maskexpr);
       assert (maskss != g95_ss_terminator);
-      maskss = g95_reverse_ss (maskss);
     }
   else
     maskss = NULL;
@@ -1606,10 +1598,11 @@ g95_conv_intrinsic_size (g95_se * se, g95_expr * expr)
   g95_ss *ss;
 
   g95_init_se (&argse, NULL);
-  actual =expr->value.function.actual;
+  actual = expr->value.function.actual;
 
   ss = g95_walk_expr (g95_ss_terminator, actual->expr);
   assert (ss != g95_ss_terminator);
+  argse.want_pointer = 1;
   g95_conv_array_parameter (&argse, actual->expr, ss);
   g95_add_block_to_block (&se->pre, &argse.pre);
   g95_add_block_to_block (&se->post, &argse.post);

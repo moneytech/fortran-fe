@@ -464,7 +464,6 @@ g95_trans_io_call (g95_code * code)
 
   if (ss != g95_ss_terminator)
     {
-      ss = g95_reverse_ss (ss);
       /* Initialize the scalarizer.  */
       g95_init_loopinfo (&loop);
       g95_add_ss_to_loop (&loop, ss);

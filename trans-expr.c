@@ -1077,7 +1077,10 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
           if (argss == g95_ss_terminator)
             g95_conv_expr_reference (&parmse, arg->expr);
           else
-            g95_conv_array_parameter (&parmse, arg->expr, argss);
+            {
+              parmse.want_pointer = 1;
+              g95_conv_array_parameter (&parmse, arg->expr, argss);
+            }
         }
 
       g95_add_block_to_block (&se->pre, &parmse.pre);
@@ -1271,9 +1274,43 @@ g95_conv_expr_reference (g95_se * se, g95_expr * expr)
 }
 
 tree
-g95_trans_pointer_assign (g95_code * code ATTRIBUTE_UNUSED)
+g95_trans_pointer_assign (g95_code * code)
 {
-  g95_internal_error ("pointer assignment not implemented");
+  g95_se lse;
+  g95_se rse;
+  g95_ss *lss;
+  g95_ss *rss;
+  stmtblock_t block;
+
+  g95_start_block (&block);
+
+  g95_init_se (&lse, NULL);
+
+  lss = g95_walk_expr (g95_ss_terminator, code->expr);
+  rss = g95_walk_expr (g95_ss_terminator, code->expr2);
+  if (lss == g95_ss_terminator)
+    {
+      lse.want_pointer = 1;
+      g95_conv_expr (&lse, code->expr);
+      assert (rss == g95_ss_terminator);
+      g95_init_se (&rse, NULL);
+      rse.want_pointer = 1;
+      g95_conv_expr (&rse, code->expr2);
+      g95_add_block_to_block (&block, &lse.pre);
+      g95_add_block_to_block (&block, &rse.pre);
+      g95_add_modify_expr (&block, lse.expr, rse.expr);
+      g95_add_block_to_block (&block, &rse.post);
+      g95_add_block_to_block (&block, &lse.post);
+    }
+  else
+    {
+      g95_conv_array_parameter (&lse, code->expr2, lss);
+      lse.direct_byref = 1;
+      g95_conv_array_parameter (&lse, code->expr2, rss);
+      g95_add_block_to_block (&block, &lse.pre);
+      g95_add_block_to_block (&block, &lse.post);
+    }
+  return g95_finish_block (&block);
 }
 
 /* Get the decl for the length of a string from an expression.  */
@@ -1396,6 +1433,7 @@ g95_trans_arrayfunc_assign (g95_expr * expr1, g95_expr * expr2)
   assert (ss != g95_ss_terminator);
   g95_init_se (&se, NULL);
   g95_start_block (&se.pre);
+  se.want_pointer = 1;
 
   g95_conv_array_parameter (&se, expr1, ss);
 
@@ -1466,10 +1504,6 @@ g95_trans_assignment (g95_expr * expr1, g95_expr * expr2)
           rss->type = G95_SS_SCALAR;
           rss->expr = expr2;
         }
-      /* The SS chains are built in reverse order, so reverse them.  */
-      rss = g95_reverse_ss (rss);
-      lss = g95_reverse_ss (lss);
-
       /* Associate the SS with the loop.  */
       g95_add_ss_to_loop (&loop, lss);
       g95_add_ss_to_loop (&loop, rss);

@@ -28,8 +28,6 @@ Boston, MA 02111-1307, USA.  */
    First, a Scalarization State (SS) chain is built.  This is done by walking
    the expression tree, and building a linear list of the terms in the
    expression.  As the tree is walked, scalar subexpressions are translated.
-   The SS chain is built in reverse order, so must be reversed before being
-   passed to the rest of the scalarizer.
 
    The scalarization parameters are stored in a g95_loopinfo structure.
    First the start and stride of each term is calculated by
@@ -95,9 +93,10 @@ Boston, MA 02111-1307, USA.  */
 #include "trans-const.h"
 #include "dependency.h"
 
+static g95_ss * g95_walk_subexpr (g95_ss *, g95_expr *);
 /* The contents of this structure aren't actualy used, just the address.  */
 static g95_ss g95_ss_terminator_var;
-g95_ss* g95_ss_terminator = &g95_ss_terminator_var;
+g95_ss *g95_ss_terminator = &g95_ss_terminator_var;
 
 unsigned HOST_WIDE_INT g95_stack_space_left;
 
@@ -607,7 +606,6 @@ g95_trans_array_constructor_subarray (stmtblock_t * pblock, tree type,
   /* Walk the array expression.  */
   ss = g95_walk_expr (g95_ss_terminator, expr);
   assert (ss != g95_ss_terminator);
-  ss = g95_reverse_ss (ss);
 
   /* Initialize the scalarizer.  */
   g95_init_loopinfo (&loop);
@@ -1012,32 +1010,10 @@ g95_add_loop_ss_code (g95_loopinfo * loop, g95_ss * ss)
     }
 }
 
-/* Reverse a SS chain.  */
-g95_ss *
-g95_reverse_ss (g95_ss *ss)
-{
-  g95_ss *next;
-  g95_ss *head;
-
-  assert (ss != NULL);
-
-  head = g95_ss_terminator;
-  while (ss != g95_ss_terminator)
-    {
-      next = ss->next;
-      assert (next != NULL); /* Check we didn't somehow break the chain.  */
-      ss->next = head;
-      head = ss;
-      ss = next;
-    }
-
-  return (head);
-}
-
 /* Translate expressions for the descriptor and data pointer of a SS.  */
 /*GCC ARRAYS*/
 static void
-g95_conv_ss_descriptor (g95_loopinfo * loop, g95_ss * ss)
+g95_conv_ss_descriptor (stmtblock_t * block, g95_ss * ss, int base)
 {
   g95_se se;
 
@@ -1046,14 +1022,14 @@ g95_conv_ss_descriptor (g95_loopinfo * loop, g95_ss * ss)
   g95_init_se (&se, NULL);
   se.descriptor_only = 1;
   g95_conv_expr_lhs (&se, ss->expr);
-  g95_add_block_to_block (&loop->pre, &se.pre);
+  g95_add_block_to_block (block, &se.pre);
   ss->data.info.descriptor = se.expr;
 
-  if (! loop->array_parameter)
+  if (base)
     {
       /* Also the data pointer.  */
       se.expr = g95_conv_array_base (se.expr);
-      ss->data.info.data = g95_evaluate_now (se.expr, &loop->pre);
+      ss->data.info.data = g95_evaluate_now (se.expr, block);
     }
 }
 
@@ -1796,7 +1772,8 @@ g95_conv_section_startstride (g95_loopinfo * loop, g95_ss * ss, int n)
       vecss = vecss->data.info.subscript[dim];
       assert (vecss && vecss->type == G95_SS_VECTOR);
       /* Get the descriptors for the vector subscripts as well.  */
-      g95_conv_ss_descriptor (loop, vecss);
+      if (! vecss->data.info.descriptor)
+        g95_conv_ss_descriptor (&loop->pre, vecss, ! loop->array_parameter);
       dim = vecss->data.info.dim[0];
     }
 
@@ -1887,7 +1864,7 @@ g95_conv_ss_startstride (g95_loopinfo * loop)
         {
         case G95_SS_SECTION:
           /* Get the descriptor for the array.  */
-          g95_conv_ss_descriptor (loop, ss);
+          g95_conv_ss_descriptor (&loop->pre, ss, ! loop->array_parameter);
 
           for (n = 0; n < ss->data.info.dimen; n++)
             g95_conv_section_startstride (loop, ss, n);
@@ -3332,12 +3309,14 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
 /* Convert an array for passing as an actual function parameter.  Expressions
    and vector subscripts are evaluated and stored in a teporary, which is then
    passed.  For whole arrays the descriptor is passed.  For array sections
-   a modified copy of the descriptor is passed, but using the original data. */
+   a modified copy of the descriptor is passed, but using the original data.
+   Also used for array pointer assignments by setting se->direct_byref.  */
 void
 g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
 {
   g95_loopinfo loop;
   g95_ss * secss;
+  g95_ss_info *info;
   int need_tmp;
   int n;
   tree tmp;
@@ -3345,18 +3324,12 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
   stmtblock_t block;
   tree start;
   tree offset;
+  int full;
 
   assert (ss != g95_ss_terminator);
 
   if (expr->ts.type == BT_CHARACTER)
     g95_todo_error ("Character string array actual parameters");
-
-  g95_init_loopinfo (&loop);
-
-  ss = g95_reverse_ss (ss);
-
-  /* Associate the SS with the loop.  */
-  g95_add_ss_to_loop (&loop, ss);
 
   /* TODO: Pass constant array constructors without a temporary.  */
   /* If we have a linear array section, we can pass it directly.  Otherwise
@@ -3380,16 +3353,85 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
           if (vss && vss->type == G95_SS_VECTOR)
             need_tmp = 1;
         }
+
+      info = &secss->data.info;
+
+      g95_conv_ss_descriptor (&se->pre, secss, 0);
+      desc = info->descriptor;
+      if (G95_ARRAY_TYPE_P(TREE_TYPE (desc)))
+        {
+          /* Create a new descriptor if the array doesn't have one.  */
+          full = 0;
+        }
+      else if (info->ref->u.ar.type == AR_FULL)
+        full = 1;
+      else if (se->direct_byref)
+        full = 0;
+      else
+        {
+          assert (info->ref->u.ar.type == AR_SECTION);
+
+          full = 1;
+          for (n = 0; n < info->ref->u.ar.dimen; n++)
+            {
+              /* Detect passing the full array as a section.  This could do
+                 even more checking, but it doesn't seem worth it.  */
+              if (info->ref->u.ar.start[n]
+                  || info->ref->u.ar.end[n]
+                  || (info->ref->u.ar.stride[n]
+                      && ! g95_expr_is_one (info->ref->u.ar.stride[n], 0)))
+                {
+                  full = 0;
+                  break;
+                }
+            }
+        }
+      if (full)
+        {
+          if (se->direct_byref)
+            {
+              /* Copy the descriptor for pointer assignments.  */
+              g95_add_modify_expr (&se->pre, se->expr, desc);
+            }
+          else if (se->want_pointer)
+            {
+              /* We pass full arrays directly.  This means that pointers and
+                 allocatable arrays should work.  */
+              if (TREE_CODE (desc) == INDIRECT_REF)
+                se->expr = TREE_OPERAND (desc, 0);
+              else
+                {
+                  assert (is_simple_varname (desc));
+                  if (is_simple_id (desc))
+                    TREE_ADDRESSABLE (desc) = 1;
+                  se->expr = build1 (ADDR_EXPR,
+                      build_pointer_type (TREE_TYPE (desc)), desc);
+                }
+            }
+          else
+            {
+              se->expr = desc;
+            }
+          return;
+        }
     }
   else
     {
       need_tmp = 1;
       secss = NULL;
+      info = NULL;
     }
+
+  g95_init_loopinfo (&loop);
+
+  /* Associate the SS with the loop.  */
+  g95_add_ss_to_loop (&loop, ss);
 
   /* Tell the scalarizer not to bother creating loop varliables, etc.  */
   if (! need_tmp)
     loop.array_parameter = 1;
+  else
+    assert (se->want_pointer && ! se->direct_byref);
 
   /* Setup the scalarizing loops and bounds.  */
   g95_conv_ss_startstride (&loop);
@@ -3461,157 +3503,167 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
          decide to repack the array to speed up access, but we're not
          bothered about that here.  */
       int dim;
-      tree type;
       tree parm;
       tree parmtype;
       tree stride;
-      g95_ss_info *info;
-      int full;
+      tree from;
+      tree to;
+      tree base;
 
-      info = &secss->data.info;
-      type = TREE_TYPE (info->descriptor);
+      /* Otherwise make a new descriptor and point it at the section we
+         want.  The loop variable limits will be the limits of the section.
+       */
       desc = info->descriptor;
-
-      full = 1;
-      if (G95_ARRAY_TYPE_P(TREE_TYPE (desc)))
+      assert (secss && secss != g95_ss_terminator);
+      if (se->direct_byref)
         {
-          /* Create a descriptor if the array doesn't have one.  */
-          full = 0;
-        }
-      else if (info->ref->u.ar.type != AR_FULL)
-        {
-          assert (info->ref->u.ar.type == AR_SECTION);
-
-          for (n = 0; n < info->ref->u.ar.dimen; n++)
-            {
-              /* Detect passing the full array as a section.  This could do
-                 even more checking, but it doesn't seem worth it.  */
-              if (info->ref->u.ar.start[n]
-                  || info->ref->u.ar.end[n]
-                  || (info->ref->u.ar.stride[n]
-                      && ! g95_expr_is_one (info->ref->u.ar.stride[n], 0)))
-                {
-                  full = 0;
-                  break;
-                }
-            }
-        }
-      if (full)
-        {
-          /* We pass full arrays directly.  This means that pointers and
-             allocatable arrays should work.  */
-          if (TREE_CODE (desc) == INDIRECT_REF)
-            se->expr = TREE_OPERAND (desc, 0);
-          else
-            {
-              assert (is_simple_varname (desc));
-              if (is_simple_id (desc))
-                TREE_ADDRESSABLE (desc) = 1;
-              se->expr = build1 (ADDR_EXPR, build_pointer_type (type), desc);
-            }
+          /* For pointer assignments we fill in the destination.  */
+          parm = se->expr;
+          parmtype = TREE_TYPE (parm);
         }
       else
         {
-          /* Otherwise make a copy of the descriptor and point it at
-             the section we want.  The loop variable limits will be the limits
-             of the section.  */
-          assert (secss && secss != g95_ss_terminator);
-          parmtype = g95_get_element_type (type);
+          /* Otherwise make a new one.  */
+          parmtype = g95_get_element_type (TREE_TYPE (desc));
           parmtype = g95_get_array_type_bounds (parmtype, loop.dimen,
                                                loop.from, loop.to);
           parm = g95_create_var (parmtype, "parm");
+        }
 
-          offset = integer_zero_node;
-          dim = 0;
+      offset = integer_zero_node;
+      dim = 0;
 
-          /* The following can be somewhat confusing.  We have two
-             descriptors, a temporary and the original array.
-             {parm, parmtype, dim} refer to the temporary.
-             {desc, type, n, secss, loop} refer to the original.
-             The bounds of the scaralization are the bounds of the section.
-             We don't have to worry about numeric overflows when calculating
-             the offsets because all elements are within the array data.  */
+      /* The following can be somewhat confusing.  We have two
+         descriptors, a new one and the original array.
+         {parm, parmtype, dim} refer to the new one.
+         {desc, type, n, secss, loop} refer to the original.
+         The bounds of the scaralization are the bounds of the section.
+         We don't have to worry about numeric overflows when calculating
+         the offsets because all elements are within the array data.  */
 
-          /* Set the dtype.  */
-          tmp = g95_conv_descriptor_dtype (parm);
-          tmp = build_v (MODIFY_EXPR, tmp,
-                       G95_TYPE_ARRAY_DTYPE (parmtype));
-          g95_add_expr_to_block (&loop.pre, tmp);
+      /* Set the dtype.  */
+      tmp = g95_conv_descriptor_dtype (parm);
+      tmp = build_v (MODIFY_EXPR, tmp,
+                   G95_TYPE_ARRAY_DTYPE (parmtype));
+      g95_add_expr_to_block (&loop.pre, tmp);
 
-          for (n = 0; n < info->ref->u.ar.dimen; n++)
+      if (se->direct_byref)
+        base = integer_zero_node;
+      else
+        base = NULL_TREE;
+
+      for (n = 0; n < info->ref->u.ar.dimen; n++)
+        {
+          stride = g95_conv_array_stride (desc, n);
+
+          /* Work out the offset.  */
+          if (info->ref->u.ar.dimen_type[n] == DIMEN_ELEMENT)
             {
-              stride = g95_conv_array_stride (desc, n);
+              assert (info->subscript[n]
+                      && info->subscript[n]->type == G95_SS_SCALAR);
+              start = info->subscript[n]->data.scalar.expr;
+            }
+          else
+            {
+              /* Check we haven't somehow got out of sync.  */
+              assert (info->dim[dim] == n);
 
-              /* Work out the offset.  */
-              tmp = g95_conv_array_lbound (desc, n);
-              if (info->ref->u.ar.dimen_type[n] == DIMEN_ELEMENT)
-                {
-                  assert (info->subscript[n]
-                          && info->subscript[n]->type == G95_SS_SCALAR);
-                  start = info->subscript[n]->data.scalar.expr;
-                }
-              else
-                {
-                  /* Check we haven't somehow got out of sync.  */
-                  assert (info->dim[dim] == n);
-
-                  /* Evaluate and remember the start of the section.  */
-                  start = info->start[dim];
-                  stride = g95_evaluate_now (stride, &loop.pre);
-                }
-
-              tmp = fold (build (MINUS_EXPR, TREE_TYPE (tmp), start, tmp));
-
-              tmp = fold (build (MULT_EXPR, TREE_TYPE (tmp), tmp, stride));
-              offset = fold (build (PLUS_EXPR, TREE_TYPE (tmp), offset, tmp));
-
-              if (info->ref->u.ar.dimen_type[n] == DIMEN_ELEMENT)
-                {
-                  /* For elemental dimensions, we only need the offset.  */
-                  continue;
-                }
-
-              /* Vector subscripts need copying and are handled elsewhere.  */
-              assert (info->ref->u.ar.dimen_type[n] == DIMEN_RANGE);
-
-              /* Set the new lower bound.  */
-              tmp = g95_conv_descriptor_lbound (parm, g95_rank_cst[dim]);
-              g95_add_modify_expr (&loop.pre, tmp, loop.from[dim]);
-
-              /* Set the new upper bound.  */
-              tmp = g95_conv_descriptor_ubound (parm, g95_rank_cst[dim]);
-              g95_add_modify_expr (&loop.pre, tmp, loop.to[dim]);
-
-              /* Multiply the stride by the section stride to get the
-                 total stride.  */
-              stride = fold (build (MULT_EXPR, g95_array_index_type, stride,
-                             info->stride[dim]));
-              tmp = g95_conv_descriptor_stride (parm, g95_rank_cst[dim]);
-              g95_add_modify_expr (&loop.pre, tmp, stride);
-
-              dim++;
+              /* Evaluate and remember the start of the section.  */
+              start = info->start[dim];
+              stride = g95_evaluate_now (stride, &loop.pre);
             }
 
-          /* Point the data pointer at the first element in the section.  */
+          tmp = g95_conv_array_lbound (desc, n);
+          tmp = fold (build (MINUS_EXPR, TREE_TYPE (tmp), start, tmp));
+
+          tmp = fold (build (MULT_EXPR, TREE_TYPE (tmp), tmp, stride));
+          offset = fold (build (PLUS_EXPR, TREE_TYPE (tmp), offset, tmp));
+
+          if (info->ref->u.ar.dimen_type[n] == DIMEN_ELEMENT)
+            {
+              /* For elemental dimensions, we only need the offset.  */
+              continue;
+            }
+
+          /* Vector subscripts need copying and are handled elsewhere.  */
+          assert (info->ref->u.ar.dimen_type[n] == DIMEN_RANGE);
+
+          /* Set the new lower bound.  */
+          from = loop.from[dim];
+          to = loop.to[dim];
+          if (se->direct_byref && ! integer_onep (from))
+            {
+              /* Make sure the new section starts at 1.  */
+              tmp = fold (build (MINUS_EXPR, TREE_TYPE (from),
+                                 integer_one_node, from));
+              to = fold (build (PLUS_EXPR, TREE_TYPE (to), to, tmp));
+              from = integer_one_node;
+            }
+          tmp = g95_conv_descriptor_lbound (parm, g95_rank_cst[dim]);
+          g95_add_modify_expr (&loop.pre, tmp, from);
+
+          /* Set the new upper bound.  */
+          tmp = g95_conv_descriptor_ubound (parm, g95_rank_cst[dim]);
+          g95_add_modify_expr (&loop.pre, tmp, to);
+
+          /* Multiply the stride by the section stride to get the
+             total stride.  */
+          stride = fold (build (MULT_EXPR, g95_array_index_type, stride,
+                         info->stride[dim]));
+
+          if (se->direct_byref)
+            {
+              base = fold (build (MINUS_EXPR, TREE_TYPE (base),
+                                  base, stride));
+            }
+
+          /* Store the new stride.  */
+          tmp = g95_conv_descriptor_stride (parm, g95_rank_cst[dim]);
+          g95_add_modify_expr (&loop.pre, tmp, stride);
+
+
+          dim++;
+        }
+
+      /* Point the data pointer at the first element in the section.  */
+      tmp = g95_conv_array_data (desc);
+      if (TREE_CODE (tmp) == INDIRECT_REF)
+        tmp = TREE_OPERAND (tmp, 0);
+      else
+        tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
+      tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
+      offset = build1 (ADDR_EXPR, g95_array_dataptr_type (desc), tmp);
+
+      tmp = g95_conv_descriptor_data (parm);
+      g95_add_modify_expr (&loop.pre, tmp, offset);
+
+      if (se->direct_byref)
+        {
+          /* Set the base pointer.  */
           tmp = g95_conv_array_data (desc);
           if (TREE_CODE (tmp) == INDIRECT_REF)
             tmp = TREE_OPERAND (tmp, 0);
           else
             tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
-          tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
-          offset = build1 (ADDR_EXPR, g95_array_dataptr_type (desc), tmp);
+          tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, base);
+          base = build1 (ADDR_EXPR, g95_array_dataptr_type (desc), tmp);
 
-          tmp = g95_conv_descriptor_data (parm);
-          tmp = build_v (MODIFY_EXPR, tmp, offset);
-          g95_add_expr_to_block (&loop.pre, tmp);
-
+          tmp = g95_conv_descriptor_base (parm);
+          g95_add_modify_expr (&loop.pre, tmp, base);
+        }
+      else
+        {
           /* Invaidate the base pointer.  */
           tmp = g95_conv_descriptor_base (parm);
           tmp = build_v (MODIFY_EXPR, tmp, integer_zero_node);
           g95_add_expr_to_block (&loop.pre, tmp);
+        }
 
+      if (se->want_pointer)
+        {
           /* Get a pointer to the new descriptor.  */
-          se->expr = build1 (ADDR_EXPR, build_pointer_type (parmtype), parm);
+          se->expr = build1 (ADDR_EXPR, build_pointer_type (parmtype),
+                             parm);
           TREE_ADDRESSABLE (parm) = 1;
         }
     }
@@ -3843,11 +3895,11 @@ g95_walk_op_expr (g95_ss * ss, g95_expr *expr)
   g95_ss *head2;
   g95_ss *newss;
 
-  head = g95_walk_expr (ss, expr->op1);
+  head = g95_walk_subexpr (ss, expr->op1);
   if (expr->op2 == NULL)
     head2 = head;
   else
-    head2 = g95_walk_expr (head, expr->op2);
+    head2 = g95_walk_subexpr (head, expr->op2);
 
   /* All operands are scalar.  Pass back and let the caller deal with it.  */
   if (head2 == ss)
@@ -3905,7 +3957,7 @@ g95_walk_elemental_function_args (g95_ss * ss, g95_expr * expr,
       if (! arg->expr)
         continue;
 
-      newss = g95_walk_expr (ss, arg->expr);
+      newss = g95_walk_subexpr (ss, arg->expr);
       if (newss == ss)
         {
           /* Scalar argumet.  */
@@ -3990,8 +4042,8 @@ g95_walk_array_constructor (g95_ss * ss, g95_expr * expr)
 
 /* Walk an expresson.  Add walked expressions to the head of the SS chain.
    A wholy scalar expression will not be added.  */
-g95_ss *
-g95_walk_expr (g95_ss * ss, g95_expr * expr)
+static g95_ss *
+g95_walk_subexpr (g95_ss * ss, g95_expr * expr)
 {
   g95_ss *head;
 
@@ -4027,5 +4079,37 @@ g95_walk_expr (g95_ss * ss, g95_expr * expr)
       internal_error("bad expression type during walk (%d)", expr->expr_type);
     }
   return ss;
+}
+
+/* Reverse a SS chain.  */
+static g95_ss *
+g95_reverse_ss (g95_ss *ss)
+{
+  g95_ss *next;
+  g95_ss *head;
+
+  assert (ss != NULL);
+
+  head = g95_ss_terminator;
+  while (ss != g95_ss_terminator)
+    {
+      next = ss->next;
+      assert (next != NULL); /* Check we didn't somehow break the chain.  */
+      ss->next = head;
+      head = ss;
+      ss = next;
+    }
+
+  return (head);
+}
+
+/* Entry point for expression walking.  */
+g95_ss *
+g95_walk_expr (g95_ss * ss, g95_expr * expr)
+{
+  g95_ss *res;
+
+  res = g95_walk_subexpr (ss, expr);
+  return g95_reverse_ss (res);
 }
 
