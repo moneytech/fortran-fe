@@ -66,6 +66,8 @@ g95_symbol *sym;
 
     if (sym == NULL) continue;  /* Alternate return placeholder */
 
+    if (sym->formal) resolve_formal_arglist(sym->formal);
+
     if (sym->attr.subroutine || sym->attr.external || sym->attr.intrinsic)
       continue;
 
