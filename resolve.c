@@ -804,7 +804,7 @@ try t;
         if (s->block_no == lp->block_no) break;
 
       if (lp->defined == ST_LABEL_TARGET && s == NULL) {
-        g95_error("Label at %L is not in the same scoping unit as the "
+        g95_error("Label at %L is not in the same block as the "
                   "GOTO statement at %L", &lp->where, &code->loc);
       } else if (lp->defined == ST_LABEL_BAD_TARGET) {
         g95_error("Statement at %L is not a valid branch target statement "
@@ -828,23 +828,28 @@ try t;
       break;
 
     case EXEC_POINTER_ASSIGN:
-      if (t == SUCCESS) g95_check_pointer_assign(code->expr, code->expr2);
+      if (t == FAILURE) break;
+
+      g95_check_pointer_assign(code->expr, code->expr2);
       break;
 
     case EXEC_ARITHMETIC_IF:
-      if (code->expr->ts.type != BT_INTEGER && code->expr->ts.type != BT_REAL)
+      if (t == SUCCESS && code->expr->ts.type != BT_INTEGER &&
+	  code->expr->ts.type != BT_REAL)
 	g95_error("Arithmetic IF statement at %L requires a numeric "
 		  "expression", &code->expr->where);
       break;
 
     case EXEC_IF:
-      if (code->expr != NULL && code->expr->ts.type != BT_LOGICAL)
+      if (t == SUCCESS && code->expr != NULL &&
+	  code->expr->ts.type != BT_LOGICAL)
 	g95_error("IF/ELSE IF clause at %L requires a LOGICAL expression",
 		  &code->expr->where);
       break;
 
     case EXEC_WHERE:
-      if (code->expr != NULL && code->expr->ts.type != BT_LOGICAL)
+      if (t == SUCCESS && code->expr != NULL &&
+	  code->expr->ts.type != BT_LOGICAL)
 	g95_error("WHERE/ELSEWHERE clause at %L requires a LOGICAL expression",
 		  &code->expr->where);
       break;
@@ -854,7 +859,7 @@ try t;
       break;
 
     case EXEC_SELECT:
-      g95_resolve_select(code,ns);      /* Select is complicated */
+      g95_resolve_select(code, ns);      /* Select is complicated */
       break;
 
     case EXEC_DO:
@@ -862,13 +867,15 @@ try t;
       break;
 
     case EXEC_DO_WHILE:
-      if (code->expr != NULL && code->expr->ts.type != BT_LOGICAL)
+      if (t == SUCCESS && code->expr != NULL &&
+	  code->expr->ts.type != BT_LOGICAL)
 	g95_error("Argument of DO WHILE loop at %L must be of type LOGICAL",
 		  &code->expr->where);
       break;
 
     case EXEC_ALLOCATE:
-      if (code->expr != NULL && code->expr->ts.type != BT_INTEGER)
+      if (t == SUCCESS && code->expr != NULL &&
+	  code->expr->ts.type != BT_INTEGER)
 	g95_error("STAT tag in ALLOCATE statement at %L must be "
 		  "of type INTEGER", &code->expr->where);
 
@@ -877,7 +884,8 @@ try t;
       break;
 
     case EXEC_DEALLOCATE:
-      if (code->expr != NULL && code->expr->ts.type != BT_INTEGER)
+      if (t == SUCCESS && code->expr != NULL &&
+	  code->expr->ts.type != BT_INTEGER)
 	g95_error("STAT tag in DEALLOCATE statement at %L must be of type "
 		  "INTEGER", &code->expr->where);
 
@@ -910,6 +918,7 @@ try t;
 
     case EXEC_FORALL:
       resolve_forall_iterators(code->ext.forall_iterator);
+
       if (code->expr != NULL && code->expr->ts.type != BT_LOGICAL)
 	g95_error("FORALL mask clause at %L requires a LOGICAL expression",
 		  &code->expr->where);
