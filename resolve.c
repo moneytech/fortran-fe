@@ -1116,7 +1116,8 @@ static try check_dimension(int i, g95_array_ref *ar, g95_array_spec *as) {
     break;
 
   case AR_SECTION:
-    if (compare_bound_int(ar->stride[i], 0) == CMP_EQ) {
+    if (ar->stride[i] != NULL &&
+	compare_bound_int(ar->stride[i], 0) == CMP_EQ) {
       g95_error("Illegal stride of zero at %L", &ar->c_where[i]);
       return FAILURE;
     }
@@ -1712,9 +1713,11 @@ try t;
 
 void resolve_code(g95_code *code, g95_namespace *ns) {
 symbol_attribute attr;
-int forall_save=0;
+int i, forall_save=0;
+g95_array_ref *ar;
 code_stack frame;
 g95_alloc *a;
+g95_ref *ref;
 try t;
 
   frame.prev = cs_base;
@@ -1841,9 +1844,33 @@ try t;
 	  continue;
 	}
 
-	if (!attr.pointer && !attr.dimension)
+	if (attr.pointer) continue;
+
+	ref = a->expr->ref;
+	while(ref && ref->next)
+	  ref = ref->next;
+
+	if (ref == NULL || ref->type != REF_ARRAY ||
+	    ref->type == AR_FULL) {
 	  g95_error("Array specification required in ALLOCATE statement "
 		    "at %L", &a->expr->where);
+	  continue;
+	}
+
+	if (ref->type == AR_ELEMENT) continue;
+
+	/* Make sure that the array reference makes sense in the
+	 * context of an ALLOCATE specification */
+
+	ar = &ref->u.ar;
+
+	for(i=0; i<ar->dimen; i++)
+	  if (ar->dimen_type[i] == DIMEN_VECTOR || ar->stride[i] != NULL) {
+	    g95_error("Bad array specification in ALLOCATE statement at %L",
+		      &a->expr->where);
+	    break;
+	  }
+
       }
 
       break;

@@ -1379,9 +1379,6 @@ match m;
       goto cleanup;
     }
 
-    if (m == MATCH_ERROR) goto cleanup;
-    if (m == MATCH_NO) goto syntax;
-
     if (g95_match_char(',') != MATCH_YES) break;
 
     m = g95_match(" stat = %v", &stat);

@@ -171,9 +171,7 @@ end_element:
 
 /* See if we have an optional stride */
 
-  if (g95_match_char(':') == MATCH_NO)
-    ar->stride[i] = g95_int_expr(1);
-  else {
+  if (g95_match_char(':') == MATCH_YES) {
     m = init ? g95_match_init_expr(&ar->stride[i])
       : g95_match_expr(&ar->stride[i]);
 
@@ -1396,7 +1394,7 @@ int d;
 /* ref_dimen_size()-- Get the number of elements in an array section */
 
 static try ref_dimen_size(g95_array_ref *ar, int dimen, mpz_t *result) {
-mpz_t upper, lower;
+mpz_t upper, lower, stride;
 try t;
 
   switch(ar->dimen_type[dimen]) {
@@ -1413,6 +1411,7 @@ try t;
   case DIMEN_RANGE:
     mpz_init(upper);
     mpz_init(lower);
+    mpz_init(stride);
     t = FAILURE;
 
     if (ar->start[dimen] == NULL) {
@@ -1433,12 +1432,17 @@ try t;
       mpz_set(upper, ar->end[dimen]->value.integer);
     }
 
-    if (ar->stride[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
+    if (ar->stride[dimen] == NULL)
+      mpz_set_ui(stride, 1);
+    else {
+      if (ar->stride[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
+      mpz_set(stride, ar->stride[dimen]->value.integer);
+    }
 
     mpz_init(*result);
     mpz_sub(*result, upper, lower);
-    mpz_add(*result, *result, ar->stride[dimen]->value.integer);
-    mpz_div(*result, *result, ar->stride[dimen]->value.integer); 
+    mpz_add(*result, *result, stride);
+    mpz_div(*result, *result, stride);
 
     /* Zero stride caught earlier */
 
@@ -1448,6 +1452,7 @@ try t;
   cleanup:
     mpz_clear(upper);
     mpz_clear(lower);
+    mpz_clear(stride);
     return t;
 
   default:
