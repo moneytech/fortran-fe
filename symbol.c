@@ -788,7 +788,9 @@ try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
 
 try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 
-  if (check_used(attr, loc)) return FAILURE;
+  if ((f == FL_PROGRAM || f == FL_BLOCK_DATA || f == FL_MODULE ||
+       f == FL_PARAMETER || f == FL_LABEL || f == FL_DERIVED ||
+       f == FL_NAMELIST) && check_used(attr, loc)) return FAILURE;
 
   if (attr->flavor == FL_PROCEDURE && f == FL_GENERIC) {
     attr->flavor = FL_GENERIC;
