@@ -498,19 +498,25 @@ static void resolve_symbol(g95_symbol *sym) {
 }
 
 
-/* g95_resolve()-- This function is called after a complete
- * program unit has been compiled.  Its purpose is to examine all of
- * the expressions associated with the program unit, assign types to
- * all intermediate expressions, make sure that all assignments are to
- * compatible types and figure out which names refer to which functions
- * or subroutines. */
+/* g95_resolve()-- This function is called after a complete program
+ * unit has been compiled.  Its purpose is to examine all of the
+ * expressions associated with a program unit, assign types to all
+ * intermediate expressions, make sure that all assignments are to
+ * compatible types and figure out which names refer to which
+ * functions or subroutines. */
 
 void g95_resolve(g95_namespace *ns) {
-g95_namespace *n;
+g95_namespace *old_ns, *n;
 g95_charlen *cl;
 
-  for(n=ns->contained; n; n=n->sibling)
+  old_ns = g95_current_ns;
+
+  for(n=ns->contained; n; n=n->sibling) {
+    g95_current_ns = n;
     g95_resolve(n);
+  }
+
+  g95_current_ns = ns;
 
   if (ns->save_all) g95_save_all(ns);
 
@@ -531,6 +537,7 @@ g95_charlen *cl;
 
   g95_traverse_ns(ns, resolve_symbol);
 
+  g95_current_ns = old_ns;
 }
 
 

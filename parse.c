@@ -1695,6 +1695,7 @@ g95_symbol *sym;
   } while(st != ST_END_FUNCTION && st != ST_END_SUBROUTINE &&
 	  st != ST_END_MODULE   && st != ST_END_PROGRAM);
 
+  g95_current_ns = parent_ns;
   pop_state();
 }
 
