@@ -1345,6 +1345,41 @@ g95_expr *e;
 }
 
 
+/* mio_interface()-- Save/restore lists of g95_interface stuctures */
+
+static void mio_interface(g95_interface **ip) {
+g95_interface *head, *tail, *new;
+
+  mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    if (ip != NULL)
+      for(head=*ip; head; head=head->next)
+	mio_symbol_ref(&head->sym);
+  } else {
+    head = tail = NULL;
+
+    for(;;) {
+      if (peek_atom() == ATOM_RPAREN) break;
+
+      new = g95_get_interface();
+      mio_symbol_ref(&new->sym);
+
+      if (tail == NULL)
+	head = new;
+      else
+	tail->next = new;
+
+      tail = new;
+    }
+
+    *ip = head;
+  }
+
+  mio_rparen();
+}
+
+
 /* mio_symbol()-- Unlike most other routines, the address of the
  * symbol node is already fixed on input and the name/module has
  * already been filled in */
@@ -1361,9 +1396,8 @@ g95_component *dummy = NULL;
   mio_symbol_attribute(&sym->attr);
   mio_typespec(&sym->ts);
 
-  mio_symbol_ref(&sym->operator);     /* Save/restore interface links */
-  mio_symbol_ref(&sym->generic);
-  mio_symbol_ref(&sym->next_if);
+  mio_interface(&sym->operator);
+  mio_interface(&sym->generic);
 
   mio_symbol_ref(&sym->common_head);  /* Save/restore common block links */
   mio_symbol_ref(&sym->common_next);
@@ -1460,7 +1494,8 @@ static int check_unique_name(char *name) {
 
 static void read_namespace(g95_namespace *ns) {
 int serial, ambiguous, i, new_flag, sym_save, visible_save;
-g95_symbol *sym, *next, **sym_table_save;
+g95_symbol *sym, **sym_table_save;
+g95_interface *head, *tail;
 g95_use_rename *u;
 g95_symtree *st;
 
@@ -1581,13 +1616,15 @@ g95_symtree *st;
 
   mio_lparen();
   for(i=0; i<G95_INTRINSIC_OPS; i++) {
-    mio_symbol_ref(&sym);
+    mio_interface(&head);
 
-    for(; sym; sym=next) { /* TODO: Make sure new interface doesn't conflict */
-      next = sym->next_if;
+    if (head != NULL) {
+      for(tail=head; tail->next; tail=tail->next);
 
-      sym->next_if = ns->operator[i];
-      g95_current_ns->operator[i] = sym;
+/* TODO: Make sure new interfaces don't conflict with others already loaded */
+
+      tail->next = ns->operator[i];
+      ns->operator[i] = head;
     }
   }
 
@@ -1613,15 +1650,15 @@ g95_symtree *st;
  * module. */
 
 static void mark_intrinsic_ops(g95_namespace *ns) {
-g95_symbol *sym;
+g95_interface *intr;
 int i;
 
   for(i=0; i<G95_INTRINSIC_OPS; i++)
     if (ns->operator_access[i] == ACCESS_PUBLIC ||
 	(ns->default_access != ACCESS_PRIVATE &&
 	 ns->operator_access[i] != ACCESS_PRIVATE)) 
-      for(sym=ns->operator[i]; sym; sym=sym->next_if)
-	if (sym->serial == -1) sym->serial = sym_num++;
+      for(intr=ns->operator[i]; intr; intr=intr->next)
+	if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
 }
 
 
@@ -1630,15 +1667,15 @@ int i;
  * be written as invisible symbols. */
 
 static void find_invisibles(g95_symbol *sym) {
-g95_symbol *s;
+g95_interface *intr;
 
   if (sym->serial == -1) return;
 
-  for(s=sym->operator; s; s=s->next_if)
-    if (s->serial == -1) s->serial = sym_num++;
+  for(intr=sym->operator; intr; intr=intr->next)
+    if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
 
-  for(s=sym->generic; s; s=s->next_if)
-    if (s->serial == -1) s->serial = sym_num++;
+  for(intr=sym->generic; intr; intr=intr->next)
+    if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
 }
 
 
@@ -1732,8 +1769,8 @@ static void write_symtree(g95_symtree *st) {
 
 
 static void write_namespace(g95_namespace *ns) {
-g95_symbol *sym, **sym_table_save;
 int i, sym_save, visible_save;
+g95_symbol **sym_table_save;
 
   sym_table_save = sym_table; 
   sym_save = sym_num;
@@ -1778,15 +1815,14 @@ int i, sym_save, visible_save;
 /* Write the heads of operator interfaces */
 
   mio_lparen();
-  sym = NULL;
 
   for(i=0; i<G95_INTRINSIC_OPS; i++) {
     if (ns->operator_access[i] == ACCESS_PUBLIC ||
 	(ns->default_access != ACCESS_PRIVATE &&
 	 ns->operator_access[i] != ACCESS_PRIVATE))
-      mio_symbol_ref(&ns->operator[i]);
+      mio_interface(&ns->operator[i]);
     else
-      mio_symbol_ref(&sym);
+      mio_interface(NULL);
   }
 
   mio_rparen();

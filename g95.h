@@ -382,6 +382,17 @@ typedef struct g95_st_label {
 #define g95_get_st_label() g95_getmem(sizeof(g95_st_label))
 
 
+/* g95_interface()-- Interfaces are lists of symbols strung together */
+
+typedef struct g95_interface {
+  struct g95_symbol *sym;
+  locus where;
+  struct g95_interface *next;
+} g95_interface;
+
+#define g95_get_interface() g95_getmem(sizeof(g95_interface))
+
+
 /* Symbol nodes.  These are important things.  They are what the
  * standard refers to as "entities".  The possibly multiple names that
  * refer to the same entity are accomplished by a binary tree of
@@ -400,7 +411,7 @@ typedef struct g95_symbol {
  * symbol is a function or subroutine name.  If the symbol is a
  * generic name, the generic member points to the list of interfaces. */
 
-  struct g95_symbol *operator, *generic, *next_if;
+  g95_interface *operator, *generic;
   g95_access operator_access, component_access;
 
   g95_formal_arglist *formal;
@@ -464,7 +475,8 @@ typedef struct g95_namespace {
   int set_flag[G95_LETTERS];
   g95_typespec default_type[G95_LETTERS];    /* IMPLICIT typespecs */
 
-  struct g95_symbol *proc_name, *operator[G95_INTRINSIC_OPS];
+  struct g95_symbol *proc_name;
+  g95_interface *operator[G95_INTRINSIC_OPS];
   struct g95_namespace *parent, *contained, *sibling;
   struct g95_code *code;
   g95_symbol *blank_common;
@@ -1208,13 +1220,15 @@ g95_constructor *g95_copy_constructor(g95_constructor *src);
 
 /* interface.c */
 
+void g95_free_interface(g95_interface *);
 match g95_match_generic_spec(interface_type *, char *, int *);
 match g95_match_interface(void);
 match g95_match_end_interface(void);
 void g95_start_interface(void);
 int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
-try g95_check_interface(g95_symbol *, g95_symbol *);
+try g95_check_interface(g95_interface *, g95_symbol *);
 try g95_extend_expr(g95_expr *);
+void g95_add_interface(g95_symbol *sym);
 
 /* select.c */
 

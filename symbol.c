@@ -1652,6 +1652,9 @@ void g95_free_symbol(g95_symbol *sym) {
 
   g95_free_namespace(sym->formal_ns);
 
+  g95_free_interface(sym->generic);
+  g95_free_interface(sym->operator);
+
   g95_free(sym);
 }
 
@@ -1907,6 +1910,7 @@ g95_symbol *sym;
 
 void g95_free_namespace(g95_namespace *ns) {
 g95_charlen *cl, *cl2;
+int i;
 
   if (ns == NULL) return; 
 
@@ -1922,6 +1926,9 @@ g95_charlen *cl, *cl2;
   free_st_labels(ns->st_labels);
 
   g95_free_equiv(ns->equiv);
+
+  for(i=0; i<G95_INTRINSIC_OPS; i++)
+    g95_free_interface(ns->operator[i]);
 
   g95_free(ns);
 }
@@ -1981,6 +1988,7 @@ int i;
 
 void g95_show_symbol(g95_symbol *sym) {
 g95_formal_arglist *formal;
+g95_interface *intr;
 g95_symbol *s;
 
   if (sym == NULL) return;
@@ -2006,15 +2014,15 @@ g95_symbol *s;
   if (sym->operator) {
     show_indent();
     g95_status("Operator interfaces:");
-    for(s=sym->operator; s; s=s->next_if)
-      g95_status(" %s", s->name);
+    for(intr=sym->operator; intr; intr=intr->next)
+      g95_status(" %s", intr->sym->name);
   }
 
   if (sym->generic) {
     show_indent();
     g95_status("Generic interfaces:");
-    for(s=sym->generic; s; s=s->next_if)
-      g95_status(" %s", s->name);
+    for(intr=sym->generic; intr; intr=intr->next)
+      g95_status(" %s", intr->sym->name);
   }
 
   if (sym->common_head) {
@@ -2185,7 +2193,7 @@ void g95_set_sym_defaults(g95_namespace *ns) {
 /* g95_show_namespace()-- Show a namespace */
 
 void g95_show_namespace(g95_namespace *ns) {
-g95_symbol *sym;
+g95_interface *intr;
 int i;
 
   show_level++; 
@@ -2209,14 +2217,14 @@ int i;
     g95_traverse_symtree(ns, show_symtree);
 
     for(i=0; i<G95_INTRINSIC_OPS; i++) {    /* User operator interfaces */
-      sym = ns->operator[i];
-      if (sym == NULL) continue;
+      intr = ns->operator[i];
+      if (intr == NULL) continue;
 
       show_indent();
       g95_status("Operator interfaces for %s:", g95_op2string(i));
 
-      for(; sym; sym=sym->next_if)
-	g95_status(" %s", sym->name);
+      for(; intr; intr=intr->next)
+	g95_status(" %s", intr->sym->name);
     }
   }
 

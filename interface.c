@@ -37,15 +37,16 @@ Boston, MA 02111-1307, USA.  */
 
 
 Nameless interfaces:
-   Nameless interfaces create unlinked symbols within the current namespace.
+   Nameless interfaces create symbols with explicit interfaces within
+   the current namespace.  They are otherwise unlinked.
 
 Generic interfaces:
    The generic name points to a linked list of symbols.  Each symbol
-   is an explicit interface.  Each explicit interface has it's own
+   has an explicit interface.  Each explicit interface has it's own
    namespace containing the arguments.  Module procedures are symbols in
    which the interface is added later when the module procedure is parsed.
 
-User operators: 
+User operators:
    If a symbol is a user-defined operator, the operator member heads up
    the list of relevant interfaces.
 
@@ -76,6 +77,19 @@ the program unit name.
 g95_interface_info current_interface;
 
 
+/* g95_free_interface()-- Frees a singly linked list of g95_interface
+ * structures */
+
+void g95_free_interface(g95_interface *intr) {
+g95_interface *next;
+
+  for(; intr; intr=next) {
+    next = intr->next;
+    g95_free(intr);
+  }
+}
+
+
 /* g95_match_generic_spec()-- Match a generic specification.
  * Depending on which type of interface is found, the 'name' or
  * 'operator' pointers may be set.  This subroutine doesn't return
@@ -87,19 +101,19 @@ char buffer[G95_MAX_SYMBOL_LEN+1];
 match m;
 int i;
  
-  if (g95_match(" assignment ( = )") == MATCH_YES) {
+  if (g95_match("% assignment ( = )") == MATCH_YES) {
     *type = INTERFACE_INTRINSIC_OP;
     *operator = INTRINSIC_ASSIGN;
     return MATCH_YES;
   }
 
-  if (g95_match(" operator ( %o )", &i) == MATCH_YES) { /* Operator i/f */
+  if (g95_match("% operator ( %o )", &i) == MATCH_YES) { /* Operator i/f */
     *type = INTERFACE_INTRINSIC_OP;
     *operator = i;
     return MATCH_YES;
   }
 
-  if (g95_match(" operator ( ") == MATCH_YES) {
+  if (g95_match("% operator ( ") == MATCH_YES) {
     m = g95_match_defined_op_name(buffer, 1);
     if (m == MATCH_NO) goto syntax;
     if (m != MATCH_YES) return MATCH_ERROR;
@@ -129,7 +143,7 @@ syntax:
 
 
 /* g95_match_interface()-- Match one of the five forms of an interface
- * statement.  */
+ * statement. */
 
 match g95_match_interface(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
@@ -245,7 +259,6 @@ match m;
 }
 
 
-
 /* g95_compare_types()-- Compare two typespecs, recursively if
  * necessary. */
 
@@ -300,7 +313,7 @@ int g95_compare_formal_arglist(g95_formal_arglist *a1,
 			       g95_formal_arglist *a2) {
 g95_symbol *s1, *s2;
  
-  for(;;) { 
+  for(;;) {
     s1 = a1->sym;
     s2 = a2->sym;
 
@@ -328,19 +341,28 @@ g95_symbol *s1, *s2;
  * correct number of arguments.  The 'base' pointer points to the
  * first symbol node in the list of operators (which might be NULL) */
 
-try g95_check_interface(g95_symbol *base, g95_symbol *new) {
+try g95_check_interface(g95_interface *base, g95_symbol *new) {
 g95_formal_arglist *p, *arg1, *arg2;
+g95_interface *ip;
 bt t1, t2;
 int args;
-try t;
 
-  for(; base; base=base->next_if)
-    if (g95_compare_formal_arglist(new->formal, base->formal) == MATCH_YES) {
+  for(ip=base; ip; ip=ip->next) {
+    if (ip->sym == new) {
+      g95_error("Entity '%s' at %C is already present in the interface",
+		new->name);
+      return FAILURE;
+    }
+
+    if (new->formal == NULL) continue;
+
+    if (g95_compare_formal_arglist(new->formal, ip->sym->formal)==MATCH_YES) {
       g95_error("Interface ending at %C is the same as the interface at %L",
-		&base->declared_at);
+		&ip->where);
 
       return FAILURE;
     }
+  }
 
   args = 0;
   t1 = BT_UNKNOWN;
@@ -355,33 +377,23 @@ try t;
 
 /* All kinds of checking needs to be done on intrinsic operator interfaces */
 
-  t = SUCCESS;
+  if (current_interface.type == INTERFACE_INTRINSIC_OP) {
 
-  switch(current_interface.type) {
-  case INTERFACE_NAMELESS:
-  case INTERFACE_GENERIC:
-  case INTERFACE_USER_OP:
-    break;
-
-  case INTERFACE_INTRINSIC_OP:
     if (current_interface.op == INTRINSIC_ASSIGN) {
       if (!new->attr.subroutine) {
 	g95_error("Assignment operator interface at %C must be a SUBROUTINE");
-	t = FAILURE;
-	break;
+	return FAILURE;
       }
     } else {
       if (!new->attr.function) {
 	g95_error("Intrinsic operator interface at %C must be a FUNCTION");
-	t = FAILURE;
-	break;
+	return FAILURE;
       }
     }
 
     if (args == 0 || args > 2) goto num_args;
 
     switch(current_interface.op) {
-     
     case INTRINSIC_PLUS:     /* Numeric unary or binary */
     case INTRINSIC_MINUS: 
       if ((args == 1) &&
@@ -397,7 +409,7 @@ try t;
 
     case INTRINSIC_POWER:    /* Binary numeric */
     case INTRINSIC_TIMES:
-    case INTRINSIC_DIVIDE:    
+    case INTRINSIC_DIVIDE:
 
     case INTRINSIC_EQ:
     case INTRINSIC_NE:
@@ -443,21 +455,18 @@ try t;
       break;
     }
 
-    break;
+    return SUCCESS;
 
   bad_repl:
     g95_error("Operator interface at %C conflicts with intrinsic interface");
-    t = FAILURE;
-    break;
+    return FAILURE;
 
   num_args:
     g95_error("Operator interface at %C has the wrong number of arguments");
-    t = FAILURE;
-    break;
-
+    return FAILURE;
   }
 
-  return t;
+  return SUCCESS;
 }
 
 
@@ -493,10 +502,10 @@ g95_formal_arglist *f;
  * actual.  If found, returns a pointer to the symbol of the correct
  * interface.  Returns NULL if not found. */
 
-g95_symbol *search_interface(g95_symbol *p, g95_actual_arglist *actual) {
+g95_symbol *search_interface(g95_interface *intr, g95_actual_arglist *actual) {
 
-  for(; p; p=p->next_if)
-    if (g95_compare_actual_formal(actual, p->formal)) return p;
+  for(; intr; intr=intr->next)
+    if (g95_compare_actual_formal(actual, intr->sym->formal)) return intr->sym;
 
   return NULL;
 }
@@ -527,8 +536,8 @@ int i;
   i = e->operator;
 
   switch(i) {
-  case INTRINSIC_UPLUS:    i = INTRINSIC_PLUS;  break;
-  case INTRINSIC_UMINUS:   i = INTRINSIC_MINUS;  break;
+  case INTRINSIC_UPLUS:   i = INTRINSIC_PLUS;     break;
+  case INTRINSIC_UMINUS:  i = INTRINSIC_MINUS;    break;
 
   case INTRINSIC_PLUS:    case INTRINSIC_MINUS:   case INTRINSIC_TIMES: 
   case INTRINSIC_DIVIDE:  case INTRINSIC_POWER:   case INTRINSIC_CONCAT:
@@ -547,11 +556,11 @@ int i;
     g95_internal_error("g95_extend_expr(): Bad operator");
   }
     
-  if (i == -1) sym = search_interface(ip->operator, actual);
+  if (i == -1)
+    sym = search_interface(ip->operator, actual);
   else {
     for(ns=g95_current_ns; ns; ns=ns->parent) {
-      ip = ns->operator[i];
-      sym = search_interface(ip, actual);
+      sym = search_interface(ns->operator[i], actual);
       if (sym != NULL) break;
     }
   }
@@ -571,4 +580,36 @@ int i;
   e->value.function.actual = actual;
 
   return SUCCESS;
+}
+
+
+/* g95_add_interface()-- Add a symbol to the current interface */
+
+void g95_add_interface(g95_symbol *new) {
+g95_interface **head, *intr;
+
+  switch(current_interface.type) {
+  case INTERFACE_NAMELESS:
+    return;
+
+  case INTERFACE_INTRINSIC_OP:
+    head = &current_interface.ns->operator[current_interface.op];
+    break;
+
+  case INTERFACE_GENERIC:
+    head = &current_interface.sym->generic;
+    break;
+
+  case INTERFACE_USER_OP:
+    head = &current_interface.sym->operator;
+    break;
+  }
+
+  if (g95_check_interface(*head, new) == SUCCESS) {
+    intr = g95_get_interface();
+    intr->sym = new;
+
+    intr->next = *head;
+    *head = intr;
+  }
 }

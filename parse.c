@@ -964,7 +964,7 @@ static g95_statement parse_spec(g95_statement);
 
 static void parse_interface(void) {
 int seen_body, new_state, current_state;
-g95_symbol *progname, *sym, *base;
+g95_symbol *prog_unit, *sym;
 g95_interface_info save;
 g95_state_data s1, s2;
 g95_statement st;
@@ -1045,8 +1045,8 @@ loop:
 
   push_state(&s2, new_state, g95_new_block);
   accept_statement(st);
-  progname = g95_new_block;
-  progname->formal_ns = g95_current_ns;
+  prog_unit = g95_new_block;
+  prog_unit->formal_ns = g95_current_ns;
 
 /* Read data declaration statements */
 
@@ -1063,50 +1063,7 @@ loop:
   seen_body = 1;
 
   g95_set_sym_defaults(g95_current_ns);
-
-/* Make sure this interface is unique within its block */
-
-  switch(current_interface.type) {
-  case INTERFACE_NAMELESS:
-    base = NULL;
-    break;
-
-  case INTERFACE_INTRINSIC_OP:
-    base = current_interface.ns->operator[current_interface.op];
-    break;
-
-  case INTERFACE_GENERIC:
-    base = current_interface.sym->generic;
-    break;
-    
-  case INTERFACE_USER_OP:
-    base = current_interface.sym->operator;
-    break;
-  }
-
-  if (g95_check_interface(base, progname) == SUCCESS) {
-    switch(current_interface.type) {
-    case INTERFACE_NAMELESS:
-      break;
-
-    case INTERFACE_INTRINSIC_OP:
-      progname->next_if =
-	current_interface.ns->operator[current_interface.op];
-
-      current_interface.ns->operator[current_interface.op] = progname;
-      break;
-
-    case INTERFACE_USER_OP:
-      progname->next_if = current_interface.sym->operator;
-      current_interface.sym->operator = progname;
-      break;
-
-    case INTERFACE_GENERIC:
-      progname->next_if = current_interface.sym->generic;
-      current_interface.sym->generic = progname;
-      break;
-    }
-  }
+  g95_add_interface(prog_unit);
 
   pop_state();
   goto loop;

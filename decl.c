@@ -1040,7 +1040,9 @@ match m;
 
 ok:
   if (progname->formal != NULL) {
-    g95_error("Symbol %s at %C already has an explicit interface");
+    g95_error("Symbol '%s' at %C already has an explicit interface",
+	      progname->name);
+    m = MATCH_ERROR;
     goto cleanup;
   }
 
@@ -1857,8 +1859,8 @@ syntax:
  * interface's formal argument list. */
 
 match g95_match_modproc(void) {
-g95_symbol *sym, *saved_base;
 char name[G95_MAX_SYMBOL_LEN+1];
+g95_symbol *sym;
 match m;
 
   if (g95_state_stack->state != COMP_INTERFACE ||
@@ -1869,9 +1871,6 @@ match m;
     return MATCH_ERROR;
   }
 
-  if (current_interface.type == INTERFACE_INTRINSIC_OP)
-    saved_base = current_interface.ns->operator[current_interface.op];
-
   for(;;) {
     m = g95_match_name(name);
     if (m == MATCH_NO) goto syntax;
@@ -1880,35 +1879,11 @@ match m;
     if (g95_get_symbol(name, g95_current_ns->parent, 0, &sym))
       return MATCH_ERROR;
 
-    if (g95_add_flavor(&sym->attr, FL_MODULE_PROC, NULL) == FAILURE)
+    if (sym->attr.flavor != FL_MODULE_PROC &&
+	g95_add_flavor(&sym->attr, FL_MODULE_PROC, NULL) == FAILURE)
       return MATCH_ERROR;
 
-    /* Insert the symbol into the right list of interfaces */
-
-    if (sym->next_if != NULL) {
-      g95_error("Symbol %s at %C already has a generic interface", sym->name);
-      return MATCH_ERROR;
-    }
-
-    switch(current_interface.type) {
-    case INTERFACE_GENERIC:
-      sym->next_if = current_interface.sym->generic;
-      current_interface.sym->generic = sym;
-      break;
-
-    case INTERFACE_USER_OP:
-      sym->next_if = current_interface.sym->operator;
-      current_interface.sym->operator = sym;
-      break;
-
-    case INTERFACE_INTRINSIC_OP:
-      sym->next_if = current_interface.ns->operator[current_interface.op];
-      current_interface.ns->operator[current_interface.op] = sym;
-      break;
-
-    default:
-      break;
-    }
+    g95_add_interface(sym);
 
     if (g95_match_eos() == MATCH_YES) break;
     if (g95_match(" ,") != MATCH_YES) goto syntax;
@@ -1917,9 +1892,6 @@ match m;
   return MATCH_YES;
 
 syntax:
-  if (current_interface.type == INTERFACE_INTRINSIC_OP)
-    current_interface.ns->operator[current_interface.op] = saved_base;
-
   g95_syntax_error(ST_MODULE_PROC);
   return MATCH_ERROR;
 }
