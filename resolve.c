@@ -1711,6 +1711,7 @@ try t;
  * everything pointed to by this code block */
 
 void resolve_code(g95_code *code, g95_namespace *ns) {
+symbol_attribute attr;
 int forall_save=0;
 code_stack frame;
 g95_alloc *a;
@@ -1829,8 +1830,21 @@ try t;
 	g95_error("STAT tag in ALLOCATE statement at %L must be "
 		  "of type INTEGER", &code->expr->where);
 
-      for(a=code->ext.alloc_list; a; a=a->next)
-	g95_resolve_expr(a->expr);
+      for(a=code->ext.alloc_list; a; a=a->next) {
+	if (g95_resolve_expr(a->expr) == FAILURE) continue;
+
+	attr = g95_variable_attr(a->expr, NULL);
+
+	if (attr.allocatable == 0 && attr.pointer == 0) {
+	  g95_error("Expression in ALLOCATE statement at %L must be "
+		    "ALLOCATABLE or a POINTER", &a->expr->where);
+	  continue;
+	}
+
+	if (!attr.pointer && !attr.dimension)
+	  g95_error("Array specification required in ALLOCATE statement "
+		    "at %L", &a->expr->where);
+      }
 
       break;
 
@@ -1840,8 +1854,15 @@ try t;
 	g95_error("STAT tag in DEALLOCATE statement at %L must be of type "
 		  "INTEGER", &code->expr->where);
 
-      for(a=code->ext.alloc_list; a; a=a->next)
-	g95_resolve_expr(a->expr);
+      for(a=code->ext.alloc_list; a; a=a->next) {
+	if (g95_resolve_expr(a->expr) == FAILURE) continue;
+
+	attr = g95_variable_attr(a->expr, NULL);
+
+	if (attr.pointer == 0 && attr.allocatable == 0)
+	  g95_error("Expression in DEALLOCATE statement at %L must be "
+		    "ALLOCATABLE or a POINTER", &a->expr->where);
+      }
 
       break;
 

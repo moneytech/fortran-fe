@@ -1353,7 +1353,6 @@ g95_alloc *q;
 
 match g95_match_allocate(void) {
 g95_alloc *head, *tail;
-symbol_attribute attr;
 g95_expr *stat;
 match m;
 
@@ -1373,19 +1372,6 @@ match m;
     m = g95_match_variable(&tail->expr, 0);
     if (m == MATCH_NO) goto syntax;
     if (m == MATCH_ERROR) goto cleanup;
-
-    attr = g95_variable_attr(tail->expr, NULL);
-
-    if (attr.allocatable == 0 && attr.pointer == 0) {
-      g95_error("Expression in ALLOCATE statement at %C must be ALLOCATABLE "
-		"or a POINTER");
-      goto cleanup;
-    }
-
-    if (attr.dimension && tail->expr->rank == 0) {
-      g95_error("Array specification required in ALLOCATE statement at %C");
-      goto cleanup;
-    }
 
     if (g95_pure(NULL) && g95_impure_variable(tail->expr->symbol)) {
       g95_error("Bad allocate-object in ALLOCATE statement at %C for a "
@@ -1436,11 +1422,10 @@ cleanup:
 
 
 /* g95_match_nullify()-- Match a NULLIFY statement. A NULLIFY
-   statement is transformed into a set of pointer assignments to
-   intrinsic NULL(). */
+ * statement is transformed into a set of pointer assignments to
+ * intrinsic NULL(). */
 
 match g95_match_nullify(void) {
-symbol_attribute attr;
 g95_code *tail;
 g95_expr *e, *p;
 match m;
@@ -1450,16 +1435,9 @@ match m;
   if (g95_match_char('(') != MATCH_YES) goto syntax;
 
   for(;;) {
-
     m = g95_match_variable(&p, 0);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
-
-    attr = g95_variable_attr(p, NULL);
-    if (attr.pointer == 0) {
-      g95_error("Variable in NULLIFY statement at %C must be a POINTER");
-      goto cleanup;
-    }
 
     if (g95_pure(NULL) && g95_impure_variable(p->symbol)) {
       g95_error("Illegal variable in NULLIFY at %C for a PURE procedure");
@@ -1503,7 +1481,6 @@ cleanup:
 
 match g95_match_deallocate(void) {
 g95_alloc *head, *tail;
-symbol_attribute attr;
 g95_expr *stat;
 match m;
 
@@ -1523,13 +1500,6 @@ match m;
     m = g95_match_variable(&tail->expr, 0);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
-
-    attr = g95_variable_attr(tail->expr, NULL);
-    if (attr.pointer == 0 && attr.allocatable == 0) {
-      g95_error("Expression in DEALLOCATE statement at %C must be "
-		"ALLOCATABLE or a POINTER");
-      goto cleanup;
-    }
 
     if (g95_pure(NULL) && g95_impure_variable(tail->expr->symbol)) {
       g95_error("Illegal deallocate-expression in DEALLOCATE at %C for a PURE "

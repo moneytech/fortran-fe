@@ -1352,19 +1352,19 @@ check_substring:
  * symbol and store the attribute.  Component references load a
  * completely new attribute.
  *
- * If the new attribute is an array, then the next element is scanned.
- * If the next element is an array reference, then the array bit is
- * cleared.  If the next element is *not* an array reference, then the
- * overall expression is an array expression.
+ * A couple of rules come into play.  Subobjects of targets are always
+ * targets themselves.  If we see a component that goes through a
+ * pointer, then the expression must also be a target, since the
+ * pointer is associated with something (if it isn't core will soon be
+ * dumped).  If we see a full part or section of an array, the
+ * expression is also an array.
  *
  * We can have at most one full array reference. */
 
 symbol_attribute g95_variable_attr(g95_expr *expr, g95_typespec *ts) {
-int add_array, pointer, target;
+int dimension, pointer, target;
 symbol_attribute attr;
 g95_ref *ref;
-
-  add_array = 0;
 
   if (expr->expr_type != EXPR_VARIABLE)
     g95_internal_error("g95_variable_attr(): Expression isn't a variable");
@@ -1372,42 +1372,49 @@ g95_ref *ref;
   ref = expr->ref;
   attr = expr->symbol->attr;
 
-  pointer = expr->symbol->attr.pointer;
-  target = expr->symbol->attr.target;
+  dimension = attr.dimension;
+  pointer = attr.pointer;
+
+  target = attr.target;
+  if (pointer) target = 1;
 
   if (ts != NULL && expr->ts.type == BT_UNKNOWN) *ts = expr->symbol->ts;
-
-new_attr:
-  if (attr.dimension && ref != NULL) {
-    if (ref->type != REF_ARRAY)
-      add_array = 1;
-    else {
-      attr.dimension = 0;
-      ref = ref->next;
-    }
-  }
 
   for(; ref; ref=ref->next)
     switch(ref->type) {
     case REF_ARRAY:
-      attr.dimension = 0;
+
+      switch(ref->u.ar.type) {
+      case AR_FULL:
+      case AR_SECTION:
+	dimension = 1;
+	break;
+
+      case AR_ELEMENT:
+	break;
+
+      case AR_UNKNOWN:
+	g95_internal_error("g95_variable_attr(): Bad array reference");
+      }
+
       break;
 
     case REF_COMPONENT:
       g95_get_component_attr(&attr, ref->u.c.component);
       if (ts != NULL) *ts = ref->u.c.component->ts;
-      pointer |= ref->u.c.component->pointer;
+      pointer = ref->u.c.component->pointer;
 
-      ref = ref->next;
-      goto new_attr;
+      if (pointer) target = 1;
+      break;
 
     case REF_SUBSTRING:
+      pointer = 0;
       break;
     }
 
-  if (add_array) attr.dimension = 1;
-  if (pointer) attr.pointer = 1;
-  if (target) attr.target = 1;
+  attr.dimension = dimension;
+  attr.pointer = pointer;
+  attr.target = target;
 
   return attr;
 }
