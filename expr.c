@@ -1070,16 +1070,20 @@ g95_typespec ts;
   sym->attr.proc = PROC_EXTERNAL;
   expr->value.function.name = sym->name;
 
-  /* Type of the expression is the default type of the symbol since we
-   * have nothing better to go on. */
+  /* Type of the expression is either the type of the symbol or the
+   * default type of the symbol */
 
-  ts = sym->ns->default_type[sym->name[0] - 'a'];
+  if (sym->ts.type != BT_UNKNOWN)
+    expr->ts = sym->ts;
+  else {
+    ts = sym->ns->default_type[sym->name[0] - 'a'];
 
-  if (ts.type == BT_UNKNOWN)
-    g95_error("Function '%s' at %L has no implicit type",
-	      sym->name, &expr->where);
-  else
-    expr->ts = ts;
+    if (ts.type == BT_UNKNOWN)
+      g95_error("Function '%s' at %L has no implicit type",
+		sym->name, &expr->where);
+    else
+      expr->ts = ts;
+  }
 
   return SUCCESS;
 }
