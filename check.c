@@ -927,6 +927,8 @@ try g95_check_present(g95_expr *a) {
     return FAILURE;
   }
 
+  g95_intrinsic_extension = 0;
+
   return SUCCESS;
 }
 
