@@ -1357,6 +1357,8 @@ match m;
   m = g95_match_symbol(&sym);
   if (m != MATCH_YES) return m;
 
+  if (sym->ts.type == BT_UNKNOWN) g95_set_default_type(sym);
+
   e = NULL;
   where = *g95_current_locus();
 
@@ -1588,6 +1590,7 @@ match m;
   case FL_UNKNOWN:
     if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE)
       return MATCH_ERROR;
+
     break;
 
   case FL_MODULE_PROC:

@@ -345,30 +345,6 @@ match m;
 }
 
 
-/* g95_match_symbol_type()-- Like match_symbol(), but requires a
- * particular type of symbol to match.  If the symbol is currently
- * BT_UNKNOWN, we attempt to apply the default. */
-
-match g95_match_symbol_type(bt type, g95_symbol **matched) {
-g95_symbol *sym;
-match m;
-
-  m = g95_match_symbol(&sym);
-  if (m != MATCH_YES) return m;
-
-  if (sym->ts.type == BT_UNKNOWN && g95_set_default_type(sym) == FAILURE)
-    return MATCH_ERROR;
-
-  if (sym->ts.type != type) {
-    g95_error("Symbol '%s' at %C is not %s", sym->name, g95_typename(type));
-    return MATCH_ERROR;
-  }
-
-  *matched = sym;
-  return MATCH_YES;
-}
-
-
 /* g95_match_compound()-- Match a variable, possible compound.  The
  * first part must be a symbol in the current context, while zero or
  * more component specifications can be present. */

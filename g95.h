@@ -1067,7 +1067,6 @@ match g95_match_small_int(int *);
 int g95_match_strings(mstring *);
 match g95_match_name(char *);
 match g95_match_symbol(g95_symbol **);
-match g95_match_symbol_type(bt, g95_symbol **);
 match g95_match_compound(g95_symbol **, int **, g95_typespec *);
 match g95_match_intrinsic_op(int *);
 char *g95_op2string(int);

@@ -720,16 +720,10 @@ g95_actual_arglist *ap;
 /* Simplify a function.  First simplify the arguments */
 
   if (p->expr_type == EXPR_FUNCTION) {
-    int const_flag = 1;
+    for(ap=p->value.function.actual; ap; ap=ap->next)
+      if (ap->expr != NULL) simplify_expr(ap->expr, init_flag);
 
-    for(ap=p->value.function.actual; ap; ap=ap->next) {
-      if (ap->expr != NULL) {
-	simplify_expr(ap->expr, init_flag);
-	if (ap->expr->expr_type != EXPR_CONSTANT) const_flag = 0;
-      }
-    }
-
-    if (const_flag && init_flag) g95_intrinsic_func_interface(p);
+    if (init_flag) g95_intrinsic_func_interface(p);
 
     return;
   }
