@@ -1090,9 +1090,9 @@ const g95_actual_arglist *a1, *a2;
   return a1->expr->symbol < a2->expr->symbol;
 }
 
-/* compare_ref()-- Given two expressions from some actual arguments, test 
- * whether they refer to the same expression. The analysis is conservative.
- * Returning FAILURE will produce no warning. */
+/* compare_actual_expr()-- Given two expressions from some actual arguments,
+ * test whether they refer to the same expression. The analysis is conserva-
+ * tive. Returning FAILURE will produce no warning. */
 
 static try compare_actual_expr(g95_expr *e1, g95_expr *e2){
 const g95_ref *r1, *r2;
