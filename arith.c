@@ -51,10 +51,9 @@ g95_real_info g95_real_kinds[] = {
 };
 
 
-
 /* natural_logarithm()-- Compute a natural logarithm */
 
-static void natural_logarithm(mpf_t *arg, mpf_t *result) {
+void natural_logarithm(mpf_t *arg, mpf_t *result) {
 mpf_t x, xp, t, log;
 int i, p;
 
@@ -118,7 +117,7 @@ int i, p;
 }
 
 
-static void common_logarithm(mpf_t *arg, mpf_t *result) {
+void common_logarithm(mpf_t *arg, mpf_t *result) {
 mpf_t i10, log10;
 
   natural_logarithm(arg, result);
@@ -257,7 +256,6 @@ int i;
   mpz_clear(r);
   mpf_clear(a);
   mpf_clear(b);
-  mpf_clear(e);
 }
 
 

@@ -146,6 +146,7 @@ int kind;
   return kind;
 }
 
+
 /*********************** Simplification functions ******************************/
 
 
@@ -749,30 +750,65 @@ int i;
 
 
 /* simplify_exp */
-g95_expr *g95_simplify_exp(g95_expr *e) {
+g95_expr *g95_simplify_exp(g95_expr *x) {
+  return NULL;
+/* Not ready yet
+g95_expr *result;
 
-  return NULL; 
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-/* We haven't implemented the extension of evaluation of transcendentals yet 
-  //  if (e->expr_type != EXPR_CONSTANT) return NULL;
+  if (g95_option.pedantic == 1) 
+    g95_warning("Evaluation of exp function at %L for constant parameter is an extension", x->where);
+
+  result=g95_constant_result(BT_REAL,g95_default_real_kind());
+  result->where = x->where;
+
+  switch (x->ts.type) {
+  case BT_REAL: 
+    break;
+
+  case BT_COMPLEX: 
+  default:
+    g95_internal_error("g95_simplify_exp(): Bad type");
+  }
+
+  return result; 
 */
+
 }
 
 
+g95_expr *g95_simplify_exponent(g95_expr *x) {
+g95_expr *result;
+mpf_t i2, ln2, lnx;
 
-g95_expr *g95_simplify_exponent(g95_expr *e) {
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-  return NULL; 
+  result=g95_constant_result(BT_INTEGER,g95_default_integer_kind());
+  result->where = x->where;
 
-//  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-/* Not done yet 
-
-  if (arg->ts.type != BT_REAL) {
-    g95_warning("Argument of EXPONENT at %L must be real", &e->where);
-    return &g95_bad_expr;
+  if (mpf_cmp(x->value.real,mpf_zero) == 0) {
+    mpz_set_ui(result->value.integer,0);
+    return range_check(result,"EXPONENT");
   }
-*/
+
+  mpf_init_set_ui(i2,2);
+  mpf_init(ln2);
+  mpf_init(lnx);
+
+  natural_logarithm(&i2,&ln2);
+  natural_logarithm(&x->value.real,&lnx);
+
+  mpf_div(lnx,lnx,ln2);
+  mpf_trunc(lnx,lnx);
+  mpf_add_ui(lnx,lnx,1);
+  mpz_set_f(result->value.integer,lnx);
+
+  mpf_clear(i2);
+  mpf_clear(ln2);
+  mpf_clear(lnx);
+
+  return range_check(result,"EXPONENT");
 
 }
 
@@ -801,12 +837,50 @@ int kind;
 }
 
 
+g95_expr *g95_simplify_fraction(g95_expr *x) {
+g95_expr *result;
+mpf_t i1, i2, ln2, lnx, pow2, ratio;
+unsigned long exp2;
 
-g95_expr *g95_simplify_fraction(g95_expr *e) {
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-  return NULL; 
+  result=g95_constant_result(BT_REAL,x->ts.kind);
+  result->where = x->where;
 
-  //  if (arg->expr_type != EXPR_CONSTANT) return NULL;
+  if (mpf_cmp(x->value.real,mpf_zero) == 0) {
+    mpf_set(result->value.real,mpf_zero);
+    return range_check(result,"FRACTION");
+  }
+
+  mpf_init_set_ui(i1,1);
+  mpf_init_set_ui(i2,2);
+  mpf_init(ln2);
+  mpf_init(lnx);
+  mpf_init(pow2);
+  mpf_init(ratio);
+
+  natural_logarithm(&i2,&ln2);
+  natural_logarithm(&x->value.real,&lnx);
+
+  mpf_div(lnx,lnx,ln2);
+  mpf_trunc(lnx,lnx);
+  mpf_add_ui(lnx,lnx,1);
+
+  exp2 = (unsigned long) mpf_get_d(lnx);
+  mpf_mul_2exp(pow2,i1,exp2);
+
+  mpf_div(ratio,x->value.real,pow2);
+
+  mpf_set(result->value.real,ratio);
+
+  mpf_clear(i1);
+  mpf_clear(i2);
+  mpf_clear(ln2);
+  mpf_clear(lnx);
+  mpf_clear(pow2);
+  mpf_clear(ratio);
+
+  return result;
 
 }
 
@@ -996,7 +1070,7 @@ int *bits;
     return &g95_bad_expr;
   }
 
-  bits = g95_getmem(bitsize);
+  bits = g95_getmem(bitsize*sizeof(int));
 
   for ( i=0; i<bitsize; ++i ) {
     bits[i] = 0;
@@ -1364,7 +1438,7 @@ int *bits;
     return result;
   }
 
-  bits = g95_getmem(isize);
+  bits = g95_getmem(isize*sizeof(int));
 
   if (bits == NULL) {
     g95_internal_error("ISHFTC: Unable to allocate memory");
@@ -2009,7 +2083,7 @@ mpf_t quot, iquot, term;
 		}
     		break;
 	    default:
-       		g95_warning("Type of arguments of MOD at %L must be real or integer",
+       		g95_error("Type of arguments of MOD at %L must be real or integer",
 	 	       	&a->where);
 		return &g95_bad_expr;
   }
@@ -2077,7 +2151,7 @@ mpf_t quot, iquot, term;
 		}
     		break;
 	    default:
-       		g95_warning("Type of arguments of MODULO at %L must be real or integer",
+       		g95_error("Type of arguments of MODULO at %L must be real or integer",
 	 	       	&a->where);
 		return &g95_bad_expr;
   }
@@ -2255,7 +2329,7 @@ int kind;
 	    break;
 
         default:
-       	    g95_warning("Invalid argument type in REAL at %L", e->where);
+       	    g95_internal_error("bad type in REAL");
 	    return &g95_bad_expr;
   }
 
@@ -2560,7 +2634,7 @@ g95_expr *sroot, *result;
 	  break;
 
         default:
-	    g95_warning("Invalid argument of SQRT at %L", &e->where);
+	    g95_error("Invalid argument of SQRT at %L", &e->where);
 	    return &g95_bad_expr;
   }
 }
@@ -2688,6 +2762,9 @@ int index;
 
 }
 
+/****************************************************************************
+ * Helper functions
+ */
 
 
 /* init_pi()-- Calculate pi.  We use the Bailey, Borwein and Plouffe formula:
