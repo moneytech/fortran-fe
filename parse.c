@@ -970,7 +970,7 @@ g95_compile_state new_state, current_state;
 g95_symbol *prog_unit, *sym;
 g95_interface_info save;
 g95_state_data s1, s2;
-g95_statement st;
+g95_statement st=0;
 int seen_body;
 
   accept_statement(ST_INTERFACE);
@@ -1791,9 +1791,10 @@ locus prog_locus;
   g95_state_stack = &top;
 
   g95_statement_label = 0;
-  seen_program = 0;
 
   if (setjmp(eof)) return FAILURE;   /* Come here on unexpected EOF */
+
+  seen_program = 0;
 
 loop:
   g95_init_2();
