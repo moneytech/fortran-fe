@@ -416,6 +416,7 @@ va_list argp;
   use_warning_buffer = 0;
 
   va_start(argp, format);
+  if (buffer_flag == 0) errors++;
   error_print("Error:", format, argp);
   va_end(argp);
 
@@ -434,6 +435,7 @@ int i;
 
   i = buffer_flag;
   buffer_flag = 0;
+  errors++;
 
   va_start(argp, format);
   error_print("Error:", format, argp);
