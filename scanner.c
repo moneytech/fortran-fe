@@ -385,13 +385,13 @@ void g95_skip_comments(void) {
 
 
 /* g95_next_char_literal()-- Get the next character from the input,
- * taking continuation lines into account.  This implies that comment
- * lines between continued lines must be eaten here.  For higher-level
- * subroutines, this flattens continued lines into a single logical
- * line. instring denotes whether we´re inside a character constant
- * where '!' gets ignored */
+ * taking continuation lines and end-of-line comments into account.
+ * This implies that comment lines between continued lines must be
+ * eaten here.  For higher-level subroutines, this flattens continued
+ * lines into a single logical line.  The in_string flag denotes
+ * whether we're inside a character context or not. */
 
-int g95_next_char_literal(int instring) {
+int g95_next_char_literal(int in_string) {
 locus old_loc;
 int i, c;
 
@@ -402,6 +402,15 @@ restart:
   if (g95_at_end()) return c;
 
   if (g95_current_file->form == FORM_FREE) {
+
+    if (!in_string && c == '!') {   /* This line can't be continued */
+      do {
+	c = next_char();
+      } while(c != '\n');
+
+      goto done;
+    }
+
     if (c != '&') goto done;
 
 /* If the next nonblank character is a ! or \n, we've got a
@@ -410,6 +419,15 @@ restart:
     old_loc = g95_current_file->loc;
 
     c = next_char();
+
+/* Character constants to be continued cannot have commentary after the '&' */
+
+    if (in_string && c != '\n') {
+      g95_set_locus(&old_loc);
+      c = '&';
+      goto done;
+    }
+
     while(g95_is_whitespace(c))
       c = next_char();
 
@@ -444,7 +462,7 @@ restart:
     if (c != '&') g95_set_locus(&old_loc);
 
   } else {   /* Fixed form continuation */
-    if (!instring && c == '!') { /* skip comment at end of line */
+    if (!in_string && c == '!') { /* skip comment at end of line */
       do {
 	c = next_char();
       }	while(c != '\n');
