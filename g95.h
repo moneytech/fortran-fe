@@ -1313,7 +1313,6 @@ void g95_show_code(int, g95_code *);
 /* resolve.c */
 
 void g95_resolve_formal_arglist(g95_formal_arglist *);
-void g95_resolve_modproc(g95_namespace *);
 try g95_resolve_expr(g95_expr *);
 void g95_resolve_code(g95_code *, g95_namespace *);
 void g95_resolve(g95_namespace *);

@@ -47,12 +47,12 @@ g95_symbol *sym;
 }
 
 
-/* resolve_formal_arglist()-- Resolve types of formal argument lists.
- * These have to be done early so that the formal argument lists of
- * module procedures can be copied to the containing module before the
- * individual procedures are resolved individually.  We also resolve
- * argument lists of procedures in interface blocks because they are
- * self-contained scoping units.
+/* g95_resolve_formal_arglist()-- Resolve types of formal argument
+ * lists.  These have to be done early so that the formal argument
+ * lists of module procedures can be copied to the containing module
+ * before the individual procedures are resolved individually.  We
+ * also resolve argument lists of procedures in interface blocks
+ * because they are self-contained scoping units.
  *
  * Since a dummy argument cannot be a non-dummy procedure, the only
  * resort left for untyped names are the IMPLICIT types. */
@@ -104,14 +104,14 @@ static void resolve_formal_arglists(g95_namespace *ns) {
 }
 
 
-/* g95_resolve_modproc()-- Resolve module procedure types.  Because
- * module procedures can call one another, function types have to be
- * worked out before any of the contained procedures can be resolved.
- * If a function in a module procedure doesn't already have a type,
- * the only way it can get one is through an IMPLICIT. */
+/* resolve_modproc()-- Resolve module procedure types.  Because module
+ * procedures can call one another, function types have to be worked
+ * out before any of the contained procedures can be resolved.  If a
+ * function in a module procedure doesn't already have a type, the
+ * only way it can get one is through an IMPLICIT. */
 
-void g95_resolve_modproc(g95_namespace *ns) {
-g95_symbol *sym_upper, *sym_lower;
+void resolve_modproc(g95_namespace *ns) {
+g95_symbol *sym_upper, *sym_lower, *result;
 g95_namespace *child;
 
   resolve_formal_arglists(ns);
@@ -126,12 +126,22 @@ g95_namespace *child;
     g95_find_symbol(sym_lower->name, ns, 0, &sym_upper);
 
     if (sym_upper == NULL)
-      g95_internal_error("g95_resolve_modproc(): Module procedure not found");
+      g95_internal_error("resolve_modproc(): Module procedure not found");
 
     if (sym_lower->result != NULL) sym_lower = sym_lower->result;
 
-    if (sym_lower->ts.type == BT_UNKNOWN)
-      g95_set_default_type(sym_lower, 1, child);
+    if (sym_lower->ts.type == BT_UNKNOWN) {
+      if (sym_lower->result == NULL)
+	g95_set_default_type(sym_lower, 1, child);
+      else {
+	result = sym_lower->result;
+
+	if (result->ts.type == BT_UNKNOWN)
+	  g95_set_default_type(result, 1, NULL);
+
+	sym_lower->ts = result->ts;
+      }
+    }
 
     sym_upper->ts = sym_lower->ts;
   }
@@ -914,6 +924,7 @@ try t;
  * variable.  This sort of thing commonly happens for symbols in module. */
 
 static void resolve_symbol(g95_symbol *sym) {
+g95_symbol *result;
 
   if (sym->attr.flavor == FL_UNKNOWN) {
     if (sym->attr.external == 0 && sym->attr.intrinsic == 0)
@@ -929,6 +940,17 @@ static void resolve_symbol(g95_symbol *sym) {
     g95_error("Assumed size array at %L must be a dummy argument",
 	      &sym->declared_at);
     return;
+  }
+
+  /* For a function with a result variable, copy the type of the result. */
+
+  if (sym->attr.function && sym->ts.type == BT_UNKNOWN &&
+      sym->result != NULL) {
+    result = sym->result;
+
+    if (result->ts.type != BT_UNKNOWN ||
+	g95_set_default_type(result, 1, NULL) == SUCCESS)
+      sym->ts = result->ts;
   }
 
   /* Resolve inital values and make sure they are compatible with the
@@ -976,7 +998,9 @@ g95_charlen *cl;
 
   g95_check_operator_interfaces(ns);
 
-  g95_resolve_modproc(ns);
+  resolve_modproc(ns);
+
+  g95_traverse_ns(ns, resolve_symbol);
 
   for(n=ns->contained; n; n=n->sibling) {
     g95_current_ns = n;
@@ -989,8 +1013,6 @@ g95_charlen *cl;
 
   g95_set_sym_defaults(ns);
 
-  g95_resolve_code(ns->code, ns);
-
   for(cl=ns->cl_list; cl; cl=cl->next) {
     if (cl->length == NULL || g95_resolve_expr(cl->length) == FAILURE)
       continue;
@@ -1000,9 +1022,9 @@ g95_charlen *cl;
 		&cl->length->where);
   }
 
-  g95_check_st_labels(ns);
+  g95_resolve_code(ns->code, ns);
 
-  g95_traverse_ns(ns, resolve_symbol);
+  g95_check_st_labels(ns);
 
   g95_current_ns = old_ns;
 }
