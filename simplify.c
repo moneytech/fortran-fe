@@ -2525,12 +2525,18 @@ g95_expr *e;
   e->value.constructor = head;
   e->ts = head->expr->ts;
 
-  e->shape = s = g95_get_array_shape();
+  e->rank = rank;
 
-  s->rank = rank;
+  /* TODO: Reshape is broken-- need to be able to specify the shape of
+   * array constants */
 
+  s = NULL;
+
+#if 0
   for(i=0; i<rank; i++)
     s->shape[i] = g95_int_expr(shape[i]);
+#endif
+
 
   return e;
 

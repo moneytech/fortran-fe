@@ -236,8 +236,8 @@ int i;
   if (m != MATCH_YES) return MATCH_ERROR;
 
   e = ar->start[i];
-  if (e->shape != NULL) {
-    if (e->shape->rank != 1) {
+  if (e->rank != 0) {
+    if (e->rank != 1) {
       g95_error("Vector subscript at %C must have rank of one");
       return MATCH_ERROR;
     }
@@ -728,18 +728,17 @@ int i, total;
  * Constructors are always rank-1 arrays. */
 
 static void size_constructor(g95_expr *e) {
+
+#if 0
 g95_array_shape *shape;
 int size;
 
   size = count_elements(e->value.constructor);
   if (size == -1) return;
 
-  if (e->shape != NULL) g95_free_array_shape(e->shape);
-
-  e->shape = shape = g95_get_array_shape();
-
-  shape->rank = 1;
-  shape->shape[0] = g95_int_expr(size);
+  if (e->rank != 0) g95_free_array_shape(e->shape);
+  e->rank = 1;
+#endif
 }
 
 

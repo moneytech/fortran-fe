@@ -649,19 +649,19 @@ try t;
   case INTRINSIC_NEQV:    case INTRINSIC_EQ:     case INTRINSIC_NE:
   case INTRINSIC_GT:      case INTRINSIC_GE:     case INTRINSIC_LT:
   case INTRINSIC_LE:
-    if (op1->shape == NULL && op2->shape == NULL) e->shape = NULL;
-    if (op1->shape != NULL && op2->shape == NULL)
-      e->shape = g95_copy_array_shape(op1->shape);
-    if (op1->shape == NULL && op2->shape != NULL)
-      e->shape = g95_copy_array_shape(op2->shape);
 
-/* TODO: we should really be comparing array refs where possible */
+    if (op1->rank == 0 && op2->rank == 0) e->rank = 0;
+    if (op1->rank == 0 && op2->rank != 0) e->rank = op2->rank;
+    if (op1->rank != 0 && op2->rank == 0) e->rank = op1->rank;
+    if (op1->rank != 0 && op2->rank != 0) {
+      if (op1->rank == op2->rank)
+	e->rank = op1->rank;
+      else {
+	g95_error("Inconsistent ranks for operator at %L and %L",
+		  &op1->where, &op2->where);
 
-    if (op1->shape != NULL && op2->shape != NULL) {
-
-      /* g95_check_conformability(op1->shape, op2->shape); */
-
-      e->shape = g95_copy_array_shape(op1->shape);
+	e->rank = 0;   /* Allow higher level expressions to work */
+      }
     }
 
     break;
@@ -669,7 +669,7 @@ try t;
   case INTRINSIC_NOT:
   case INTRINSIC_UPLUS:
   case INTRINSIC_UMINUS:
-    if (op1->shape != NULL) e->shape = g95_copy_array_shape(op1->shape);
+    e->rank = op1->rank;
     break;           /* Simply copy arrayness attribute */
 
   default:

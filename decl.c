@@ -461,7 +461,7 @@ match m, n;
   if (n == MATCH_NO) g95_error("Expected initialization expression at %C");
   if (n != MATCH_YES) return MATCH_ERROR;
 
-  if (e->shape != NULL) {
+  if (e->rank != 0) {
     g95_error("Expected scalar initialization expression at %C");
     m = MATCH_ERROR;
     goto no_match;

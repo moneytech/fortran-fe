@@ -612,7 +612,7 @@ typedef struct g95_expr {
   expr_t expr_type;
 
   g95_typespec ts;         /* These two refer to the overall expression */
-  g95_array_shape *shape;  /* Nonnull if the expression is array-valued */
+  int rank;
 
   g95_intrinsic_op operator;
   g95_symbol *symbol;   /* Nonnull for functions and structure constructors */

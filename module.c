@@ -997,6 +997,7 @@ done:
 }
 
 
+#if 0
 static void mio_array_shape(g95_array_shape **asp) {
 g95_array_shape *as;
 int i;
@@ -1023,6 +1024,7 @@ int i;
 done:
   mio_rparen();
 }
+#endif
 
 
 #if 0
@@ -1442,7 +1444,7 @@ g95_expr *e;
   }
 
   mio_typespec(&e->ts);
-  mio_array_shape(&e->shape);
+  mio_integer(&e->rank);
 
   switch(e->expr_type) {
   case EXPR_OP:

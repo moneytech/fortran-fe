@@ -187,8 +187,6 @@ static void g95_free_expr0(g95_expr *e) {
     g95_internal_error("g95_free_expr0(): Bad expr type");
   }
 
-  if (e->shape != NULL) g95_free_array_shape(e->shape);
-
   memset(e, '\0', sizeof(g95_expr));
 }
 
@@ -303,8 +301,6 @@ char *s;
 
   q = g95_get_expr();
   *q = *p;
-
-  if (p->shape != NULL) q->shape = g95_copy_array_shape(p->shape);
 
   switch(q->expr_type) {
   case EXPR_SUBSTRING:
@@ -907,22 +903,16 @@ match m;
  * scalar */
 
 match g95_match_scalar_expr(g95_expr **result) {
-g95_ref *ref;
 g95_expr *e;
 match m;
 
   m = g95_match_expr(&e);
   if (m != MATCH_YES) return m;
 
-  if (e->shape != NULL) {
-    for(ref=e->ref; ref->next;)
-      ref = ref->next;
-
-    if (ref->type == REF_ARRAY && ref->ar.type != AR_ELEMENT) {
-      g95_error("Expression at %C must be scalar valued, not array valued");
-      g95_free_expr(e);
-      return MATCH_ERROR;
-    }
+  if (e->rank != 0) {
+    g95_error("Expression at %C must be scalar valued, not array valued");
+    g95_free_expr(e);
+    return MATCH_ERROR;
   }
 
   *result = e;

@@ -710,7 +710,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  if (sym->value->shape != NULL) {
+  if (sym->value->rank != 0) {
     g95_error("Scalar PARAMETER required in complex constant at %C");
     return MATCH_ERROR;
   }
@@ -1029,7 +1029,7 @@ int c;
 
       e = g95_get_expr();      /* Leave it unknown for now */
 
-      g95_get_symbol(name, NULL, 0, &sym);
+      g95_get_symbol(name, NULL, 1, &sym);
       e->symbol = sym;
       e->expr_type = EXPR_VARIABLE;
       e->ts.type = BT_UNKNOWN;
@@ -1492,6 +1492,7 @@ match m;
     e = g95_get_expr();
 
     e->expr_type = EXPR_VARIABLE;
+    if (sym->as != NULL) e->rank = sym->as->rank;
     e->symbol = sym;
 
     m = match_varspec(e, 0);
@@ -1500,6 +1501,7 @@ match m;
   case FL_PARAMETER:
     e = g95_copy_expr(sym->value);
     e->symbol = sym;
+    if (sym->as != NULL) e->rank = sym->as->rank;
     m = match_varspec(e, 0);
     break;
 
@@ -1566,6 +1568,7 @@ match m;
 
     e = g95_get_expr();
     e->symbol = sym;
+    if (sym->as != NULL) e->rank = sym->as->rank;
     e->expr_type = EXPR_FUNCTION;
     e->value.function.actual = actual_arglist;
 
@@ -1717,6 +1720,7 @@ g95_expr *expr;
 g95_ref *ref;
 locus where;
 match m;
+int i;
 
   m = g95_match_symbol(&sym);
   if (m != MATCH_YES) return m;
@@ -1764,14 +1768,20 @@ match m;
 /* Follow the reference list to see if there is an array section
  * somewhere in it all (there can be only one) */
 
-  for(ref=expr->ref; ref; ref=ref->next)
-    if (ref->type == REF_ARRAY &&
-	(ref->ar.type == AR_SECTION || ref->ar.type == AR_FULL)) break;
+  for(ref=expr->ref; ref; ref=ref->next) {
+    if (ref->type != REF_ARRAY) continue;
 
-  if (ref != NULL) { /* Convert array ref to an array spec */
+    if (ref->ar.type == AR_FULL) {
+      expr->rank = sym->as->rank;
+      break;
+    }
 
+    if (ref->ar.type == AR_SECTION) { /* Figure out the rank of the section */
+      for(i=0; i<G95_MAX_DIMENSIONS; i++)
+	if (ref->ar.end[i] != NULL) expr->rank++;
 
-
+      break;
+    }
   }
 
   *result = expr;

@@ -283,7 +283,7 @@ int i;
  * arbitrary expression, make sure that the assignment can take place.
  *
  * If the root symbol associated with the variable has no type, then
- * we try to give it the default type.   */
+ * we try to give it the default type. */
 
 try g95_check_assign(g95_expr *lvalue, g95_expr *rvalue) {
 g95_symbol *sym;
@@ -297,7 +297,13 @@ g95_symbol *sym;
 
   if (lvalue->ts.type == BT_DERIVED && rvalue->ts.type == BT_DERIVED &&
       lvalue->ts.derived != rvalue->ts.derived) {
-    g95_error("Incompatible derived types in assignment at %C");
+    g95_error("Incompatible derived types in assignment at %L",
+	      &lvalue->where);
+    return FAILURE;
+  }
+
+  if (rvalue->rank != 0 && lvalue->rank != rvalue->rank) {
+    g95_error("Incompatible ranks in assignment at %L", &lvalue->where);
     return FAILURE;
   }
 
