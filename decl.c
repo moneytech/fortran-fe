@@ -1773,8 +1773,18 @@ syntax:
 /* g95_match_modproc()-- Match a module procedure statement */
 
 match g95_match_modproc(void) {
-g95_symbol *sym;
+g95_symbol *sym, *generic;
 match m;
+
+  if (g95_state_stack->state != COMP_INTERFACE ||
+      g95_state_stack->previous == NULL ||
+      g95_state_stack->previous->state != COMP_MODULE ||
+      current_interface.type != INTERFACE_GENERIC) {
+    g95_error("MODULE PROCEDURE at %C must be in a module interface");
+    return MATCH_ERROR;
+  }
+
+  generic = g95_state_stack->previous->sym;
 
   for(;;) {
     m = g95_match(" %s", &sym);
@@ -1783,6 +1793,16 @@ match m;
 
     if (g95_add_flavor(&sym->attr, FL_MODULE_PROC, NULL) == FAILURE)
       return MATCH_ERROR;
+
+    /* Insert the symbol into the right list of interfaces */
+
+    if (sym->generic != NULL) {
+      g95_error("Symbol %s at %C already has a generic interface", sym->name);
+      return MATCH_ERROR;
+    }
+
+    sym->generic = generic;
+    generic->generic = sym;
 
     if (g95_match_eos() == MATCH_YES) break;
     if (g95_match(" ,") != MATCH_YES) goto syntax;

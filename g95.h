@@ -416,7 +416,7 @@ typedef struct g95_symbol {
  * the old symbol. */
 
   struct g95_symbol *old_symbol, *tlink;
-  int mark, serial;
+  int mark, serial, refs;
   struct g95_namespace *ns;    /* namespace containing this symbol */
 
 } g95_symbol;

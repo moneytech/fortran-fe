@@ -1485,6 +1485,7 @@ g95_symtree *st;
     } else {
       st->sym = sym_table[serial];
       st->ambiguous = ambiguous;
+      st->sym->refs++;
       st->sym->mark = 0;
     }
   }

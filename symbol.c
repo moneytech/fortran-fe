@@ -1662,6 +1662,7 @@ static g95_symbol *mark_new_symbol(g95_symbol *p, char *name,
   if (p == NULL) {
     p = new_symbol(name, ns);
     insert_node(ns, name)->sym = p;
+    p->refs++;
   }
 
   return p;
@@ -1711,15 +1712,6 @@ g95_symbol *p;
 }
 
 
-/* delete_symbol()-- Delete a symbol */
-
-static void delete_symbol(g95_symbol *sym) {
-
-  delete_node(sym->ns, sym);
-  g95_free_symbol(sym);
-}
-
-
 /* g95_undo_symbols()-- Undoes all the changes made to symbols in the
  * current statement.  This subroutine is made simpler due to the fact
  * that attributes are never removed once added. */
@@ -1734,7 +1726,10 @@ g95_symbol *p, *q, *old;
     /*    g95_status("Undoing %s\n", p->name); */
 
     if (p->old_symbol == NULL) {  /* Symbol was new */
-      delete_symbol(p);
+      delete_node(p->ns, p);
+
+      p->refs--;
+      if (p->refs == 0) g95_free_symbol(p);
       continue;
     }
 
@@ -1811,13 +1806,16 @@ g95_symbol *p, *q;
  * red-black tree and all the symbols that it contains. */
 
 static void free_rb_tree(g95_symtree *rb) {
+g95_symbol *sym;
 
   if (rb == NIL) return;
 
   free_rb_tree(rb->left);
   free_rb_tree(rb->right);
 
-  g95_free_symbol(rb->sym);
+  sym = rb->sym;
+  sym->refs--;
+  if (sym->refs == 0) g95_free_symbol(sym);
 
   g95_free(rb);
 }

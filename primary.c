@@ -1303,15 +1303,14 @@ match m;
 
   case FL_PARAMETER:
     e = g95_copy_expr(sym->value);
-    m = MATCH_YES;
+    e->symbol = sym;
+    m = match_varspec(e);
     break;
 
   case FL_DERIVED:
     m = match_structure_constructor(sym, &e);
-
     if (m == MATCH_YES) e->symbol = sym;
     break;
-
 
 /* If we're here, then the name is known to be the name of a
  * procedure, yet it is not sure to be the name of a function. */
