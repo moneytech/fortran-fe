@@ -2168,8 +2168,7 @@ static void set_sym_defaults(g95_symbol *sym) {
   case FL_MODULE_PROC:
   case FL_DUMMY_PROC:
   case FL_PROCEDURE:
-    if (!sym->attr.function || sym->attr.recursive || sym->result != NULL)
-      return;
+    if (sym->attr.subroutine) return;
     break;
 
   default:
