@@ -557,10 +557,7 @@ try g95_check_iand(g95_expr *i, g95_expr *j) {
   if (type_check(i, 0, BT_INTEGER) == FAILURE ||
       type_check(j, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (i->ts.kind != j->ts.kind) {
-    must_be(j, 1, "the same kind as 'i'");
-    return FAILURE;
-  }
+  if (same_type_check(i, 0, j, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -569,7 +566,9 @@ try g95_check_iand(g95_expr *i, g95_expr *j) {
 try g95_check_ibclr(g95_expr *i, g95_expr *pos) {
 
   if (type_check(i,   0, BT_INTEGER) == FAILURE ||
-      type_check(pos, 1, BT_INTEGER) == FAILURE) return FAILURE;
+      type_check(pos, 1, BT_INTEGER) == FAILURE ||
+      kind_value_check(pos, 1, g95_default_integer_kind()) == FAILURE)
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -579,7 +578,9 @@ try g95_check_ibits(g95_expr *i, g95_expr *pos, g95_expr *len) {
 
   if (type_check(i,   0, BT_INTEGER) == FAILURE ||
       type_check(pos, 1, BT_INTEGER) == FAILURE ||
-      type_check(len, 2, BT_INTEGER) == FAILURE) return FAILURE;
+      kind_value_check(pos, 1, g95_default_integer_kind()) == FAILURE ||
+      type_check(len, 2, BT_INTEGER) == FAILURE)
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -588,7 +589,9 @@ try g95_check_ibits(g95_expr *i, g95_expr *pos, g95_expr *len) {
 try g95_check_ibset(g95_expr *i, g95_expr *pos) {
 
   if (type_check(i,   0, BT_INTEGER) == FAILURE ||
-      type_check(pos, 1, BT_INTEGER) == FAILURE) return FAILURE;
+      type_check(pos, 1, BT_INTEGER) == FAILURE ||
+      kind_value_check(pos, 1, g95_default_integer_kind()) == FAILURE)
+    return FAILURE;
 
   return SUCCESS;
 }
@@ -608,6 +611,8 @@ try g95_check_ieor(g95_expr *i, g95_expr *j) {
 
   if (type_check(i, 0, BT_INTEGER) == FAILURE ||
       type_check(j, 1, BT_INTEGER) == FAILURE) return FAILURE;
+
+  if (same_type_check(i, 0, j, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }
@@ -645,10 +650,7 @@ try g95_check_ior(g95_expr *i, g95_expr *j) {
   if (type_check(i, 0, BT_INTEGER) == FAILURE ||
       type_check(j, 1, BT_INTEGER) == FAILURE) return FAILURE;
 
-  if (i->ts.kind != j->ts.kind) {
-    must_be(j, 1, "the same kind as 'i'");
-    return FAILURE;
-  }
+  if (same_type_check(i, 0, j, 1) == FAILURE) return FAILURE;
 
   return SUCCESS;
 }

@@ -825,7 +825,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("iachar");
 
   add_sym("iand", 1, 1, BT_INTEGER, di,
-	  g95_check_iand, g95_simplify_iand, NULL,
+	  g95_check_iand, g95_simplify_iand, g95_resolve_iand,
 	  i, BT_INTEGER, di, 0,   j, BT_INTEGER, di, 0, NULL);
 
   make_generic("iand");
@@ -835,20 +835,20 @@ int di, dr, dd, dl, dc, dz;
 	  NULL);   /* Extension, takes no arguments */
 
   add_sym("ibclr", 1, 1, BT_INTEGER, di,
-	  g95_check_ibclr, g95_simplify_ibclr, NULL,
+	  g95_check_ibclr, g95_simplify_ibclr, g95_resolve_ibclr,
 	  i, BT_INTEGER, di, 0,   pos, BT_INTEGER, di, 0, NULL);
 
   make_generic("ibclr");
 
   add_sym("ibits", 1, 1, BT_INTEGER, di,
-	  g95_check_ibits, g95_simplify_ibits, NULL,
+	  g95_check_ibits, g95_simplify_ibits, g95_resolve_ibits,
 	  i, BT_INTEGER, di, 0,   pos, BT_INTEGER, di, 0,
 	  ln, BT_INTEGER, di, 0, NULL);
 
   make_generic("ibits");
 
   add_sym("ibset", 1, 1, BT_INTEGER, di,
-	  g95_check_ibset, g95_simplify_ibset, NULL,
+	  g95_check_ibset, g95_simplify_ibset, g95_resolve_ibset,
 	  i, BT_INTEGER, di, 0, pos,   BT_INTEGER, di, 0, NULL);
 
   make_generic("ibset");
@@ -860,7 +860,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("ichar");
 
   add_sym("ieor", 1, 1, BT_INTEGER, di,
-	  g95_check_ieor, g95_simplify_ieor, NULL,
+	  g95_check_ieor, g95_simplify_ieor, g95_resolve_ieor,
 	  i, BT_INTEGER, di, 0,   j, BT_INTEGER, di, 0, NULL);
 
   make_generic("ieor");
@@ -887,7 +887,7 @@ int di, dr, dd, dl, dc, dz;
   make_generic("int");
 
   add_sym("ior", 1, 1, BT_INTEGER, di,
-	  g95_check_ior, g95_simplify_ior, NULL,
+	  g95_check_ior, g95_simplify_ior, g95_resolve_ior,
 	  i, BT_INTEGER, di, 0, j,   BT_INTEGER, di, 0, NULL);
 
   make_generic("ior");

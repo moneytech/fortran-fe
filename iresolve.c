@@ -351,12 +351,55 @@ void g95_resolve_fraction(g95_expr *f, g95_expr *x) {
 }
 
 
+void g95_resolve_iand(g95_expr *f, g95_expr *i, g95_expr *j) {
+
+  f->ts = i->ts;
+  f->value.function.name = get_string("__iand_%d", i->ts.kind);
+}
+
+
+void g95_resolve_ibclr(g95_expr *f, g95_expr *i, g95_expr *pos) {
+
+  f->ts = i->ts;
+  f->value.function.name = get_string("__ibclr_%d", i->ts.kind);
+}
+
+
+void g95_resolve_ibits(g95_expr *f, g95_expr *i, g95_expr *pos,
+		       g95_expr *len) {
+
+  f->ts = i->ts;
+  f->value.function.name = get_string("__ibits_%d", i->ts.kind);
+}
+
+
+void g95_resolve_ibset(g95_expr *f, g95_expr *i, g95_expr *pos) {
+
+  f->ts = i->ts;
+  f->value.function.name = get_string("__ibset_%d", i->ts.kind);
+}
+
+
 void g95_resolve_ichar(g95_expr *f, g95_expr *c) {
 
   f->ts.type = BT_INTEGER;
   f->ts.kind = g95_default_integer_kind();
 
   f->value.function.name = get_string("__ichar_%d", c->ts.kind);
+}
+
+
+void g95_resolve_ieor(g95_expr *f, g95_expr *i, g95_expr *j) {
+
+  f->ts = i->ts;
+  f->value.function.name = get_string("__ieor_%d", i->ts.kind);
+}
+
+
+void g95_resolve_ior(g95_expr *f, g95_expr *i, g95_expr *j) {
+
+  f->ts = i->ts;
+  f->value.function.name = get_string("__ior_%d", i->ts.kind);
 }
 
 
