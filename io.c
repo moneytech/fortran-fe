@@ -26,7 +26,7 @@ Boston, MA 02111-1307, USA.  */
 
 
 typedef struct { 
-  char *name, *spec;
+  const char *name, *spec;
   bt type;
 } io_tag;
 
@@ -664,8 +664,8 @@ g95_expr *e;
 
 /* io_kind_name()-- Given an io_kind, return its name */
 
-static char *io_kind_name(io_kind k) {
-char *name;
+static const char *io_kind_name(io_kind k) {
+const char *name;
 
   switch(k) {
   case M_READ:     name = "READ";     break;

@@ -136,8 +136,8 @@ mpf_t i10, log10;
 /* g95_arith_error()-- Given an arithmetic error code, return a
  * pointer to a string that explains the error. */
 
-char *g95_arith_error(arith code) {
-char *p;
+const char *g95_arith_error(arith code) {
+const char *p;
 
   switch(code) {
     case ARITH_OK:         p = "Arithmetic OK"; break;
@@ -1284,7 +1284,7 @@ g95_expr *g95_user(g95_expr *op1, g95_expr *op2) {
 /* g95_convert_integer()-- Convert an integer string to an expression
  * node */
 
-g95_expr *g95_convert_integer(char *buffer, int kind, int radix) {
+g95_expr *g95_convert_integer(const char *buffer, int kind, int radix) {
 g95_expr *e;
 
   e = g95_constant_result(BT_INTEGER, kind);
@@ -1296,7 +1296,7 @@ g95_expr *e;
 
 /* g95_convert_real()-- Convert a real string to an expression node. */
 
-g95_expr *g95_convert_real(char *buffer, int kind) {
+g95_expr *g95_convert_real(const char *buffer, int kind) {
 g95_expr *e;
 
   e = g95_constant_result(BT_REAL, kind);

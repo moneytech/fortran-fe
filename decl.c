@@ -121,7 +121,7 @@ syntax:
  * the name of the interface (located in another namespace).  If so,
  * return that symbol.  If not, use g95_get_symbol(). */
 
-static int find_special(char *name, g95_symbol **result) {
+static int find_special(const char *name, g95_symbol **result) {
 g95_state_data *s;
 
   if (g95_current_state() != COMP_SUBROUTINE &&
@@ -150,7 +150,7 @@ normal:
  * search/create in the parent unit and create a link from the current
  * namespace.  Returns value from g95_get_symbol() */
 
-static int get_proc_name(char *name, g95_symbol **result) {
+static int get_proc_name(const char *name, g95_symbol **result) {
 
   if (g95_current_state() == COMP_INTERFACE)
     return g95_get_symbol(name, g95_current_ns->parent, 0, result);
@@ -162,7 +162,7 @@ static int get_proc_name(char *name, g95_symbol **result) {
 /* build_sym()-- Function called by variable_decl() that adds a name
  * to the symbol table. */
 
-static try build_sym(char *name, g95_charlen *cl, g95_expr **initp,
+static try build_sym(const char *name, g95_charlen *cl, g95_expr **initp,
 		     g95_array_spec **as, locus *var_locus) {
 symbol_attribute attr;
 g95_symbol *sym;
@@ -230,7 +230,7 @@ g95_expr *init;
 /* build_struct()-- Function called by variable_decl() that adds a
  * name to a structure being built. */
 
-static try build_struct(char *name, g95_charlen *cl, g95_expr **init,
+static try build_struct(const char *name, g95_charlen *cl, g95_expr **init,
 			g95_array_spec **as) {
 g95_component *c;
 
@@ -392,15 +392,15 @@ match m;
  * error. */
 
 match g95_match_kind_spec(g95_typespec *ts) {
-locus cur_loc;
+const char *msg;
+locus where;
 g95_expr *e;
 match m, n;
-char *msg;
 
   m = MATCH_NO;
   e = NULL;
 
-  cur_loc = *g95_current_locus();
+  where = *g95_current_locus();
 
   if (g95_match(" (") == MATCH_NO) return MATCH_NO;
 
@@ -444,7 +444,7 @@ char *msg;
 
 no_match:
   g95_free_expr(e);
-  g95_set_locus(&cur_loc);
+  g95_set_locus(&where);
   return m;
 }
 
@@ -714,8 +714,8 @@ static mstring decls[] = {
 
 locus start, seen_at[NUM_DECL];
 int i, seen[NUM_DECL];
+const char *attr;
 decl_types d;
-char *attr;
 match m;
 try t;
 
@@ -1320,8 +1320,9 @@ match m;
  * statement. */
 
 match g95_match_end(g95_statement *st) {
-char *target, name[G95_MAX_SYMBOL_LEN+1];
+char name[G95_MAX_SYMBOL_LEN+1];
 g95_compile_state state;
+const char *target;
 char *block_name;
 locus old_loc;
 match m;

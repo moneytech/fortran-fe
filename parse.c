@@ -44,7 +44,8 @@ g95_state_data *g95_state_stack;
  * rest of the statement.  For single keywords, the matching
  * subroutine is g95_match_eos(). */
 
-static match match_word(char *str, match (*subr)(void), locus *old_locus) {
+static match match_word(const char *str, match (*subr)(void),
+			locus *old_locus) {
 match m;
 
   if (str != NULL) {
@@ -525,8 +526,8 @@ g95_state_data *p;
 
 /* g95_ascii_statement()-- Translate a statement enum to a string */
 
-char *g95_ascii_statement(g95_statement st) {
-char *p;
+const char *g95_ascii_statement(g95_statement st) {
+const char *p;
 
   switch(st) {
   case ST_ARITHMETIC_IF:  p = "arithmetic IF"; break;
@@ -611,8 +612,8 @@ char *p;
 
 /* g95_state_name()-- Return the name of a compile state */
 
-char *g95_state_name(g95_compile_state state) {
-char *p;
+const char *g95_state_name(g95_compile_state state) {
+const char *p;
 
   switch(state) {
   case COMP_PROGRAM:     p = "a PROGRAM"; break;

@@ -26,7 +26,7 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 
 g95_option_t g95_option;
-extern char g95_compile_date[];
+extern const char g95_compile_date[];
 
 
 /* g95_getmem()-- Get a block of memory.  Many callers assume that the
@@ -119,8 +119,8 @@ FILE *f;
 
 /* g95_typename()-- Return a string for each type */
 
-char *g95_typename(bt type) {
-char *p;
+const char *g95_typename(bt type) {
+const char *p;
 
   switch(type) {
   case BT_INTEGER:    p = "INTEGER";    break;
@@ -164,7 +164,7 @@ void g95_show_typespec(g95_typespec *ts) {
 /* g95_code2string()-- Given an mstring array and a code, locate the
  * code in the table, returning a pointer to the string. */
 
-char *g95_code2string(mstring *m, int code) {
+const char *g95_code2string(mstring *m, int code) {
 
   while(m->string != NULL) {
     if (m->tag == code) return m->string;
@@ -180,7 +180,7 @@ char *g95_code2string(mstring *m, int code) {
  * the value of the tag field.  Returns the final tag if no matches to
  * the string are found. */
 
-int g95_string2code(mstring *m, char *string) {
+int g95_string2code(mstring *m, const char *string) {
 
   for(; m->string != NULL; m++)
     if (strcmp(m->string, string) == 0) return m->tag;

@@ -80,7 +80,7 @@ static int nfunc, nsub, nargs, nconv, sizing;
 /* intrinsic_error()-- write an error message into static memory in
  * case a caller is interested in why something failed. */
 
-static void intrinsic_error(char *format, ...) {
+static void intrinsic_error(const char *format, ...) {
 va_list argp;
 
   va_start(argp, format);
@@ -1322,7 +1322,7 @@ try t;
  *
  * the sequence is terminated by a NULL name. */
 
-static void add_sym(char *name, int elemental, bt type, int kind,
+static void add_sym(const char *name, int elemental, bt type, int kind,
 		    g95_expr *(*simplify)(),
 		    try (*cfunction)(), ...) {
 int optional, first_flag;
@@ -1386,7 +1386,7 @@ va_list argp;
  * number of elements in the table and a pointer to a name.  Returns
  * the NULL pointer if a name is not found. */
 
-static intrinsic_sym *find_sym(intrinsic_sym *start, int n, char *name) {
+static intrinsic_sym *find_sym(intrinsic_sym *start, int n, const char *name) {
 
   while(n > 0) {
     if (strcmp(name, start->name) == 0) return start;
@@ -1402,7 +1402,7 @@ static intrinsic_sym *find_sym(intrinsic_sym *start, int n, char *name) {
 /* find_function()-- Given a name, find a function in the intrinsic
  * function table.  Returns NULL if not found. */
 
-static intrinsic_sym *find_function(char *name) {
+static intrinsic_sym *find_function(const char *name) {
 
   return find_sym(functions, nfunc, name);
 }
@@ -1411,7 +1411,7 @@ static intrinsic_sym *find_function(char *name) {
 /* find_subroutine()-- Given a name, find a function in the intrinsic
  * subroutine table.  Returns NULL if not found. */
 
-static intrinsic_sym *find_subroutine(char *name) {
+static intrinsic_sym *find_subroutine(const char *name) {
 
   return find_sym(subroutines, nsub, name);
 }
@@ -1423,7 +1423,7 @@ static intrinsic_sym *find_subroutine(char *name) {
  * of the specifics currently in the table are placed into the list of
  * specific functions associated with that generic.  */
 
-static void make_generic(char *name) {
+static void make_generic(const char *name) {
 intrinsic_sym *generic;
 
   if (sizing) return; 
@@ -2207,7 +2207,7 @@ g95_actual_arglist *head, *tail, *next;
  * something is obviously wrong (say, a missing required argument) we
  * abort sorting and return FAILURE. */
 
-static try sort_actual(char *name, g95_actual_arglist **ap,
+static try sort_actual(const char *name, g95_actual_arglist **ap,
 		       intrinsic_arg *formal) {
 
 g95_actual_arglist *actual, *a;
@@ -2460,7 +2460,7 @@ try t;
 match g95_intrinsic_func_interface(g95_expr *expr, int extension_flag ) {
 intrinsic_sym *isym, *specific;
 g95_actual_arglist *actual;
-char *name;
+const char *name;
 int flag;
 
   intrinsic_extension = 1;
@@ -2536,7 +2536,7 @@ char *name;
  *    2   Name is a specific intrinsic name
  */
 
-int g95_check_intrinsic(char *name, int sub_flag) {
+int g95_check_intrinsic(const char *name, int sub_flag) {
 intrinsic_sym *sym;
 
   if (sub_flag)
@@ -2620,8 +2620,8 @@ bad:
  * is called for. */
 
 void g95_simplify_intrinsic(g95_expr *expr) {
+const char *lib_name;
 intrinsic_sym *sym;
-char *lib_name;
 int i;
 
   if (expr->expr_type != EXPR_FUNCTION) return;

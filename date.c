@@ -21,5 +21,5 @@ Boston, MA 02111-1307, USA.  */
 
 /* Current compilation date */
 
-char g95_compile_date[] = __DATE__ " " __TIME__ ;
+const char g95_compile_date[] = __DATE__ " " __TIME__ ;
 

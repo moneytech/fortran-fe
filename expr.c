@@ -218,7 +218,7 @@ void g95_replace_expr(g95_expr *dest, g95_expr *src) {
  * result is set.  It is tempting to generate an error and return
  * SUCCESS or FAILURE, but failure is OK for some callers. */
 
-char *g95_extract_int(g95_expr *expr, int *result) {
+const char *g95_extract_int(g95_expr *expr, int *result) {
 
   if (expr->expr_type != EXPR_CONSTANT)
     return "Constant expression required at %C";
@@ -1004,7 +1004,7 @@ try t;
 
 try g95_resolve_expr(g95_expr *e) {
 g95_expr *op1, *op2;
-char *msg;
+const char *msg;
 try t;
 
   if (e == NULL) return SUCCESS;
@@ -1260,7 +1260,7 @@ static try check_init_expr(g95_expr *);
 static try check_spec_expr(g95_expr *);
 
 static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
-char *expr_type;
+const char *expr_type;
  
   if ((*check_function)(e->op1) == FAILURE) return FAILURE;
 
@@ -1356,7 +1356,7 @@ not_numeric:
 
 static try check_numeric_inquiry(g95_expr *e) {
 char *name;
-static char *inquiry_function[] = {
+static const char *inquiry_function[] = {
   "digits", "epsilon", "huge", "maxexponent", "minexponent",
   "precision", "radix", "range", "tiny", "bit_size", NULL
 };

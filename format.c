@@ -281,7 +281,7 @@ int zflag;
 
 
 static try check_format(void) {
-char *error,
+const char *error,
      *posint_required = "Positive width required",
      *period_required = "Period required",
      *nonneg_required = "Nonnegative width required",

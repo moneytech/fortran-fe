@@ -96,7 +96,7 @@ static char ascii_table[128] = {
 /* range_check()-- Range checks an expression node.  If all goes well,
  * returns the node, otherwise returns &g95_bad_expr and frees the node.  */
 
-static g95_expr *range_check(g95_expr *result, char *name) {
+static g95_expr *range_check(g95_expr *result, const char *name) {
 
   switch(result->ts.type) {
   case BT_REAL:
@@ -124,7 +124,7 @@ static g95_expr *range_check(g95_expr *result, char *name) {
  * missing kind parameter.  Returns the kind, -1 if something went
  * wrong. */
 
-static int get_kind(g95_expr *k, char *name, int default_kind) {
+static int get_kind(g95_expr *k, const char *name, int default_kind) {
 int kind;
 
   if (k == NULL) return default_kind;

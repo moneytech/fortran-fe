@@ -138,7 +138,7 @@ int i;
 
 match g95_match_small_int(int *value) {
 g95_expr *expr;
-char *p;
+const char *p;
 match m;
 int i;
 
@@ -376,7 +376,7 @@ int t;
 }
 
 
-char *g95_op2string(int i) {
+const char *g95_op2string(int i) {
 
   if (i == INTRINSIC_ASSIGN) return "=";
   return g95_code2string(operators, i);
@@ -473,11 +473,12 @@ cleanup:
  * %   Matches a required space (in free form) and optional spaces.
  */
 
-match g95_match(char *target, ...) {
+match g95_match(const char *target, ...) {
 int matches, *ip;
-char c, *p, *np;
+const char *p;
 locus old_loc;
 va_list argp;
+char c, *np;
 match m, n;
 void **vp;
 
@@ -1105,10 +1106,10 @@ got_match:
 /* g95_match_stop()-- Match the STOP statement */
 
 match g95_match_stop(void) {
+const char *error_msg;
 g95_expr *e;
-char *error_msg;
-match m;
 int label;
+match m;
 
   if (g95_match_eos() == MATCH_YES) {
     new_st.op = EXEC_STOP;
@@ -2090,8 +2091,8 @@ match m;
 
 static match top_val_list(g95_data *data) {
 g95_data_value *new, *tail;
+const char *msg;
 g95_expr *expr;
-char *msg;
 match m;
 
   tail = NULL;

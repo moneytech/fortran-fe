@@ -164,7 +164,7 @@ cleanup:
 
 /* find_use_name()-- Try to find the use name in the current list */
 
-static g95_use_rename *find_use_name(char *name) {
+static g95_use_rename *find_use_name(const char *name) {
 g95_use_rename *u;
 
   for(u=g95_rename_list; u; u=u->next)
@@ -203,7 +203,7 @@ static g95_module *loaded_modules, *new_modules;
 /* find_module()-- See if a module can be found in a list of modules.
  * Returns zero if not, nonzero if so. */
 
-static int find_module(g95_module *m, char *name) {
+static int find_module(g95_module *m, const char *name) {
 
   for(; m; m=m->next)
     if (strcmp(name, m->name) == 0) return 1;
@@ -216,7 +216,7 @@ static int find_module(g95_module *m, char *name) {
  * before.  Returns zero if not, nonzero if we have.  As a side
  * effect, not-seen before modules are placed in the new_modules list. */
 
-static int check_module(char *name) {
+static int check_module(const char *name) {
 g95_module *m;
 
   if (find_module(loaded_modules, name)) return 1;
@@ -300,8 +300,8 @@ static char *atom_string, atom_name[MAX_ATOM_SIZE];
  * not very elaborate, since this sorts of errors shouldn't really
  * happen.  This subroutine never returns.  */
 
-static void bad_module(char *message) {
-char *p;
+static void bad_module(const char *message) {
+const char *p;
 
   switch(iomode) {
   case IO_INPUT:   p = "Reading";  break;
@@ -499,8 +499,8 @@ atom_type a;
 
 static void require_atom(atom_type type) {
 module_locus m;
+const char *p;
 atom_type t;
-char *p;
 
   get_module_locus(&m); 
 
@@ -574,7 +574,8 @@ static void write_char(char out) {
  * anyway. */
 
 static void write_atom(atom_type atom, void *v) {
-char *p, buffer[20];
+char buffer[20];
+const char *p;
 int i, len;
 
   switch(atom) {
@@ -646,7 +647,7 @@ static void mio_symbol_ref(g95_symbol **);
 static int mio_name(int t, mstring *m) {
 
   if (iomode == IO_OUTPUT)
-    write_atom(ATOM_NAME, g95_code2string(m, t));
+    write_atom(ATOM_NAME, (char *) g95_code2string(m, t));
   else {
     require_atom(ATOM_NAME);
     t = find_enum(m);
@@ -1588,7 +1589,7 @@ int dummy;
 
 /* check_unique_name()-- See if a name is a generated name. */
 
-static int check_unique_name(char *name) {
+static int check_unique_name(const char *name) {
 
   return *name == '@';
 }
@@ -2024,7 +2025,7 @@ g95_symbol **sym_table_save;
  * error while processing the module, dump_flag will be set to zero
  * and we delete the module file, even if it was already there. */
 
-void g95_dump_module(char *name, int dump_flag) {
+void g95_dump_module(const char *name, int dump_flag) {
 char filename[PATH_MAX];
 
   filename[0] = '\0';
