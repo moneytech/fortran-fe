@@ -402,6 +402,16 @@ typedef struct g95_st_label {
 #define g95_get_st_label() g95_getmem(sizeof(g95_st_label))
 
 
+/* Stack of block numbers for validating GOTO statements */
+
+typedef struct g95_block_stack {
+  int block_no;
+  struct g95_block_stack *prev;
+} g95_block_stack;
+
+#define g95_get_block_stack() g95_getmem(sizeof(g95_block_stack))
+
+
 /* g95_interface()-- Interfaces are lists of symbols strung together */
 
 typedef struct g95_interface {
@@ -508,7 +518,7 @@ typedef struct g95_namespace {
 
   g95_charlen *cl_list;
 
-  int save_all, seen_save;
+  int serial, save_all, seen_save;
 } g95_namespace;
 
 extern g95_namespace *g95_current_ns;
@@ -1268,8 +1278,6 @@ g95_expr *g95_build_funcall(g95_symbol *func, ...);
 void g95_free_ref_list(g95_ref *);
 void g95_type_convert_binary(g95_expr *);
 try g95_simplify_expr(g95_expr *, int);
-void g95_resolve_modproc(g95_namespace *);
-try g95_resolve_expr(g95_expr *);
 void g95_expr_init_1(void);
 
 g95_expr *g95_get_expr(void);
@@ -1297,11 +1305,18 @@ g95_code *g95_new_level(g95_code *);
 g95_code *g95_add_statement(void);
 g95_code *g95_append_code(g95_code *, g95_code *);
 void g95_free_statements(g95_code *);
+void g95_undo_statement(void);
+void g95_show_code(int, g95_code *);
+
+/* resolve.c */
+
+void g95_resolve_modproc(g95_namespace *);
+try g95_resolve_expr(g95_expr *);
+
 void g95_resolve_code(g95_code *, g95_namespace *);
 void g95_resolve(g95_namespace *);
 try g95_resolve_iterator(g95_iterator *);
-void g95_undo_statement(void);
-void g95_show_code(int, g95_code *);
+
 
 /* array.c */
 
