@@ -832,6 +832,7 @@ int i;
 
 g95_expr *g95_simplify_exp(g95_expr *x) {
 g95_expr *re, *result;
+mpf_t neg, overflow;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -841,15 +842,36 @@ g95_expr *re, *result;
   switch (x->ts.type) {
   case BT_INTEGER: 
     if (g95_option.pedantic == 1) 
-        g95_warning("Integer initialization constant to EXP at %L is nonstandard",&x->where);
+        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
     re = g95_int2real(x,x->ts.kind);
     exponential(&re->value.real,&result->value.real);
     break;
   case BT_REAL: 
+    /* Overflow if magnitude of x is greater than about ln2*2^31 */
+    mpf_init_set_str(overflow,"1.488522e9",10);
+    if (mpf_cmp_ui(x->value.real,0) < 0) {
+      mpf_init(neg);
+      mpf_neg(neg,x->value.real);
+      if (mpf_cmp(neg,overflow) > 0) {
+        if (g95_option.pedantic == 1) 
+	  g95_warning_now("Argument of EXP at %L too small, setting value to zero",&x->where);
+	mpf_set_ui(result->value.real,0);
+        mpf_clear(neg);
+        mpf_clear(overflow);
+	return result;
+      }
+      mpf_clear(neg);
+    }
+    else if (mpf_cmp(x->value.real, overflow) > 0) {
+      g95_error("Argument for initialization expression EXP at %L too large",&x->where);
+      mpf_clear(overflow);
+      return &g95_bad_expr;
+    }
+    mpf_clear(overflow);
     exponential(&x->value.real,&result->value.real);
     break;
   case BT_COMPLEX: 
-    g95_error("Complex exponent at %L has not yet been implemented",x->where);
+    g95_error("Complex exponent at %L has not yet been implemented",&x->where);
     return &g95_bad_expr;
   default:
     g95_internal_error("in g95_simplify_exp(): Bad type");
@@ -1714,7 +1736,7 @@ mpf_t ri;
   switch(x->ts.type) {
   case BT_INTEGER:
     if (g95_option.pedantic == 1) 
-      g95_warning("Integer initialization constant to LOG at %L is "
+      g95_warning_now("Integer initialization constant to LOG at %L is "
 		  "nonstandard", &x->where);
 
     if (mpz_cmp(x->value.integer, mpz_zero) <= 0) {
@@ -1747,7 +1769,7 @@ mpf_t ri;
       return &g95_bad_expr;
     }
 
-    g95_warning("LOG at %L not done for complex expressions yet", &x->where);
+    g95_warning_now("LOG at %L not done for complex expressions yet", &x->where);
     break;
 
   default:
@@ -1770,7 +1792,7 @@ mpf_t ri;
   switch(x->ts.type) {
   case BT_INTEGER:
     if (g95_option.pedantic == 1) 
-      g95_warning("Integer initialization constant to LOG10 at %L is "
+      g95_warning_now("Integer initialization constant to LOG10 at %L is "
 		  "nonstandard", &x->where);
 
     if (mpz_cmp(x->value.integer, mpz_zero) <= 0) {

@@ -131,8 +131,8 @@ mpf_t i10, log10;
   mpf_clear(log10);
 }
 
-unsigned int factorial(int n) {
-unsigned int fac;
+unsigned factorial(int n) {
+unsigned fac;
 
   if (n == 1) return(1);
   fac = factorial(n-1)*n;
@@ -149,8 +149,7 @@ unsigned int denom, limit, p, mp;
 /* We use a reduction of the form
  *   x= Nln2 + r
  *   then obtain exp(r) from the McLaurin series.
- *   exp(x) is then recovered from the identity 
- *   exp(x) = 2^N*exp(r) */
+ *   exp(x) is then recovered from the identity exp(x) = 2^N*exp(r) */
 
   mpf_init_set(x, *arg);
 
