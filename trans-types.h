@@ -82,8 +82,6 @@ tree g95_get_real_type (int);
 tree g95_get_complex_type (int);
 tree g95_get_logical_type (int);
 tree g95_get_character_type (int, g95_charlen *);
-/* For holding array data on the stack.  */
-tree g95_get_stack_array_type (tree);
 
 tree g95_sym_type (g95_symbol *);
 tree g95_typenode_for_spec (g95_typespec *);

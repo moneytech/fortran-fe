@@ -1,3 +1,31 @@
+2002-10-07  Paul Brook  <paul@nowt.org>
+
+	(g95_expand_decl): Rename from f95_expand_decl_stmt and use as
+	langhook.
+	* trans-array.c (g95_build_array_initializer): Remove.
+	(g95_conv_array_initializer): New Function.
+	(g95_trans_auto_arry_allocation): Cleanup.
+	(g95_trans_init_character_array): Remove.
+	* g95spec.c: Link in libgforbegin.
+	* trans.c (g95_generate_code): Rename main function to MAIN__.
+	(g95_create_var): New function.
+	(g95_create_var_np): New function.
+	(g95_evaluate_now): New function.
+	(g95_start_block): New function.
+	(g95_finish_block): New function.
+	(g95_add_expr_to_block): New function.
+	(g95_add_block_to_block): New function.
+	* trans-expr.c (g95_conv_componen_ref): New function.
+	* Make-lang.in (F95_ADDITIONAL_OBJS): Add gimplify.o.
+	(F95_OBJS): Add dependency.o.
+	* f95-lang.c (g95_is_simple_stmt): Remove.
+	* f95-tree.c (mark_not_simple): New function.
+	(unshare_all_trees): New function.
+	(create_tmp_var, create_tmp_alias_var): Remove.
+	* support.c (declare_tmp_vars, tree_last_decl): Remove.
+	* trans*: Convert to new IR using GENERIC trees.  Don't bother about
+	SIMPLE/GIMPLE rules, this is now done by Lang-independant code.
+
 2002-10-01  Paul Brook  <paul@nowt.org>
 
 	* trans-array.c: Add support for descriptorless arrays.

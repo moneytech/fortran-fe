@@ -357,6 +357,7 @@ typedef struct g95_component {
   int pointer, dimension;
   g95_array_spec *as;
 
+  tree backend_decl;
   locus loc;
   struct g95_expr *initializer;
   struct g95_component *next;

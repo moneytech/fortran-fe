@@ -343,19 +343,6 @@ g95_get_element_type (tree type)
   return element;
 }
 
-/* Creates a type with the given size.  Used for holding array data.  */
-tree
-g95_get_stack_array_type (tree size)
-{
-  tree type;
-  tree bounds;
-
-  bounds = build_range_type (g95_array_index_type, integer_one_node, size);
-  type = build_array_type (unsigned_char_type_node, bounds);
-
-  return type;
-}
-
 /* Build an array. This function is called from g95_sym_type().
    Actualy returns array descriptor type.
 
@@ -859,6 +846,11 @@ g95_sym_type (g95_symbol * sym)
 
   if (sym->attr.dimension)
     {
+      /* The string code is currently very broken.  I need to figure out a way
+         of doing it that works with descriptorless arrays.  */
+      if (sym->ts.type == BT_CHARACTER)
+        g95_todo_error ("arrays of strings");
+
       if (g95_is_nodesc_array (sym))
         type = g95_get_nodesc_array_type (type, sym->as);
       else
@@ -959,6 +951,9 @@ g95_get_derived_type (g95_symbol * derived)
       TREE_CHAIN (field) = NULL_TREE;
 
       fieldlist = chainon (fieldlist, field);
+
+      assert (! c->backend_decl);
+      c->backend_decl = field;
     }
 
   /* Now we have the final fieldlist.  Record it, then lay out the
@@ -989,6 +984,8 @@ g95_return_by_reference (g95_symbol * sym)
   if (sym->ts.type == BT_CHARACTER)
     g95_todo_error ("Returning character variables");
 
+  if (sym->ts.type == BT_DERIVED)
+    g95_todo_error ("Returning derived types");
   /* Possibly return derived types by reference.  */
   return 0;
 }

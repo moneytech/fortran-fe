@@ -29,12 +29,15 @@ void g95_array_allocate (g95_se *, g95_ref *, tree);
 /* Generate code to allocate a temporary array.  */
 tree g95_trans_allocate_temp_array (g95_loopinfo *, g95_ss_info *, tree, tree);
 
-/* Generate code for allocation of compiler allocated array variables.  */
+/* Generate function entry code for allocation of compiler allocated array
+   variables.  */
 tree g95_trans_auto_array_allocation (tree, g95_symbol *);
 /* Generate entry and exit code for dummy array parameters.  */
 tree g95_trans_dummy_array_bias (g95_symbol *, tree, tree);
 /* Add initialisation for deferred arrays.  */
 tree g95_trans_deferred_array (g95_symbol *, tree);
+/* Generate an initializer for a static pointer or allocatable array.  */
+void g95_trans_static_array_pointer (g95_symbol *);
 
 /* Generate scalarization information for an expression.  */
 g95_ss * g95_walk_expr (g95_ss *, g95_expr *);
@@ -60,11 +63,11 @@ void g95_init_loopinfo (g95_loopinfo *);
 void g95_copy_loopinfo_to_se (g95_se *, g95_loopinfo *);
 
 /* Marks the start of a scalarized expression, and declares loop variables.  */
-void g95_start_scalarized_body (g95_loopinfo *);
+void g95_start_scalarized_body (g95_loopinfo *, stmtblock_t *);
 /* Generates the actual loops for a scalarized expression.  */
-void g95_trans_scalarizing_loops (g95_loopinfo *, tree, tree);
+void g95_trans_scalarizing_loops (g95_loopinfo *, stmtblock_t *);
 /* Mark the end of the main loop body and the start of the copying loop.  */
-void g95_trans_scalarized_loop_boundary (g95_loopinfo *, tree, tree);
+void g95_trans_scalarized_loop_boundary (g95_loopinfo *, stmtblock_t *);
 /* Initialise the scalarization loop parameters.  */
 void g95_conv_loop_setup (g95_loopinfo *);
 /* Resolve array assignment dependencies.  */

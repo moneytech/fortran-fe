@@ -199,39 +199,32 @@ g95_trans_read (g95_code * code ATTRIBUTE_UNUSED)
 tree
 g95_trans_write (g95_code * code)
 {
-  /* The interface for the IO library isn't fixed, so this code will probably
-     change a lot.  It was only written so that I could write a "Hello World"
-     program :-)  */
+  /* The IO library is still in the very early stages of development.  */
   tree args;
   unsigned long flags;
   g95_dt *dt;
   g95_se se;
-  tree head;
-  tree tail;
-  tree post;
-  tree post_tail;
+  stmtblock_t block;
+  stmtblock_t postblock;
   tree tmp;
   tree pstate;
   tree state;
   tree field;
-  tree stmt;
 
-  g95_start_stmt ();
+  g95_start_block (&block);
+  g95_init_block (&postblock);
 
   dt = code->ext.dt;
   args = NULL_TREE;
-  head = tail = NULL_TREE;
-  post = post_tail = NULL_TREE;
   flags = 0;
 
   tmp = g95_build_function_call (gforio_fndecl_state_get, NULL_TREE);
   if (! g95_current_io_state)
-    g95_current_io_state = create_tmp_alias_var (TREE_TYPE (tmp), "iostate");
+    g95_current_io_state = g95_create_var_np (TREE_TYPE (tmp), "iostate");
 
   pstate = g95_current_io_state;
   tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), pstate, tmp);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+  g95_add_expr_to_block (&block, tmp);
 
   state = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pstate)), pstate);
 /* TODO: IO error status codes.  */
@@ -239,66 +232,60 @@ g95_trans_write (g95_code * code)
     {
       field = gforio_state_unit;
       g95_init_se (&se, NULL);
-      g95_conv_simple_val_type (&se, dt->io_unit, TREE_TYPE (field));
-      g95_add_stmt_to_list (&head, &tail, se.pre, se.pre_tail);
+      g95_conv_expr_type (&se, dt->io_unit, TREE_TYPE (field));
+      g95_add_block_to_block (&block, &se.pre);
 
       tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      stmt = build_stmt (EXPR_STMT, tmp);
-      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+      g95_add_expr_to_block (&block, tmp);
     }
 
   if (dt->rec)
     {
       field = gforio_state_rec;
       g95_init_se (&se, NULL);
-      g95_conv_simple_val_type (&se, dt->rec, TREE_TYPE (field));
-      g95_add_stmt_to_list (&head, &tail, se.pre, se.pre_tail);
+      g95_conv_expr_type (&se, dt->rec, TREE_TYPE (field));
+      g95_add_block_to_block (&block, &se.pre);
 
       tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      stmt = build_stmt (EXPR_STMT, tmp);
-      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+      g95_add_expr_to_block (&block, tmp);
     }
 
   if (dt->advance)
     {
       field = gforio_state_adv;
       g95_init_se (&se, NULL);
-      g95_conv_simple_val_type (&se, dt->advance, TREE_TYPE (field));
-      g95_add_stmt_to_list (&head, &tail, se.pre, se.pre_tail);
-      g95_add_stmt_to_list (&post, &post_tail, se.post, se.post_tail);
+      g95_conv_expr_val (&se, dt->advance);
+      g95_add_block_to_block (&block, &se.pre);
+      g95_add_block_to_block (&postblock, &se.post);
 
       tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      stmt = build_stmt (EXPR_STMT, tmp);
-      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+      g95_add_expr_to_block (&block, tmp);
 
       field = gforio_state_advlen;
       tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      stmt = build_stmt (EXPR_STMT, tmp);
-      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.string_length);
+      g95_add_expr_to_block (&block, tmp);
     }
 
   if (dt->format_expr)
     {
       field = gforio_state_fmt;
       g95_init_se (&se, NULL);
-      g95_conv_simple_val_type (&se, dt->advance, TREE_TYPE (field));
-      g95_add_stmt_to_list (&head, &tail, se.pre, se.pre_tail);
-      g95_add_stmt_to_list (&post, &post_tail, se.post, se.post_tail);
+      g95_conv_expr_val (&se, dt->advance);
+      g95_add_block_to_block (&block, &se.pre);
+      g95_add_block_to_block (&postblock, &se.post);
 
       tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      stmt = build_stmt (EXPR_STMT, tmp);
-      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+      g95_add_expr_to_block (&block, tmp);
 
       field = gforio_state_fmtlen;
       tmp = build (COMPONENT_REF, TREE_TYPE (field), state, field);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.expr);
-      stmt = build_stmt (EXPR_STMT, tmp);
-      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+      tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, se.string_length);
+      g95_add_expr_to_block (&block, tmp);
     }
 
   if (dt->size)
@@ -306,14 +293,11 @@ g95_trans_write (g95_code * code)
 
   args = g95_chainon_list (NULL_TREE, pstate);
   tmp = g95_build_function_call (gforio_fndecl_write_begin, args);
-  tmp = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_list (&head, &tail, tmp, tmp);
+  g95_add_expr_to_block (&block, tmp);
 
-  g95_add_stmt_to_list (&head, &tail, post, post_tail);
+  g95_add_block_to_block (&block, &postblock);
 
-  stmt = g95_finish_stmt (head, tail);
-
-  return stmt;
+  return g95_finish_block (&block);
 }
 
 tree
@@ -347,48 +331,35 @@ g95_trans_rewind (g95_code * code ATTRIBUTE_UNUSED)
 }
 
 tree
-g95_trans_io_call (g95_code * code)
+g95_trans_iostate_call (g95_code * code)
 {
-  g95_ss *ss;
-  g95_se se;
-  g95_expr *expr;
-  g95_loopinfo loop;
+  tree tmp;
+
+  if (strcmp (code->sub_name, "_gforio_write_end") == 0)
+    {
+      assert (g95_current_io_state);
+      tmp = g95_chainon_list (NULL_TREE, g95_current_io_state);
+      tmp = g95_build_function_call (gforio_fndecl_write_end, tmp);
+      return tmp;
+    }
+  else
+    internal_error ("Unknown IO state call %s\n", code->sub_name);
+}
+
+/* Generate the IO statements for an expression.  */
+static void
+g95_trans_expr_io (g95_se * se, g95_typespec * ts, int mode)
+{
   tree args;
   tree tmp;
-  tree fndecl;
   int kind;
+  tree fndecl;
   gforio_fndecl_enum fn;
 
-  g95_start_stmt ();
-
-  g95_init_se (&se, NULL);
-
-  expr = code->ext.actual->expr;
-  ss = g95_walk_expr (g95_ss_terminator, expr);
-
-  if (ss != g95_ss_terminator)
-    {
-      ss = g95_reverse_ss (ss);
-      /* Initialize the scalarizer.  */
-      g95_init_loopinfo (&loop);
-      g95_add_ss_to_loop (&loop, ss);
-
-      /* Initialize the loop.  */
-      g95_conv_ss_startstride (&loop);
-      g95_conv_loop_setup (&loop);
-
-      /* The main loop body.  */
-      g95_mark_ss_chain_used (ss, 1);
-      g95_start_scalarized_body (&loop);
-      g95_copy_loopinfo_to_se (&se, &loop);
-      se.ss = ss;
-    }
-
-  g95_conv_simple_val (&se, expr);
-  kind = expr->ts.kind;
   fndecl = NULL_TREE;
   fn = GFORIO_NUM_FNDECLS;
-  switch (expr->ts.type)
+  kind = ts->kind;
+  switch (ts->type)
     {
     case BT_INTEGER:
       if (kind == 4)
@@ -428,63 +399,115 @@ g95_trans_io_call (g95_code * code)
         fatal_error ("Can't do character kind=%d IO", kind);
       break;
 
+    case BT_DERIVED:
+      g95_todo_error ("IO of derived types");
+      break;
+
     default:
-      internal_error ("Bad IO basetype (%d)", expr->ts.type);
+      internal_error ("Bad IO basetype (%d)", ts->type);
     }
 
   if (fndecl == NULL_TREE)
     {
-      if (code->sub_name[4] == 'r')
+      if (mode == 'r')
         fndecl = gforio_fndecls[fn].read;
-      else if (code->sub_name[4] == 'w')
+      else if (mode == 'w')
         fndecl = gforio_fndecls[fn].write;
       else
-        g95_todo_error ("%s", code->sub_name);
+        g95_todo_error ("IO mode %c", mode);
     }
 
   assert (g95_current_io_state);
   args = g95_chainon_list (NULL_TREE, g95_current_io_state);
-  switch (expr->ts.type)
+  switch (ts->type)
     {
     case BT_CHARACTER:
-      g95_conv_string_parameter (&se);
+      g95_conv_string_parameter (se);
 
-      args = g95_chainon_list (args, se.string_length);
-      args = g95_chainon_list (args, se.expr);
+      args = g95_chainon_list (args, se->string_length);
+      args = g95_chainon_list (args, se->expr);
       break;
 
     case BT_LOGICAL:
       /* Logical kinds are always passed as kind=4.  */
       if (kind != 4)
-        {
-          tmp = build1 (NOP_EXPR, g95_logical4_type_node, se.expr);
-          se.expr = g95_simple_fold (tmp, &se.pre, &se.pre_tail, NULL);
-        }
+        se->expr = convert (g95_logical4_type_node, se->expr);
 
       /* Fall through.  */
 
     default:
-      args = g95_chainon_list (args, se.expr);
+      args = g95_chainon_list (args, se->expr);
       break;
     }
 
   tmp = g95_build_function_call (fndecl, args);
-  tmp = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_pre (&se, tmp, tmp);
-  g95_add_stmt_to_pre (&se, se.post, se.post_tail);
+  g95_add_expr_to_block (&se->pre, tmp);
+  g95_add_block_to_block (&se->pre, &se->post);
+}
+
+tree
+g95_trans_io_call (g95_code * code)
+{
+  g95_ss *ss;
+  g95_se se;
+  g95_expr *expr;
+  g95_loopinfo loop;
+  tree tmp;
+  stmtblock_t block;
+  stmtblock_t body;
+
+  g95_start_block (&block);
+
+  expr = code->ext.actual->expr;
+  ss = g95_walk_expr (g95_ss_terminator, expr);
+
+  g95_init_se (&se, NULL);
+
+  if (ss != g95_ss_terminator)
+    {
+      ss = g95_reverse_ss (ss);
+      /* Initialize the scalarizer.  */
+      g95_init_loopinfo (&loop);
+      g95_add_ss_to_loop (&loop, ss);
+
+      /* Initialize the loop.  */
+      g95_conv_ss_startstride (&loop);
+      g95_conv_loop_setup (&loop);
+
+      /* The main loop body.  */
+      g95_mark_ss_chain_used (ss, 1);
+      g95_start_scalarized_body (&loop, &body);
+
+      g95_copy_loopinfo_to_se (&se, &loop);
+      se.ss = ss;
+    }
+  else
+    g95_init_block (&body);
+
+  g95_conv_expr (&se, expr);
+
+  g95_trans_expr_io (&se, &expr->ts, code->sub_name[4]);
+
+  g95_add_block_to_block (&body, &se.pre);
+  g95_add_block_to_block (&body, &se.post);
 
   if (se.ss)
     {
       assert (se.ss == g95_ss_terminator);
-      g95_trans_scalarizing_loops (&loop, se.pre, se.pre_tail);
+      g95_trans_scalarizing_loops (&loop, &body);
 
-      g95_add_stmt_to_pre (&loop, loop.post, loop.post_tail);
-      tmp = g95_finish_stmt (loop.pre, loop.pre_tail);
+      g95_add_block_to_block (&loop.pre, &loop.post);
+
+      tmp = g95_finish_block (&loop.pre);
+      g95_add_expr_to_block (&block, tmp);
     }
   else
-    tmp = g95_finish_stmt (se.pre, se.pre_tail);
+    {
+      tmp = g95_finish_block (&body);
+      g95_add_expr_to_block (&block, tmp);
+    }
 
-  return tmp;
+  return g95_finish_block (&block);;
 }
 
 #include "gt-f95-trans-io.h"

@@ -22,15 +22,24 @@ Boston, MA 02111-1307, USA.  */
 #ifndef G95_TRANS_H
 #define G95_TRANS_H
 
-/* Currently mangled symbols take the form __module__name.  */
+/* Mangled symbols take the form __module__name.  */
 #define G95_MAX_MANGLED_SYMBOL_LEN  (G95_MAX_SYMBOL_LEN*2+4)
+
+/* Struct for holding a block of statements.  It should be treated as an
+   opaque entity and not modified directly.  This allows us to change the
+   underlying representation of statement lists.  */
+typedef struct
+{
+  tree head;
+  int has_scope:1;
+} stmtblock_t;
 
 /* a simplified expresson */
 typedef struct g95_se
 {
-  /* two chains of *_STMT trees */
-  tree pre, pre_tail;
-  tree post, post_tail;
+  /* Code blocks to be executed before and after using the value.  */
+  stmtblock_t pre;
+  stmtblock_t post;
 
   /* the result of the expression */
   tree expr;
@@ -138,8 +147,8 @@ extern g95_ss *g95_ss_terminator;
 /* Holds information about an expression while it is being scalarized.  */
 typedef struct g95_loopinfo
 {
-  tree pre, pre_tail;
-  tree post, post_tail;
+  stmtblock_t pre;
+  stmtblock_t post;
 
   int dimen;
 
@@ -152,8 +161,7 @@ typedef struct g95_loopinfo
   g95_ss *specloop[G95_MAX_DIMENSIONS];
 
   /* The code member contains the code for the body of the next outer loop.  */
-  tree code[G95_MAX_DIMENSIONS];
-  tree code_tail[G95_MAX_DIMENSIONS];
+  stmtblock_t code[G95_MAX_DIMENSIONS];
 
   /* Order in which the dimensions should be looped, innermost first.  */
   int order[G95_MAX_DIMENSIONS];
@@ -171,20 +179,15 @@ void g95_advance_se_ss_chain (g95_se *);
    parent to get scalarization data from, or NULL.  */
 void g95_init_se(g95_se *, g95_se *);
 
-/* Helpers for adding to stmt chains.  Not these should be macros as they are
-   used for both g95_se and g95_loop structures.  */
-/* Add statements to a g95_se->pre chain.  */
-#define g95_add_stmt_to_pre(se, h, t) \
-            g95_add_stmt_to_list(&(se)->pre, &(se)->pre_tail, h, t)
-/* Add statements to a g95_se->post chain.  */
-#define g95_add_stmt_to_post(se, h, t) \
-            g95_add_stmt_to_list(&(se)->post, &(se)->post_tail, h, t)
+/* Build an expression with void type.  */
+void build_v (int code, ...);
 
-/* Like chainon() but updates both head and tail.
-   Used by g95_add_stmt_to_(pre|post).  */
-void g95_add_stmt_to_list(tree *, tree *, tree, tree);
+/* Create an artificial variable decl and add it to the current scope.  */
+tree g95_create_var (tree, const char *);
+/* Like above but doesn't add it to the current scope.  */
+tree g95_create_var_np (tree, const char *);
 
-/* store the result of an expression on a temp variable so it can be used
+/* Store the result of an expression in a temp variable so it can be used
    repeatedly even if the original changes */
 void g95_make_safe_expr(g95_se * se);
 
@@ -200,26 +203,20 @@ tree g95_chainon_list (tree, tree);
    should not be a problem as most statements/operations only deal with
    numeric/logical types.  */
 
-/* Suitable for array indices and function parameters
-   ie. either a constant of a variable.
-   Guaranteed to return post=NULL for non-character values.  */
-void g95_conv_simple_val(g95_se *, g95_expr *);
-/* Like g95_conv_simple_val except the value will be of specified type.  Does
-   not work with character types.  */
-void g95_conv_simple_val_type(g95_se *, g95_expr *, tree);
-/* Suitable for use in if constructs, etc.
-   Guaranteed to return post=NULL for non-character values.  */
-void g95_conv_simple_cond(g95_se *, g95_expr *);
-/* Returns an lvalue, throws error if not possble.
-   Guaranteed to return post=NULL for non-character values.  */
-void g95_conv_simple_lhs(g95_se *, g95_expr *);
-
-/* Simple expression suitable for RHS of assignment.
-   Can return a non-NULL post tree */
-void g95_conv_simple_rhs(g95_se *, g95_expr *);
-
-/* Translate a expression to pass by reference.  */
-void g95_conv_simple_reference (g95_se *, g95_expr *);
+/* Entry point for expression translation.  */
+void g95_conv_expr (g95_se * se, g95_expr * expr);
+/* Like g95_conv_expr, but the POST block is guaranteed to be empty for
+   numeric expressions.  */
+void g95_conv_expr_val (g95_se * se, g95_expr * expr);
+/* Like g95_conv_expr_val, but the value is also suitable for use in the lhs of
+   an assignment.  */
+void g95_conv_expr_lhs (g95_se * se, g95_expr * expr);
+/* Converts an expression so that it can be passed be reference.  */
+void g95_conv_expr_reference (g95_se * se, g95_expr *);
+/* Equivalent to convert(type, g95_conv_expr_val(se, expr)).  */
+void g95_conv_expr_type (g95_se * se, g95_expr *, tree);
+/* If the value is not constant, Create a temporary and copy the value.  */
+tree g95_evaluate_now (tree, stmtblock_t *);
 
 /* Intrinsic function handling.  */
 void g95_conv_intrinsic_function (g95_se *, g95_expr *);
@@ -237,20 +234,25 @@ tree g95_trans_scalar_assign (g95_se *, g95_se *, bt);
 /* Get the length of a string.  */
 tree g95_conv_string_length (tree);
 /* Initialize a string length variable.  */
-tree g95_conv_init_string_length (g95_symbol *, tree *, tree *);
+tree g95_conv_init_string_length (g95_symbol *, stmtblock_t *);
 
-/* Start a new satement block.  */
-void g95_start_stmt (void);
-/* Finish a statement block.  The two paramenters are the head and tail of the
-   code for the block.  Returns a COMPOUNT_STMT containing the code, decls
-   for temporaries and scope neatly wrapped up in a single COMPOUNT_STMT.  */
-tree g95_finish_stmt (tree, tree);
-/* We've decided we don't need this scope, so merge it with the parent.
-   Only variable decls will be merged, you still need to add the code.  */
-void g95_merge_stmt (void);
-/* Like g95_finish_stmt, but only wraps in COMPOUND_STMT if there are variable
-   decls in the scope.  */
-void g95_finish_se_stmt (g95_se *);
+/* Add an expression to the end of a block.  */
+void g95_add_expr_to_block (stmtblock_t *, tree);
+/* Add a block to the end of a block.  */
+void g95_add_block_to_block (stmtblock_t *, stmtblock_t *);
+/* Add a MODIFY_EXPR to a block.  */
+void g95_add_modify_expr (stmtblock_t *, tree, tree);
+
+/* Initialize a statement block.  */
+void g95_init_block (stmtblock_t *);
+/* Start a new satement block.  Like g95_init_block but also starts a new
+   variable scope.  */
+void g95_start_block (stmtblock_t *);
+/* Finish a statement block.  Also closes the scope if the block was created
+   with g95_start_block.  */
+tree g95_finish_block (stmtblock_t *);
+/* Merge the scope of a block with its parent.  */
+void g95_merge_block_scope (stmtblock_t * block);
 
 /* Return the backend label decl.  */
 tree g95_get_label_decl(g95_st_label *);
@@ -286,12 +288,6 @@ void g95_allocate_lang_decl (tree);
 /* Advance along a TREE_CHAIN.  */
 tree g95_advance_chain (tree, int);
 
-/* Helper routine for constant folding.  Please read comments above
-   declaration in trans.c to avoid subtle bugs.  */
-tree g95_simple_fold(tree, tree *, tree *, tree *);
-/* Safer version of the above.  */
-tree g95_simple_fold_tmp(tree, tree *, tree *, tree *);
-
 /* Generate the code for a function.  */
 void g95_generate_function_code (g95_namespace *);
 /* Output a decl for a module variable.  */
@@ -306,7 +302,7 @@ extern GTY(()) tree g95_static_ctors;
 void g95_generate_constructors (void);
 
 /* Generate a runtime error check.  */
-void g95_trans_runtime_check (tree, tree, tree *, tree *);
+void g95_trans_runtime_check (tree, tree, stmtblock_t *);
 
 /* Generate code for an assigment, includes scalarization.  */
 tree g95_trans_assignment (g95_expr *, g95_expr *);
@@ -318,11 +314,6 @@ void g95_build_io_library_fndecls (void);
 /* Build a function decl for a library function.  */
 tree g95_build_library_function_decl VPARAMS((tree name, tree rettype,
                                               int nargs, ...));
-
-/* Identical to convert() except it checks that the arguments are valid
-   SIMPLE expressions.
-   #define g95_simple_convert convert would also work.  */
-tree g95_simple_convert (tree, tree);
 
 /* We have a single io state for a procedure.  */
 extern GTY(()) tree g95_current_io_state;
@@ -421,5 +412,7 @@ struct lang_decl GTY (())
 /* I changed this from sorry(...) because it should not return.  */
 /* TODO: Remove g95_todo_error before releasing g95.  */
 #define g95_todo_error(args...) fatal_error("g95_todo: Not Implemented: " args)
+
+#define build_v(code, args...) build(code, void_type_node, args)
 
 #endif /* G95_TRANS_H */

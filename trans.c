@@ -76,142 +76,129 @@ g95_chainon_list (tree list, tree add)
   return chainon (list, l);
 }
 
-/* Identical to convert() in effect.  Generates an error if the conversion
-   causes the expression to violate SIMPLE grammar.  The initial expression
-   should be a simple_val, the result will be a simple_rhs.  */
-tree
-g95_simple_convert (tree type, tree expr)
+/* Strip off a legitimate source ending from the input string NAME of
+   length LEN.  Rather than having to know the names used by all of
+   our front ends, we strip off an ending of a period followed by
+   up to five characters.  (Java uses ".class".)  */
+
+static inline void
+remove_suffix (char *name, int len)
 {
-  tree result;
+  int i;
 
-  assert (is_simple_val (expr));
-  result = convert (type, expr);
-  if (! is_simple_rhs (result))
-    warning ("Internal: convert broke SIMPLE");
-
-  return result;
+  for (i = 2;  i < 8 && len > i;  i++)
+    {
+      if (name[len - i] == '.')
+	{
+	  name[len - i] = '\0';
+	  break;
+	}
+    }
 }
 
-/* SIMPLE constant folding helper, returns a simple_val.  If tmpvar does
-   not point to an existing temporary a new one will be created as neccessary.
-   The expression should already be a simple_rhs.  Care must be taken when
-   reusing temporary variables.  See below.  */
+/* Create a decl for an artificial decl with the given type.  */
 tree
-g95_simple_fold(tree expr, tree * phead, tree * ptail, tree * tmpvar)
+g95_create_var_np (tree type, const char * prefix)
+{
+  static unsigned int id_num = 1;
+  char *tmp_name;
+  char *preftmp = NULL;
+  tree tmp_var;
+
+  if (prefix)
+    {
+      preftmp = ASTRDUP (prefix);
+      remove_suffix (preftmp, strlen (preftmp));
+      prefix = preftmp;
+    }
+
+  ASM_FORMAT_PRIVATE_NAME (tmp_name, (prefix ? prefix : "T"), id_num++);
+
+  /* Make the type of the variable writable.  */
+  type = build_type_variant (type, 0, 0);
+
+  tmp_var = build_decl (VAR_DECL, get_identifier (tmp_name), type);
+
+  /* The variable was declared by the compiler.  */
+  DECL_ARTIFICIAL (tmp_var) = 1;
+
+  /* Make the variable writable.  */
+  TREE_READONLY (tmp_var) = 0;
+
+  DECL_EXTERNAL (tmp_var) = 0;
+  TREE_STATIC (tmp_var) = 0;
+  TREE_USED (tmp_var) = 1;
+
+  return tmp_var;
+}
+
+/* Like above, but also adds it to the current scope.  */
+tree
+g95_create_var (tree type, const char * prefix)
 {
   tree tmp;
+
+  tmp = g95_create_var_np (type, prefix);
+
+  pushdecl (tmp);
+
+  return tmp;
+}
+
+/* If the value is not constant, Create a temporary and copy the value.  */
+tree
+g95_evaluate_now (tree expr, stmtblock_t * pblock)
+{
   tree var;
-  tree stmt;
 
-  assert (is_simple_rhs (expr));
+  if (TREE_CODE_CLASS (TREE_CODE (expr)) == 'c')
+    return expr;
 
-  tmp = fold (expr);
-  if (is_simple_val (tmp))
-    return tmp;
-
-  if (! is_simple_rhs (expr))
-      warning ("Internal inconsistancy: fold broke SIMPLE");
-
-  if (tmpvar != NULL)
-    {
-      var = *tmpvar;
-      assert (var == NULL_TREE || TREE_CODE (var) == VAR_DECL);
-    }
-  else
-    var = NULL_TREE;
-
-  if (var == NULL_TREE)
-    {
-      var = create_tmp_var (TREE_TYPE (tmp), NULL);
-      if (tmpvar != NULL)
-        *tmpvar = var;
-    }
-
-  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), var, tmp);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_list (phead, ptail, stmt, stmt);
+  var = g95_create_var (TREE_TYPE (expr), NULL);
+  g95_add_modify_expr (pblock, var, expr);
 
   return var;
 }
 
-static int
-g95_is_artificial_decl (tree t)
-{
-  if (TREE_CODE (t) == NON_LVALUE_EXPR)
-    t = TREE_OPERAND (t, 0);
-  return (DECL_ARTIFICIAL (t));
-}
-
-/* Like g95_simple_fold, but will not return annother temporary variable.
-   Used when the value of the operands may change before the result is used.
-
-   eg:
-    tmp1 = 2;
-    tmp2 = fold_tmp (tmp1 * 1); // folds to assign(tmp2, tmp1), not tmp2=>tmp1
-    tmp1 = 3;
-    tmp2 = tmp2 + tmp1;
-   This situation can easily happen inside loops.
-   if g95_simple_fold was used, the final value of tmp would be 3, not 5.  */
-tree
-g95_simple_fold_tmp(tree expr, tree * phead, tree * ptail, tree * tmpvar)
-{
-  tree tmp;
-  tree var;
-  tree stmt;
-
-  assert (is_simple_rhs (expr));
-
-  tmp = fold (expr);
-  if (TREE_CODE (tmp) == NON_LVALUE_EXPR)
-    var = TREE_OPERAND (tmp, 0);
-  else
-    var = tmp;
-
-  if (is_simple_val (tmp)
-      && (is_simple_const (tmp)
-          || (tmpvar && var == *tmpvar)
-          || ! DECL_ARTIFICIAL (var)))
-    return tmp;
-
-  if (! is_simple_rhs (expr))
-      warning ("Internal inconsistancy: fold broke SIMPLE");
-
-  if (tmpvar != NULL)
-    {
-      var = *tmpvar;
-      assert (var == NULL_TREE || TREE_CODE (var) == VAR_DECL);
-    }
-  else
-    var = NULL_TREE;
-
-  if (var == NULL_TREE)
-    {
-      var = create_tmp_var (TREE_TYPE (tmp), NULL);
-      if (tmpvar != NULL)
-        *tmpvar = var;
-    }
-
-  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), var, tmp);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_list (phead, ptail, stmt, stmt);
-
-  return var;
-}
-
-/* Create a new scope/binding level.  */
+/* Add a MODIFY_EXPR to a block.  */
 void
-g95_start_stmt (void)
+g95_add_modify_expr (stmtblock_t * pblock, tree lhs, tree rhs)
+{
+  tree tmp;
+
+  tmp = build (MODIFY_EXPR, void_type_node, lhs, rhs);
+  g95_add_expr_to_block (pblock, tmp);
+}
+
+/* Create a new scope/binding level and initialize a block.  */
+void
+g95_start_block (stmtblock_t * block)
 {
   pushlevel (0);
+  block->head = NULL_TREE;
+  block->has_scope = 1;
+}
+
+/* Initialize a block without creating a new scope.  */
+void
+g95_init_block (stmtblock_t * block)
+{
+  /* This function must not allocate anything that requires freeing as it may
+     be discarded without being used.  */
+  block->head = NULL_TREE;
+  block->has_scope = 0;
 }
 
 /* We've decided we don't need this scope, so merge it with the parent.
    Only variable decls will be merged, you still need to add the code.  */
 void
-g95_merge_stmt (void)
+g95_merge_block_scope (stmtblock_t * block)
 {
   tree decl;
   tree next;
+
+  assert (block->has_scope);
+  block->has_scope = 0;
 
   /* Remember the decls in this scope.  */
   decl = getdecls();
@@ -228,75 +215,31 @@ g95_merge_stmt (void)
     }
 }
 
-/* Like g95_finish_stmt, but only wraps in COMPOUND_STMT if there are variable
-   decls in the scope.  Calling with se->post != NULL just doesn't make sense.
-   Used to aviod excessive and pointless scopes for expressions.  */
-void
-g95_finish_se_stmt (g95_se * se)
-{
-  tree decls;
-
-  /* Check we haven't been called with an incomplete expression.  */
-  assert (se->post == NULL_TREE);
-  /* Should never happen.  */
-  assert (se->pre != NULL_TREE && TREE_CHAIN (se->pre_tail) == NULL_TREE);
-
-  decls = getdecls();
-  if (decls != NULL_TREE)
-    {
-      se->pre = g95_finish_stmt (se->pre, se->pre_tail);
-      se->pre_tail = se->pre;
-      assert (TREE_CHAIN (se->pre_tail) == NULL_TREE);
-    }
-  else
-    g95_merge_stmt ();
-}
-
-/* Finish a scope containing a stmt list, and create and add DECL_STMTs
-   for the current binding level.  Wrap the whole thing in a COMPOUND_STMT.  */
+/* Finish a scope containing a block of statements.  */
 tree
-g95_finish_stmt (tree body, tree tail)
+g95_finish_block (stmtblock_t * stmtblock)
 {
   tree decl;
-  tree stmt;
+  tree expr;
   tree block;
-  tree head;
 
-  head = stmt = build_stmt (SCOPE_STMT, NULL_TREE);
+  expr = stmtblock->head;
+  stmtblock->head = NULL_TREE;
 
-  SCOPE_BEGIN_P (stmt) = 1;
-  for (decl = getdecls () ; decl ; decl = TREE_CHAIN (decl))
+  if (stmtblock->has_scope)
     {
-      TREE_CHAIN (stmt) = build_stmt (DECL_STMT, decl);
-      stmt = TREE_CHAIN (stmt);
+      decl = getdecls ();
+
+      if (decl)
+        {
+          block = poplevel (1, 0, 0);
+          expr = build_v (BIND_EXPR, decl, expr, block);
+        }
+      else
+        poplevel (0, 0, 0);
     }
 
-  block = poplevel (1, 0, 0);
-
-  TREE_CHAIN (stmt) = body;
-
-  if (tail == NULL_TREE)
-    {
-      tail = stmt;
-      while (TREE_CHAIN (tail))
-        tail = TREE_CHAIN (tail);
-    }
-  assert (TREE_CHAIN (tail) == NULL_TREE);
-
-  /* Empty scope.  */
-  if (TREE_CHAIN (head) == NULL_TREE)
-    return (NULL_TREE);
-
-  stmt = build_stmt (SCOPE_STMT, NULL_TREE);
-  SCOPE_BEGIN_P (stmt) = 0;
-
-  TREE_CHAIN (tail) = stmt;
-  tail = stmt;
-
-  SCOPE_STMT_BLOCK (head) = block;
-  SCOPE_STMT_BLOCK (tail) = block;
-
-  return build_stmt (COMPOUND_STMT, head);
+  return rationalize_compound_expr (expr);
 }
 
 /* Build a CALL_EXPR.  */
@@ -315,13 +258,12 @@ g95_build_function_call (tree fndecl, tree arglist)
 
 /* Generate a runtime error if cond is true.  */
 void
-g95_trans_runtime_check (tree cond, tree msg, tree * phead, tree * ptail)
+g95_trans_runtime_check (tree cond, tree msg, stmtblock_t * pblock)
 {
-  tree head;
-  tree tail;
+  stmtblock_t block;
+  tree body;
   tree tmp;
   tree args;
-  tree stmt;
 
   cond = fold (cond);
 
@@ -329,86 +271,66 @@ g95_trans_runtime_check (tree cond, tree msg, tree * phead, tree * ptail)
     return;
 
   /* The code to generate the error.  */
-  g95_start_stmt ();
-  head = tail = NULL;
+  g95_start_block (&block);
 
   assert (TREE_CODE (msg) == STRING_CST);
 
   TREE_USED (msg) = 1;
 
   tmp = build1 (ADDR_EXPR, pchar_type_node, msg);
-  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
   args = g95_chainon_list (NULL_TREE, tmp);
 
   tmp = build1 (ADDR_EXPR, pchar_type_node, g95_strconst_current_filename);
-  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
   args = g95_chainon_list (args, tmp);
 
   tmp = build_int_2 (lineno, 0);
   args = g95_chainon_list (args, tmp);
 
   tmp = g95_build_function_call (gfor_fndecl_runtime_error, args);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+  g95_add_expr_to_block (&block, tmp);
 
-  stmt = g95_finish_stmt (head, tail);
+  body = g95_finish_block (&block);
 
   if (integer_onep (cond))
     {
-      g95_add_stmt_to_list (phead, ptail, stmt, NULL_TREE);
+      g95_add_expr_to_block (pblock, body);
     }
   else
     {
       /* Tell the compiler that this isn't likley.  */
-      cond = g95_simple_fold (cond, phead, ptail, NULL);
       tmp = g95_chainon_list (NULL_TREE, cond);
       tmp = g95_chainon_list (tmp, integer_zero_node);
       cond = g95_build_function_call (built_in_decls[BUILT_IN_EXPECT], tmp);
-      cond = g95_simple_fold (cond, phead, ptail, NULL);
 
-      stmt = build_stmt (IF_STMT, cond, stmt, NULL_TREE);
-      g95_add_stmt_to_list (phead, ptail, stmt, stmt);
+      tmp = build_v (COND_EXPR, cond, body, empty_stmt_node);
+      g95_add_expr_to_block (pblock, tmp);
     }
 }
 
-/* Chain two stmt chains. PHEAD is the head of the current stmt chain
-   (or 0 if HEAD is the new phead), HEAD is the chain you want to link
-   to it. PTAIL is the new tail of the current stmt chain. It's set to
-   TAIL, or to the tail of the HEAD chain if you pass 0 for TAIL.  */
+/* Add a statement to a bock.  */
 void
-g95_add_stmt_to_list (tree * phead, tree * ptail, tree head, tree tail)
+g95_add_expr_to_block (stmtblock_t * block, tree expr)
 {
+  assert (block);
 
-  /* Make sure we have something to link to.  */
-  assert (phead && ptail);
-
-  if (head == NULL_TREE)
-  {
-    assert (tail == NULL_TREE);
-    /* Don't add non-existing code to the tree. */
+  if (expr == empty_stmt_node || ! expr)
     return;
-  }
 
-  /* Chain the statement to the list or set if empty.  */
-  if (*phead == NULL_TREE)
-    *phead = head;
+  if (block->head)
+    block->head = build (COMPOUND_EXPR, void_type_node, block->head, expr);
   else
-    TREE_CHAIN (*ptail) = head;
+    block->head = expr;
+}
 
-  /* Find the tail of the passed tree if the caller was lazy.  */
-  if (tail == NULL_TREE)
-    {
-      tail = head;
-      while (TREE_CHAIN (tail) != NULL_TREE)
-        tail = TREE_CHAIN (tail);
-    }
+/* Add a block the end of a block.  */
+void
+g95_add_block_to_block (stmtblock_t * block, stmtblock_t * append)
+{
+  assert (append);
+  assert (! append->has_scope);
 
-  /* Check this is actualy the tail of the tree.  */
-  assert (TREE_CHAIN(tail) == NULL_TREE);
-
-  /* Set the new tail.  */
-  *ptail = tail;
-
+  g95_add_expr_to_block (block, append->head);
+  append->head = NULL_TREE;
 }
 
 /* Get the current locus.  The structure may not be complete, and should only
@@ -429,22 +351,17 @@ g95_set_backend_locus (locus * loc)
   input_filename = loc->file->filename;
 }
 
-/* Translate an executable statement.
-   Returns NULL_TREE if there is no code to translate.  */
+/* Translate an executable statement.  */
 tree
 g95_trans_code (g95_code * code)
 {
-  tree  head;
-  tree  tail;
+  stmtblock_t block;
   tree  res;
 
   if (! code)
     return (NULL_TREE);
 
-  g95_start_stmt ();
-
-  head = NULL_TREE;
-  tail = NULL_TREE;
+  g95_start_block (&block);
 
   /* Translate statements one by one to SIMPLE trees until we reach
      the end of this g95_code branch.  */
@@ -453,8 +370,9 @@ g95_trans_code (g95_code * code)
       g95_set_backend_locus (&code->loc);
       if (code->here != 0)
         {
-          res=g95_trans_label_here (code);
-          g95_add_stmt_to_list (&head, &tail, res, NULL_TREE);
+          res = g95_trans_label_here (code);
+          wrap_all_with_wfl (&res, input_filename, lineno);
+          g95_add_expr_to_block (&block, res);
         }
 
 
@@ -575,42 +493,19 @@ g95_trans_code (g95_code * code)
           break;
 
         default:
-          fatal_error ("g95_trans_code(): Bad statement code");
+          internal_error ("g95_trans_code(): Bad statement code");
         }
 
-      /* If we've just successfully translated a statement, chain the
-         generated stmt chain to the current stmt chain.  */
-      if (res)
+      if (res && res != empty_stmt_node)
         {
-          if (head)
-            TREE_CHAIN (tail) = res;
-          else
-            head = res;
-          tail = res;
-
-          /* Find the tail of the new chain.  */
-          while (TREE_CHAIN (tail))
-            tail = TREE_CHAIN (tail);
+          wrap_all_with_wfl (&res, input_filename, lineno);
+          /* Add the new statemment to the block.  */
+          g95_add_expr_to_block (&block, res);
         }
     }
 
-  /* Abort empty chains.  */
-  if (! head)
-    {
-      g95_merge_stmt();
-      return NULL_TREE;
-    }
-
-  /* We now have translated the full g95_code chain passed to us.  If
-     the resulting stmt tree is not a single tree but a chain, put it
-     in its own scope.  */
-  assert (TREE_CHAIN (tail) == NULL_TREE);
-  if (head == tail && TREE_CODE (head) == COMPOUND_STMT)
-    g95_merge_stmt ();
-  else
-    head = g95_finish_stmt (head, tail);
-
-  return head;
+  /* Return the finished block.  */
+  return g95_finish_block (&block);
 }
 
 /* This function is called after a complete program unit has been parsed
@@ -626,7 +521,7 @@ g95_generate_code (g95_namespace * ns)
     {
       /* Lots of things get upset if a subroutine doesn't have a symbol, so we
           make one now.  Hopefully we've set all the required fields.  */
-      g95_get_symbol ("__fortran_main", ns, &main_program);
+      g95_get_symbol ("MAIN__", ns, &main_program);
       g95_clear_attr(&attr);
       attr.flavor = FL_PROCEDURE;
       attr.proc = PROC_UNKNOWN;

@@ -64,13 +64,13 @@ F95_OBJS = $(F95_PARSER_OBJS) \
     f95/f95-lang.o f95/support.o f95/convert.o f95/trans.o \
     f95/trans-decl.o f95/trans-types.o f95/trans-const.o f95/trans-expr.o \
     f95/trans-stmt.o f95/trans-io.o f95/trans-array.o f95/trans-intrinsic.o \
-    f95/f95-tree.o
+    f95/f95-tree.o f95/dependency.o
 
 F95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o c-dump.o \
 	tree-cfg.o tree-dfa.o tree-optimize.o tree-simple.o \
 	tree-ssa.o tree-ssa-pre.o tree-ssa-ccp.o tree-ssa-dce.o \
 	disjoint-set.o tree-alias-common.o tree-alias-ecr.o \
-	tree-alias-type.o tree-alias-steen.o tree-dchain.o
+	tree-alias-type.o tree-alias-steen.o tree-dchain.o gimplify.o
 
 # G95 uses GMP for its internal arithmetics.
 F95_LIBS = $(LIBS) -lgmp
@@ -213,7 +213,7 @@ check-f95-fix: force
 # Dependencies for source files.
 
 # Everything depends on g95.h
-$(G95_PARSER_OBJS): f95/g95.h f95/intrinsic.h
+$(F95_PARSER_OBJS): f95/g95.h f95/intrinsic.h
 
 G95_TRANS_DEPS = f95/g95.h f95/intrinsic.h f95/trans-array.h \
     f95/trans-const.h f95/trans-const.h f95/trans.h f95/trans-stmt.h \
@@ -233,4 +233,4 @@ f95/trans-stmt.o: $(G95_TRANS_DEPS)
 f95/trans-io.o: $(G95_TRANS_DEPS) gt-f95-trans-io.h
 f95/trans-array.o: $(G95_TRANS_DEPS)
 f95/trans-intrinsic.o: $(G95_TRANS_DEPS) gt-f95-trans-intrinsic.h
-
+f95/dependency.o: f95/g95.h f95/dependency.h

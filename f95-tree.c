@@ -21,6 +21,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* f95-tree.c-- Various functions that should be language indepedant, but
    aren't.  */
+/* TODO: remove this file.  */
 
 #include "config.h"
 #include "system.h"
@@ -28,40 +29,120 @@ Boston, MA 02111-1307, USA.  */
 #include "tree-simple.h"
 #include "tree-inline.h"
 #include "c-common.h"
+#include "hard-reg-set.h"
+#include "basic-block.h"
+#include "tree-flow.h"
 #define BACKEND_CODE
 #include "g95.h"
 #include "trans.h"
 
-/*  Given a tree, try to return a useful variable name that we can use
-    to prefix a temporary that is being assigned the value of the tree.
-    I.E. given  <temp> = &A, return A.  */
+/* Callback for walk_tree.  Mark *TP and its sub-trees as not simplified.  */
 
-const char *
-get_name (t)
-     tree t;
+static tree
+mark_not_simple_r (tree *tp, int *walk_subtrees, void *data ATTRIBUTE_UNUSED)
 {
-  tree stripped_decl;
+  const enum tree_code code = TREE_CODE (*tp);
+  const char class = TREE_CODE_CLASS (code);
 
-  stripped_decl = t;
-  STRIP_NOPS (stripped_decl);
-  if (DECL_P (stripped_decl) && DECL_NAME (stripped_decl))
-    return IDENTIFIER_POINTER (DECL_NAME (stripped_decl));
+  /* Don't mark constants, identifier nodes, declarations nor types.  */
+  if (class == 'c' || class == 'd' || class == 't' || code == IDENTIFIER_NODE)
+    *walk_subtrees = 0;
+  else
+    set_tree_flag (*tp, TF_NOT_SIMPLE);
+
+  return NULL_TREE;
+}
+
+void
+mark_not_simple (tree *expr_p)
+{
+  walk_tree (expr_p, mark_not_simple_r, NULL, NULL);
+}
+/* Similar to copy_tree_r() but do not copy SAVE_EXPR nodes.  These nodes
+   model computations that should only be done once.  If we were to unshare
+   something like SAVE_EXPR(i++), the simplification process would create
+   wrong code.
+
+   Additionally, copy any flags that were set in the original tree.  */
+
+static tree
+mostly_copy_tree_r (tree *tp, int *walk_subtrees, void *data)
+{
+  enum tree_code code = TREE_CODE (*tp);
+  /* Don't unshare decls, blocks, types and SAVE_EXPR nodes.  */
+  if (TREE_CODE_CLASS (code) == 't'
+      || TREE_CODE_CLASS (code) == 'd'
+      || TREE_CODE_CLASS (code) == 'c'
+      || TREE_CODE_CLASS (code) == 'b'
+      || code == SAVE_EXPR
+      || *tp == empty_stmt_node)
+    *walk_subtrees = 0;
+  else if (code == STMT_EXPR || code == SCOPE_STMT || code == BIND_EXPR)
+    /* Unsharing STMT_EXPRs doesn't make much sense; they tend to be
+       complex, so they shouldn't be shared in the first place.  Unsharing
+       SCOPE_STMTs breaks because copy_tree_r zeroes out the block.  */
+    abort ();
   else
     {
-      switch (TREE_CODE (stripped_decl))
-	{
-	case ADDR_EXPR:
-	  return get_name (TREE_OPERAND (stripped_decl, 0));
-	  break;
-	default:
-	  return NULL;
-	}
+      enum tree_flags flags = tree_flags (*tp);
+      copy_tree_r (tp, walk_subtrees, data);
+      if (flags)
+	set_tree_flag (*tp, flags);
     }
+
+  return NULL_TREE;
+}
+
+/* Callback for walk_tree to unshare most of the shared trees rooted at
+   *TP.  If *TP has been visited already (i.e., TREE_VISITED (*TP) == 1),
+   then *TP is deep copied by calling copy_tree_r.
+
+   This unshares the same trees as copy_tree_r with the exception of
+   SAVE_EXPR nodes.  These nodes model computations that should only be
+   done once.  If we were to unshare something like SAVE_EXPR(i++), the
+   simplification process would create wrong code.  */
+
+static tree
+copy_if_shared_r (tree *tp, int *walk_subtrees, void *data ATTRIBUTE_UNUSED)
+{
+  /* If this node has been visited already, unshare it and don't look
+     any deeper.  */
+  if (TREE_VISITED (*tp))
+    {
+      walk_tree (tp, mostly_copy_tree_r, NULL, NULL);
+      *walk_subtrees = 0;
+    }
+  else
+    /* Otherwise, mark the tree as visited and keep looking.  */
+    TREE_VISITED (*tp) = 1;
+
+  return NULL_TREE;
+}
+
+static tree
+unmark_visited_r (tree *tp, int *walk_subtrees ATTRIBUTE_UNUSED,
+                  void *data ATTRIBUTE_UNUSED)
+{
+  if (TREE_VISITED (*tp))
+    TREE_VISITED (*tp) = 0;
+  else
+    *walk_subtrees = 0;
+
+  return NULL_TREE;
 }
 
 
-/*  Replaces T; by a COMPOUND_STMT containing {T;}.  */
+/* Unshare T and all the trees reached from T via TREE_CHAIN.  */
 
+void
+unshare_all_trees (t)
+     tree t;
+{
+  walk_tree (&t, copy_if_shared_r, NULL, NULL);
+  walk_tree (&t, unmark_visited_r, NULL, NULL);
+}
+
+/*  Replaces T; by a COMPOUND_STMT containing {T;}.  */
 void
 tree_build_scope (t)
      tree *t;
@@ -269,79 +350,5 @@ make_type_writable (tree t)
 	  }
 	}
     }
-}
-
-/* Strip off a legitimate source ending from the input string NAME of
-   length LEN.  Rather than having to know the names used by all of
-   our front ends, we strip off an ending of a period followed by
-   up to five characters.  (Java uses ".class".)  */
-
-static inline void
-remove_suffix (char * name, int len)
-{
-  int i;
-
-  for (i = 2;  i < 8 && len > i;  i++)
-    {
-      if (name[len - i] == '.')
-	{
-	  name[len - i] = '\0';
-	  break;
-	}
-    }
-}
-
-/** Create a new temporary variable declaration of type TYPE.  Returns the
-    newly created decl and pushes it into the current binding.  */
-tree
-create_tmp_var (tree type, const char * prefix)
-{
-  tree tmp_var;
-
-  /* Get a temporary.  */
-  tmp_var = create_tmp_alias_var (type, prefix);
-
-  /* Add it to the current scope.  */
-  pushdecl (tmp_var);
-
-  return tmp_var;
-}
-
-/*  Create a new temporary alias variable declaration of type TYPE.  Returns the
-    newly created decl. Does NOT push it into the current binding.  */
-tree
-create_tmp_alias_var (tree type, const char * prefix)
-{
-  static unsigned int id_num = 1;
-  char *tmp_name;
-  char *preftmp = NULL;
-  tree tmp_var;
-
-  if (prefix)
-    {
-      preftmp = ASTRDUP (prefix);
-      remove_suffix (preftmp, strlen (preftmp));
-      prefix = preftmp;
-    }
-
-  ASM_FORMAT_PRIVATE_NAME (tmp_name, (prefix ? prefix : "T"), id_num++);
-
-  tmp_var = build_decl (VAR_DECL, get_identifier (tmp_name), type);
-
-  /* The variable was declared by the compiler.  */
-  DECL_ARTIFICIAL (tmp_var) = 1;
-
-  /* Make the variable writable.  */
-  TREE_READONLY (tmp_var) = 0;
-
-  /* Make the type of the variable writable.  */
-  make_type_writable (tmp_var);
-
-  DECL_EXTERNAL (tmp_var) = 0;
-  TREE_STATIC (tmp_var) = 0;
-  TREE_USED (tmp_var) = 1;
-
-
-  return tmp_var;
 }
 

@@ -114,12 +114,14 @@ void insert_block (tree);
 void set_block (tree);
 tree g95_truthvalue_conversion (tree);
 static void g95_be_parse_file (void *);
+static int g95_expand_decl (tree t);
 
 #undef LANG_HOOKS_NAME
 #undef LANG_HOOKS_INIT
 #undef LANG_HOOKS_FINISH
 #undef LANG_HOOKS_INIT_OPTIONS
 #undef LANG_HOOKS_DECODE_OPTION
+#undef LANG_HOOKS_EXPAND_DECL
 #undef LANG_HOOKS_TREE_DUMP_DUMP_TREE_FN
 #undef LANG_HOOKS_PRINT_IDENTIFIER
 #undef LANG_HOOKS_PARSE_FILE
@@ -131,12 +133,14 @@ static void g95_be_parse_file (void *);
 #undef LANG_HOOKS_SIGNED_TYPE
 #undef LANG_HOOKS_SIGNED_OR_UNSIGNED_TYPE
 
+
 /* Define lang hooks.  */
 #define LANG_HOOKS_NAME                 "GNU F95"
 #define LANG_HOOKS_INIT                 g95_init
 #define LANG_HOOKS_FINISH               g95_finish
 #define LANG_HOOKS_INIT_OPTIONS         g95_init_options
 #define LANG_HOOKS_DECODE_OPTION        g95_parse_arg
+#define LANG_HOOKS_EXPAND_DECL          g95_expand_decl
 #define LANG_HOOKS_TREE_DUMP_DUMP_TREE_FN c_dump_tree
 #define LANG_HOOKS_PRINT_IDENTIFIER     g95_print_identifier
 #define LANG_HOOKS_PARSE_FILE           g95_be_parse_file
@@ -210,140 +214,6 @@ static struct stmt_tree_s g95_stmt_tree;
 
 static GTY (()) tree g95_scope_stmt_stack;
 
-/* Check that a stmt is SIMPLE. Used to be part of tree-simple.c but then
-   disappeared.  We generate SIMPLE trees anyway, these are just used to
-   double-check.  */
-int
-is_simple_decl_stmt (tree stmt)
-{
-  tree decl = DECL_STMT_DECL (stmt);
-  tree init = DECL_INITIAL (decl);
-
-  if (!is_simple_val (DECL_SIZE_UNIT (decl)))
-    return 0;
-
-  /* Plain decls are simple.  */
-  if (init == NULL_TREE || init == error_mark_node)
-    return 1;
-
-  /* Don't mess with a compile-time initializer.  */
-  if (TREE_STATIC (decl))
-    return 1;
-
-  return 0;
-}
-
-static int is_simple_stmt (tree t);
-
-static int
-is_simple_compstmt (tree t)
-{
-  if (t == NULL_TREE)
-    return 1;
-
-  /* Look for '{'.  */
-  if (TREE_CODE (t) != SCOPE_STMT
-      || !SCOPE_BEGIN_P (t))
-    return 0;
-
-  /* Test all the statements in the body.  */
-  for (t = TREE_CHAIN (t);
-       t && !(TREE_CODE (t) == SCOPE_STMT && SCOPE_END_P (t));
-       t = TREE_CHAIN (t))
-    if (!is_simple_stmt (t))
-      return 0;
-
-  /* Look for '}'.  */
-  if (t
-      && (TREE_CODE (t) != SCOPE_STMT
-	  || !SCOPE_END_P (t)))
-    return 0;
-
-  return 1;
-}
-
-
-static int
-is_simple_stmt (tree t)
-{
-  if (t == NULL_TREE)
-    return 1;
-
-  switch (TREE_CODE (t))
-    {
-    case COMPOUND_STMT:
-      return is_simple_compstmt (COMPOUND_BODY (t));
-
-    case SCOPE_STMT:
-      return is_simple_compstmt (t);
-
-    case EXPR_STMT:
-      return is_simple_expr (EXPR_STMT_EXPR (t));
-
-    case IF_STMT:
-      return (is_simple_condexpr (IF_COND (t))
-	      && is_simple_stmt (THEN_CLAUSE (t))
-	      && is_simple_stmt (ELSE_CLAUSE (t)));
-
-    case WHILE_STMT:
-      return (is_simple_condexpr (WHILE_COND (t))
-	      && is_simple_stmt (WHILE_BODY (t)));
-
-    case DO_STMT:
-      return (is_simple_condexpr (DO_COND (t))
-	      && is_simple_stmt (DO_BODY (t)));
-
-    case FOR_STMT:
-      {
-	int s1, s2, s3, s4;
-
-	if (TREE_CODE (FOR_INIT_STMT (t)) == DECL_STMT)
-	  s1 = 0;
-	else
-	  s1 = is_simple_exprseq (EXPR_STMT_EXPR (FOR_INIT_STMT (t)));
-
-	s2 = is_simple_condexpr (FOR_COND (t));
-	s3 = is_simple_exprseq (FOR_EXPR (t));
-	s4 = is_simple_stmt (FOR_BODY (t));
-
-	return (s1 && s2 && s3 && s4);
-      }
-
-    /* Note that we can assume that we don't need to special case the body
-       of the switch() statement.  If we got to this stage, we can assume
-       that the switch() is properly formed (i.e., it will be a compound
-       statement containing all the case labels).  */
-    case SWITCH_STMT:
-      return (is_simple_val (SWITCH_COND (t))
-	      && is_simple_stmt (SWITCH_BODY (t)));
-
-    case FILE_STMT:
-    case LABEL_STMT:
-    case GOTO_STMT:
-    case ASM_STMT:
-    case CASE_LABEL:
-    case CONTINUE_STMT:
-    case BREAK_STMT:
-      return 1;
-
-    case RETURN_STMT:
-      {
-	tree type = TREE_TYPE (TREE_TYPE (current_function_decl));
-	if (TREE_CODE (type) != VOID_TYPE
-	    && RETURN_STMT_EXPR (t))
-	  return is_simple_rhs (TREE_OPERAND (RETURN_STMT_EXPR (t), 1));
-	else
-	  return 1;
-      }
-
-    case DECL_STMT:
-      return is_simple_decl_stmt (t);
-
-    default:
-      return 0;
-    }
-}
-
 void
 expand_function_body (tree fndecl, int nested)
 {
@@ -369,23 +239,16 @@ expand_function_body (tree fndecl, int nested)
   immediate_size_expand = 0;
   cfun->x_dont_save_pending_sizes_p = 1;
 
-  /* The code _should_ already be in SIMPLE form.  If not then something has
-     gone wrong.*/
-  if (is_simple_stmt (DECL_SAVED_TREE (fndecl)))
-    {
-      /* Invoke the SSA tree optimizer */
-      if (optimize >= 1)
-        optimize_function_tree (fndecl);
-      if (! is_simple_stmt (DECL_SAVED_TREE (fndecl)))
-        warning ("Function tree not simple after optimization");
-    }
-  else
-    warning ("Internal failure: Function is not SIMPLE. Optimization inhibited. This is probably an indication of other problems.");
-
+/* Disable this until we've converted everything to the new form.  */
+#if 0
+  /* Invoke the SSA tree optimizer */
+  if (optimize >= 1)
+    optimize_function_tree (fndecl);
+#endif
   /* create RTL for startup code of function, such as saving registers */
   expand_function_start (fndecl, 0);
 
-  expand_stmt (DECL_SAVED_TREE (fndecl));
+  expand_expr_stmt_value (DECL_SAVED_TREE (fndecl), 0, 0);
 
   immediate_size_expand = 1;
 
@@ -492,19 +355,19 @@ g95_be_parse_file (void *set_yydebug ATTRIBUTE_UNUSED)
 
 /* Routines Expected by GCC:  */
 
-static void
-f95_expand_decl_stmt (tree t)
+/* Expand a decl.  */
+static int
+g95_expand_decl (tree t)
 {
-  tree decl;
+  /* Expand nested functions.  */
+  if (TREE_CODE (t) == FUNCTION_DECL
+      && DECL_CONTEXT (t) == current_function_decl
+      && DECL_SAVED_TREE (t))
+    expand_function_body (t, 1);
+  else
+    return 0;
 
-  decl = DECL_STMT_DECL (t);
-
-  /* Expand nexted functions.  */
-  if (TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_CONTEXT (decl) == current_function_decl
-      && DECL_SAVED_TREE (decl))
-    expand_function_body (decl, 1);
-
+  return 1;
 }
 
 const char *
@@ -515,8 +378,6 @@ g95_init (const char *filename)
     {
       filename = "";
     }
-
-  lang_expand_decl_stmt = f95_expand_decl_stmt;
 
   g95_option.source = (char *) filename;
   g95_init_1 ();

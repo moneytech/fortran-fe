@@ -43,6 +43,7 @@ Boston, MA 02111-1307, USA.  */
 #include "intl.h"
 #include "target.h"
 #include "ggc.h"
+#include "toplev.h"
 #define BACKEND_CODE
 #include "g95.h"
 #include "trans.h"
@@ -81,7 +82,6 @@ tree decl_constant_value PARAMS((tree));
 static void warn_for_assignment PARAMS((const char *, const char *, tree, int));
 int lvalue_or_else PARAMS((tree, const char *));
 int lvalue_p PARAMS((tree));
-static tree tree_last_decl PARAMS((tree));
 
 /*dunno if/when this should be set*/
 static int skip_evaluation = 0;
@@ -213,60 +213,6 @@ convert_and_check (type, expr)
   return t;
 }
 
-/** Declares all the variables in VARS in SCOPE.  Returns the last
-    DECL_STMT emitted.  */
-
-tree
-declare_tmp_vars (vars, scope)
-     tree vars;
-     tree scope;
-{
-  tree t, last;
-
-  /* Find the last declaration statement in the scope.  Add all the new
-     declarations after it.  */
-  last = tree_last_decl (scope);
-
-  for (t = vars; t; t = TREE_CHAIN (t))
-    {
-      tree decl, tmp;
-
-      decl = build_stmt (DECL_STMT, t);
-      STMT_LINENO (decl) = STMT_LINENO (scope);
-
-      tmp = TREE_CHAIN (last);
-      TREE_CHAIN (last) = decl;
-      TREE_CHAIN (decl) = tmp;
-
-      last = decl;
-    }
-
-  return last;
-}
-
-/** Returns the last DECL_STMT in the scope SCOPE.  */
-
-static tree
-tree_last_decl (scope)
-     tree scope;
-{
-  tree last;
-
-  /* Be sure that we get a scope.  Ignore FILE_STMT nodes.  */
-  while (TREE_CODE (scope) == FILE_STMT)
-    scope = TREE_CHAIN (scope);
-
-  if (!SCOPE_BEGIN_P (scope))
-    abort ();
-
-  /* Find the last declaration statement in the scope.  */
-  last = scope;
-  while (TREE_CHAIN (last) && TREE_CODE (TREE_CHAIN (last)) == DECL_STMT)
-    last = TREE_CHAIN (last);
-
-  return last;
-}
-
 /* Print a warning if a large constant is truncated to unsigned,
    or if -Wconversion is used and a constant < 0 is converted to unsigned.
    Invoke this function on every expression that might be implicitly
@@ -583,10 +529,11 @@ comp_target_types (ttl, ttr)
 
 void
 c_expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
-     tree string, outputs, inputs, clobbers;
-     int vol;
-     const char *filename;
-     int line;
+     tree string ATTRIBUTE_UNUSED, outputs ATTRIBUTE_UNUSED;
+     tree inputs ATTRIBUTE_UNUSED, clobbers ATTRIBUTE_UNUSED;
+     int vol ATTRIBUTE_UNUSED;
+     const char *filename ATTRIBUTE_UNUSED;
+     int line ATTRIBUTE_UNUSED;
 {
   internal_error("fortran shouldn't contain asm statements!");
 }

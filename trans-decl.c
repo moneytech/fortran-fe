@@ -534,7 +534,9 @@ g95_get_symbol_decl (g95_symbol * sym)
       break;
 
     case BT_DERIVED:
-      g95_defer_symbol_init (sym);
+      //g95_defer_symbol_init (sym);
+      if (sym->value)
+        g95_todo_error ("Derived type initializer");
       break;
 
     default:
@@ -545,7 +547,6 @@ g95_get_symbol_decl (g95_symbol * sym)
           assert (TREE_STATIC (decl));
           g95_init_se (&se, NULL);
           g95_conv_constant (&se, sym->value);
-          assert (se.pre == NULL_TREE && se.post == NULL_TREE);
           DECL_INITIAL (decl) = se.expr;
         }
       break;
@@ -1098,51 +1099,47 @@ g95_build_builtin_function_decls (void)
 
 /* Allocate and cleanup an automatic character variable.  */
 static tree
-g95_trans_auto_character_variable (g95_symbol * sym, tree body)
+g95_trans_auto_character_variable (g95_symbol * sym, tree fnbody)
 {
-  tree stmt;
   tree tmp;
   tree args;
   tree len;
-  tree head;
-  tree tail;
+  stmtblock_t block;
+  stmtblock_t body;
 
   assert (sym->ts.cl && sym->ts.cl->length);
   assert (sym->backend_decl != NULL_TREE);
 
-  g95_start_stmt ();
-  head = tail = NULL_TREE;
+  g95_start_block (&body);
+  g95_start_block (&block);
 
-  len = g95_conv_init_string_length (sym, &head, &tail);
+  len = g95_conv_init_string_length (sym, &block);
 
   TREE_ADDRESSABLE (sym->backend_decl) = 1;
   tmp = build1 (ADDR_EXPR, ppvoid_type_node, sym->backend_decl);
-  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
 
   args = g95_chainon_list (NULL_TREE, tmp);
   args = g95_chainon_list (args, len);
   tmp = g95_build_function_call (gfor_fndecl_internal_malloc, args);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+  g95_add_expr_to_block (&block, tmp);
 
-  stmt = g95_finish_stmt (head, tail);
-  body = chainon (stmt, body);
+  tmp = g95_finish_block (&block);
+  g95_add_expr_to_block (&body, tmp);
 
-  g95_start_stmt ();
+  g95_add_expr_to_block (&body, fnbody);
 
-  head = tail = NULL_TREE;
+  g95_start_block (&block);
+
   tmp = build1 (ADDR_EXPR, ppvoid_type_node, sym->backend_decl);
-  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
 
   args = tree_cons (NULL_TREE, tmp, NULL_TREE);
   tmp = g95_build_function_call (gfor_fndecl_internal_free, args);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+  g95_add_expr_to_block (&block, tmp);
 
-  stmt = g95_finish_stmt (head, tail);
-  body = chainon (body, stmt);
+  tmp = g95_finish_block (&block);
+  g95_add_expr_to_block (&body, tmp);
 
-  return body;
+  return g95_finish_block (&body);
 }
 
 /* Generate function entry and exit code, and add it to the function body.
@@ -1151,10 +1148,10 @@ g95_trans_auto_character_variable (g95_symbol * sym, tree body)
     Allocation of character string variables.
     Initialization and possibly repacking of dummy arrays.  */
 static tree
-g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
+g95_trans_deferred_vars (g95_symbol * proc_sym, tree fnbody)
 {
   tree tmp;
-  tree stmt;
+  stmtblock_t block;
   locus loc;
   g95_symbol * sym;
 
@@ -1165,10 +1162,10 @@ g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
       if (! current_fake_result_decl)
         {
           warning ("Function does not return a value");
-          return body;
+          return fnbody;
         }
-      body = g95_trans_dummy_array_bias (proc_sym, current_fake_result_decl,
-                                         body);
+      fnbody = g95_trans_dummy_array_bias (proc_sym, current_fake_result_decl,
+                                           fnbody);
     }
 
   for (sym = proc_sym->tlink; sym != proc_sym; sym = sym->tlink)
@@ -1181,18 +1178,26 @@ g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
             {
             case AS_EXPLICIT:
               if (sym->attr.dummy || sym->attr.result)
-                body =
-                  g95_trans_dummy_array_bias (sym, sym->backend_decl, body);
+                fnbody =
+                  g95_trans_dummy_array_bias (sym, sym->backend_decl, fnbody);
+              else if (sym->attr.pointer || sym->attr.allocatable)
+                {
+                  if (TREE_STATIC (sym->backend_decl))
+                    g95_trans_static_array_pointer (sym);
+                  else
+                    fnbody = g95_trans_deferred_array (sym, fnbody);
+                }
               else
                 {
                   g95_get_backend_locus (&loc);
                   g95_set_backend_locus (&sym->declared_at);
-                  stmt = g95_trans_auto_array_allocation (sym->backend_decl,
-                                                          sym);
+                  g95_init_block (&block);
+                  tmp = g95_trans_auto_array_allocation (sym->backend_decl,
+                      sym);
+                  g95_add_expr_to_block (&block, tmp);
+                  g95_add_expr_to_block (&block, fnbody);
+                  fnbody = g95_finish_block (&block);
                   g95_set_backend_locus (&loc);
-
-                  /* Add to the start of the function body.  */
-                  body = chainon (stmt, body);
                 }
               break;
 
@@ -1201,11 +1206,12 @@ g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
               /* These must be dummy parameters.  */
               assert (sym->attr.dummy);
 
-              body = g95_trans_dummy_array_bias (sym, sym->backend_decl, body);
+              fnbody = g95_trans_dummy_array_bias (sym, sym->backend_decl,
+                                                   fnbody);
               break;
 
             case AS_DEFERRED:
-              body = g95_trans_deferred_array (sym, body);
+              fnbody = g95_trans_deferred_array (sym, fnbody);
               break;
 
             default:
@@ -1216,28 +1222,24 @@ g95_trans_deferred_vars (g95_symbol * proc_sym, tree body)
         {
           g95_get_backend_locus (&loc);
           g95_set_backend_locus (&sym->declared_at);
-          body = g95_trans_auto_character_variable (sym, body);
+          fnbody = g95_trans_auto_character_variable (sym, fnbody);
           g95_set_backend_locus (&loc);
         }
       else
         abort ();
     }
 
+  g95_init_block (&block);
   /* Build a call to _gfor_push_context ().  */
   tmp = g95_build_function_call (gfor_fndecl_push_context, NULL_TREE);
-  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_expr_to_block (&block, tmp);
 
-  /* Add to start of function body.  */
-  body = chainon (stmt, body);
-
+  g95_add_expr_to_block (&block, fnbody);
   /* Build a call to _gfor_pop_context ().  */
   tmp = g95_build_function_call (gfor_fndecl_pop_context, NULL_TREE);
-  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_expr_to_block (&block, tmp);
 
-  /* Add to end of function body.  */
-  body = chainon (body, stmt);
-
-  return body;
+  return g95_finish_block (&block);
 }
 
 static void
@@ -1274,11 +1276,15 @@ g95_create_module_variable (g95_symbol * sym)
     {
       assert (sym->attr.pointer || sym->attr.allocatable
               || G95_ARRAY_TYPE_P (TREE_TYPE (sym->backend_decl)));
-      g95_trans_auto_array_allocation (sym->backend_decl, sym);
+      if (sym->attr.pointer || sym->attr.allocatable)
+        g95_trans_static_array_pointer (sym);
+      else
+        g95_trans_auto_array_allocation (sym->backend_decl, sym);
     }
   else if (sym->ts.type == BT_DERIVED)
     {
-      g95_todo_error ("Derived type module variables");
+      if (sym->value)
+        g95_todo_error ("Initialization of derived type module variables");
     }
   else
     {
@@ -1286,7 +1292,6 @@ g95_create_module_variable (g95_symbol * sym)
         {
           g95_init_se (&se, NULL);
           g95_conv_constant (&se, sym->value);
-          assert (se.pre == NULL_TREE && se.post == NULL_TREE);
           DECL_INITIAL (decl) = se.expr;
         }
     }
@@ -1310,8 +1315,6 @@ g95_create_module_variable (g95_symbol * sym)
 void
 g95_generate_module_vars (g95_namespace * ns)
 {
-  g95_symbol *sym;
-
   module_namespace = ns;
 
   /* Check the frontend left the namespace in a reasonable state.  */
@@ -1319,16 +1322,6 @@ g95_generate_module_vars (g95_namespace * ns)
 
   /* Create decls for all the module varuiables.  */
   g95_traverse_ns (ns, g95_create_module_variable);
-
-  /* Generate initialization code.  */
-  for (sym = ns->proc_name->tlink; sym; sym = sym->tlink)
-    {
-      if (sym->attr.dimension)
-        {
-        }
-      else
-        g95_todo_error ("deferred initialization of module variable");
-    }
 }
 
 static void
@@ -1363,7 +1356,9 @@ g95_generate_function_code (g95_namespace * ns)
   tree fndecl;
   tree old_context;
   tree decl;
-  tree body;
+  tree tmp;
+  stmtblock_t block;
+  stmtblock_t body;
   tree result;
   g95_symbol *sym;
 
@@ -1422,7 +1417,7 @@ g95_generate_function_code (g95_namespace * ns)
   /* function.c requires a push at the start of the function */
   pushlevel (0);
 
-  g95_start_stmt ();
+  g95_start_block (&block);
 
   g95_generate_contained_functions (ns);
 
@@ -1432,18 +1427,23 @@ g95_generate_function_code (g95_namespace * ns)
 
   current_function_return_label = NULL;
 
-  /* Now generate SIMPLE code for this function.  */
-  body = g95_trans_code (ns->code);
+  /* Now generate the code for the body of this function.  */
+  g95_init_block (&body);
+
+  tmp = g95_trans_code (ns->code);
+  g95_add_expr_to_block (&body, tmp);
 
   /* Add a return label if needed.  */
   if (current_function_return_label)
     {
-      body = chainon (body,
-                      build_stmt (LABEL_STMT, current_function_return_label));
+      tmp = build_v (LABEL_EXPR, current_function_return_label);
+      g95_add_expr_to_block (&body, tmp);
     }
 
+  tmp = g95_finish_block (&body);
   /* Add code to create and cleanup arrays.  */
-  body = g95_trans_deferred_vars (sym, body);
+  tmp = g95_trans_deferred_vars (sym, tmp);
+  g95_add_expr_to_block (&block, tmp);
 
   if (TREE_TYPE (DECL_RESULT (fndecl)) != void_type_node)
     {
@@ -1460,9 +1460,10 @@ g95_generate_function_code (g95_namespace * ns)
       else
         {
           /* Set the return value to the the dummy result variable.  */
-          result = build (MODIFY_EXPR, TREE_TYPE (result),
+          tmp = build (MODIFY_EXPR, TREE_TYPE (result),
                           DECL_RESULT (fndecl), result);
-          body = chainon (body, build_stmt (RETURN_STMT, result));
+          tmp = build_v (RETURN_EXPR, tmp);
+          g95_add_expr_to_block (&block, tmp);
         }
     }
 
@@ -1485,7 +1486,7 @@ g95_generate_function_code (g95_namespace * ns)
     }
   saved_function_decls = NULL_TREE;
 
-  DECL_SAVED_TREE (fndecl) = g95_finish_stmt (body, NULL_TREE);
+  DECL_SAVED_TREE (fndecl) = g95_finish_block (&block);
 
   /* Finish off this function and send it for code generation.  */
   poplevel (1, 0, 1);
@@ -1498,8 +1499,6 @@ g95_generate_function_code (g95_namespace * ns)
     tree fnbody;
 
     fnbody = DECL_SAVED_TREE (fndecl);
-    if (fnbody != NULL_TREE)
-      fnbody = COMPOUND_BODY (fnbody);
 
     dump_file = dump_begin (TDI_simple, &dump_flags);
     if (dump_file)
@@ -1545,6 +1544,8 @@ g95_generate_constructors ()
   if (g95_static_ctors == NULL_TREE)
     return;
 
+  abort ();
+#if 0
   fnname = get_file_function_name ('I');
   type = build_function_type (void_type_node,
                              g95_chainon_list (NULL_TREE, void_type_node));
@@ -1588,6 +1589,7 @@ g95_generate_constructors ()
   expand_function_body (fndecl, 0);
 
   current_function_decl = NULL_TREE;
+#endif
 }
 
 #include "gt-f95-trans-decl.h"

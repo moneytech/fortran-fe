@@ -52,12 +52,8 @@ Boston, MA 02111-1307, USA.  */
 #define MATH_LIBRARY "-lm"
 #endif
 
-#if 0
-/* The g95 startup code is currently part of libgfor.  This should change
-   soon.  */
 #ifndef FORTRAN_INIT
-#define FORTRAN_INIT "-lfrtbegin"
-#endif
+#define FORTRAN_INIT "-lgforbegin"
 #endif
 
 #ifndef FORTRAN_LIBRARY
@@ -285,11 +281,9 @@ lang_specific_driver (in_argc, in_argv, in_added_libraries)
      2 => last two args were -l<library> -lm.  */
   int saw_library = 0;
 
-#ifdef FORTRAN_INIT
   /* 0 => initial/reset state
      1 => FORTRAN_INIT linked in */
   int use_init = 0;
-#endif
 
   /* By default, we throw on the math library if we have one.  */
   int need_math = (MATH_LIBRARY[0] != '\0');
@@ -477,7 +471,6 @@ For more information about these matters, see the file named COPYING\n\
 	    {
 	      if (saw_library == 1)
 		saw_library = 2;	/* -l<library> -lm. */
-#ifdef FORTRAN_INIT
 	      else
 		{
 		  if (0 == use_init)
@@ -487,7 +480,6 @@ For more information about these matters, see the file named COPYING\n\
 		    }
 		  append_arg (FORTRAN_LIBRARY);
 		}
-#endif
 	    }
 	  else if (strcmp (argv[i], FORTRAN_LIBRARY) == 0)
 	    saw_library = 1;	/* -l<library>. */
@@ -511,13 +503,11 @@ For more information about these matters, see the file named COPYING\n\
       switch (saw_library)
 	{
 	case 0:
-#ifdef FORTRAN_INIT
 	  if (0 == use_init)
 	    {
 	      append_arg (FORTRAN_INIT);
 	      use_init = 1;
 	    }
-#endif
 	  append_arg (library);
 	case 1:
 	 if (need_math)

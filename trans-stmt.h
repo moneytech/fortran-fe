@@ -20,11 +20,7 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 /* Statement translators (g95_trans_*) return a fully translated tree.
-   Usually it will be a COMPOUND_STMT node because most statements need a
-   new scope, hence a new compound.  */
-
-/* Returns NULL if code==NULL, otherwise a single COMPOND_STMT
-Calls g95_trans_*.  */
+   Calls g95_trans_*.  */
 tree g95_trans_code (g95_code *);
 
 /* All other g95_trans_* should only need be called by g95_trans_code */
@@ -64,3 +60,5 @@ tree g95_trans_inquire (g95_code *);
 tree g95_trans_rewind (g95_code *);
 
 tree g95_trans_io_call (g95_code *);
+tree g95_trans_iostate_call (g95_code *);
+
