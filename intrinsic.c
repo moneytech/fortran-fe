@@ -1944,7 +1944,7 @@ intrinsic_sym *g;
 
   g->generic = 1;
   g->specific = 1;
-  g->specific_head = g + 1;
+  if ((g+1)->name[0] != '\0') g->specific_head = g + 1;
   g++;
   
   while(g->name[0] != '\0') {
