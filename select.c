@@ -189,6 +189,8 @@ match m;
   new_st.op = EXEC_SELECT;
   new_st.ext = head;
 
+  if (head == (g95_case *) 1) abort();
+
   return MATCH_YES;
 
 syntax:
