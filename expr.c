@@ -1428,6 +1428,9 @@ int *type_flag;
     t = g95_check_constructor(e, check_init_expr);
     if (t == FAILURE) break;
 
+    t = g95_expand_constructor(e);
+    if (t == FAILURE) break;
+
     t = g95_check_constructor_type(e);
     break;
   }
