@@ -2796,33 +2796,27 @@ int n, d;
 
 
 g95_expr *g95_simplify_sign(g95_expr *x, g95_expr *y) {
-g95_expr *absv, *result;
-mpz_t sgnz;
-mpf_t sgnf;
-int sgn;
+g95_expr *result;
 
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
     return NULL;
-
-  absv = g95_copy_expr(x);
 
   result = g95_constant_result(x->ts.type, x->ts.kind, &x->where);
 
   switch(x->ts.type) {
   case BT_INTEGER:
-    sgn = mpz_sgn(y->value.integer);
-    mpz_init_set_si(sgnz, sgn);
-    mpz_abs(absv->value.integer, x->value.integer);
-    mpz_mul(result->value.integer, absv->value.integer, sgnz);
-    mpz_clear(sgnz);
+    mpz_abs(result->value.integer, x->value.integer);
+    if (mpz_sgn(y->value.integer) < 0)
+      mpz_neg(result->value.integer, result->value.integer);
+
     break;
 
   case BT_REAL:
-    sgn = mpf_sgn(y->value.real);
-    mpf_abs(absv->value.real, x->value.real);
-    mpf_init_set_si(sgnf, sgn);
-    mpf_mul(result->value.real, absv->value.real, sgnf);
-    mpf_clear(sgnf);
+    /* TODO: Handle -0.0 and +0.0 correctly on machines that support it */
+    mpf_abs(result->value.real, x->value.real);
+    if (mpf_sgn(y->value.integer) < 0)
+      mpf_neg(result->value.real, result->value.real);
+
     break;
 
   default:
@@ -2831,7 +2825,6 @@ int sgn;
     return &g95_bad_expr;
   }
 
-  g95_free_expr(absv);
   return result;
 }
 
