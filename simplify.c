@@ -255,16 +255,14 @@ mpf_t negative, square, term;
   result->where = x->where;
 
   if (mpf_cmp_si(x->value.real, 1) == 0) {
-    mpf_set(result->value.real, mpf_hpi);
+    mpf_set_ui(result->value.real, 0);
     return range_check(result, "ACOS");
   }
 
   mpf_init(negative);
 
   if (mpf_cmp_si(x->value.real, -1) == 0) {
-    mpf_neg(negative, mpf_hpi);
-    mpf_set(result->value.real, negative);
-    mpf_clear(negative);
+    mpf_set(result->value.real, mpf_pi);
     return range_check(result, "ACOS");
   }
 
