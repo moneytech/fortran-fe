@@ -1860,6 +1860,7 @@ g95_symbol *p;
     p->old_symbol = NULL;   /* Add to the list of tentative symbols. */
     p->tlink = changed;
     p->mark = 1;
+    p->new = 1;
     changed = p;
 
     g95_new_symtree(ns, name)->sym = p;
@@ -1894,7 +1895,9 @@ g95_symbol *p;
 
     p->mark = 1;
 
-    if (p->old_symbol == NULL) { /* Copy in case this symbol is changed */
+    /* Copy in case this symbol is changed */
+
+    if (!p->new && p->old_symbol == NULL) {
       p->old_symbol = g95_getmem(sizeof(g95_symbol));
       *(p->old_symbol) = *p;
 
@@ -1937,7 +1940,7 @@ g95_symbol *p, *q, *old;
     q = p->tlink;
     /*    g95_status("Undoing %s\n", p->name); */
 
-    if (p->old_symbol == NULL) {  /* Symbol was new */
+    if (p->new) {  /* Symbol was new */
       delete_node(p->ns, p);
 
       p->refs--;
@@ -2005,6 +2008,7 @@ g95_symbol *p, *q;
     q = p->tlink;
     p->tlink = NULL;
     p->mark = 0;
+    p->new = 0;
 
     if (p->old_symbol != NULL) {
       g95_free(p->old_symbol);
