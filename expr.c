@@ -1172,20 +1172,12 @@ try t;
 }
 
 
-/* resolve_entry_arglists()-- Recursive function to see out ENTRY
+/* resolve_entry_arglists()-- Recursive function to seek out ENTRY
  * symbols and resolve their formal argument lists. */
 
-static try resolve_entry_arglists(g95_symtree *st) {
+static void resolve_entry_arglists(g95_symbol *sym) {
 
-  if (st == NULL) return SUCCESS;
-
-  if (resolve_entry_arglists(st->left) == FAILURE ||
-      resolve_entry_arglists(st->right) == FAILURE)
-    return FAILURE;
-
-  if (!st->sym->attr.entry) return SUCCESS;
-
-  return resolve_formal_arglist(st->sym->formal);
+  if (sym->attr.entry) resolve_formal_arglist(sym->formal);
 }
 
 
@@ -1202,11 +1194,11 @@ static try resolve_formal_arglists(g95_namespace *ns) {
       resolve_formal_arglist(ns->proc_name->formal) == FAILURE)
     return FAILURE;
 
-  /* Recursively resolve child and sibling namespaces */
+  g95_traverse_ns(ns, resolve_entry_arglists);
 
-  if (resolve_formal_arglists(ns->contained) == FAILURE) return FAILURE;
+  /* Recursively resolve child namespaces */
 
-  for(ns=ns->sibling; ns; ns=ns->sibling)
+  for(ns=ns->contained; ns; ns=ns->sibling)
     if (resolve_formal_arglists(ns) == FAILURE)
       return FAILURE;
 
