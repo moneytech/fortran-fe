@@ -917,8 +917,10 @@ match g95_match_actual_arglist(int sub_flag, g95_actual_arglist **argp,
 g95_label_list *label_head, *label_tail;
 g95_actual_arglist *arglist, *arg_tail;
 char name[G95_MAX_SYMBOL_LEN+1];
+locus old_loc, name_loc;
 int arg_number, label;
-locus old_loc;
+g95_symbol *sym;
+g95_expr *e;
 match m;
 
   *argp = NULL;
@@ -958,11 +960,61 @@ match m;
 
     arg_tail->arg_number = arg_number++;
 
-    m = g95_match(" %n = %e", name, &arg_tail->expr);
-    if (m == MATCH_YES) {
-      strcpy(arg_tail->name, name);
+    name_loc = *g95_current_locus();
+
+    m = g95_match_name(name);
+    if (m == MATCH_ERROR) goto cleanup;
+    if (m == MATCH_NO) {
+      g95_set_locus(&name_loc);
+      goto arg;
+    }
+
+    if (g95_match(" =") == MATCH_NO) {
+      g95_set_locus(&name_loc);
+      goto arg;
+    }
+
+    strcpy(arg_tail->name, name);
+
+/* Parse the argument expression.  A very special case here is that a
+ * procedure name can be used by itself. */
+
+  arg:
+    name_loc = *g95_current_locus();
+
+    m = g95_match_name(name);
+    switch(m) {
+    case MATCH_ERROR:
+      goto cleanup;
+
+    case MATCH_NO:
+      break;
+
+    case MATCH_YES:
+      g95_find_symbol(name, NULL, 1, &sym);
+
+      if (sym == NULL) break;
+
+      if (sym->attr.flavor != FL_PROCEDURE) break;
+
+/* If the name is a function name, we have to peek ahead yet again to
+ * see if the next character is a left parenthesis.  If so, the
+ * argument is a function call. */
+
+      if (sym->attr.function && g95_match(" (") == MATCH_YES) break;
+
+      e = g95_get_expr();
+      e->symbol = sym;
+      e->expr_type = EXPR_VARIABLE;
+      e->ts.type = BT_PROCEDURE;
+
+      arg_tail->expr = e;
       goto next;
     }
+
+    /* Parse the argument as a regular expression */
+
+    g95_set_locus(&name_loc);
 
     m = g95_match_expr(&arg_tail->expr);
     if (m == MATCH_NO) goto syntax;
@@ -1333,12 +1385,8 @@ match m;
 
   case FL_PROCEDURE:
     if (sym->attr.subroutine) {
-      e = g95_get_expr();
-      e->symbol = sym;
-
-      e->expr_type = EXPR_VARIABLE;
-      e->ts.type = BT_PROCEDURE;
-      m = MATCH_YES;
+      g95_error("Unexpected use of subroutine name '%s' at %C", sym->name);
+      m = MATCH_ERROR;
       break;
     }
 
@@ -1365,20 +1413,15 @@ match m;
   function0:
     m = g95_match_actual_arglist(0, &actual_arglist, NULL);
     if (m == MATCH_NO) {
-      if (sym->attr.flavor == FL_ST_FUNCTION) {
+      if (sym->attr.flavor == FL_ST_FUNCTION)
 	g95_error("Statement function '%s' requires argument list at %C",
 		  sym->name);
+      else
+	g95_error("Function '%s' requires an argument list at %C",
+		  sym->name);
 
-	m = MATCH_ERROR;
-	break;
-      } else {
-	e = g95_get_expr();
-	e->symbol = sym;
-	e->expr_type = EXPR_VARIABLE;
-	e->ts.type = BT_PROCEDURE;
-	m = MATCH_YES;
-	break;
-      }
+      m = MATCH_ERROR;
+      break;
     }
 
     if (m != MATCH_YES) {

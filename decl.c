@@ -1146,10 +1146,14 @@ match m;
     goto cleanup;
   }
 
-  if (g95_add_function(&sym->attr, NULL) == FAILURE ||
-      g95_missing_attr(&sym->attr, NULL) == FAILURE) goto cleanup;
+  if (result == NULL) {
+    if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) goto cleanup;
+  } else {
+    if (g95_add_function(&sym->attr, NULL) == FAILURE) goto cleanup;
+  }
 
-  if (g95_copy_attr(&sym->attr, &current_attr, NULL) == FAILURE) goto cleanup;
+  if (g95_missing_attr(&sym->attr, NULL) == FAILURE ||
+      g95_copy_attr(&sym->attr, &current_attr, NULL) == FAILURE) goto cleanup;
 
   sym->result = result;
 
