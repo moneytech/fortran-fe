@@ -667,8 +667,13 @@ try t;
 
   case EXPR_VARIABLE:
     t = FAILURE;
-
     if (e->ref && resolve_ref(e) == FAILURE) break;
+
+    if (e->symbol->attr.flavor == FL_PROCEDURE && !e->symbol->attr.function) {
+      e->ts.type = BT_PROCEDURE;
+      t = SUCCESS;
+      break;
+    }
 
     if (e->symbol->ts.type != BT_UNKNOWN)
       g95_variable_attr(e, &e->ts);
