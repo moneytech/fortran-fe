@@ -96,7 +96,7 @@ g95_expr *g95_simplify_mod(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_modulo(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_mvbits(g95_expr *, g95_expr *, g95_expr *,
 			      g95_expr *, g95_expr *);
-g95_expr *g95_simplify_nearest(g95_expr *);
+g95_expr *g95_simplify_nearest(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_nint(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_null(g95_expr *);
 g95_expr *g95_simplify_idnint(g95_expr *);

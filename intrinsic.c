@@ -1166,6 +1166,22 @@ static try check_modulo(g95_expr *a, g95_expr *p) {
 }
 
 
+static try check_nearest(g95_expr *x, g95_expr *s) {
+
+  if ( x->ts.type != BT_REAL ) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if ( s->ts.type != BT_REAL ) {
+    type_error(s);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
 static try check_nint(g95_expr *x, g95_expr *kind) {
 
   if (x->ts.type != BT_REAL) {
@@ -2249,7 +2265,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym("modulo", 0, BT_REAL, di, g95_simplify_modulo, check_modulo,
 	  a, BT_REAL, di, 0,   p, BT_REAL, di, 0, NULL);
 
-  add_sym("nearest", 0, BT_REAL, dr, g95_simplify_nearest, NULL,
+  add_sym("nearest", 0, BT_REAL, dr, g95_simplify_nearest, check_nearest,
 	  x, BT_REAL, dr, 0,   s, BT_REAL, dr, 0, NULL);
 
   add_sym("nint",   0, BT_INTEGER, di, g95_simplify_nint, check_nint,

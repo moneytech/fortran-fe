@@ -2236,7 +2236,7 @@ mpf_t quot, iquot, term;
 
   switch (a->ts.type) {
   case BT_INTEGER:
-    if (g95_compare_expr(p, integer_zero) == 0) {
+    if (mpz_cmp_ui(p->value.integer,0) == 0) {
       /* Result is processor-dependent */
       g95_error("Second argument MOD at %L is zero", &a->where);
       g95_free_expr(result);
@@ -2246,7 +2246,7 @@ mpf_t quot, iquot, term;
     break;
 
   case BT_REAL:
-    if (g95_compare_expr(p, real_zero) == 0) {
+    if (mpf_cmp_ui(p->value.real,0) == 0) {
       /* Result is processor-dependent */
 
       g95_error("Second argument of MOD at %L is zero", &p->where);
@@ -2288,9 +2288,9 @@ mpf_t quot, iquot, term;
 
   switch (a->ts.type) {
   case BT_INTEGER:
-    if (g95_compare_expr(p, integer_zero) == 0) {
-      /* Result is processor-dependent */
-      g95_error("Second argument MODULO at %L is zero", &a->where);
+    if (mpz_cmp_ui(p->value.integer,0) == 0) {
+      /* Result is processor-dependent, and this processor doesn't handle it */
+      g95_error("Second argument of MODULO at %L is zero", &a->where);
       g95_free_expr(result);
       return &g95_bad_expr;
     }
@@ -2299,7 +2299,7 @@ mpf_t quot, iquot, term;
     break;
 
   case BT_REAL:
-    if (g95_compare_expr(p, real_zero) == 0) {
+    if (mpf_cmp_ui(p->value.real,0) == 0) {
       /* Result is processor-dependent */
       g95_error("Second argument of MODULO at %L is zero", &p->where);
       g95_free_expr(result);
@@ -2335,9 +2335,61 @@ g95_expr *g95_simplify_mvbits(g95_expr *f, g95_expr *fp, g95_expr *l,
 }
 
 
-g95_expr *g95_simplify_nearest(g95_expr *e) {
+g95_expr *g95_simplify_nearest(g95_expr *x, g95_expr *s) {
+g95_expr *result;
+float rval;
+double val, eps;
+int p, i, k;
 
-  return NULL; 
+/* FIXME */
+/*This implementation is dopey and probably not quite right, but it's a start.*/
+
+  if (x->expr_type != EXPR_CONSTANT ) return NULL;
+
+  k = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (k == -1) g95_internal_error("g95_simplify_precision(): Bad kind");
+
+  result = g95_constant_result(x->ts.type,x->ts.kind);
+  result->where = x->where;
+
+  val  = mpf_get_d(x->value.real);
+  p    = g95_real_kinds[k].digits;
+
+  eps = 1.;
+  for (i=1;i<p;++i) {
+    eps = eps/2.;
+  }
+
+  if ( mpf_cmp_ui(s->value.real,0) > 0 ) {
+    if ( k == g95_default_real_kind() ) {
+      rval = (float) val;
+      rval = rval + eps;
+      mpf_set_d(result->value.real, rval);
+    }
+    else {
+      val = val + eps;
+      mpf_set_d(result->value.real, val);
+    }
+  }
+  else if ( mpf_cmp_ui(s->value.real,0) < 0 ) {
+    if ( k == g95_default_real_kind() ) {
+      rval = (float) val;
+      rval = rval - eps;
+      mpf_set_d(result->value.real, rval);
+    }
+    else {
+      val = val - eps;
+      mpf_set_d(result->value.real, val);
+    }
+  }
+  else {
+    g95_error("Invalid second argument of NEAREST at %L", &s->where);
+    g95_free(result);
+    return &g95_bad_expr;
+  }
+
+  return range_check(result, "NEAREST");
+
 }
 
 
