@@ -612,6 +612,7 @@ done:
 
 int g95_is_constant_expr(g95_expr *e) {
 g95_constructor *c;
+g95_actual_arglist *arg;
 int rv;
 
   if (e == NULL) return 1; 
@@ -624,9 +625,15 @@ int rv;
 
   case EXPR_FUNCTION:
     rv = 0;
-    if (e->value.function.isym && e->value.function.actual && 
-	e->value.function.actual->expr)
-      rv = g95_is_constant_expr(e->value.function.actual->expr);
+    /* call to intrinsic with at least one argument */
+    if (e->value.function.isym && e->value.function.actual) {
+      for( arg = e->value.function.actual; arg; arg = arg->next){
+	if (!g95_is_constant_expr(arg->expr))
+	  break;
+      }
+      if (arg == NULL)
+	rv = 1;
+    }
     break;
 
   case EXPR_CONSTANT:
