@@ -10,6 +10,7 @@
 	reference types.
 	* trans-array.c (g95_build_array_initializer): New Function.
 	(g95_trans_auto_array_allocation): Build initializer for static decls.
+	Don't use mpz_addmul, it's GMP4 only.
 	
 2002-09-12  Paul Brook  <paul@nowt.org>
 

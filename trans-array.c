@@ -341,7 +341,9 @@ g95_build_array_initializer (g95_symbol * sym)
       list = build (CONSTRUCTOR, type, NULL_TREE, nreverse (list));
       init = tree_cons (NULL_TREE, list, init);
 
-      mpz_addmul (offset, sym->as->lower[n]->value.integer, s);
+
+      mpz_mul (val, sym->as->lower[n]->value.integer, s);
+      mpz_add (offset, offset, val);
       mpz_sub (val, sym->as->upper[n]->value.integer,
                sym->as->lower[n]->value.integer);
       mpz_add_ui (val, val, 1);
