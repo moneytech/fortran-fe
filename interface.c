@@ -383,7 +383,7 @@ static int compare_type_rank_if(g95_symbol *s1, g95_symbol *s2) {
 
   if (s1->attr.function && compare_type_rank(s1, s2) == 0) return 0;
 
-  return compare_interfaces(s1, s2, 1);    /* Recurse! */
+  return compare_interfaces(s1, s2, 0);    /* Recurse! */
 }
 
 
@@ -629,7 +629,12 @@ arginfo *arg;
 /* operator_correspondence()-- Perform the abbreviated correspondence
  * test for operators.  The arguments cannot be optional and are
  * always ordered correctly, which makes this test much easier than
- * that for generic tests. */
+ * that for generic tests.
+ *
+ * This subroutine is also used when comparing a formal and actual
+ * argument list when an actual parameter is a dummy procedure.  At
+ * that point, two formal interfaces must be compared for equality
+ * which is what happens here. */
 
 static int operator_correspondence(g95_formal_arglist *f1,
 				   g95_formal_arglist *f2) {
@@ -917,7 +922,7 @@ g95_ref *ref;
 
     if (formal->attr.if_source == IFSRC_UNKNOWN) return 1;  /* Assume match */
 
-    return compare_interfaces(formal, actual->symbol, 1);
+    return compare_interfaces(formal, actual->symbol, 0);
   }
 
   if (!g95_compare_types(&formal->ts, &actual->ts)) return 0;
