@@ -79,12 +79,14 @@ static match match_case_selector(g95_case **cp) {
 g95_case *c;
 match m;
 
-  c = g95_get_case(); 
+  c = g95_get_case();
 
   if (g95_match(" :") == MATCH_YES) {
     m = g95_match_scalar_expr(&c->high);
     if (m == MATCH_NO) goto need_expr;
     if (m == MATCH_ERROR) goto cleanup;
+
+    if (c->high->ts.type == BT_LOGICAL) goto logical_range;
     goto done;
   }
 
@@ -98,19 +100,23 @@ match m;
     m = g95_match_scalar_expr(&c->high);
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto done;   /* It's OK if nothing is there! */
+
+    if (c->high->ts.type == BT_LOGICAL) goto logical_range;
   }
 
 done:
   *cp = c;
   return MATCH_YES;
 
+logical_range:
+  g95_error("Logical range in CASE statement at %C not allowed");
+  goto cleanup;
+
 need_expr:
   g95_error("Expected expression in CASE at %C");
 
 cleanup:
   free_case(c);
-  g95_free(c);
-
   return MATCH_ERROR;
 }
 
