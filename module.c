@@ -498,9 +498,9 @@ int len;
   *p++ = c;
   len = 1;
 
-  for(;;) {
-    get_module_locus(&m);
+  get_module_locus(&m);
 
+  for(;;) {
     c = module_char();
     if (!isalnum(c) && c != '_' && c != '-') break;
 
@@ -509,7 +509,11 @@ int len;
   }
 
   *p = '\0';
-  set_module_locus(&m);
+
+  fseek(module_fp, -1, SEEK_CUR);
+  module_column = m.column + len - 1;
+
+  if (c == '\n') module_line--;
 }
 
 
@@ -522,23 +526,38 @@ int c;
     c = module_char();
   } while (c == ' ' || c == '\n');
 
-  if (c == '(') return ATOM_LPAREN;
-  if (c == ')') return ATOM_RPAREN;
+  switch(c) {
+  case '(':
+    return ATOM_LPAREN;
 
-  if (c == '\'') {
+  case ')':
+    return ATOM_RPAREN;
+
+  case '\'':
     parse_string();
     return ATOM_STRING;
-  }
 
-  if (c >= '0' && c <= '9') {
+  case '0':  case '1':  case '2':  case '3':  case '4':
+  case '5':  case '6':  case '7':  case '8':  case '9':
     parse_integer(c);
     return ATOM_INTEGER;
+
+  case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
+  case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
+  case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
+  case 'v': case 'w': case 'x': case 'y': case 'z': case 'A': case 'B':
+  case 'C': case 'D': case 'E': case 'F': case 'G': case 'H': case 'I':
+  case 'J': case 'K': case 'L': case 'M': case 'N': case 'O': case 'P':
+  case 'Q': case 'R': case 'S': case 'T': case 'U': case 'V': case 'W':
+  case 'X': case 'Y': case 'Z':
+    parse_name(c);
+    return ATOM_NAME;
+
+  default:
+    bad_module("Bad name");
   }
 
-  if (!isalnum(c)) bad_module("Bad name");
-
-  parse_name(c);
-  return ATOM_NAME;
+  return 0;   /* Not reached */
 }
 
 
@@ -2144,6 +2163,8 @@ g95_symbol *sym;
 
   if (sym->serial == -1)
     g95_internal_error("write_symtree(): Symbol not written");
+
+  if (check_unique_name(st->name)) return;
 
   mio_internal_string(st->name);
   mio_integer(&st->ambiguous);
