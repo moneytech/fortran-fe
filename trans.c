@@ -142,15 +142,15 @@ g95_create_tmp_var (tree type)
 
 /* Create a new scope/binding level.  */
 void
-g95_push_scope (void)
+g95_start_stmt (void)
 {
   pushlevel (0);
 }
 
-/* Finish a scope containing stmt list, and create and add DECL_STMTs
-   for the current binding level. */
+/* Finish a scope containing a stmt list, and create and add DECL_STMTs
+   for the current binding level.  Wrap the whole thing in a COMPOUND_STMT.  */
 tree
-g95_pop_scope (tree body, tree tail)
+g95_finish_stmt (tree body, tree tail)
 {
   tree  decl;
   tree  stmt;
@@ -191,22 +191,6 @@ g95_pop_scope (tree body, tree tail)
   SCOPE_STMT_BLOCK (tail) = block;
 
   return build_stmt (COMPOUND_STMT, head);
-}
-
-/* Start a statement.  */
-/* These may do more in the future. For now that just wrap g95_*_scope.  */
-void
-g95_start_stmt (void)
-{
-  g95_push_scope ();
-}
-
-/* Finish a statement.  Cleanup all the temporaries and wrap up in a
- COMPOUND_STMT */
-tree
-g95_finish_stmt (tree head, tree tail)
-{
-  return g95_pop_scope (head, tail);
 }
 
 /* Chain two stmt chains. PHEAD is the head of the current stmt chain
@@ -274,7 +258,7 @@ g95_trans_code (g95_code * code)
       if (code->here != 0)
         {
           res=g95_trans_label_here (code);
-          g95_add_stmt_to_list (&head, &tail, res, NULLi_TREE);
+          g95_add_stmt_to_list (&head, &tail, res, NULL_TREE);
         }
 
 
