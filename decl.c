@@ -284,6 +284,7 @@ g95_component *c;
   *init = NULL;
 
   c->as = *as;
+  if (c->as != NULL) c->dimension = 1;
   *as = NULL;
 
   return SUCCESS;
