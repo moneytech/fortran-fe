@@ -782,6 +782,7 @@ typedef struct {
   int verbose, pedantic, resolve, line_truncation, fixed_80, fmode, dollar;
   g95_directorylist *include_dirs;
   char *module_dir;
+  g95_source_form form;
 } g95_option_t;
 
 extern g95_option_t g95_option;

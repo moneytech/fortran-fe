@@ -233,7 +233,9 @@ static void display_help(void) {
     "  -Wline-truncation       Warn about truncated source lines\n"
     "  -F                      Parse an F program\n"
     "  -ffixed-line-length-80  80 character line width in fixed mode\n"
-    "  -fdollar-ok             Allow dollar sign in entity names\n"
+    "  -fdollar-ok             Allow dollar signs in entity names\n"
+    "  -ffree-form             Assume that the source file is free form\n"
+    "  -ffixed-form            Assume that the source file is fixed form\n"
     "  -pedantic               Warn about use of non-standard features\n"
     "  -r                      Run the resolution phase\n"
     "  -I[directory]           Append directory to the include/module\n"
@@ -284,6 +286,16 @@ char *option;
 
   if (strcmp(option, "-ffixed-line-length-80") == 0) {
     g95_option.fixed_80 = 1;
+    return 1;
+  }
+
+  if (strcmp(option, "-ffree-form") == 0) {
+    g95_option.form = FORM_FREE;
+    return 1;
+  }
+
+  if (strcmp(option, "-ffixed-form") == 0) {
+    g95_option.form = FORM_FIXED;
     return 1;
   }
 
@@ -356,6 +368,7 @@ static void init_options(void) {
   g95_option.line_truncation = 0;
   g95_option.fixed_80 = 0;
   g95_option.fmode = 0;
+  g95_option.form = FORM_UNKNOWN;
 }
 
 
@@ -381,7 +394,7 @@ int errors, warnings, i;
 
   g95_init_1();
 
-  if (g95_new_file(g95_option.source, FORM_UNKNOWN) == SUCCESS)
+  if (g95_new_file(g95_option.source, g95_option.form) == SUCCESS)
     g95_parse_file();
   else
     return 3;
