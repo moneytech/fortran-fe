@@ -1095,6 +1095,12 @@ arith g95_arith_times(g95_expr *, g95_expr *, g95_expr **);
 arith g95_arith_divide(g95_expr *, g95_expr *, g95_expr **);
 arith g95_arith_power(g95_expr *, g95_expr *, g95_expr **);
 arith g95_arith_concat(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_not(g95_expr *, g95_expr **);
+arith g95_arith_and(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_or(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_eqv(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_neqv(g95_expr *, g95_expr *, g95_expr **);
+arith g95_arith_uplus(g95_expr *, g95_expr **);
 
 int g95_compare_expr(g95_expr *, g95_expr *);
 int g95_compare_string(g95_expr *, g95_expr *, int *);
@@ -1307,7 +1313,6 @@ match g95_match_forall(g95_statement *);
 
 /* decl.c */
 
-extern g95_symbol *g95_new_derived;
 extern g95_symbol *g95_new_block;
 
 match g95_match_null(g95_expr **);
@@ -1361,7 +1366,6 @@ void g95_free_ref_list(g95_ref *);
 void g95_type_convert_binary(g95_expr *);
 int g95_is_constant_expr(g95_expr *);
 try g95_simplify_expr(g95_expr *, int);
-void g95_expr_init_1(void);
 
 g95_expr *g95_get_expr(void);
 void g95_free_expr(g95_expr *);
@@ -1380,7 +1384,7 @@ int g95_kind_max(g95_expr *, g95_expr *);
 
 /* st.c */
 
-extern g95_code new_st, *program_tail;
+extern g95_code new_st;
 
 void g95_clear_new_st(void);
 g95_code *g95_new_level(g95_code *);
@@ -1436,8 +1440,6 @@ void g95_free_interface(g95_interface *);
 match g95_match_generic_spec(interface_type *, char *, int *);
 match g95_match_interface(void);
 match g95_match_end_interface(void);
-void g95_start_interface(void);
-int g95_compare_actual_formal(g95_actual_arglist *, g95_formal_arglist *);
 int g95_compare_types(g95_typespec *, g95_typespec *);
 void g95_check_interfaces(g95_namespace *);
 void g95_procedure_use(g95_symbol *, g95_actual_arglist **, locus *);

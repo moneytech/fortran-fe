@@ -987,7 +987,7 @@ static g95_statement parse_spec(g95_statement);
 
 static void parse_interface(void) {
 g95_compile_state new_state, current_state;
-g95_symbol *prog_unit, *sym, *proc;
+g95_symbol *prog_unit, *sym;
 g95_interface_info save;
 g95_state_data s1, s2;
 g95_statement st=0;
@@ -1018,14 +1018,12 @@ loop:
     new_state = COMP_SUBROUTINE;
     g95_add_explicit_interface(g95_new_block, IFSRC_IFBODY,
 			       g95_new_block->formal, NULL);
-    proc = g95_new_block;
     break;
 
   case ST_FUNCTION: 
     new_state = COMP_FUNCTION;
     g95_add_explicit_interface(g95_new_block, IFSRC_IFBODY,
 			       g95_new_block->formal, NULL);
-    proc = g95_new_block;
     break;
 
   case ST_MODULE_PROC:  /* The module procedure matcher makes sure the
@@ -1387,13 +1385,11 @@ int seen_else;
 static void parse_select_block(void) {
 int seen_default;
 g95_statement st;
-g95_expr *expr;
 g95_code *cp;
 g95_select s;
 
   seen_default = 0;
   s.selector_type = new_st.expr->ts.type;
-  expr = new_st.expr;
 
   accept_statement(ST_SELECT_CASE);
 

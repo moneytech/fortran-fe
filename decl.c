@@ -23,7 +23,6 @@ Boston, MA 02111-1307, USA.  */
 /* decl.c -- Declaration statement matcher.  */
 
 #include <string.h>
-
 #include "g95.h"
 
 
@@ -1231,7 +1230,6 @@ match m;
 
 match g95_match_function_decl(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_formal_arglist *arglist;
 g95_symbol *sym, *result;
 locus old_loc;
 match m;
@@ -1242,7 +1240,6 @@ match m;
 
   g95_clear_ts(&current_ts);
 
-  arglist = NULL;
   old_loc = *g95_current_locus();
 
   m = match_prefix(&current_ts);
@@ -1699,14 +1696,12 @@ match g95_match_external(void) {
 
 match g95_match_intent(void) {
 sym_intent intent;
-match m;
 
   intent = match_intent_spec();
   if (intent == INTENT_UNKNOWN) return MATCH_ERROR;
 
   g95_clear_attr(&current_attr);
   g95_add_intent(&current_attr, intent, NULL);   /* Can't fail */
-  m = MATCH_YES;
 
   return attr_decl();
 }
@@ -1884,7 +1879,6 @@ match g95_match_public(g95_statement *st) {
 
 static match do_parm(void) {
 g95_symbol *sym;
-locus var_locus;
 g95_expr *init;
 match m;
 
@@ -1893,8 +1887,6 @@ match m;
     g95_error("Expected variable name at %C in PARAMETER statement");
 
   if (m != MATCH_YES) return m;
-
-  var_locus = *g95_current_locus();
 
   if (g95_match_char('=') == MATCH_NO) {
     g95_error("Expected = sign in PARAMETER statement at %C");

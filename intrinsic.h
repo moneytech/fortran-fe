@@ -110,7 +110,6 @@ g95_expr *g95_simplify_abs(g95_expr *);
 g95_expr *g95_simplify_iabs(g95_expr *);
 g95_expr *g95_simplify_cabs(g95_expr *);
 g95_expr *g95_simplify_achar(g95_expr *);
-g95_expr *g95_simplify_achar(g95_expr *);
 g95_expr *g95_simplify_acos(g95_expr *);
 g95_expr *g95_simplify_adjustl(g95_expr *);
 g95_expr *g95_simplify_adjustr(g95_expr *);

@@ -44,7 +44,6 @@ static int format_length, use_last_char;
 static format_token saved_token;
 
 static enum { MODE_STRING, MODE_FORMAT, MODE_COPY } mode;
-static locus last_locus;
 
 
 /* next_char()-- Return the next character in the format string */
@@ -56,8 +55,6 @@ char c;
     use_last_char = 0;
     return last_char;
   }
-
-  last_locus = *g95_current_locus();
 
   format_length++;
 

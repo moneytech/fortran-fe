@@ -246,13 +246,13 @@ separate:
 
 static void error_print(const char *type, const char *format0, va_list argp) {
 char c, *p, int_buf[IBUF_LEN], c_arg[MAX_ARGS], *cp_arg[MAX_ARGS];
-int i, n, have_l1, have_l2, i_arg[MAX_ARGS];
+int i, n, have_l1, i_arg[MAX_ARGS];
 locus *l1, *l2, *loc;
 const char *format;
 
   l1 = l2 = loc = NULL;
 
-  have_l1 = have_l2 = 0;
+  have_l1 = 0;
 
   n = 0;
   format = format0;

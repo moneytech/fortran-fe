@@ -360,7 +360,7 @@ try t;
     if (g95_numeric_ts(&lvalue->ts) && g95_numeric_ts(&rvalue->ts))
       return SUCCESS;
 
-    g95_error("Incompatable types in assignment at %L, %s to %s",
+    g95_error("Incompatible types in assignment at %L, %s to %s",
 	      &rvalue->where, g95_typename(&rvalue->ts),
 	      g95_typename(&lvalue->ts));
 

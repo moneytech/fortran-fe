@@ -45,7 +45,7 @@ static g95_intrinsic_arg *next_arg;
 
 static int nfunc, nsub, nargs, nconv;
 
-enum { SZ_NOTHING=0, SZ_SUBS, SZ_FUNCS, SZ_CONVS } sizing;
+static enum { SZ_NOTHING=0, SZ_SUBS, SZ_FUNCS, SZ_CONVS } sizing;
 
 /* g95_type_letter()-- Return a letter based on the passed type.  Used
  * to construct the name of a type-dependent subroutine. */

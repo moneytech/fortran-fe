@@ -957,7 +957,7 @@ int i, n, na;
   for(f=formal; f; f=f->next)
     n++;
 
-  new = alloca(n*sizeof(g95_actual_arglist *));
+  new = (g95_actual_arglist **) alloca(n*sizeof(g95_actual_arglist *));
 
   for(i=0; i<n; i++)
     new[i] = NULL;
@@ -1152,12 +1152,12 @@ g95_symbol *g95_search_interface(g95_interface *intr, int sub_flag,
 
 try g95_extend_expr(g95_expr *e) {
 g95_actual_arglist *actual;
-g95_symbol *ip, *sym;
+g95_symbol *sym;
 g95_namespace *ns;
 g95_user_op *uop;
 int i;
 
-  ip = sym = NULL;
+  sym = NULL;
 
   actual = g95_get_actual_arglist();
   actual->expr = e->op1;

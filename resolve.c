@@ -1389,9 +1389,7 @@ int i, rank;
 /* resolve_variable()-- Resolve a variable expression. */
 
 static try resolve_variable(g95_expr *e) {
-try t;
 
-  t = FAILURE;
   if (e->ref && resolve_ref(e) == FAILURE) return FAILURE;
 
   if (e->symbol->attr.flavor == FL_PROCEDURE && !e->symbol->attr.function) {

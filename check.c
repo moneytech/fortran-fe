@@ -115,7 +115,7 @@ static try double_check(g95_expr *d, int n) {
   if (type_check(d, n, BT_REAL) == FAILURE) return FAILURE;
 
   if (d->ts.type != g95_default_double_kind()) {
-    must_be(d, n, "double presicion");
+    must_be(d, n, "double precision");
     return FAILURE;
   }
 

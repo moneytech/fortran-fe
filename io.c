@@ -752,7 +752,7 @@ g95_expr *e;
   }
 
   if (dt->size != NULL && dt->advance == NULL) {
-    g95_error("SIZE tag at %L requries an ADVANCE tag", &dt->size->where);
+    g95_error("SIZE tag at %L requires an ADVANCE tag", &dt->size->where);
     return FAILURE;
   }
 

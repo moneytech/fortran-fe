@@ -271,7 +271,7 @@ int i;
   return FAILURE;
 
  non_scalar:
-  g95_error("Array specfication at %L must be scalar", &e->where);
+  g95_error("Array specification at %L must be scalar", &e->where);
   return FAILURE;
 }
 
