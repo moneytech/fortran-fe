@@ -144,6 +144,7 @@ int c;
     case 'a':
       match("allocate", g95_match_allocate, ST_ALLOCATE);
       match("allocatable", g95_match_allocatable, ST_ATTR_DECL);
+      match("assign", g95_match_assign, ST_NONE);
       break;
 
     case 'b':

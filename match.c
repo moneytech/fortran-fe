@@ -885,6 +885,7 @@ match m, n;
   match("deallocate", g95_match_deallocate,  ST_DEALLOCATE)
   match("end file",   g95_match_endfile,     ST_END_FILE)
   match("exit",       g95_match_exit,        ST_EXIT)
+  match("assign",     g95_match_assign,      ST_NONE)
   match("go to",      g95_match_goto,        ST_GOTO)
   match("inquire",    g95_match_inquire,     ST_INQUIRE)
   match("nullify",    g95_match_nullify,     ST_NULLIFY)
@@ -1221,6 +1222,22 @@ match g95_match_continue(void) {
 }
 
 
+/* g95_match_assign()-- Match the (deprecated) ASSIGN statement. */
+
+match g95_match_assign(void) {
+g95_expr *expr;
+int label;
+
+  if (g95_match(" %l to %v%t", &label, &expr) == MATCH_YES) {
+    g95_free_expr(expr);
+    g95_error("The ASSIGN statement at %C is not allowed in Fortran 95.");
+    return MATCH_ERROR;
+  }
+
+  return MATCH_NO;
+}
+
+
 /* g95_match_goto()-- Match the GO TO statement.  As a computed GOTO
  * statement is matched, it is transformed into an equivalent SELECT
  * block.  No tree is necessary, and the resulting jumps-to-jumps are
@@ -1240,6 +1257,15 @@ match m;
     new_st.op = EXEC_GOTO;
     new_st.label = label;
     return MATCH_YES;
+  }
+
+/* The assigned GO TO statement is not allowed in Fortran 95 */
+
+  if (g95_match(" %v", &expr) == MATCH_YES) {
+    g95_free_expr(expr);
+    g95_error("The assigned GO TO statement at %C is not allowed in "
+	      "Fortran 95.");
+    return MATCH_ERROR;
   }
 
 /* Last chance is a computed GO TO statement */

@@ -1056,6 +1056,7 @@ match g95_match_exit(void);
 match g95_match_pause(void);
 match g95_match_stop(void);
 match g95_match_continue(void);
+match g95_match_assign(void);
 match g95_match_goto(void);
 
 void g95_free_alloc_list(g95_alloc *);

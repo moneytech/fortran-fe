@@ -31,7 +31,7 @@ typedef enum {
   FMT_UNKNOWN=1, FMT_NEGINT, FMT_ZERO, FMT_POSINT, FMT_PERIOD, FMT_COMMA,
   FMT_COLON, FMT_SLASH, FMT_DOLLAR, FMT_POS, FMT_LPAREN, FMT_RPAREN, FMT_X,
   FMT_SIGN, FMT_BLANK, FMT_CHAR, FMT_P, FMT_IBOZ, FMT_F, FMT_E, FMT_EXT,
-  FMT_G, FMT_L, FMT_A, FMT_D, FMT_END
+  FMT_G, FMT_L, FMT_A, FMT_D, FMT_H, FMT_END
 } format_token;
 
 
@@ -243,6 +243,10 @@ int zflag;
     token = FMT_G;
     break;
 
+  case 'H':
+    token = FMT_H;
+    break;
+
   case 'L':
     token = FMT_L;
     break;
@@ -363,6 +367,10 @@ format_item:
   case FMT_POS:  case FMT_IBOZ:  case FMT_F:  case FMT_E:  case FMT_EXT:
   case FMT_G:    case FMT_L:     case FMT_A:  case FMT_D:
     goto data_desc;
+
+  case FMT_H:
+    error = "The H format specifier is not allowed in Fortran 95";
+    goto syntax;
 
   case FMT_END:
     error = unexpected_end;
