@@ -1282,8 +1282,8 @@ int i, rank;
     }
 
     if (ref->ar.type == AR_SECTION) { /* Figure out the rank of the section */
-      for(i=0; i<G95_MAX_DIMENSIONS; i++)
-	if (ref->ar.end[i] != NULL) rank++;
+      for(i=0; i<ref->ar.rank; i++)
+	if (ref->ar.start[i] == NULL && ref->ar.end[i] == NULL) rank++;
 
       break;
     }
@@ -1291,7 +1291,6 @@ int i, rank;
 
   return rank;
 }
-
 
 
 /* match_varspec()-- Match any additional specifications associated
