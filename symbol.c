@@ -2175,9 +2175,10 @@ g95_symbol *sym;
 
 /* g95_free_namespace()-- Free a namespace structure and everything
  * below it.  Interface lists associated with intrinsic operators are
- * not freed.  These are take care of when a specific name is freed. */
+ * not freed.  These are taken care of when a specific name is freed. */
 
 void g95_free_namespace(g95_namespace *ns) {
+g95_namespace *next_ns;
 g95_charlen *cl, *cl2;
 int i;
 
@@ -2204,30 +2205,15 @@ int i;
   g95_free_data(ns->data);
 
   g95_free(ns);
-}
 
+  /* Recursively free any contained namespaces */
 
-/* free_all_symbols()-- Free all of the namespaces, starting with the
- * current namespace, its siblings and parents.  Relies on the fact
- * sibling can only occur on the bottom level. */
+  for(next_ns=ns->contained; next_ns;) {
+    ns = next_ns;
+    next_ns = next_ns->sibling;
 
-static void free_all_symbols(void) {
-g95_namespace *ns;
-
-  for(;;) {
-    ns = g95_current_ns->sibling;
-    if (ns == NULL) break;
-
-    g95_free_namespace(g95_current_ns);
-    g95_current_ns = ns;
+    g95_free_namespace(ns);
   }
-
-  do {
-    ns = g95_current_ns->parent;
-    g95_free_namespace(g95_current_ns);
-    g95_current_ns = ns;
-
-  } while(g95_current_ns != NULL);
 }
 
 
@@ -2239,7 +2225,7 @@ void g95_symbol_init_2(void) {
 
 void g95_symbol_done_2(void) {
 
-  free_all_symbols();
+  g95_free_namespace(g95_current_ns);
 }
 
 

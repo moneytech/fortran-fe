@@ -27,7 +27,7 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include <string.h>
 
-mpf_t mpf_pi, mpf_hpi, mpf_nhpi, mpf_tpi;
+mpf_t pi, half_pi, two_pi;
 
 static mpf_t e;
 
@@ -228,9 +228,9 @@ int i, sign;
     mpf_init(factor);
     mpf_init(term);
 
-    mpf_div(q, x, mpf_tpi);
+    mpf_div(q, x, two_pi);
     mpf_floor(factor, q);
-    mpf_mul(q, factor, mpf_tpi);
+    mpf_mul(q, factor, two_pi);
     mpf_sub(r, x, q);
 
     mpf_init_set_ui(xp, 0);
@@ -283,9 +283,9 @@ int i, sign;
     mpf_init(factor);
     mpf_init(term);
 
-    mpf_div(q, x, mpf_tpi);
+    mpf_div(q, x, two_pi);
     mpf_floor(factor, q);
-    mpf_mul(q, factor, mpf_tpi);
+    mpf_mul(q, factor, two_pi);
     mpf_sub(r, x, q);
 
     mpf_init_set_ui(xp, 1);
@@ -333,12 +333,12 @@ int i, sign;
     mpf_set_ui(*result, 0);
   } else if (mpf_cmp_ui(x,1) == 0) {
     mpf_init(num);
-    mpf_div_ui(num, mpf_hpi, 2);
+    mpf_div_ui(num, half_pi, 2);
     mpf_set(*result, num);
     mpf_clear(num);
   } else if (mpf_cmp_si(x,-1) == 0) {
     mpf_init(num);
-    mpf_div_ui(num, mpf_hpi, 2);
+    mpf_div_ui(num, half_pi, 2);
     mpf_neg(*result, num);
     mpf_clear(num);
   } else { /* General cases */
@@ -366,7 +366,7 @@ int i, sign;
 	  mpf_sub(xp, xp, term);
       }
     } else if (mpf_cmp(absval, convgu) >= 0) {
-      mpf_init_set(xp, mpf_hpi);
+      mpf_init_set(xp, half_pi);
       sign = 1;
       for(i=1; i<G95_REAL_BITS+10; i++) {
         mpf_div(num, num, absval);
@@ -400,7 +400,7 @@ int i, sign;
 	  mpf_sub(xp, xp, term);
       }
 
-      mpf_div_ui(term, mpf_hpi, 2);
+      mpf_div_ui(term, half_pi, 2);
       mpf_add(xp, term, xp);
     }
 
@@ -526,12 +526,10 @@ int i, n, limit;
  * which gives about four bits per iteration.
  */
 
+  mpf_init_set_ui(pi,0);
 
-  mpf_init_set_ui(mpf_pi,0);
-
-  mpf_init(mpf_tpi);
-  mpf_init(mpf_hpi);
-  mpf_init(mpf_nhpi);
+  mpf_init(two_pi);
+  mpf_init(half_pi);
 
   limit = (G95_REAL_BITS / 4) + 10;  /* (1/16)^n gives 4 bits per iteration */
 
@@ -556,12 +554,11 @@ int i, n, limit;
 
     mpf_div(b, b, a);
 
-    mpf_add(mpf_pi, mpf_pi, b);
+    mpf_add(pi, pi, b);
   }
 
-  mpf_mul_ui(mpf_tpi,mpf_pi,2);
-  mpf_div_ui(mpf_hpi,mpf_pi,2);
-  mpf_neg(mpf_nhpi, mpf_hpi);
+  mpf_mul_ui(two_pi, pi, 2);
+  mpf_div_ui(half_pi, pi, 2);
 
 /* Convert the minimum/maximum values for each kind into their Gnu MP
  * representation. */
@@ -660,6 +657,32 @@ int i, n, limit;
   mpz_clear(r);
   mpf_clear(a);
   mpf_clear(b);
+}
+
+
+/* g95_arith_done_1()-- Get rid of numeric constants. */
+
+void g95_arith_done_1(void) {
+g95_integer_info *ip;
+g95_real_info *rp;
+
+  mpf_clear(e);
+
+  mpf_clear(pi);
+  mpf_clear(half_pi);
+  mpf_clear(two_pi);
+
+  for(ip=g95_integer_kinds; ip->kind; ip++) {
+    mpz_clear(ip->min_int);
+    mpz_clear(ip->max_int);
+    mpz_clear(ip->huge);
+  }
+
+  for(rp=g95_real_kinds; rp->kind; rp++) {
+    mpf_clear(rp->epsilon);
+    mpf_clear(rp->huge);
+    mpf_clear(rp->tiny);
+  }
 }
 
 

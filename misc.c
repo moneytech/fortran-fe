@@ -313,6 +313,7 @@ void g95_done_1(void) {
   g95_intrinsic_done_1();
   g95_simplify_done_1();
   g95_iresolve_done_1();
+  g95_arith_done_1();
 }
 
 
@@ -520,6 +521,21 @@ static void init_options(void) {
 }
 
 
+/* release_options()-- Release resources */
+
+static void release_options(void) {
+g95_directorylist *p;
+
+  g95_free(g95_option.module_dir);
+  while(g95_option.include_dirs != NULL) {
+    p = g95_option.include_dirs;
+    g95_option.include_dirs = g95_option.include_dirs->next;
+    g95_free(p->path);
+    g95_free(p);
+  }
+}
+
+
 /* main()-- Compile a fortran program */
 
 int main(int argc, char *argv[]) {
@@ -527,6 +543,7 @@ int errors, warnings, i;
 
   if (argc == 1) display_help();
 
+  mtrace();
   init_options();
 
   argv++;
@@ -554,6 +571,7 @@ int errors, warnings, i;
   if (!g95_option.quiet)
     g95_status("Warnings: %d  Errors: %d\n", warnings, errors);
 
+  release_options();
   if (errors > 0) return 2;
   if (warnings > 0) return 1;
   return 0;

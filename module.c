@@ -1494,8 +1494,8 @@ intrinsics[] = {
  * to indicate a NULL expression */
 
 static void mio_expr(g95_expr **ep) {
-atom_type t;
 g95_expr *e;
+atom_type t;
 int flag;
 
   mio_lparen();
@@ -1554,9 +1554,9 @@ int flag;
   case EXPR_FUNCTION:
     mio_symbol_ref(&e->symbol);
     mio_actual_arglist(&e->value.function.actual);
-    mio_allocated_string(&e->value.function.name);
 
     if (iomode == IO_OUTPUT) {
+      mio_allocated_string(&e->value.function.name);
       flag = e->value.function.esym != NULL;
       mio_integer(&flag);
       if (flag)
@@ -1565,6 +1565,10 @@ int flag;
 	write_atom(ATOM_STRING, e->value.function.isym->name);
 
     } else {
+      require_atom(ATOM_STRING);
+      e->value.function.name = g95_get_string(atom_string);
+      g95_free(atom_string);
+
       mio_integer(&flag);
       if (flag)
 	mio_symbol_ref(&e->value.function.esym);

@@ -224,7 +224,7 @@ mpf_t negative, square, term;
   }
 
   if (mpf_cmp_si(x->value.real, -1) == 0) {
-    mpf_set(result->value.real, mpf_pi);
+    mpf_set(result->value.real, pi);
     return range_check(result, "ACOS");
   }
 
@@ -238,7 +238,7 @@ mpf_t negative, square, term;
   mpf_div(term, x->value.real, term);
   mpf_neg(term, term);
   arctangent(&term, &negative);
-  mpf_add(result->value.real, mpf_hpi, negative);
+  mpf_add(result->value.real, half_pi, negative);
 
   mpf_clear(negative);
   mpf_clear(square);
@@ -436,13 +436,13 @@ mpf_t negative, square, term;
   result = g95_constant_result(x->ts.type, x->ts.kind, &x->where);
 
   if (mpf_cmp_si(x->value.real, 1) == 0) {
-    mpf_set(result->value.real, mpf_hpi);
+    mpf_set(result->value.real, half_pi);
     return range_check(result, "ASIN");
   }
 
   if (mpf_cmp_si(x->value.real, -1) == 0) {
     mpf_init(negative);
-    mpf_neg(negative, mpf_hpi);
+    mpf_neg(negative, half_pi);
     mpf_set(result->value.real, negative);
     mpf_clear(negative);
     return range_check(result, "ASIN");
@@ -498,7 +498,7 @@ mpf_t term;
       return &g95_bad_expr;
     }
     else if (mpf_cmp_si(x->value.real, 0) < 0) {
-      mpf_set(result->value.real, mpf_pi);
+      mpf_set(result->value.real, pi);
       mpf_clear(term);
       return result;
     }
@@ -511,13 +511,13 @@ mpf_t term;
 
   if (mpf_cmp_ui(x->value.real, 0) == 0) {
     if (mpf_cmp_si(y->value.real, 0) < 0) {
-      mpf_neg(term, mpf_hpi);
+      mpf_neg(term, half_pi);
       mpf_set(result->value.real, term);
       mpf_clear(term);
       return range_check(result, "ATAN2");
     }
     else if (mpf_cmp_si(y->value.real, 0) > 0) {
-      mpf_set(result->value.real, mpf_hpi);
+      mpf_set(result->value.real, half_pi);
       mpf_clear(term);
       return range_check(result, "ATAN2");
     }
@@ -2277,9 +2277,9 @@ g95_expr *g95_simplify_reshape(g95_expr *source, g95_expr *shape_exp,
 int order[G95_MAX_DIMENSIONS], shape[G95_MAX_DIMENSIONS];
 int i, rank, npad, x[G95_MAX_DIMENSIONS];
 g95_constructor *head, *tail;
+mpz_t index, size;
 unsigned long j;
 size_t nsource;
-mpz_t index;
 g95_expr *e;
 
 /* Unpack the shape array */
@@ -2305,16 +2305,19 @@ g95_expr *e;
     e = g95_get_array_element(shape_exp, rank);
     if (e == NULL) break;
 
+    if (g95_extract_int(e, &shape[rank]) != NULL) {
+      g95_error("Integer too large in shape specification at %L",
+		&e->where);
+      g95_free_expr(e);
+      goto done;
+    }
+
+    g95_free_expr(e);
+
     if (rank >= G95_MAX_DIMENSIONS) {
       g95_error("Too many dimensions in shape specification for RESHAPE "
 		"at %L", &e->where);
 
-      goto done;
-    }
-
-    if (g95_extract_int(e, &shape[rank]) != NULL) {
-      g95_error("Integer too large in shape specification at %L",
-		&e->where);
       goto done;
     }
 
@@ -2353,8 +2356,11 @@ g95_expr *e;
 
       if (g95_extract_int(e, &order[i]) != NULL) {
 	g95_error("Error in ORDER parameter of RESHAPE at %L", &e->where);
+	g95_free_expr(e);
 	goto done;
       }
+
+      g95_free_expr(e);
 
       if (order[i] < 1 || order[i] > rank) {
 	g95_error("ORDER parameter of RESHAPE at %L is out of range",
@@ -2376,17 +2382,19 @@ g95_expr *e;
   /* Count the elements in the source and padding arrays */
 
   npad = 0;
-
-  if (pad != NULL)
-    for(;; npad++)
-      if (g95_get_array_element(pad, npad) == NULL) break;
+  if (pad != NULL) {
+    g95_array_size(pad, &size);
+    npad = mpz_get_ui(size);
+    mpz_clear(size);
+  }
 
   nsource = 0;
 
-  head = tail = NULL;
+  g95_array_size(source, &size);
+  nsource = mpz_get_ui(size);
+  mpz_clear(size);
 
-  for(;; nsource++)
-    if (g95_get_array_element(source, nsource) == NULL) break;
+  head = tail = NULL;
 
   /* If it weren't for that pesky permutation we could just loop
    * through the source and round out any shortage with pad elements.
@@ -2396,10 +2404,7 @@ g95_expr *e;
   for(i=0; i<rank; i++)
     x[i] = 0;
 
-  for(;;) {
-
-    /* Figure out which element to extract */
-
+  for(;;) {     /* Figure out which element to extract */
     mpz_set_ui(index, 0);
 
     for(i=rank-1; i>=0; i--) {
@@ -2437,7 +2442,7 @@ g95_expr *e;
     }
 
     tail->where = e->where;
-    tail->expr = g95_copy_expr(e);
+    tail->expr = e;
 
     /* Calculate the next element */
 
@@ -3264,13 +3269,8 @@ void g95_simplify_init_1(void) {
 
 void g95_simplify_done_1(void) {
 
-  mpf_clear(mpf_pi);
-  mpf_clear(mpf_hpi);
-  mpf_clear(mpf_nhpi);
-
   mpf_clear(mpf_zero);
   mpf_clear(mpf_half);
   mpf_clear(mpf_one);
   mpz_clear(mpz_zero);
-
 }

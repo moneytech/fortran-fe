@@ -1652,7 +1652,6 @@ g95_symbol *sym;
     case ST_FUNCTION:
     case ST_SUBROUTINE:
       accept_statement(st);
-      g95_current_ns->parent = parent_ns;
 
       g95_current_ns->sibling = parent_ns->contained;
       parent_ns->contained = g95_current_ns;
@@ -1854,6 +1853,7 @@ loop:
   st = next_statement();
   switch(st) {
   case ST_NONE:
+    g95_done_2();
     goto done;
 
   case ST_PROGRAM:

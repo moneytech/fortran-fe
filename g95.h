@@ -1005,6 +1005,14 @@ void g95_init_2(void);
 void g95_done_1(void);
 void g95_done_2(void);
 
+/* iresolve.c */
+
+char *g95_get_string(char *, ...)
+#ifdef __GNUC__
+__attribute__ ((format (printf, 1, 2)))
+#endif
+;
+
 void g95_iresolve_init_1(void);
 void g95_iresolve_done_1(void);
 
@@ -1062,10 +1070,11 @@ extern int g95_statement_label;
 
 /* arith.c */
 
-extern mpf_t mpf_pi, mpf_hpi, mpf_nhpi, mpf_tpi;
+extern mpf_t pi, half_pi, minus_half_hpi, two_pi;
 
 char *g95_arith_error(arith);
 void g95_arith_init_1(void);
+void g95_arith_done_1(void);
 
 void natural_logarithm(mpf_t *, mpf_t *); 
 void common_logarithm(mpf_t *, mpf_t *); 
