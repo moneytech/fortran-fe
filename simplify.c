@@ -242,18 +242,70 @@ int index;
 }
 
 
-g95_expr *g95_simplify_acos(g95_expr *e) {
+g95_expr *g95_simplify_acos(g95_expr *x) {
+g95_expr *re, *result;
+mpf_t negative, square, term;
+int i;
 
-  if (e->expr_type != EXPR_CONSTANT) return NULL; 
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-/* Range checking--  Must have abs(x)<=1 */
- 
-  if (mpf_cmp_si(e->value.real, 1) > 0 || mpf_cmp_si(e->value.real, -1) < 0) {
-    g95_error("Argument of ACOS at %L must be between -1 and 1", &e->where);
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_acos(): Bad kind");
+
+  if (mpf_cmp_si(x->value.real, 1) > 0 || mpf_cmp_si(x->value.real, -1) < 0) {
+    g95_error("Argument of ACOS at %L must be between -1 and 1", &x->where);
     return &g95_bad_expr;
   }
 
-  return NULL;
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  if (mpf_cmp_si(x->value.real, 1) == 0 ) {
+    mpf_set(result->value.real,mpf_hpi);
+    return result;
+  }
+
+  if (mpf_cmp_si(x->value.real, -1) == 0) {
+    mpf_neg(negative,mpf_hpi);
+    mpf_set(result->value.real,negative);
+    return result;
+  }
+
+  mpf_init(negative);
+  mpf_init(square);
+  mpf_init(term);
+
+  switch (x->ts.type) {
+  case BT_INTEGER: 
+    if (g95_option.pedantic == 1) 
+        g95_warning_now("Integer initialization constant to ACOS at %L is nonstandard",&x->where);
+    re = g95_int2real(x,x->ts.kind);
+    mpf_pow_ui(square,re->value.real,2);
+    mpf_ui_sub(term,1,square);
+    mpf_sqrt(term,term);
+    mpf_div(term,re->value.real,term);
+    mpf_neg(term,term);
+    arctangent(&term,&negative);
+    mpf_add(result->value.real,mpf_hpi,negative);
+    break;
+  case BT_REAL: 
+    mpf_pow_ui(square,x->value.real,2);
+    mpf_ui_sub(term,1,square);
+    mpf_sqrt(term,term);
+    mpf_div(term,x->value.real,term);
+    mpf_neg(term,term);
+    arctangent(&term,&negative);
+    mpf_add(result->value.real,mpf_hpi,negative);
+    break;
+  default:
+    g95_internal_error("in g95_simplify_acos(): Bad type");
+  }
+
+  mpf_clear(negative);
+  mpf_clear(square);
+  mpf_clear(term);
+
+  return range_check(result, "ACOS");
 }
 
 
@@ -467,19 +519,66 @@ int kind, cmp;
 }
 
 
-g95_expr *g95_simplify_asin(g95_expr *e) {
+g95_expr *g95_simplify_asin(g95_expr *x) {
+g95_expr *re, *result;
+mpf_t negative, square, term;
+int i;
 
-  return NULL;
+  if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-/* Range checking--  Must have abs(x)<=1 */
- 
-  /* Evaluation of transcendentals not implemented yet 
-  if (e->expr_type != EXPR_CONSTANT) return NULL; 
-  if (mpf_cmp_si(e->value.real, 1) > 0 || mpf_cmp_si(e->value.real, -1) < 0) {
-    g95_error("Argument of ASIN at %L must be between -1 and 1", &e->where);
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_asin(): Bad kind");
+
+  if (mpf_cmp_si(x->value.real, 1) > 0 || mpf_cmp_si(x->value.real, -1) < 0) {
+    g95_error("Argument of ASIN at %L must be between -1 and 1", &x->where);
     return &g95_bad_expr;
   }
-  */
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  if (mpf_cmp_si(x->value.real, 1) == 0 ) {
+    mpf_set(result->value.real,mpf_hpi);
+    return result;
+  }
+
+  if (mpf_cmp_si(x->value.real, -1) == 0) {
+    mpf_neg(negative,mpf_hpi);
+    mpf_set(result->value.real,negative);
+    return result;
+  }
+
+  mpf_init(negative);
+  mpf_init(square);
+  mpf_init(term);
+
+  switch (x->ts.type) {
+  case BT_INTEGER: 
+    if (g95_option.pedantic == 1) 
+        g95_warning_now("Integer initialization constant to ASIN at %L is nonstandard",&x->where);
+    re = g95_int2real(x,x->ts.kind);
+    mpf_pow_ui(square,re->value.real,2);
+    mpf_ui_sub(term,1,square);
+    mpf_sqrt(term,term);
+    mpf_div(term,re->value.real,term);
+    arctangent(&term,&result->value.real);
+    break;
+  case BT_REAL: 
+    mpf_pow_ui(square,x->value.real,2);
+    mpf_ui_sub(term,1,square);
+    mpf_sqrt(term,term);
+    mpf_div(term,x->value.real,term);
+    arctangent(&term,&result->value.real);
+    break;
+  default:
+    g95_internal_error("in g95_simplify_asin(): Bad type");
+  }
+
+  mpf_clear(negative);
+  mpf_clear(square);
+  mpf_clear(term);
+
+  return range_check(result, "ASIN");
 }
 
 
@@ -490,7 +589,7 @@ int i;
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   i = g95_validate_kind(x->ts.type, x->ts.kind);
-  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
+  if (i == -1) g95_internal_error("g95_simplify_atan(): Bad kind");
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
@@ -498,7 +597,7 @@ int i;
   switch (x->ts.type) {
   case BT_INTEGER: 
     if (g95_option.pedantic == 1) 
-        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
+        g95_warning_now("Integer initialization constant to ATAN at %L is nonstandard",&x->where);
     re = g95_int2real(x,x->ts.kind);
     arctangent(&re->value.real,&result->value.real);
     break;
@@ -506,7 +605,7 @@ int i;
     arctangent(&x->value.real,&result->value.real);
     break;
   default:
-    g95_internal_error("in g95_simplify_exp(): Bad type");
+    g95_internal_error("in g95_simplify_atan(): Bad type");
   }
 
   return range_check(result, "ATAN");
@@ -516,23 +615,73 @@ int i;
 
 
 g95_expr *g95_simplify_atan2(g95_expr *y, g95_expr *x) {
-
-  return NULL;
-
-  /* Evaluation of transcendentals not implemented yet 
-  if (x == NULL) {
-    g95_error("Second argument of ATAN2 missing at %L", &x->where);
-    return &g95_bad_expr;
-  }
+g95_expr *re1, *re2, *result;
+mpf_t term;
+int i;
 
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
     return NULL; 
 
-  if (x->ts.kind != y->ts.kind) {
-    g95_error("KIND of arguments of ATAN2 at %L must agree", &x->where);
-    return &g95_bad_expr;
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i == -1) g95_internal_error("g95_simplify_atan2(): Bad kind");
+
+  result = g95_constant_result(x->ts.type, x->ts.kind);
+  result->where = x->where; 
+
+  mpf_init(term);
+
+  if ( mpf_cmp_ui(y->value.real,0) == 0 ) {
+    if ( mpf_cmp_ui(x->value.real,0) == 0 ) {
+      mpf_clear(term);
+      g95_error("If first argument of ATAN2 %L is zero, the second argument must not be zero", &x->where);
+      return &g95_bad_expr;
+    }
+    else if ( mpf_cmp_si(x->value.real,0) < 0 ) {
+      mpf_set(result->value.real,mpf_pi);
+      mpf_clear(term);
+      return result;
+    }
+    else if ( mpf_cmp_si(x->value.real,-1)== 0 ) {
+      mpf_set_ui(result->value.real,0);
+      mpf_clear(term);
+      return result;
+    }
   }
-  */
+
+  if ( mpf_cmp_ui(x->value.real,0) == 0 ) {
+    if ( mpf_cmp_si(y->value.real,0) < 0 ) {
+      mpf_neg(term,mpf_hpi);
+      mpf_set(result->value.real,term);
+      mpf_clear(term);
+      return result;
+    }
+    else if ( mpf_cmp_si(y->value.real,0) > 0) {
+      mpf_set(result->value.real,mpf_hpi);
+      mpf_clear(term);
+      return result;
+    }
+  }
+
+  switch (x->ts.type) {
+  case BT_INTEGER: 
+    if (g95_option.pedantic == 1) 
+        g95_warning_now("Integer initialization constant to ATAN at %L is nonstandard",&x->where);
+    re1 = g95_int2real(x,x->ts.kind);
+    re2 = g95_int2real(y,y->ts.kind);
+    mpf_div(term,re2->value.real,re1->value.real);
+    arctangent(&term,&result->value.real);
+    break;
+  case BT_REAL: 
+    mpf_div(term,y->value.real,x->value.real);
+    arctangent(&term,&result->value.real);
+    break;
+  default:
+    g95_internal_error("in g95_simplify_atan(): Bad type");
+  }
+
+  mpf_clear(term);
+
+  return range_check(result, "ATAN2");
 
 }
 
@@ -709,7 +858,7 @@ int i;
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   i = g95_validate_kind(x->ts.type, x->ts.kind);
-  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
+  if (i == -1) g95_internal_error("g95_simplify_cos(): Bad kind");
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
@@ -717,7 +866,7 @@ int i;
   switch (x->ts.type) {
   case BT_INTEGER: 
     if (g95_option.pedantic == 1) 
-        g95_warning_now("Integer initialization constant to EXP at %L is nonstandard",&x->where);
+        g95_warning_now("Integer initialization constant to COS at %L is nonstandard",&x->where);
     re = g95_int2real(x,x->ts.kind);
     cosine(&re->value.real,&result->value.real);
     break;
@@ -728,7 +877,7 @@ int i;
     g95_error("Complex cos at %L has not yet been implemented",&x->where);
     return &g95_bad_expr;
   default:
-    g95_internal_error("in g95_simplify_exp(): Bad type");
+    g95_internal_error("in g95_simplify_cos(): Bad type");
   }
 
   return range_check(result, "COS");
@@ -801,11 +950,6 @@ g95_expr *result;
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (y == NULL) {
-    g95_error("Second argument of DIM missing at %L", &x->where);
-    return &g95_bad_expr;
-  }
-
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where;
 
@@ -841,21 +985,9 @@ int kx, ky;
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (y == NULL) {
-    g95_error("Second argument of DPROD missing at %L", &x->where);
-    return &g95_bad_expr;
-  }
-
   kx = g95_validate_kind(x->ts.type, x->ts.kind);
   ky = g95_validate_kind(y->ts.type, y->ts.kind);
   if (kx== -1 || ky== -1) g95_internal_error("g95_simplify_dprod(): Bad kind");
-
-  if (x->ts.kind != g95_default_real_kind() || 
-		  y->ts.kind != g95_default_real_kind()) {
-    g95_error("Arguments of DPROD at %L must be of default real kind",
-	      x->where);
-    return &g95_bad_expr;
-  }
 
   result = g95_constant_result(BT_REAL, g95_default_double_kind());
   result->where = x->where;
@@ -3106,7 +3238,7 @@ int i;
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   i = g95_validate_kind(x->ts.type, x->ts.kind);
-  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
+  if (i == -1) g95_internal_error("g95_simplify_sin(): Bad kind");
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
@@ -3125,7 +3257,7 @@ int i;
     g95_error("Complex sin at %L has not yet been implemented",&x->where);
     return &g95_bad_expr;
   default:
-    g95_internal_error("in g95_simplify_exp(): Bad type");
+    g95_internal_error("in g95_simplify_sin(): Bad type");
   }
 
   return range_check(result, "SIN");
@@ -3341,7 +3473,7 @@ int i;
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
   i = g95_validate_kind(x->ts.type, x->ts.kind);
-  if (i == -1) g95_internal_error("g95_simplify_exp(): Bad kind");
+  if (i == -1) g95_internal_error("g95_simplify_tan(): Bad kind");
 
   result = g95_constant_result(x->ts.type, x->ts.kind);
   result->where = x->where; 
@@ -3400,7 +3532,7 @@ int i;
     }
     break;
   default:
-    g95_internal_error("in g95_simplify_exp(): Bad type");
+    g95_internal_error("in g95_simplify_tan(): Bad type");
   }
 
   return range_check(result, "TAN");

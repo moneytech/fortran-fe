@@ -311,6 +311,7 @@ g95_ref *ref;
 static try check_dabs(g95_expr *x) {
 
   if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
+    type_error(x);
     return FAILURE;
   }
 
@@ -361,6 +362,62 @@ static try check_anint(g95_expr *a, g95_expr *kind) {
 
   return SUCCESS;
 }
+
+/* Atan2 family */
+
+static try check_atan2(g95_expr *y, g95_expr *x) {
+
+    if (x == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+	/* Integer is an extension, may need to remove it */
+  if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL ) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (y->ts.type != BT_INTEGER && y->ts.type != BT_REAL ) {
+    type_error(y);
+    return FAILURE;
+  }
+
+  if (x->ts.type != y->ts.type) {
+    intrinsic_error("Types of arguments to intrinsic at %%L must agree");
+    return FAILURE;
+  }
+
+  if (x->ts.kind != y->ts.kind) {
+    intrinsic_error("Kinds of arguments to intrinsic at %%L must agree");
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+static try check_datan2(g95_expr *y, g95_expr *x) {
+
+    if (x == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (y->ts.type != BT_REAL || y->ts.kind != g95_default_double_kind()) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
+}
+
+/* end atan2 */
 
 
 static try check_ceiling(g95_expr *a, g95_expr *kind) {
@@ -424,6 +481,30 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
   return SUCCESS;
 }
 
+/* Cosine family */
+
+static try check_cos(g95_expr *x) {
+/* May need to remove integer */
+  if (!g95_numeric_ts(&x->ts)) {
+   type_error(x);
+   return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+static try check_dcos(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+/* end of cosines */
+
 
 static try check_count(g95_expr *mask, g95_expr *dim) {
 
@@ -481,6 +562,11 @@ static try check_digits(g95_expr *x) {
 
 static try check_dim(g95_expr *x, g95_expr *y) {
 
+    if (y == NULL) {
+    intrinsic_error("Second argument of DIM missing at %%L");
+    return FAILURE;
+  }
+
   if (x->ts.type != BT_INTEGER && x->ts.type != BT_REAL ) {
     type_error(x);
     return FAILURE;
@@ -521,6 +607,34 @@ static try check_dot_product(g95_expr *vector_a, g95_expr *vector_b) {
   if (vector_b->shape == NULL || vector_b->shape->rank != 1) return FAILURE;
 
   return SUCCESS;
+}
+
+
+static try check_dprod(g95_expr *x, g95_expr *y) {
+
+    if (y == NULL) {
+    intrinsic_error("Second argument missing at %%L");
+    return FAILURE;
+  }
+
+  if (x->ts.type != BT_REAL ) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  if (y->ts.type != BT_REAL ) {
+    type_error(y);
+    return FAILURE;
+  }
+
+  if (x->ts.kind != g95_default_real_kind() ||
+                y->ts.kind != g95_default_real_kind()) {
+    kind_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+
 }
 
 
@@ -1127,6 +1241,31 @@ static try check_shape(g95_expr *source) {
 }
 
 
+/* Sine family */
+
+static try check_sin(g95_expr *x) {
+/* May need to remove integer */
+  if (!g95_numeric_ts(&x->ts)) {
+   type_error(x);
+   return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+static try check_dsin(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+/* end sines */
+
+
 static try check_size(g95_expr *array, g95_expr *dim) {
 
   if (array->shape == NULL) return FAILURE;
@@ -1209,6 +1348,29 @@ static try check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
   return SUCCESS;
 }
+
+/* Tangent family */
+
+static try check_tan(g95_expr *x) {
+/* May need to remove integer */
+  if (!g95_numeric_ts(&x->ts)) {
+   type_error(x);
+   return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+static try check_dtan(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) {
+    type_error(x);
+    return FAILURE;
+  }
+
+  return SUCCESS;
+}
+/* end of tangents */
 
 
 static try check_transfer(g95_expr *source, g95_expr *mold, g95_expr *size) {
@@ -1657,9 +1819,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("datan", 0, BT_REAL, dd, g95_simplify_atan, NULL, x, BT_REAL, dd, 0, NULL);
   make_generic("atan");
 
-  add_sym_f2("atan2",  0, BT_REAL, dr, g95_simplify_atan2, NULL,
+  add_sym_f2("atan2",  0, BT_REAL, dr, g95_simplify_atan2, check_atan2,
 	     y, BT_REAL, dr, 0, x, BT_REAL, dr, 0, NULL);
-  add_sym_f2("datan2", 0, BT_REAL, dd, g95_simplify_atan2, NULL,
+  add_sym_f2("datan2", 0, BT_REAL, dd, g95_simplify_atan2, check_datan2,
 	     y, BT_REAL, dd, 0, x, BT_REAL, dd, 0, NULL);
   make_generic("atan2");
 
@@ -1682,11 +1844,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f1("conjg", 0, BT_COMPLEX, dz, g95_simplify_conjg, NULL,
 	     z, BT_COMPLEX, dz, 0, NULL);
 
-  add_sym_f1("cos",  0, BT_REAL,    dr, g95_simplify_cos, NULL,
+  add_sym_f1("cos",  0, BT_REAL,    dr, g95_simplify_cos, check_cos,
 	     x, BT_REAL,    dr, 0, NULL);
-  add_sym_f1("dcos", 0, BT_REAL,    dd, g95_simplify_cos, NULL,
+  add_sym_f1("dcos", 0, BT_REAL,    dd, g95_simplify_cos, check_dcos,
 	     x, BT_REAL,    dd, 0, NULL);
-  add_sym_f1("ccos", 0, BT_COMPLEX, dz, NULL, NULL,
+  add_sym_f1("ccos", 0, BT_COMPLEX, dz, g95_simplify_cos, NULL,
 	     x, BT_COMPLEX, dz, 0, NULL);
   make_generic("cos");
 
@@ -1717,7 +1879,7 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f2("dot_product", 1, BT_REAL, dr, NULL, check_dot_product,
 	     va, BT_REAL, dr, 0, vb, BT_REAL, dr, 0, NULL);
 
-  add_sym_f2("dprod", 0, BT_REAL, dd, g95_simplify_dprod, NULL,
+  add_sym_f2("dprod", 0, BT_REAL, dd, g95_simplify_dprod, check_dprod,
 	     x, BT_REAL, dr, 0, y, BT_REAL, dr, 0, NULL);
 
   add_sym_f4("eoshift", 1, BT_REAL, dr, NULL, check_eoshift,
@@ -1993,9 +2155,9 @@ int di, dr, dd, dl, dc, dz;
 	     a, BT_REAL, dd, 0,   b, BT_REAL, dd, 0, NULL);
   make_generic("sign");
 
-  add_sym_f1("sin",  1, BT_REAL,    dr, g95_simplify_sin, NULL,   x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dsin", 1, BT_REAL,    dd, g95_simplify_sin, NULL,   x, BT_REAL, dd, 0, NULL);
-  add_sym_f1("csin", 1, BT_COMPLEX, dz, NULL, NULL,
+  add_sym_f1("sin",  1, BT_REAL,    dr, g95_simplify_sin, check_sin,   x, BT_REAL, dr, 0, NULL);
+  add_sym_f1("dsin", 1, BT_REAL,    dd, g95_simplify_sin, check_dsin,   x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("csin", 1, BT_COMPLEX, dz, g95_simplify_sin, NULL,
 	     x, BT_COMPLEX, dz, 0, NULL);
   make_generic("sin");
 
@@ -2023,8 +2185,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym_f3("sum", 1, BT_REAL, dr, NULL, check_sum, ar, BT_REAL, dr, 0,
 	     dm, BT_INTEGER, di, 1,   msk, BT_LOGICAL, dl, 1, NULL);
 
-  add_sym_f1("tan",  1, BT_REAL, dr, g95_simplify_tan, NULL, x, BT_REAL, dr, 0, NULL);
-  add_sym_f1("dtan", 1, BT_REAL, dd, g95_simplify_tan, NULL, x, BT_REAL, dd, 0, NULL);
+  add_sym_f1("tan",  1, BT_REAL, dr, g95_simplify_tan, check_tan, x, BT_REAL, dr, 0, NULL);
+  add_sym_f1("dtan", 1, BT_REAL, dd, g95_simplify_tan, check_dtan, x, BT_REAL, dd, 0, NULL);
   make_generic("tan");
 
   add_sym_f1("tanh",  1, BT_REAL, dr, NULL, NULL,  x, BT_REAL, dr, 0, NULL);
