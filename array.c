@@ -251,28 +251,17 @@ int i;
 
     if (e != NULL) {
       g95_resolve_expr(e);
-      if (e->ts.type != BT_INTEGER) goto non_integral;
-      if (e->rank != 0) goto non_scalar;
+      if (g95_specification_expr(e) == FAILURE) return FAILURE;
     }
 
     e = as->upper[i];
-
     if (e != NULL) {
       g95_resolve_expr(e);
-      if (e->ts.type != BT_INTEGER) goto non_integral;
-      if (e->rank != 0) goto non_scalar;
+      if (g95_specification_expr(e) == FAILURE) return FAILURE;
     }
   }
 
   return SUCCESS;
-
- non_integral:
-  g95_error("Array specification at %L must be of INTEGER type", &e->where);
-  return FAILURE;
-
- non_scalar:
-  g95_error("Array specification at %L must be scalar", &e->where);
-  return FAILURE;
 }
 
 

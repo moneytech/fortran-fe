@@ -905,15 +905,10 @@ g95_actual_arglist *ap;
  * see if it is consistent with some type of expression. */
 
 static try check_init_expr(g95_expr *);
-static try check_spec_expr(g95_expr *);
 
 static try check_intrinsic_op(g95_expr *e, try (*check_function)(g95_expr *)) {
-const char *expr_type = NULL;
  
   if ((*check_function)(e->op1) == FAILURE) return FAILURE;
-
-  if (check_function == check_init_expr) expr_type = "initialization";
-  if (check_function == check_spec_expr) expr_type = "specification";
 
   switch(e->operator) {
   case INTRINSIC_UPLUS:
@@ -946,8 +941,8 @@ const char *expr_type = NULL;
     if ((*check_function)(e->op2) == FAILURE) return FAILURE;
 
     if (e->op1->ts.type != BT_CHARACTER || e->op2->ts.type != BT_CHARACTER) {
-      g95_error("Concatenation operator in %s expression at %L "
-		"must have two CHARACTER operands", expr_type, &e->op1->where);
+      g95_error("Concatenation operator in expression at %L "
+		"must have two CHARACTER operands", &e->op1->where);
       return FAILURE;
     }
 
@@ -961,8 +956,8 @@ const char *expr_type = NULL;
 
   case INTRINSIC_NOT:
     if (e->op1->ts.type != BT_LOGICAL) {
-      g95_error(".NOT. operator in %s expression at %L must have "
-		"a LOGICAL operand", expr_type, &e->op1->where);
+      g95_error(".NOT. operator in expression at %L must have a LOGICAL "
+		"operand", &e->op1->where);
       return FAILURE;
     }
 
@@ -973,24 +968,23 @@ const char *expr_type = NULL;
     if ((*check_function)(e->op2) == FAILURE) return FAILURE;
 
     if (e->op1->ts.type != BT_LOGICAL || e->op2->ts.type != BT_LOGICAL) {
-      g95_error("LOGICAL operands are required in %s expression at %L",
-		expr_type, &e->where);
+      g95_error("LOGICAL operands are required in expression at %L",
+		&e->where);
       return FAILURE;
     }
 
     break;
 
   default:
-    g95_error("Only intrinsic operators can be used in %s expression at %L",
-	      expr_type, &e->where);
+    g95_error("Only intrinsic operators can be used in expression at %L",
+	      &e->where);
     return FAILURE;
   }
 
   return SUCCESS;
 
 not_numeric:
-  g95_error("Numeric operands are required in %s expression at %L",
-	    expr_type, &e->where);
+  g95_error("Numeric operands are required in expression at %L", &e->where);
 
   return FAILURE;
 }
@@ -1163,43 +1157,159 @@ try t;
 }
 
 
-/* check_spec_expr()-- Verify that an expression is a
- * specification expression.  Like its cousin check_init_expr(),
- * an error message is generated if we return FAILURE. */
 
-static try check_spec_expr(g95_expr *e) {
-g95_actual_arglist *ap;
+static try check_restricted(g95_expr *);
+
+/* restricted_args()-- Given an actual argument list, test to see that
+ * each argument is a restricted expression and optionally if the
+ * expression type is integer or character */
+
+static try restricted_args(g95_actual_arglist *a, int check_type) {
+bt type;
+
+  for(; a; a=a->next) {
+    if (check_restricted(a->expr) == FAILURE) return FAILURE;
+
+    if (!check_type) continue;
+
+    type = a->expr->ts.type;
+    if (type != BT_CHARACTER && type != BT_INTEGER) {
+      g95_error("Function argument at %L must be of type INTEGER or CHARACTER",
+		&a->expr->where);
+      return FAILURE;
+    }
+  }
+
+  return SUCCESS;
+}
+
+
+/************* Restricted/specification expressions *************/
+
+
+/* external_spec_function()-- Make sure a non-intrinsic function is a
+ * specification function. */
+
+static try external_spec_function(g95_expr *e) {
+g95_symbol *f;
+
+  f = e->value.function.esym;
+
+  if (f->attr.proc == PROC_ST_FUNCTION) {
+    g95_error("Specification function '%s' at %L cannot be a statement "
+	      "function", f->name, &e->where);
+    return FAILURE;
+  }
+
+  if (f->attr.proc == PROC_INTERNAL) {
+    g95_error("Specification function '%s' at %L cannot be an internal "
+	      "function", f->name, &e->where);
+    return FAILURE;
+  }
+
+  if (!f->attr.pure) {
+    g95_error("Specification function '%s' at %L must be PURE", f->name,
+	      &e->where);
+    return FAILURE;
+  }
+
+  if (f->attr.recursive) {
+    g95_error("Specification function '%s' at %L cannot be RECURSIVE",
+	      f->name, &e->where);
+    return FAILURE;
+  }
+
+  return restricted_args(e->value.function.actual, 0);
+}
+
+
+/* restricted_intrinsic()-- Check to see that a function reference to
+ * an intrinsic is a restricted expression.  Some functions required
+ * by the standard are omitted because references to them have already
+ * been simplified.  Strictly speaking, a lot of these checks are
+ * redundant with other checks.  If a function is indeed a particular
+ * intrinsic, then the type of its argument have already been checked
+ * and passed. */
+
+static try restricted_intrinsic(g95_expr *e) {
+g95_intrinsic_sym *sym;
+
+static struct { char *name; int case_number; } *cp, cases[] = {
+  { "repeat", 0 },             { "reshape", 0 },  { "selected_int_kind", 0 },
+  { "selected_real_kind", 0 }, { "transfer", 0 }, { "trim", 0 },
+
+  { "null", 1 },
+
+  { "lbound", 2 }, { "shape", 2 }, { "size", 2 }, { "ubound", 2 },
+  
+  /* bit_size() has already been reduced */
+
+  { "len", 0 },
+
+  /* kind() has already been reduced */
+  /* Numeric inquiry functions have been reduced */
+
+  { NULL, 0 } };
+
+try t;
+
+  sym = e->value.function.isym;
+  if (sym->elemental) return restricted_args(e->value.function.actual, 1);
+
+  for(cp=cases; cp->name; cp++)
+    if (strcmp(cp->name, sym->name) == 0) break;
+
+  if (cp->name == NULL) {
+    g95_error("Intrinsic function '%s' at %L is not a restricted function",
+	      sym->name, &e->where);
+    return FAILURE;
+  }
+
+  switch(cp->case_number) {
+  case 0:
+    /* Functions that are restricted if they have character/integer args */
+
+    t = restricted_args(e->value.function.actual, 1);
+    break;
+
+  case 1:  /* NULL() */
+    t = SUCCESS;
+    break;
+
+  case 2:
+    /* Functions that could be checking the bounds of an assumed-size array */
+
+    t = SUCCESS;     /* TODO: implement checks from 7.1.6.2 (10) */
+    break;
+
+  default:
+    g95_internal_error("restricted_intrinsic(): Bad case");
+  }
+
+  return t;
+}
+
+
+/* check_restricted()-- Verify that an expression is a restricted
+ * expression.  Like its cousin check_init_expr(), an error message is
+ * generated if we return FAILURE. */
+
+static try check_restricted(g95_expr *e) {
 g95_symbol *sym;
-match m;
 try t;
 
   if (e == NULL) return SUCCESS;
 
   switch(e->expr_type) {
   case EXPR_OP:
-    t = check_intrinsic_op(e, check_spec_expr);
+    t = check_intrinsic_op(e, check_restricted);
     if (t == SUCCESS) t = g95_simplify_expr(e, 0);
 
     break;
 
   case EXPR_FUNCTION:
-    t = SUCCESS;
-
-    for(ap=e->value.function.actual; ap; ap=ap->next)
-      if (check_spec_expr(ap->expr) == FAILURE) {
-	t = FAILURE;
-	break;
-      }
-
-    if (t == SUCCESS) {
-      m = g95_intrinsic_func_interface(e, 0);
-
-      if (m == MATCH_NO)
-	g95_error("Function '%s' in specification expression at %L "
-		  "must be an intrinsic function", e->symbol->name, &e->where);
-
-      if (m != MATCH_YES) t = FAILURE;
-    }
+    t = e->value.function.esym ?
+      external_spec_function(e) :  restricted_intrinsic(e);
 
     break;
 
@@ -1219,42 +1329,39 @@ try t;
       break;
     }
 
-    if (sym->attr.use_assoc || sym->ns != g95_current_ns) {
+    if (sym->attr.in_common || sym->attr.use_assoc || sym->attr.dummy ||
+	sym->ns != g95_current_ns ||
+	(sym->ns->proc_name != NULL &&
+	 sym->ns->proc_name->attr.flavor == FL_MODULE)) {
       t = SUCCESS;
       break;
     }
 
-    g95_error("Variable '%s' cannot appear in the specification expression "
-	      "at %L", sym->name, &e->where);
+    g95_error("Variable '%s' cannot appear in the expression at %L",
+	      sym->name, &e->where);
 
     break;
-
 
   case EXPR_NULL:
-    g95_error("NULL at %L cannot appear in a specification expression",
-	      &e->where);
-    t = FAILURE;
-    break;
-
   case EXPR_CONSTANT:
     t = SUCCESS;
     break;
 
   case EXPR_SUBSTRING:
-    t = check_spec_expr(e->op1);
+    t = g95_specification_expr(e->op1);
     if (t == FAILURE) break;
 
-    t = check_spec_expr(e->op2);
+    t = g95_specification_expr(e->op2);
     if (t == SUCCESS) t = g95_simplify_expr(e, 0);
 
     break;
 
   case EXPR_STRUCTURE:
-    t = g95_check_constructor(e, check_spec_expr);
+    t = g95_check_constructor(e, check_restricted);
     break;
 
   case EXPR_ARRAY:
-    t = g95_check_constructor(e, check_spec_expr);
+    t = g95_check_constructor(e, check_restricted);
     break;
 
   default:
@@ -1262,6 +1369,26 @@ try t;
   }
 
   return t;
+}
+
+
+/* g95_check_spec_expr()-- Check to see that an expression is a
+ * specification expression.  If we return FAILURE, an error has been
+ * generated. */
+
+try g95_specification_expr(g95_expr *e) {
+
+  if (e->ts.type != BT_INTEGER) {
+    g95_error("Expression at %L must be of INTEGER type", &e->where);
+    return FAILURE;
+  }
+
+  if (e->rank != 0) {
+    g95_error("Expression at %L must be scalar", &e->where);
+    return FAILURE;
+  }
+
+  return check_restricted(e);
 }
 
 
