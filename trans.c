@@ -23,15 +23,14 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include <stdio.h>
 #include "c-common.h"
 #include "ggc.h"
-#include "rtl.h"
 #include "toplev.h"
-#include "function.h"
-#include "expr.h"
+#include "defaults.h"
 #include "real.h"
 #include <gmp.h>
 #include <assert.h>

@@ -34,8 +34,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include "rtl.h"
-#include "expr.h"
+#include "coretypes.h"
 #include "tree.h"
 #include "flags.h"
 #include "errors.h"
@@ -63,7 +62,6 @@ void g95_init_c_decl_hacks(void)
   string_type_node = pchar_type_node;
   const_string_type_node = build_pointer_type (build_qualified_type
       (char_type_node, TYPE_QUAL_CONST));
-  c_size_type_node = g95_array_index_type;
 
   void_zero_node = build_int_2 (0, 0);
 }
@@ -72,7 +70,6 @@ tree build_modify_expr PARAMS((tree, enum tree_code, tree));
 static int comp_target_types PARAMS((tree, tree));
 static int comptypes PARAMS((tree, tree));
 static int function_types_compatible_p PARAMS((tree, tree));
-tree c_size_in_bytes PARAMS((tree));
 static void pedantic_lvalue_warning (enum tree_code);
 static tree convert_for_assignment PARAMS((tree, tree, const char *, tree, tree, int));
 //tree common_type PARAMS((tree, tree));
@@ -91,39 +88,6 @@ static int skip_evaluation = 0;
 static int warn_conversion = 1;
 
 static int constant_fits_type_p PARAMS((tree, tree));
-
-/* Returns non-zero if CODE is the code for a statement.  */
-
-int
-statement_code_p (code)
-     enum tree_code code;
-{
-  switch (code)
-    {
-    case CLEANUP_STMT:
-    case EXPR_STMT:
-    case COMPOUND_STMT:
-    case DECL_STMT:
-    case IF_STMT:
-    case FOR_STMT:
-    case WHILE_STMT:
-    case DO_STMT:
-    case RETURN_STMT:
-    case BREAK_STMT:
-    case CONTINUE_STMT:
-    case SCOPE_STMT:
-    case SWITCH_STMT:
-    case GOTO_STMT:
-    case LABEL_STMT:
-    case ASM_STMT:
-    case FILE_STMT:
-    case CASE_LABEL:
-      return 1;
-
-    default:
-      return 0;
-    }
-}
 
 /* Nonzero if constant C has a value that is permissible
    for type TYPE (an INTEGER_TYPE).  */
@@ -302,29 +266,6 @@ pedantic_lvalue_warning (code)
 	pedwarn ("ISO C forbids use of cast expressions as lvalues");
 	break;
       }
-}
-
-/* Compute the size to increment a pointer by.  */
-
-tree
-c_size_in_bytes (type)
-     tree type;
-{
-  enum tree_code code = TREE_CODE (type);
-
-  if (code == FUNCTION_TYPE || code == VOID_TYPE || code == ERROR_MARK)
-    return size_one_node;
-
-  if (!COMPLETE_OR_VOID_TYPE_P (type))
-    {
-      error ("arithmetic on pointer to an incomplete type");
-      return size_one_node;
-    }
-
-  /* Convert in case a char is more than one unit.  */
-  return size_binop (CEIL_DIV_EXPR, TYPE_SIZE_UNIT (type),
-		     size_int (TYPE_PRECISION (char_type_node)
-			       / BITS_PER_UNIT));
 }
 
 /* Subroutines of `comptypes'.  */

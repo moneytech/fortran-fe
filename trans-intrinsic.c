@@ -24,15 +24,13 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include <stdio.h>
 #include <string.h>
 #include "c-common.h"
 #include "ggc.h"
-#include "rtl.h"
 #include "toplev.h"
-#include "function.h"
-#include "expr.h"
 #include "real.h"
 #include "tree-simple.h"
 #include "flags.h"
@@ -1634,6 +1632,44 @@ g95_conv_intrinsic_size (g95_se * se, g95_expr * expr)
   se->expr = convert (type, se->expr);
 }
 
+/* Intrinsic string comarison functions.  */
+static void
+g95_conv_intrinsic_strcmp (g95_se * se, g95_expr * expr, int op)
+{
+  tree type;
+  tree args;
+
+  args = g95_conv_intrinsic_function_args (se, expr);
+  /* Build a call for the comparison.  */
+  se->expr = g95_build_function_call (gfor_fndecl_compare_string, args);
+
+  type = g95_typenode_for_spec (&expr->ts);
+  se->expr = build (op, type, se->expr, integer_zero_node);
+}
+
+/* Generate a call to the adjustl/adjustr library function.  */
+static void
+g95_conv_intrinsic_adjust (g95_se * se, g95_expr * expr, tree fndecl)
+{
+  tree args;
+  tree len;
+  tree type;
+  tree var;
+  tree tmp;
+
+  args = g95_conv_intrinsic_function_args (se, expr);
+  len = TREE_VALUE (args);
+
+  type = TREE_TYPE (TREE_VALUE (TREE_CHAIN (args)));
+  var = g95_conv_string_tmp (se, type, len);
+  args = tree_cons (NULL_TREE, var, args);
+
+  tmp = g95_build_function_call (fndecl, args);
+  g95_add_expr_to_block (&se->pre, tmp);
+  se->expr = var;
+  se->string_length = len;
+}
+
 /* Generate code for an intrinsic function.  Some map directly to library
    calls, others get special handling.  In some cases the name of the function
    used depends on the type specifiers.  */
@@ -1670,8 +1706,6 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_NONE:
       abort ();
 
-    case G95_ISYM_ADJUSTL:
-    case G95_ISYM_ADJUSTR:
     case G95_ISYM_ALLOCATED:
     case G95_ISYM_ANINIT:
     case G95_ISYM_ASSOCIATED:
@@ -1684,10 +1718,6 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_FLOOR:
     case G95_ISYM_FRACTION:
     case G95_ISYM_INDEX:
-    case G95_ISYM_LGE:
-    case G95_ISYM_LGT:
-    case G95_ISYM_LLE:
-    case G95_ISYM_LLT:
     case G95_ISYM_MERGE:
     case G95_ISYM_MODULO:
     case G95_ISYM_MVBITS:
@@ -1711,6 +1741,14 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 
     case G95_ISYM_ABS:
       g95_conv_intrinsic_abs (se, expr);
+      break;
+
+    case G95_ISYM_ADJUSTL:
+      g95_conv_intrinsic_adjust (se, expr, gfor_fndecl_adjustl);
+      break;
+
+    case G95_ISYM_ADJUSTR:
+      g95_conv_intrinsic_adjust (se, expr, gfor_fndecl_adjustr);
       break;
 
     case G95_ISYM_AIMAG:
@@ -1825,6 +1863,22 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 
     case G95_ISYM_LEN_TRIM:
       g95_conv_intrinsic_len_trim (se, expr);
+      break;
+
+    case G95_ISYM_LGE:
+      g95_conv_intrinsic_strcmp (se, expr, GE_EXPR);
+      break;
+
+    case G95_ISYM_LGT:
+      g95_conv_intrinsic_strcmp (se, expr, GT_EXPR);
+      break;
+
+    case G95_ISYM_LLE:
+      g95_conv_intrinsic_strcmp (se, expr, LE_EXPR);
+      break;
+
+    case G95_ISYM_LLT:
+      g95_conv_intrinsic_strcmp (se, expr, LT_EXPR);
       break;
 
     case G95_ISYM_MAX:

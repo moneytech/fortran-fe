@@ -25,59 +25,14 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include "tree-inline.h"
-#include "c-common.h"
-#include "hard-reg-set.h"
-#include "basic-block.h"
-#include "tree-flow.h"
 #define BACKEND_CODE
 #include "g95.h"
 #include "trans.h"
 
-/*  Replaces T; by a COMPOUND_STMT containing {T;}.  */
-void
-tree_build_scope (t)
-     tree *t;
-{
-  tree comp_stmt, start_scope, end_scope;
-
-  /* If T already has a proper scope, do nothing.  */
-  if (*t
-      && TREE_CODE (*t) == COMPOUND_STMT
-      && COMPOUND_BODY (*t))
-    return;
-
-  /* Create a new empty scope.  */
-  comp_stmt = make_node (COMPOUND_STMT);
-
-  start_scope = make_node (SCOPE_STMT);
-  SCOPE_BEGIN_P (start_scope) = 1;
-
-  end_scope = make_node (SCOPE_STMT);
-  SCOPE_BEGIN_P (end_scope) = 0;
-
-  COMPOUND_BODY (comp_stmt) = start_scope;
-
-  if (*t)
-    {
-      /* If T is not empty, insert it inside the newly created scope.  Note
-	 that we can't just join TREE_CHAIN(*T) to the closing scope
-	 because even if T wasn't inside a scope, it might be a list of
-	 statements.  */
-      TREE_CHAIN (start_scope) = *t;
-      chainon (*t, end_scope);
-    }
-  else
-    {
-      /* T is empty.  Simply join the start/end nodes.  */
-      TREE_CHAIN (start_scope) = end_scope;
-    }
-
-  /* Set T to the newly constructed scope.  */
-  *t = comp_stmt;
-}
 /*  Copy every statement from the chain CHAIN by calling deep_copy_node().
     Return the new chain.  */
 
@@ -120,87 +75,8 @@ deep_copy_node (node)
   if (node == NULL_TREE)
     return NULL_TREE;
 
-  switch (TREE_CODE (node))
-    {
-    case COMPOUND_STMT:
-      res = build_stmt (COMPOUND_STMT, deep_copy_list (COMPOUND_BODY (node)));
-      break;
-
-    case FOR_STMT:
-      res = build_stmt (FOR_STMT,
-			deep_copy_node (FOR_INIT_STMT (node)),
-			deep_copy_node (FOR_COND (node)),
-			deep_copy_node (FOR_EXPR (node)),
-			deep_copy_node (FOR_BODY (node)));
-      break;
-
-    case WHILE_STMT:
-      res = build_stmt (WHILE_STMT,
-			deep_copy_node (WHILE_COND (node)),
-			deep_copy_node (WHILE_BODY (node)));
-      break;
-
-    case DO_STMT:
-      res = build_stmt (DO_STMT,
-			deep_copy_node (DO_COND (node)),
-			deep_copy_node (DO_BODY (node)));
-      break;
-
-    case IF_STMT:
-      res = build_stmt (IF_STMT,
-			deep_copy_node (IF_COND (node)),
-			deep_copy_node (THEN_CLAUSE (node)),
-			deep_copy_node (ELSE_CLAUSE (node)));
-      break;
-
-    case SWITCH_STMT:
-      res = build_stmt (SWITCH_STMT,
-			deep_copy_node (SWITCH_COND (node)),
-			deep_copy_node (SWITCH_BODY (node)));
-      break;
-
-    case EXPR_STMT:
-      res = build_stmt (EXPR_STMT, deep_copy_node (EXPR_STMT_EXPR (node)));
-      break;
-
-    case DECL_STMT:
-      res = build_stmt (DECL_STMT, DECL_STMT_DECL (node));
-      break;
-
-    case RETURN_STMT:
-      res = build_stmt (RETURN_STMT, deep_copy_node (RETURN_STMT_EXPR (node)));
-      break;
-
-    case TREE_LIST:
-      res = build_tree_list (deep_copy_node (TREE_PURPOSE (node)),
-	                     deep_copy_node (TREE_VALUE (node)));
-      break;
-
-    case SCOPE_STMT:
-      if (SCOPE_BEGIN_P (node))
-	{
-	  /* ??? The sub-blocks and supercontext for the scope's BLOCK_VARS
-		 should be re-computed after copying.  */
-	  res = build_stmt (SCOPE_STMT,
-			    deep_copy_list (SCOPE_STMT_BLOCK (node)));
-	  SCOPE_BEGIN_P (res) = 1;
-	}
-      else
-	{
-	  res = build_stmt (SCOPE_STMT, NULL_TREE);
-	  SCOPE_BEGIN_P (res) = 0;
-	}
-      break;
-
-    default:
-      walk_tree (&node, copy_tree_r, NULL, NULL);
-      res = node;
-      break;
-    }
-
-  /* Set the line number.  */
-  if (statement_code_p (TREE_CODE (node)))
-    STMT_LINENO (res) = STMT_LINENO (node);
+  walk_tree (&node, copy_tree_r, NULL, NULL);
+  res = node;
 
   return res;
 }

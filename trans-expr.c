@@ -24,14 +24,12 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include <stdio.h>
 #include "c-common.h"
 #include "ggc.h"
-#include "rtl.h"
 #include "toplev.h"
-#include "function.h"
-#include "expr.h"
 #include "real.h"
 #include "tree-simple.h"
 #include "flags.h"
@@ -607,6 +605,49 @@ g95_conv_power_op (g95_se * se, g95_expr * expr)
   se->expr = g95_build_function_call (fndecl, tmp);
 }
 
+/* Generate code to allocate a string temporary.  */
+tree
+g95_conv_string_tmp (g95_se * se, tree type, tree len)
+{
+  tree var;
+  tree tmp;
+  tree args;
+  tree addr;
+
+  if (g95_can_put_var_on_stack (len))
+    {
+      /* Create a temporary variable to hold the result.  */
+      tmp = fold (build (MINUS_EXPR, TREE_TYPE (len), len, integer_one_node));
+      tmp = build_range_type (g95_array_index_type, integer_zero_node, tmp);
+      tmp = build_array_type (g95_character1_type_node, tmp);
+      var = g95_create_var (tmp, "str");
+      TREE_ADDRESSABLE (var) = 1;
+      var = build1 (ADDR_EXPR, type, var);
+    }
+  else
+    {
+      var = g95_create_var (type, "pstr");
+
+      TREE_ADDRESSABLE (var) = 1;
+
+      /* Allocate a temporary to hold the result.  */
+      addr = build1 (ADDR_EXPR, ppvoid_type_node, var);
+
+      args = NULL_TREE;
+      args = g95_chainon_list (args, addr);
+      args = g95_chainon_list (args, len);
+      tmp = g95_build_function_call (gfor_fndecl_internal_malloc, args);
+      g95_add_expr_to_block (&se->pre, tmp);
+
+      /* Free the temporary afterwards.  */
+      args = g95_chainon_list (NULL_TREE, addr);
+      tmp = g95_build_function_call (gfor_fndecl_internal_free, args);
+      g95_add_expr_to_block (&se->post, tmp);
+    }
+
+  return var;
+}
+
 /* Handle a string concatenation operation.  A temporary will be allocated to
    hold the result.  */
 static void
@@ -645,41 +686,8 @@ g95_conv_concat_op (g95_se * se, g95_expr * expr)
     }
 
   type = build_pointer_type (type);
-  var = g95_create_var (type, "pstr");
 
-
-  if (g95_can_put_var_on_stack (len))
-    {
-      /* Create a temporary variable to hold the result.  */
-      tmp = fold (build (MINUS_EXPR, TREE_TYPE (len), len, integer_one_node));
-      tmp = build_range_type (g95_array_index_type, integer_zero_node, tmp);
-      type = build_array_type (g95_character1_type_node, tmp);
-      tmp = g95_create_var (type, "str");
-      TREE_ADDRESSABLE (tmp) = 1;
-      tmp = build1 (ADDR_EXPR, TREE_TYPE (var), tmp);
-      tmp = build (MODIFY_EXPR, TREE_TYPE (var), var, tmp);
-      g95_add_expr_to_block (&se->pre, tmp);
-    }
-  else
-    {
-      tree addr;
-
-      TREE_ADDRESSABLE (var) = 1;
-
-      /* Allocate a temporary to hold the result.  */
-      addr = build1 (ADDR_EXPR, ppvoid_type_node, var);
-
-      args = NULL_TREE;
-      args = g95_chainon_list (args, addr);
-      args = g95_chainon_list (args, len);
-      tmp = g95_build_function_call (gfor_fndecl_internal_malloc, args);
-      g95_add_expr_to_block (&se->pre, tmp);
-
-      /* Free the temporary afterwards.  */
-      args = g95_chainon_list (NULL_TREE, addr);
-      tmp = g95_build_function_call (gfor_fndecl_internal_free, args);
-      g95_add_expr_to_block (&se->post, tmp);
-    }
+  var = g95_conv_string_tmp (se, type, len);
 
   /* Do the actual concatenation.  */
   args = NULL_TREE;
@@ -857,7 +865,6 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
       lse.expr = g95_build_function_call (gfor_fndecl_compare_string, tmp);
       g95_add_block_to_block (&lse.post, &rse.post);
 
-      //pushdecl (lse.expr);
       rse.expr = integer_zero_node;
     }
 
@@ -865,7 +872,7 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
 
   if (lop)
     {
-      /* The result ot logical ops is always boolean_type_node.  */
+      /* The result of logical ops is always boolean_type_node.  */
       tmp = build (code, type, lse.expr, rse.expr);
       se->expr = convert (type, tmp);
     }
@@ -920,6 +927,8 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym,
   tree len;
 
   arglist = NULL_TREE;
+  var = NULL_TREE;
+  len = NULL_TREE;
 
   if (se->ss != NULL)
     {

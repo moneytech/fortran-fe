@@ -23,15 +23,15 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include <stdio.h>
-#include "c-common.h"
 #include "ggc.h"
-#include "rtl.h"
 #include "toplev.h"
+#include "target.h"
+#include "tm.h"
 #include "function.h"
-#include "expr.h"
 #include "errors.h"
 #include <assert.h>
 #define BACKEND_CODE
@@ -92,6 +92,8 @@ tree gfor_fndecl_copy_string;
 tree gfor_fndecl_compare_string;
 tree gfor_fndecl_concat_string;
 tree gfor_fndecl_string_len_trim;
+tree gfor_fndecl_adjustl;
+tree gfor_fndecl_adjustr;
 
 /* Other misc. runtime library functions.  */
 tree gfor_fndecl_size0;
@@ -538,7 +540,6 @@ g95_get_symbol_decl (g95_symbol * sym)
       break;
 
     case BT_DERIVED:
-      //g95_defer_symbol_init (sym);
       if (sym->value)
         g95_todo_error ("Derived type initializer");
       break;
@@ -982,6 +983,22 @@ g95_build_intrinsic_function_decls (void)
     g95_build_library_function_decl (get_identifier ("_gfor_string_len_trim"),
                                     g95_int4_type_node,
                                     2, g95_strlen_type_node, pchar_type_node);
+
+  gfor_fndecl_adjustl =
+    g95_build_library_function_decl (get_identifier ("_gfor_adjustl"),
+                                    void_type_node,
+                                    3,
+                                    pchar_type_node,
+                                    g95_strlen_type_node,
+                                    pchar_type_node);
+
+  gfor_fndecl_adjustr =
+    g95_build_library_function_decl (get_identifier ("_gfor_adjustr"),
+                                    void_type_node,
+                                    3,
+                                    pchar_type_node,
+                                    g95_strlen_type_node,
+                                    pchar_type_node);
 
   /* Power functions.  */
   gfor_fndecl_math_powf =
@@ -1566,6 +1583,9 @@ g95_generate_function_code (g95_namespace * ns)
 void
 g95_generate_constructors ()
 {
+  if (g95_static_ctors != NULL_TREE)
+    abort ();
+#if 0
   tree fnname;
   tree type;
   tree fndecl;
@@ -1575,8 +1595,6 @@ g95_generate_constructors ()
   if (g95_static_ctors == NULL_TREE)
     return;
 
-  abort ();
-#if 0
   fnname = get_file_function_name ('I');
   type = build_function_type (void_type_node,
                              g95_chainon_list (NULL_TREE, void_type_node));

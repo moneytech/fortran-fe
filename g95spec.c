@@ -97,6 +97,8 @@ static void append_arg PARAMS ((const char *));
 static int g77_newargc;
 static const char **g77_newargv;
 
+const struct spec_function lang_specific_spec_functions[] = {0,0};
+
 /* --- This comes from gcc.c (2.8.1) verbatim: */
 
 /* This defines which switch letters take arguments.  */

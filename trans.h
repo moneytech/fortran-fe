@@ -231,6 +231,8 @@ void g95_conv_function_call (g95_se *, g95_symbol *, g95_actual_arglist *);
 /* Generate code for a scalar assignment.  */
 tree g95_trans_scalar_assign (g95_se *, g95_se *, bt);
 
+/* Generate code to allocate a string temporary.  */
+tree g95_conv_string_tmp (g95_se *, tree, tree);
 /* Get the length of a string.  */
 tree g95_conv_string_length (tree);
 /* Initialize a string length variable.  */
@@ -356,6 +358,8 @@ extern GTY(()) tree gfor_fndecl_copy_string;
 extern GTY(()) tree gfor_fndecl_compare_string;
 extern GTY(()) tree gfor_fndecl_concat_string;
 extern GTY(()) tree gfor_fndecl_string_len_trim;
+extern GTY(()) tree gfor_fndecl_adjustl;
+extern GTY(()) tree gfor_fndecl_adjustr;
 
 /* Other misc. runtime library functions.  */
 extern GTY(()) tree gfor_fndecl_size0;

@@ -23,14 +23,12 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include <stdio.h>
 #include "c-common.h"
 #include "ggc.h"
-#include "rtl.h"
 #include "toplev.h"
-#include "function.h"
-#include "expr.h"
 #include <assert.h>
 #define BACKEND_CODE
 #include "g95.h"
@@ -148,6 +146,7 @@ g95_init_types (void)
     n = sizeof(HOST_WIDE_INT) * 8;
   n += G95_DTYPE_SIZE_SHIFT;
   g95_max_array_element_size = (~(unsigned HOST_WIDE_INT)0) >> n;
+  size_type_node = g95_array_index_type;
 }
 
 /* Get a type node for an integer kind */

@@ -25,32 +25,30 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
-#include "output.h"
-#include <stdio.h>
-#include "debug.h"
-#include "c-common.h"
-#include "rtl.h"
-#include "tm_p.h"
-#include "ggc.h"
-#include "toplev.h"
 #include "langhooks.h"
 #include "langhooks-def.h"
-#include "function.h"
-#include "expr.h"
-#include "errors.h"
 #include "timevar.h"
-#include "flags.h"
+#include "tm.h"
+#include "function.h"
+#include "ggc.h"
+#include "toplev.h"
 #include "target.h"
+#include "debug.h"
 #include "diagnostic.h"
-#include <assert.h>
+#include "c-common.h"
+
 #define BACKEND_CODE
 #include "g95.h"
 #include "trans.h"
 #include "trans-types.h"
 #include "trans-const.h"
 #include "g95-support.h"
+
+#include <assert.h>
+#include <stdio.h>
 
 /* Language-dependent contents of an identifier.  */
 
@@ -164,6 +162,7 @@ const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
 const char tree_code_type[] = {
 #include "tree.def"
   'x',
+/* TODO: Is c-common.def still needed?  */
 #include "c-common.def"		/* Should disappear once SIMPLE is part of tree.h  */
 };
 #undef DEFTREECODE
@@ -260,6 +259,9 @@ expand_function_body (tree fndecl, int nested)
 
   if (DECL_STATIC_CONSTRUCTOR (fndecl))
     {
+      abort ();
+      /* Not bothering. Hopefully this will end up in l-i code.  */
+#if 0
       if (targetm.have_ctors_dtors)
         {
 
@@ -268,6 +270,7 @@ expand_function_body (tree fndecl, int nested)
         }
       else
         g95_static_ctors = g95_chainon_list (g95_static_ctors, fndecl);
+#endif
     }
   if (nested)
     ggc_pop_context ();

@@ -24,15 +24,13 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
 #include "tree.h"
 #include "tree-simple.h"
 #include <stdio.h>
 #include "c-common.h"
 #include "ggc.h"
-#include "rtl.h"
 #include "toplev.h"
-#include "function.h"
-#include "expr.h"
 #include "real.h"
 #include <assert.h>
 #include <gmp.h>
@@ -477,7 +475,7 @@ g95_trans_do_while (g95_code * code)
   /* Label for cycle statements (if needed).  */
   if (TREE_USED (cycle_label))
     {
-      tmp = build_v (GOTO_EXPR, cycle_label);
+      tmp = build_v (LABEL_EXPR, cycle_label);
       g95_add_expr_to_block (&block, tmp);
     }
 
@@ -490,7 +488,7 @@ g95_trans_do_while (g95_code * code)
   g95_add_expr_to_block (&block, tmp);
 
   /* Add the exit label.  */
-  tmp = build_v (GOTO_EXPR, exit_label);
+  tmp = build_v (LABEL_EXPR, exit_label);
   g95_add_expr_to_block (&block, tmp);
 
   return g95_finish_block (&block);
@@ -531,6 +529,8 @@ g95_trans_select (g95_code * code)
 
   end_label = g95_build_label_decl (NULL_TREE);
 
+  g95_init_block (&body);
+
   for (c = code->block; c; c = c->block)
     {
       for (cp = c->ext.case_list; cp; cp = cp->next)
@@ -547,23 +547,22 @@ g95_trans_select (g95_code * code)
               else
                 g95_todo_error ("unbounded case ranges");
 
-              if (mpz_cmp (cp->low->value.integer,
-                           cp->high->value.integer) == 0)
+              if (cp->high)
                 {
-                  if (cp->high)
+                  if (mpz_cmp (cp->low->value.integer,
+                               cp->high->value.integer) != 0)
                     {
                       high = g95_conv_mpz_to_tree (cp->high->value.integer,
                                                    kind);
                     }
                   else
-                    g95_todo_error ("unbounded case ranges");
+                    high = NULL_TREE;
                 }
               else
-                high = NULL_TREE;
+                g95_todo_error ("unbounded case ranges");
             }
 
           /* Add this case label.  */
-          g95_init_block (&body);
           tmp = build_v (CASE_LABEL_EXPR, low, high);
           g95_add_expr_to_block (&body, tmp);
         }

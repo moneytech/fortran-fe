@@ -1,3 +1,28 @@
+2002-12-08  Paul Brook  <paul@nowt.org>
+
+	* Make-lang.in (F95_ADDITIONAL_OBJS): Remove tree-dchain.o.
+	* support.c: Update #includes.
+	(statement_code_p, c_size_in_bytes, s_size_type_node): Remove.
+	* trans-array.c: Update #includes.
+	* trans.c: Ditto.
+	* trans-const.c: Ditto.
+	* trans-io.c: Ditto.
+	* trans-types.c: Ditto.
+	(g95_init_types): Set size_type_node.
+	* trans-decl.c: Update #includes.
+	(gfor_fndecl_adjust{l,r}): Declare and initialize.
+	* trans-stmt.c: Update #includes.
+	(g95_trans_do_while): Generate LABEL_EXPR, not GOTO_EXPR.
+	(g95_trans_select): Fix check for unbounded ranges.
+	* trans-expr.c: Update #includes.
+	(g95_conv_string_tmp): New function.
+	(g95_conv_concat_op): Use it.
+	* trans.h (g95_conv_string_tmp, gfor_fndecl_adjust{l,r}): Declare.
+	* Trans-intrisic.c: Update #includes.
+	(g95_conv_intrinsic_strcmp): New function.
+	(g95_conv_intrinsic_adjust): Ditto.
+	(g95_conv_intrinsic_function: Use them.
+
 2002-11-30  Paul Brook  <paul@nowt.org>
 
 	* trans-array.c (g95_walk_function_expr): Handle non-array return by
