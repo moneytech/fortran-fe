@@ -1558,7 +1558,7 @@ static try check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
     return FAILURE;
   }
 
-  if (check_arg_dim(array, dim, 0) == FAILURE) return FAILURE;
+  if (check_arg_dim(array, dim, 1) == FAILURE) return FAILURE;
 
   if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->rank == 0))
     return FAILURE;
