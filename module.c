@@ -2084,7 +2084,8 @@ static void write_symbol(g95_symbol *sym) {
 
 static void write_symbol0(g95_symbol *sym) {
 
-  if (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic) return;
+  if (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic &&
+      !sym->attr.subroutine && !sym->attr.function) return;
 
   if (sym->serial == -1) {
     if (!check_access(sym->attr.access, sym->ns->default_access)) return;
@@ -2122,7 +2123,8 @@ g95_symbol *sym;
 
   sym = st->sym;
   if (!check_access(sym->attr.access, sym->ns->default_access) ||
-      (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic)) return;
+      (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic &&
+       !sym->attr.subroutine && !sym->attr.function)) return;
 
   if (sym->serial == -1)
     g95_internal_error("write_symtree(): Symbol not written");
