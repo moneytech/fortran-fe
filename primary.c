@@ -907,6 +907,49 @@ match m;
 }
 
 
+/* match_actual_arg()-- match a single actual argument value.  An
+ * actual argument is usually just an expression, but can also be a
+ * procedure name. */
+
+static match match_actual_arg(g95_expr **result) {
+char name[G95_MAX_SYMBOL_LEN+1];
+g95_symbol *sym;
+g95_expr *e;
+locus where;
+
+  where = *g95_current_locus();
+
+  switch(g95_match_name(name)) {
+  case MATCH_ERROR:
+    return MATCH_ERROR;
+
+  case MATCH_NO:
+    break;
+
+  case MATCH_YES:
+    g95_find_symbol(name, NULL, 1, &sym);
+    if (sym == NULL || sym->attr.flavor != FL_PROCEDURE) break;
+
+/* If the name is a function name, we have to peek ahead yet again to
+ * see if the next character is a left parenthesis.  If so, the
+ * argument is a function call. */
+
+    if (sym->attr.function && g95_match(" (") == MATCH_YES) break;
+
+    e = g95_get_expr();
+    e->symbol = sym;
+    e->expr_type = EXPR_VARIABLE;
+    e->ts.type = BT_PROCEDURE;
+
+    *result = e;
+    return MATCH_YES;
+  }
+
+  g95_set_locus(&where);
+  return g95_match_expr(result);
+}
+
+
 /* g95_match_actual_arglist()-- Matches an actual argument list of a
  * function or subroutine, from the opening parenthesis to the closing
  * parenthesis.  */
@@ -919,8 +962,6 @@ g95_actual_arglist *arglist, *arg_tail;
 char name[G95_MAX_SYMBOL_LEN+1];
 locus old_loc, name_loc;
 int arg_number, label;
-g95_symbol *sym;
-g95_expr *e;
 match m;
 
   *argp = NULL;
@@ -964,61 +1005,24 @@ match m;
 
     m = g95_match_name(name);
     if (m == MATCH_ERROR) goto cleanup;
-    if (m == MATCH_NO) {
-      g95_set_locus(&name_loc);
-      goto arg;
+
+    /* See if we have a named argument */
+
+    if (m == MATCH_YES && g95_match(" =") == MATCH_YES) {
+      m = match_actual_arg(&arg_tail->expr);
+      if (m == MATCH_ERROR) goto cleanup;
+      if (m == MATCH_YES) {
+	strcpy(arg_tail->name, name);
+	goto next;
+      }
     }
 
-    if (g95_match(" =") == MATCH_NO) {
-      g95_set_locus(&name_loc);
-      goto arg;
-    }
-
-    strcpy(arg_tail->name, name);
-
-/* Parse the argument expression.  A very special case here is that a
- * procedure name can be used by itself. */
-
-  arg:
-    name_loc = *g95_current_locus();
-
-    m = g95_match_name(name);
-    switch(m) {
-    case MATCH_ERROR:
-      goto cleanup;
-
-    case MATCH_NO:
-      break;
-
-    case MATCH_YES:
-      g95_find_symbol(name, NULL, 1, &sym);
-
-      if (sym == NULL) break;
-
-      if (sym->attr.flavor != FL_PROCEDURE) break;
-
-/* If the name is a function name, we have to peek ahead yet again to
- * see if the next character is a left parenthesis.  If so, the
- * argument is a function call. */
-
-      if (sym->attr.function && g95_match(" (") == MATCH_YES) break;
-
-      e = g95_get_expr();
-      e->symbol = sym;
-      e->expr_type = EXPR_VARIABLE;
-      e->ts.type = BT_PROCEDURE;
-
-      arg_tail->expr = e;
-      goto next;
-    }
-
-    /* Parse the argument as a regular expression */
+    /* Deal with an unnamed argument */
 
     g95_set_locus(&name_loc);
-
-    m = g95_match_expr(&arg_tail->expr);
+    m = match_actual_arg(&arg_tail->expr);
+    if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
-    if (m != MATCH_YES) goto cleanup;
 
   next:
     if (g95_match(" )") == MATCH_YES) break;
