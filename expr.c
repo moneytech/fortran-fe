@@ -87,7 +87,11 @@ g95_actual_arglist *head, *tail, *new;
     new->expr = g95_copy_expr(p->expr);
     new->next = NULL;
 
-    if (tail == NULL) head = new;
+    if (head == NULL)
+      head = new;
+    else
+      tail->next = new;
+
     tail = new;
   }
 
@@ -325,7 +329,7 @@ char *s;
     }
     break;
 
-  case EXPR_FUNCTION:  /* Fall through */
+  case EXPR_FUNCTION:
     q->value.function.actual =
       g95_copy_actual_arglist(p->value.function.actual);
     break;
@@ -630,7 +634,138 @@ int rv;
 }
 
 
-/* simplify_expr()-- Given an expression, simplify it by collapsing
+/* simplify_intrinsic_op()-- Try to collapse intrinsic expressions */
+
+static try simplify_intrinsic_op(g95_expr *p, int type) {
+g95_expr *op1, *op2, *result;
+
+  if (p->operator == INTRINSIC_USER) return SUCCESS;
+
+  op1 = p->op1;
+  op2 = p->op2;
+
+  if (g95_simplify_expr(op1, type) == FAILURE) return FAILURE;
+  if (g95_simplify_expr(op2, type) == FAILURE) return FAILURE;
+
+  if (!is_constant_expr(op1) || (op2 != NULL && !is_constant_expr(op2)))
+    return SUCCESS;
+
+/* Rip p apart */
+
+  p->op1 = NULL;
+  p->op2 = NULL;
+
+  switch(p->operator) {
+  case INTRINSIC_UPLUS:
+    result = g95_uplus(op1);
+    break;
+
+  case INTRINSIC_UMINUS:
+    result = g95_uminus(op1);
+    break;
+
+  case INTRINSIC_PLUS:
+    result = g95_add(op1, op2);
+    break;
+
+  case INTRINSIC_MINUS:
+    result = g95_subtract(op1, op2);
+    break;
+
+  case INTRINSIC_TIMES:
+    result = g95_multiply(op1, op2);
+    break;
+
+  case INTRINSIC_DIVIDE:
+    result = g95_divide(op1, op2);
+    break;
+
+  case INTRINSIC_POWER:
+    result = g95_power(op1, op2);
+    break;
+
+  case INTRINSIC_CONCAT:
+    result = g95_concat(op1, op2);
+    break;
+
+  case INTRINSIC_EQ:      
+    result = g95_eq(op1, op2);
+    break;
+
+  case INTRINSIC_NE:
+    result = g95_ne(op1, op2);
+    break;
+
+  case INTRINSIC_GT:
+    result = g95_gt(op1, op2);
+    break;
+
+  case INTRINSIC_GE:
+    result = g95_ge(op1, op2);
+    break;
+
+  case INTRINSIC_LT:
+    result = g95_lt(op1, op2);
+    break;
+
+  case INTRINSIC_LE:
+    result = g95_le(op1, op2);
+    break;
+
+  case INTRINSIC_NOT:
+    result = g95_not(op1);
+    break;
+
+  case INTRINSIC_AND:
+    result = g95_and(op1, op2);
+    break;
+
+  case INTRINSIC_OR:
+    result = g95_or(op1, op2);
+    break;
+
+  case INTRINSIC_EQV:
+    result = g95_eqv(op1, op2);
+    break;
+
+  case INTRINSIC_NEQV:
+    result = g95_neqv(op1, op2);
+    break;
+
+  default: g95_internal_error("g95_simplify_expr(): Impossible operator"); 
+  }
+
+  if (result == NULL) return FAILURE;
+
+  g95_replace_expr(p, result);
+
+  return SUCCESS;
+}
+
+
+/* simplify_constructor()-- Subroutine to simplify constructor
+ * expressions.  Mutually recursive with g95_simplify_expr(). */
+
+static try simplify_constructor(g95_constructor *c, int type) {
+
+  for( ;c; c=c->next) {
+    if (c->iterator &&
+	(g95_simplify_expr(c->iterator->start, type) == FAILURE ||
+	 g95_simplify_expr(c->iterator->end, type) == FAILURE ||
+	 g95_simplify_expr(c->iterator->step, type) == FAILURE))
+      return FAILURE;
+
+    if (c->child && simplify_constructor(c->child, type) == FAILURE)
+      return FAILURE;
+
+    if (c->expr && g95_simplify_expr(c->expr, type) == FAILURE) return FAILURE;
+  }
+
+  return SUCCESS;
+}
+
+
+/* g95_simplify_expr()-- Given an expression, simplify it by collapsing
  * constant expressions.  Most simplification takes place when the
  * expression tree is being constructed.  If an intrinsic function is
  * simplified at some point, we get called again to collapse the
@@ -640,127 +775,65 @@ int rv;
  * intrinsic functions where possible, which can lead to further
  * constant collapsing.  If an operator has constant operand(s), we
  * rip the expression apart, and rebuild it, hoping that it becomes
- * something simpler. */
+ * something simpler.
+ *
+ * The expression type is defined for:
+ *   0   Basic expression parsing
+ *   1   Simplifying array constructors-- will substitute iterator values
+ */
 
-static void simplify_expr(g95_expr *p) {
-g95_expr *op1, *op2, *result;
+try g95_simplify_expr(g95_expr *p, int type) {
+g95_actual_arglist *ap;
 
-  if (p == NULL) return; 
+  if (p == NULL) return SUCCESS;
 
 /* Replace a parameter variable with its value */
 
-  if (p->expr_type == EXPR_VARIABLE &&
-      p->symbol->attr.flavor == FL_PARAMETER) {
-    g95_replace_expr(p, g95_copy_expr(p->symbol->value));
-    return;
+  switch(p->expr_type) {
+  case EXPR_CONSTANT:
+    break;
+
+  case EXPR_FUNCTION:
+    for(ap=p->value.function.actual; ap; ap=ap->next) 
+      if (g95_simplify_expr(ap->expr, type) == FAILURE) return FAILURE;
+
+    if (g95_intrinsic_func_interface(p) == MATCH_ERROR) return FAILURE;
+    break;
+
+  case EXPR_SUBSTRING:
+    if (g95_simplify_expr(p->op1, type) == FAILURE ||
+	g95_simplify_expr(p->op2, type) == FAILURE) return FAILURE;
+
+/* TODO: evaluate constant substrings */
+
+    break;
+
+  case EXPR_OP:
+    if (simplify_intrinsic_op(p, type) == FAILURE) return FAILURE;
+    break;
+
+  case EXPR_VARIABLE:
+    if (p->symbol->attr.flavor == FL_PARAMETER) {
+      g95_replace_expr(p, g95_copy_expr(p->symbol->value));
+      break;
+    }
+
+    if (type == 1) g95_simplify_iterator_var(p);
+
+    break;
+
+  case EXPR_STRUCTURE:
+  case EXPR_ARRAY:
+    if (simplify_constructor(p->value.constructor, type) == FAILURE)
+      return FAILURE;
+
+    if (type == 1 && g95_expand_constructor(&p->value.constructor) == FAILURE)
+      return FAILURE;
+
+    break;
   }
 
-/* TODO: Simplify a function that has been resolved to be an intrinsic
- * function. */
-
-
-/* Arithmetic simplifications */
-
-  if (p->expr_type != EXPR_OP) return;
-  if (p->operator == INTRINSIC_USER) return;
-
-  op1 = p->op1;
-  op2 = p->op2;
-
-  simplify_expr(op1);
-  simplify_expr(op2);
-
-  if (!is_constant_expr(op1) || (op2 != NULL && !is_constant_expr(op2)))
-    return;
-
-/* Rip p apart */
-
-  p->op1 = NULL;
-  p->op2 = NULL;
-
-  switch(p->operator) {
-    case INTRINSIC_UPLUS:
-      result = g95_uplus(op1);
-      break;
-
-    case INTRINSIC_UMINUS:
-      result = g95_uminus(op1);
-      break;
-
-    case INTRINSIC_PLUS:
-      result = g95_add(op1, op2);
-      break;
-
-    case INTRINSIC_MINUS:
-      result = g95_subtract(op1, op2);
-      break;
-
-    case INTRINSIC_TIMES:
-      result = g95_multiply(op1, op2);
-      break;
-
-    case INTRINSIC_DIVIDE:
-      result = g95_divide(op1, op2);
-      break;
-
-    case INTRINSIC_POWER:
-      result = g95_power(op1, op2);
-      break;
-
-    case INTRINSIC_CONCAT:
-      result = g95_concat(op1, op2);
-      break;
-
-    case INTRINSIC_EQ:      
-      result = g95_eq(op1, op2);
-      break;
-
-    case INTRINSIC_NE:
-      result = g95_ne(op1, op2);
-      break;
-
-    case INTRINSIC_GT:
-      result = g95_gt(op1, op2);
-      break;
-
-    case INTRINSIC_GE:
-      result = g95_ge(op1, op2);
-      break;
-
-    case INTRINSIC_LT:
-      result = g95_lt(op1, op2);
-      break;
-
-    case INTRINSIC_LE:
-      result = g95_le(op1, op2);
-      break;
-
-    case INTRINSIC_NOT:
-      result = g95_not(op1);
-      break;
-
-    case INTRINSIC_AND:
-      result = g95_and(op1, op2);
-      break;
-
-    case INTRINSIC_OR:
-      result = g95_or(op1, op2);
-      break;
-
-    case INTRINSIC_EQV:
-      result = g95_eqv(op1, op2);
-      break;
-
-    case INTRINSIC_NEQV:
-      result = g95_neqv(op1, op2);
-      break;
-
-    default: g95_internal_error("simplify_expr(): Impossible operator"); 
-  }
-
-  g95_replace_expr(p, result);
-
-  return;
+  return SUCCESS;
 }
 
 
@@ -1084,7 +1157,7 @@ try t;
     break;
   }
 
-  simplify_expr(e);
+  if (t == SUCCESS) t = g95_simplify_expr(e, 0);
 
   return t;
 
@@ -1288,7 +1361,7 @@ try t;
   switch(e->expr_type) {
   case EXPR_OP:
     t = check_intrinsic_op(e, check_init_expr);
-    if (t == SUCCESS) simplify_expr(e);
+    if (t == SUCCESS) t = g95_simplify_expr(e, 0);
 
     break;
 
@@ -1331,7 +1404,7 @@ try t;
     if (t == FAILURE) break;
 
     t = check_init_expr(e->op2);
-    if (t == SUCCESS) simplify_expr(e);
+    if (t == SUCCESS) t = g95_simplify_expr(e, 0);
 
     break;
 
@@ -1363,6 +1436,12 @@ match m;
     return MATCH_ERROR;
   }
 
+  if (expr->expr_type == EXPR_ARRAY &&
+      g95_expand_constructor(&expr->value.constructor) == FAILURE) {
+    g95_free_expr(expr);
+    return MATCH_ERROR;
+  }
+
   if (!is_constant_expr(expr))
     g95_internal_error("Initialization expression didn't reduce %C");
 
@@ -1387,7 +1466,7 @@ try t;
   switch(e->expr_type) {
   case EXPR_OP:
     t = check_intrinsic_op(e, check_spec_expr);
-    if (t == SUCCESS) simplify_expr(e);
+    if (t == SUCCESS) t = g95_simplify_expr(e, 0);
 
     break;
 
@@ -1447,7 +1526,7 @@ try t;
     if (t == FAILURE) break;
 
     t = check_spec_expr(e->op2);
-    if (t == SUCCESS) simplify_expr(e);
+    if (t == SUCCESS) t = g95_simplify_expr(e, 0);
 
     break;
 

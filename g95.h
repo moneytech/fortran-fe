@@ -1189,6 +1189,7 @@ char *g95_extract_int(g95_expr *, int *);
 g95_expr *g95_build_funcall(g95_symbol *func, ...);
 void g95_free_ref_list(g95_ref *);
 void g95_type_convert_binary(g95_expr *);
+try g95_simplify_expr(g95_expr *, int);
 try g95_resolve_expr(g95_expr *);
 void g95_expr_init_1(void);
 
@@ -1239,6 +1240,8 @@ int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
 
 void g95_free_constructor(g95_constructor *);
 match g95_match_array_constructor(g95_expr **);
+void g95_simplify_iterator_var(g95_expr *);
+try g95_expand_constructor(g95_constructor **);
 try g95_resolve_array_constructor(g95_expr *);
 g95_constructor *g95_copy_constructor(g95_constructor *src);
 try g95_check_constructor(g95_expr *, int, try (*)(g95_expr *));

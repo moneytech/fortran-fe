@@ -524,6 +524,7 @@ g95_expr *result;
 mpf_t x, y, div;
 arith rc;
 
+  rc = ARITH_OK;
   result = g95_constant_result(op1->ts.type, op1->ts.kind);
 
   switch(op1->ts.type) {
@@ -581,7 +582,7 @@ arith rc;
     g95_internal_error("g95_arith_divide(): Bad basic type");
   }
 
-  rc = check_range(result);
+  if (rc == ARITH_OK) rc = check_range(result);
 
   if (rc != ARITH_OK)
     g95_free_expr(result);
@@ -977,7 +978,7 @@ arith rc;
 
   rc = (unary) ? (*eval)(op1, &result) : (*eval)(op1, op2, &result);
   if (rc != ARITH_OK) {     /* Something went wrong */
-    g95_error("%s at %C", g95_arith_error(rc));
+    g95_error("%s at %L", g95_arith_error(rc), &op1->where);
     return NULL;
   }
 

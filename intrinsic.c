@@ -222,7 +222,8 @@ static try check_float(g95_expr *a, g95_expr *kind) {
   if (a->ts.type != BT_INTEGER || a->ts.kind != g95_default_integer_kind())
     return FAILURE;
 
-  if (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT)
+  if (kind != NULL &&
+      (kind->ts.type != BT_INTEGER || kind->expr_type != EXPR_CONSTANT))
     return FAILURE;
 
   return SUCCESS;

@@ -1006,6 +1006,182 @@ try t;
 }
 
 
+
+/**************** Simplification of array constructors ****************/
+
+typedef struct iterator_stack {
+  g95_symbol *variable;
+  mpz_t value;
+  struct iterator_stack *prev;
+} iterator_stack;
+
+static iterator_stack *iter_stack;
+static g95_constructor *new_head, *new_tail;
+
+static try expand_constructor(g95_constructor *);
+
+/* g95_simplify_iteration_var()-- Given an initialization expression
+ * that is a variable reference, substitute the current value of the
+ * iteration variable. */
+
+void g95_simplify_iterator_var(g95_expr *e) {
+iterator_stack *p;
+
+  for(p=iter_stack; p; p=p->prev)
+    if (e->symbol == p->variable) break;
+
+  if (p == NULL)
+    g95_internal_error("simplify_iteration_expr(): Variable '%s' not found",
+		       e->symbol->name);
+
+  g95_replace_expr(e, g95_int_expr(0));
+
+  mpz_set(e->value.integer, p->value);
+}
+
+
+static try expand_iterator(g95_constructor *c) {
+g95_expr *start, *end, *step;
+iterator_stack frame;
+mpz_t trip;
+try t;
+
+  start = end = step = NULL;
+
+  t = FAILURE;
+
+  mpz_init(trip);
+  mpz_init(frame.value);
+
+  start = g95_copy_expr(c->iterator->start);
+  if (g95_simplify_expr(start, 1) == FAILURE) goto cleanup;
+
+  if (start->expr_type != EXPR_CONSTANT || start->ts.type != BT_INTEGER) {
+    g95_error("Iterator start at %L must be a constant integer",
+	      &start->where);
+    goto cleanup;
+  }
+
+  end = g95_copy_expr(c->iterator->end);
+  if (g95_simplify_expr(end, 1) == FAILURE) goto cleanup;
+
+  if (end->expr_type != EXPR_CONSTANT || end->ts.type != BT_INTEGER) {
+    g95_error("Iterator end at %L must be a constant integer",
+	      &end->where);
+    goto cleanup;
+  }
+
+  step = g95_copy_expr(c->iterator->step);
+  if (g95_simplify_expr(step, 1) == FAILURE) goto cleanup;
+
+  if (step->expr_type != EXPR_CONSTANT || step->ts.type != BT_INTEGER) {
+    g95_error("Iterator step at %L must be a constant integer",
+	      &step->where);
+    goto cleanup;
+  }
+
+  if (mpz_sgn(step->value.integer) == 0) {
+    g95_error("Iterator step at %L cannot be zero",
+	      &step->where);
+    goto cleanup;
+  }
+
+  /* Calculate the trip count of the loop */
+
+  mpz_sub(trip, end->value.integer, start->value.integer);
+  mpz_add(trip, trip, step->value.integer);
+  mpz_tdiv_q(trip, trip, step->value.integer);
+
+  mpz_set(frame.value, start->value.integer);
+
+  frame.prev = iter_stack;
+  frame.variable = c->iterator->var->symbol;
+  iter_stack = &frame;
+
+  while(mpz_sgn(trip) > 0) {
+    if (expand_constructor(c->child) == FAILURE) goto cleanup;
+
+    mpz_add(frame.value, frame.value, step->value.integer);
+    mpz_sub_ui(trip, trip, 1);
+  }
+
+  t = SUCCESS;
+
+cleanup:
+  g95_free_expr(start);
+  g95_free_expr(end);
+  g95_free_expr(step);
+
+  mpz_clear(trip);
+  mpz_clear(frame.value);
+
+  iter_stack = frame.prev;
+
+  return t;
+}
+
+
+/* expand_constructor()-- Expand a constructor into constant
+ * constructors without any iterators. */
+
+static try expand_constructor(g95_constructor *c) {
+g95_expr *e;
+
+  for(; c; c=c->next) {
+    if (c->iterator != NULL) {
+      if (expand_iterator(c) == FAILURE) return FAILURE;
+      continue;
+    }
+
+    if (c->child != NULL) {
+      if (expand_constructor(c->child) == FAILURE) return FAILURE;
+      continue;
+    }
+
+    if (c->expr != NULL) {
+      if (new_head == NULL)
+	new_head = new_tail = g95_get_constructor();
+      else {
+	new_tail->next = g95_get_constructor();
+	new_tail = new_tail->next;
+      }
+
+      new_tail->where = e->where;
+      new_tail->expr = g95_copy_expr(c->expr);
+
+      if (g95_simplify_expr(new_tail->expr, 1) == FAILURE) return FAILURE;
+      continue;
+    }
+
+    g95_internal_error("expand_constructor(): Bad constructor node");
+  }
+
+  return SUCCESS;
+}
+
+
+/* g95_expand_constructor()-- Top level subroutine for expanding
+ * constructors. */
+
+try g95_expand_constructor(g95_constructor **cp) {
+
+  new_head = new_tail = NULL;
+  iter_stack = NULL;
+
+  if (expand_constructor(*cp) == FAILURE) {
+    g95_free_constructor(new_head);
+    return FAILURE;
+  }
+
+  g95_free_constructor(*cp);
+
+  *cp = new_head;
+
+  return SUCCESS;
+}
+
+
+
 /* resolve_array_list()-- Recursive array list resolution function.
  * All of the elements must be of the same type. */
 
