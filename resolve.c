@@ -772,13 +772,14 @@ static void resolve_forall_iterators(g95_forall_iterator *iter) {
  * everything pointed to by this code block */
 
 void g95_resolve_code(g95_code *code, g95_namespace *ns) {
-g95_alloc *a;
 g95_block_stack *s;
 g95_st_label *lp;
+g95_alloc *a;
+try t;
 
   for(; code; code=code->next) {
 
-    for(s = block_stack; s; s = s->prev)
+    for(s=block_stack; s; s=s->prev)
       if (s->block_no == code->block_no) break;
 
     if (s == NULL) {
@@ -786,18 +787,19 @@ g95_st_label *lp;
       s->block_no = code->block_no;
       s->prev = block_stack;
       block_stack = s;
-    }
-    else while (s != block_stack) {
-      g95_block_stack *t = block_stack;
-      block_stack = block_stack->prev;
-      g95_free(t);
+    } else {
+      while (s != block_stack) {
+	g95_block_stack *t = block_stack;
+	block_stack = block_stack->prev;
+	g95_free(t);
+      }
     }
 
     if (code->op != EXEC_SELECT && code->block != NULL)
       g95_resolve_code(code->block,ns);
 
-    g95_resolve_expr(code->expr);
-    g95_resolve_expr(code->expr2);
+    t = g95_resolve_expr(code->expr);
+    if (g95_resolve_expr(code->expr2) == FAILURE) t = FAILURE;
 
     switch(code->op) {
     case EXEC_NOP:  case EXEC_CYCLE:  case EXEC_IOLENGTH:
@@ -827,12 +829,12 @@ g95_st_label *lp;
 		  "return specifier", &code->expr->where);
       break;
 
-    case EXEC_ASSIGN: 
-      g95_check_assign(code->expr, code->expr2);
+    case EXEC_ASSIGN:
+      if (t == SUCCESS) g95_check_assign(code->expr, code->expr2);
       break;
 
     case EXEC_POINTER_ASSIGN:
-      g95_check_pointer_assign(code->expr, code->expr2);
+      if (t == SUCCESS) g95_check_pointer_assign(code->expr, code->expr2);
       break;
 
     case EXEC_ARITHMETIC_IF:
