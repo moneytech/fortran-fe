@@ -28,6 +28,7 @@ extern GTY(()) tree g95_type_nodes[NUM_F95_TYPES];
 extern int g95_array_index_kind;
 extern GTY(()) tree g95_array_index_type;
 extern GTY(()) tree ppvoid_type_node;
+extern GTY(()) tree pchar_type_node;
 
 #define g95_int1_type_node  g95_type_nodes[F95_INT1_TYPE]
 #define g95_int2_type_node  g95_type_nodes[F95_INT2_TYPE]
@@ -51,6 +52,8 @@ extern GTY(()) tree ppvoid_type_node;
 
 #define g95_character1_type_node g95_type_nodes[F95_CHARACTER1_TYPE]
 
+#define g95_strlen_type_node g95_int4_type_node
+
 /* be-function.c */
 void g95_convert_function_code (g95_namespace *);
 
@@ -61,7 +64,7 @@ tree g95_get_int_type (int);
 tree g95_get_real_type (int);
 tree g95_get_complex_type (int);
 tree g95_get_logical_type (int);
-tree g95_get_character_type (int);
+tree g95_get_character_type (int, g95_charlen *);
 /* For holding array data on the stack.  */
 tree g95_get_stack_array_type (tree);
 
@@ -82,7 +85,10 @@ tree g95_get_ubound_component (tree, int);
 tree g95_get_lbound_component (tree, int);
 tree g95_get_stride_component (tree, int);
 tree g95_get_data_component (tree);
-tree g95_get_block_component (tree);
+tree g95_get_base_component (tree);
+
+tree g95_get_element_type (tree);
+tree g95_get_array_type_bounds (tree, int, tree *, tree *);
 
 /* Return a structure type for saving descriptors of specified rank.  */
 tree g95_get_descriptorsave_type(int);

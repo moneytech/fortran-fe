@@ -76,18 +76,6 @@ GTY ((desc ("TREE_CODE (&%h.generic) == IDENTIFIER_NODE")))
   struct lang_identifier GTY ((tag ("1"))) identifier;
 };
 
-/* Language-specific declaration information.  */
-
-struct lang_decl
-GTY (())
-{
-};
-
-struct lang_type
-GTY (())
-{
-};
-
 /* Save and restore the variables in this file and elsewhere
    that keep track of the progress of compilation of the current function.
    Used for nested functions.  */
@@ -265,7 +253,7 @@ expand_function_body (tree fndecl)
 
   immediate_size_expand = 1;
 
-  expand_function_end (input_filename,lineno, 0);
+  expand_function_end (input_filename, lineno, 0);
 
   if (nested)
     ggc_push_context ();
@@ -334,12 +322,28 @@ g95_be_parse_file (void *set_yydebug ATTRIBUTE_UNUSED)
 const char *
 g95_init (const char *filename)
 {
+  if (! filename
+      || strcmp (filename, "-") == 0)
+    {
+      filename = "";
+    }
+
+  if (g95_use_gcc_arrays)
+    {
+      /* Setting this will use the GCC ARRAY_TYPE to implement arrays.
+         This isn't really fleible enough for what we want, and generated
+         poor good code for assumed/deferred size arrays of rank > 1.
+         It's some time since I looked at this code, so it might not work any
+         more.  */
+      internal_error ("Only use this if you know what you are doing");
+    }
+
   g95_option.source = (char *) filename;
   g95_init_1 ();
 
   g95_init_decl_processing ();
 
-  g95_build_builtin_function_decls();
+  g95_build_builtin_function_decls ();
 
   if (g95_new_file (g95_option.source, g95_option.form) != SUCCESS)
     {
@@ -630,7 +634,7 @@ g95_init_decl_processing (void)
      only use it for actual characters, not for INTEGER(1). Also, we
      want double_type_node to actually have double precision.   */
   build_common_tree_nodes (0);
-  set_sizetype(long_unsigned_type_node);
+  set_sizetype (long_unsigned_type_node);
   build_common_tree_nodes_2 (0);
 
   /* Set up F95 type nodes.  */

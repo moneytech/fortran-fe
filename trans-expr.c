@@ -45,23 +45,14 @@ Boston, MA 02111-1307, USA.  */
 /* Only for g95_trans_assign and g95_trans_pointer_assign.  */
 #include "trans-stmt.h"
 
-/* TODO: intinsic functions - move to their own file.  */
-static void
-g95_conv_intrinsic_function (g95_se * se ATTRIBUTE_UNUSED, g95_expr * expr ATTRIBUTE_UNUSED)
-{
-  warning ("intrinsic function");
-  se->expr = integer_zero_node;
-}
-
 /* Copy the scalarization loop variables.  */
 static void
 g95_copy_se_loopvars (g95_se * dest, g95_se * src)
 {
   int n;
 
-  dest->dimen = src->dimen;
   dest->ss = src->ss;
-  for (n = 0 ; n < src->dimen ; n++)
+  for (n = 0; n < G95_MAX_DIMENSIONS; n++)
     {
       dest->loopvar[n] = src->loopvar[n];
     }
@@ -111,7 +102,7 @@ is_my_tmp_var(g95_se * se)
 {
   tree  stmt;
 
-  for (stmt = se->pre ; stmt ; stmt = TREE_CHAIN(stmt))
+  for (stmt = se->pre; stmt; stmt = TREE_CHAIN(stmt))
     {
       if ((TREE_CODE(stmt) == DECL_STMT) && (DECL_STMT_DECL(stmt) == se->expr))
         return(true);
@@ -143,16 +134,115 @@ g95_make_safe_expr(g95_se * se)
   se->expr = tmp;
 }
 
-/* TODO: precalculate the stride for known size arrays.  */
+/* Returns 2 if an array is packed, 1 if the first dimension of an array is
+   packed and 0 is an array is not packed.  */
+static int
+g95_array_is_packed (tree descriptor)
+{
+  tree decl;
+
+  decl = descriptor;
+
+  assert (G95_DESCRIPTOR_TYPE_P (TREE_TYPE (descriptor)));
+
+  /* Derived type array components are always packed.  */
+  if (TREE_CODE (decl) == COMPONENT_REF)
+    return 2;
+
+  /* If this is a pointer dereference then get the pointer decl.  */
+  if (TREE_CODE (decl) == INDIRECT_REF)
+    decl = TREE_OPERAND (decl, 0);
+
+  assert (TREE_CODE (decl) == VAR_DECL);
+
+  if (G95_DECL_PACKED_ARRAY (decl))
+    return 2;
+  else if (G95_DECL_PARTIAL_PACKED_ARRAY (decl))
+    return 1;
+
+  return 0;
+}
+
 static tree
-g95_conv_array_stride (tree descriptor, int dim, g95_array_ref * ar ATTRIBUTE_UNUSED)
+g95_conv_array_stride (tree descriptor, int dim)
 {
   tree tmp;
-  tree field;
+  tree type;
+  int packed;
 
-  field = g95_get_stride_component (TREE_TYPE (descriptor), dim);
-  tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
+  type = TREE_TYPE (descriptor);
+  packed = g95_array_is_packed (descriptor);
+  if (dim == 0 && packed > 0)
+    return integer_one_node;
+
+  /* Use the array size, if known.  */
+  if (packed == 2)
+    {
+      tmp = G95_TYPE_DESCRIPTOR_STRIDE (type, dim);
+      if (tmp != NULL_TREE)
+        {
+          assert (INTEGER_CST_P (tmp));
+          return tmp;
+        }
+    }
+
+  tmp = g95_get_stride_component (type, dim);
+  tmp = build (COMPONENT_REF, TREE_TYPE (tmp), descriptor, tmp);
+
   return tmp;
+}
+
+/* Translate an array reference.  The descriptor should be in se->expr.  */
+static void
+g95_conv_array_index_ref (g95_se * se, tree pointer, tree * indices, int dimen)
+{
+  tree array;
+  tree tmp;
+  tree index;
+  tree tmpvar;
+  tree indexvar;
+  int n;
+
+  array = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pointer)), pointer);
+
+  if (g95_use_gcc_arrays)
+    {
+      /* Build the reference backwards - Fortran uses column major ordering.  */
+      for (n = dimen - 1; n >= 0; n--)
+        {
+          assert (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE);
+          array = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (array)),
+                          array, indices[n]);
+        }
+      /* Tell the backend where to find the array descriptor.  */
+      tmp = build (WITH_RECORD_EXPR, TREE_TYPE (se->expr), array, se->expr);
+    }
+  else
+    {
+      tmpvar = NULL_TREE;
+      indexvar = NULL_TREE;
+
+      index = integer_zero_node;
+      for (n = 0; n < dimen; n++)
+        {
+          /* index = index + stride[n]*index[n] */
+          tmp = g95_conv_array_stride (se->expr, n);
+          tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+          tmp = build (MULT_EXPR, g95_array_index_type, indices[n], tmp);
+          tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &tmpvar);
+
+          index = build (PLUS_EXPR, g95_array_index_type, index, tmp);
+          index = g95_simple_fold (index, &se->pre, &se->pre_tail, &indexvar);
+        }
+
+      assert (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE);
+      tmp = build (ARRAY_REF, TREE_TYPE( TREE_TYPE (array)), array, index);
+    }
+
+  /* Check we've used the correct number of dimensions.  */
+  assert (TREE_CODE (TREE_TYPE (tmp)) != ARRAY_TYPE);
+
+  se->expr = tmp;
 }
 
 /* Build an array reference. se->expr already holds the array descriptor.
@@ -167,8 +257,8 @@ g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
   tree pointer;
   tree stmt;
   tree field;
-  tree array;
-  g95_se indices[G95_MAX_DIMENSIONS];
+  tree indices[G95_MAX_DIMENSIONS];
+  g95_se indexse;
   g95_ss *ss;
   g95_ss_info *info;
   int n;
@@ -181,25 +271,26 @@ g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
   if (ss != NULL)
     {
       g95_advance_se_ss_chain (se);
-      dimen = ss->dimen;
       info = &ss->data.info;
     }
   else
     {
       assert (ar->type == AR_ELEMENT);
-      dimen = ar->dimen;
       info = NULL;
     }
 
-  /* TODO: Temporaries with rank != rank of original array. */
-  for (n = 0 ; n < dimen ; n++)
+  dimen = ar->dimen;
+  dim = 0;
+  for (n = 0; n < dimen; n++)
     {
-      g95_init_se (&indices[n], se);
       var = NULL_TREE;
       if (ar->type == AR_ELEMENT)
         {
-          g95_conv_simple_val (&indices[n], ar->start[n]);
-          g95_add_stmt_to_pre (se, indices[n].pre, indices[n].pre_tail);
+          g95_init_se (&indexse, se);
+          g95_conv_simple_val_type (&indexse, ar->start[n],
+                                   g95_array_index_type);
+          g95_add_stmt_to_pre (se, indexse.pre, indexse.pre_tail);
+          indices[n] = indexse.expr;
         }
       else
         {
@@ -207,15 +298,15 @@ g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
             {
               assert (se->ss != g95_ss_terminator);
               /* We've already translated this value outside the loop.  */
-              indices[n].expr = se->ss->data.se.expr;
+              indices[n] = se->ss->data.se.expr;
             }
           else
             {
               assert (ar->dimen_type[n] == DIMEN_RANGE);
               assert (ss != g95_ss_terminator);
               /* Substutute a scalarizing loop variable.  */
-              dim = info->dim[n];
-              assert (ss != NULL && dim < se->dimen);
+              assert (ss != NULL && dim < ss->dimen);
+              assert (info->dim[dim] == n);
 
               index = se->loopvar[dim];
               tmp = build (MULT_EXPR, g95_array_index_type,
@@ -225,13 +316,16 @@ g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
               tmp = build (PLUS_EXPR, g95_array_index_type,
                             index, info->delta[dim]);
               index = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &var);
-              indices[n].expr = index;
+              indices[n] = index;
               dim++;
             }
         }
     }
 
-  field = g95_get_data_component (TREE_TYPE (se->expr));
+  if (g95_use_gcc_arrays)
+    field = g95_get_data_component (TREE_TYPE (se->expr));
+  else
+    field = g95_get_base_component (TREE_TYPE (se->expr));
 
   /* Get a pointer to the array data.  */
   if (ss == NULL)
@@ -245,66 +339,52 @@ g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
   else
     pointer = info->data;
 
-  array = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pointer)), pointer);
+  g95_conv_array_index_ref (se, pointer, indices, dimen);
+}
 
-  if (g95_use_gcc_arrays)
+static void
+g95_conv_substring (g95_se * se, g95_ref * ref, int kind)
+{
+  tree tmp;
+  tree type;
+  tree var;
+  g95_se start;
+  g95_se end;
+
+  type = g95_get_character_type (kind, ref->u.ss.length);
+  if (G95_SIZE_STRING_TYPE_P (type))
+    type = build_pointer_type (type);
+
+  var = NULL_TREE;
+  g95_init_se (&start, se);
+  g95_conv_simple_val_type (&start, ref->u.ss.start, g95_strlen_type_node);
+  g95_add_stmt_to_pre (se, start.pre, start.pre_tail);
+
+  if (integer_onep (start.expr))
     {
-      /* Build the reference backwards - Fortran uses column major ordering.  */
-      for ( n = dimen - 1 ; n >= 0 ; n--)
-        {
-          assert (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE);
-          array = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (array)),
-                          array, indices[n].expr);
-        }
-      /* Tell the backend where to find the array descriptor.  */
-      tmp = build (WITH_RECORD_EXPR, TREE_TYPE (array), array, se->expr);
+      g95_conv_string_parameter (se);
     }
   else
     {
-      tree num;
-      tree prev;
-
-      if (dimen > 1)
-        {
-          index = g95_create_tmp_var (g95_array_index_type);
-          num = g95_create_tmp_var (g95_array_index_type);
-        }
+      /* Change the start of the string.  */
+      if (G95_SIZE_STRING_TYPE_P (TREE_TYPE (se->expr)))
+        tmp = se->expr;
       else
-        {
-          num = NULL_TREE;
-          index = indices[0].expr;
-        }
-
-      for ( n = 1 ; n < dimen ; n++)
-        {
-          /* num = index[n]*stride[n] */
-          tmp = g95_conv_array_stride (se->expr, n, ar);
-          tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-          stmt = build_stmt (EXPR_STMT, tmp);
-          g95_add_stmt_to_pre (se, stmt, stmt);
-
-          tmp = build (MULT_EXPR, g95_array_index_type, num, indices[n].expr);
-          tmp = build (MODIFY_EXPR, g95_array_index_type, num, tmp);
-          stmt = build_stmt (EXPR_STMT, tmp);
-          g95_add_stmt_to_pre (se, stmt, stmt);
-          if (n == 1)
-            prev = indices[0].expr;
-          else
-            prev=index;
-          /* index = index + num */
-          tmp = build (PLUS_EXPR, g95_array_index_type, prev, num);
-          tmp = build (MODIFY_EXPR, g95_array_index_type, index, tmp);
-          stmt  = build_stmt (EXPR_STMT, tmp);
-          g95_add_stmt_to_pre (se, stmt, stmt);
-        }
-      assert (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE);
-      tmp = build (ARRAY_REF, TREE_TYPE( TREE_TYPE (array)), array, index);
+        tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (se->expr)), se->expr);
+      tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, start.expr);
+      tmp = build1 (ADDR_EXPR, type, tmp);
+      se->expr = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
     }
 
-  /* Check we've used the correct number of dimensions.  */
-  assert (TREE_CODE (TREE_TYPE (tmp)) != ARRAY_TYPE);
+  /* Length = end + 1 - start.  */
+  g95_init_se (&end, se);
+  g95_conv_simple_val_type (&end, ref->u.ss.end, g95_strlen_type_node);
+  g95_add_stmt_to_pre (se, end.pre, end.pre_tail);
 
-  se->expr = tmp;
+  tmp = build (MINUS_EXPR, g95_strlen_type_node, integer_one_node, start.expr);
+  tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &var);
+  tmp = build (PLUS_EXPR, g95_strlen_type_node, end.expr, tmp);
+  se->string_length = g95_simple_fold (tmp, &se->pre, &se->pre_tail, &var);
 }
 
 /* Return the contents of a variable. Also handles refrence/pointer
@@ -312,7 +392,7 @@ g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
 static void
 g95_conv_variable (g95_se * se, g95_expr * expr)
 {
-  g95_ref * ref;
+  g95_ref *ref;
 
   if (se->ss != NULL)
     {
@@ -352,7 +432,7 @@ g95_conv_variable (g95_se * se, g95_expr * expr)
           return;
         }
 
-      if (expr->symbol->attr.dummy)
+      if (expr->symbol->attr.dummy && ! G95_DECL_STRING (se->expr))
         {
           se->expr = build1 (INDIRECT_REF, TREE_TYPE(TREE_TYPE (se->expr)),
                             se->expr);
@@ -363,6 +443,13 @@ g95_conv_variable (g95_se * se, g95_expr * expr)
         {
           se->expr = build1 (INDIRECT_REF, TREE_TYPE(TREE_TYPE (se->expr)),
                             se->expr);
+        }
+
+      /* For character variables, also get the length.  */
+      if (expr->symbol->ts.type == BT_CHARACTER)
+        {
+          assert (G95_DECL_STRING (se->expr));
+          se->string_length = G95_DECL_STRING_LENGTH (se->expr);
         }
 
       ref = expr->ref;
@@ -383,12 +470,72 @@ g95_conv_variable (g95_se * se, g95_expr * expr)
           g95_conv_array_ref(se, &ref->u.ar);
           break;
 
+        case REF_COMPONENT:
+          g95_todo_error("component ref");
+          break;
+
+        case REF_SUBSTRING:
+          g95_conv_substring (se, ref, expr->symbol->ts.kind);
+          break;
+
         default:
-          g95_todo_error("component or substring ref");
+          abort();
           break;
         }
       ref = ref->next;
     }
+}
+
+void
+g95_conv_simple_val_type(g95_se * se, g95_expr * expr, tree type)
+{
+  tree tmp;
+  tree assign;
+
+  g95_start_stmt ();
+  g95_start_stmt ();
+
+  assert (expr->ts.type != BT_CHARACTER);
+
+  g95_conv_simple_rhs (se, expr);
+
+  if (!is_simple_val (se->expr))
+    {
+      /* The target variable will be fixed up later.  */
+      assign = build (MODIFY_EXPR, TREE_TYPE (se->expr), NULL_TREE, se->expr);
+      g95_add_stmt_to_pre (se, build_stmt (EXPR_STMT, assign), NULL);
+      g95_add_stmt_to_pre (se, se->post, se->post_tail);
+      se->post = se->post_tail = NULL_TREE;
+
+      /* Wrap everything up in its own scope if neccessary.  */
+      g95_finish_se_stmt (se);
+
+      /* The result variable must be created outside the new scope.  */
+      tmp = g95_create_tmp_var (TREE_TYPE (se->expr));
+      TREE_OPERAND (assign, 0) = tmp;
+      se->expr = tmp;
+    }
+  else
+    g95_merge_stmt();
+
+  tmp = fold (convert (type, se->expr));
+  if (! is_simple_val (tmp))
+    {
+      assign = build (MODIFY_EXPR, type, NULL_TREE, tmp);
+      g95_add_stmt_to_pre (se, build_stmt (EXPR_STMT, assign), NULL);
+      g95_add_stmt_to_pre (se, se->post, se->post_tail);
+      se->post = se->post_tail = NULL_TREE;
+
+      /* Wrap everything up in its own scope if neccessary.  */
+      g95_finish_se_stmt (se);
+
+      /* The result variable must be created outside the new scope.  */
+      tmp = g95_create_tmp_var (type);
+      TREE_OPERAND (assign, 0) = tmp;
+      se->expr = tmp;
+    }
+  else
+    g95_merge_stmt();
 }
 
 /* Return an expr which is a single variable/value, suitable for
@@ -400,18 +547,24 @@ g95_conv_simple_val(g95_se * se, g95_expr * expr)
   tree  assign;
   tree  type;
 
-  assert (! se->ss);
-
   g95_start_stmt ();
 
-  g95_conv_simple_rhs(se, expr);
+  g95_conv_simple_rhs (se, expr);
 
-  if (!is_simple_val(se->expr))
+  /* Special handling for character variables.  */
+  if (expr->ts.type == BT_CHARACTER)
     {
-      type = TREE_TYPE(se->expr);
+      g95_conv_string_parameter (se);
+      g95_merge_stmt ();
+      return;
+    }
+
+  if (!is_simple_val (se->expr))
+    {
+      type = TREE_TYPE (se->expr);
       /* The target variable will be fixed up later.  */
       assign = build (MODIFY_EXPR, type, NULL_TREE, se->expr);
-      g95_add_stmt_to_pre (se, build_stmt(EXPR_STMT, assign), NULL);
+      g95_add_stmt_to_pre (se, build_stmt (EXPR_STMT, assign), NULL);
       g95_add_stmt_to_pre (se, se->post, se->post_tail);
       se->post = se->post_tail = NULL_TREE;
 
@@ -423,7 +576,10 @@ g95_conv_simple_val(g95_se * se, g95_expr * expr)
       se->expr = tmp;
     }
   else
-    g95_merge_stmt();
+    {
+      g95_merge_stmt ();
+      assert (se->post == NULL_TREE);
+    }
 }
 
 void
@@ -432,6 +588,12 @@ g95_conv_simple_reference (g95_se * se, g95_expr * expr)
   assert (! se->ss);
 
   g95_conv_simple_rhs (se, expr);
+
+  if (expr->ts.type == BT_CHARACTER)
+    {
+      g95_conv_string_parameter (se);
+      return;
+    }
 
   if (TREE_CODE (se->expr) == INDIRECT_REF)
     {
@@ -478,17 +640,17 @@ g95_conv_simple_reference (g95_se * se, g95_expr * expr)
 /* Returns an lvalue, throws error if not possble.
    Guaranteed to return with se.post == NULL.  */
 void
-g95_conv_simple_lhs(g95_se * se, g95_expr * expr)
+g95_conv_simple_lhs (g95_se * se, g95_expr * expr)
 {
   g95_conv_simple_rhs(se, expr);
 
-  assert (is_simple_modify_expr_lhs(se->expr));
+  assert (is_simple_modify_expr_lhs (se->expr));
   assert (se->post == NULL_TREE);
 }
 
 /* Return an expr suitable for a logic test, eg. an if condition.  */
 void
-g95_conv_simple_cond (g95_se *se, g95_expr *expr)
+g95_conv_simple_cond (g95_se * se, g95_expr * expr)
 {
   tree  tmp;
   tree  assign;
@@ -496,54 +658,148 @@ g95_conv_simple_cond (g95_se *se, g95_expr *expr)
 
   assert (! se->ss);
 
-  g95_conv_simple_rhs(se, expr);
+  g95_conv_simple_rhs (se, expr);
 
-  if (!is_simple_condexpr(se->expr))
+  if (!is_simple_condexpr (se->expr))
     {
-      type=TREE_TYPE(se->expr);
-      tmp=g95_create_tmp_var(type);
-      assign=build(MODIFY_EXPR, type, tmp, se->expr);
-      g95_add_stmt_to_pre(se, build_stmt(EXPR_STMT, assign), NULL);
+      type = TREE_TYPE (se->expr);
+      tmp = g95_create_tmp_var(type);
+      assign = build (MODIFY_EXPR, type, tmp, se->expr);
+      g95_add_stmt_to_pre(se, build_stmt (EXPR_STMT, assign), NULL);
       se->expr=tmp;
       g95_add_stmt_to_pre (se, se->post, se->post_tail);
       se->post = se->post_tail = NULL_TREE;
     }
+  assert (se->post == NULL_TREE);
 }
 
 /* Unary ops are easy... */
 static void
-g95_conv_unary_op(enum tree_code code, g95_se * se, g95_expr * expr)
+g95_conv_unary_op (enum tree_code code, g95_se * se, g95_expr * expr)
 {
   g95_se operand;
   tree type;
 
   /* Initialize the operand.  */
-  g95_init_se(&operand, se);
-  g95_conv_simple_val(&operand, expr->op1);
+  g95_init_se (&operand, se);
+  g95_conv_simple_val (&operand, expr->op1);
 
   /*SCALARIZE*/
   type = g95_typenode_for_spec(&expr->ts);
 
-  se->expr = build1(code, type, operand.expr);
+  se->expr = build1 (code, type, operand.expr);
 
   /* combine the pre and post stmts */
-  g95_add_stmt_to_pre(se, operand.pre, operand.pre_tail);
-  g95_add_stmt_to_post(se, operand.post, operand.post_tail);
+  g95_add_stmt_to_pre (se, operand.pre, operand.pre_tail);
+  g95_add_stmt_to_post (se, operand.post, operand.post_tail);
 }
 
 static void
-g95_conv_power_op(g95_se * se, g95_expr * expr)
+g95_conv_power_op (g95_se * se ATTRIBUTE_UNUSED, g95_expr * expr ATTRIBUTE_UNUSED)
 {
-  g95_todo_error("concat op");
+  g95_todo_error ("power op");
 }
 
-/* This operator need to be replaced with function calls as well, but
-   in this case, we may be able to use a (combination of) builtin
-   function(s) instead.  */
+/* Handle a string concatenation operation.  A temporary will be allocated to
+   hold the result.  */
 static void
-g95_conv_concat_op(g95_se * se ATTRIBUTE_UNUSED, g95_expr * expr ATTRIBUTE_UNUSED)
+g95_conv_concat_op (g95_se * se, g95_expr * expr)
 {
-  g95_todo_error("concat op");
+  g95_se lse;
+  g95_se rse;
+  tree len;
+  tree type;
+  tree var;
+  tree args;
+  tree tmp;
+  tree stmt;
+
+  assert (expr->op1->ts.type == BT_CHARACTER
+      && expr->op2->ts.type == BT_CHARACTER);
+
+  g95_init_se (&lse, se);
+  g95_conv_simple_val (&lse, expr->op1);
+  g95_init_se (&rse, se);
+  g95_conv_simple_val (&rse, expr->op2);
+
+  g95_add_stmt_to_pre (se, lse.pre, lse.pre_tail);
+  g95_add_stmt_to_pre (se, rse.pre, rse.pre_tail);
+
+  type = g95_get_character_type (expr->ts.kind, expr->ts.cl);
+  if (G95_SIZE_STRING_TYPE_P (type))
+    tmp = build_pointer_type (type);
+  else
+    tmp = type;
+  var = g95_create_tmp_var (tmp);
+
+  if (G95_SIZE_STRING_TYPE_P (type))
+    {
+      len = TYPE_MAX_VALUE (TYPE_DOMAIN (type));
+    }
+  else
+    {
+      len = build (PLUS_EXPR, TREE_TYPE (lse.string_length), lse.string_length,
+                   rse.string_length);
+      len = g95_simple_fold (len, &se->pre, &se->pre_tail, NULL);
+    }
+
+  if (INTEGER_CST_P (len)
+      && (g95_option.max_stack_var_size < 0
+        || (TREE_INT_CST_HIGH (len) == 0
+          && TREE_INT_CST_LOW (len) <=
+            (unsigned HOST_WIDE_INT)g95_option.max_stack_var_size)))
+    {
+      /* Create a temporary (stack) array to hold the result.  */
+      type = g95_get_stack_array_type (len);
+      tmp = g95_create_tmp_var (type);
+      TREE_ADDRESSABLE (tmp) = 1;
+      tmp = build1 (ADDR_EXPR, TREE_TYPE (var), tmp);
+      tmp = build (MODIFY_EXPR, TREE_TYPE (var), var, tmp);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_pre (se, stmt, stmt);
+    }
+  else
+    {
+      tree addr;
+
+      TREE_ADDRESSABLE (var) = 1;
+
+      /* Allocate a temporary to hold the result.  */
+      tmp = build1 (ADDR_EXPR, ppvoid_type_node, var);
+      addr = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
+
+      args = NULL_TREE;
+      args = g95_chainon_list (args, addr);
+      args = g95_chainon_list (args, len);
+      tmp = g95_build_function_call (g95_fndecl_internal_malloc, args);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_pre (se, stmt, stmt);
+
+      /* Free the temporary afterwards.  */
+      args = g95_chainon_list (NULL_TREE, addr);
+      tmp = g95_build_function_call (g95_fndecl_internal_free, args);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_post (se, stmt, stmt);
+    }
+
+  /* Do the actual concatenation.  */
+  args = NULL_TREE;
+  args = g95_chainon_list (args, len);
+  args = g95_chainon_list (args, var);
+  args = g95_chainon_list (args, lse.string_length);
+  args = g95_chainon_list (args, lse.expr);
+  args = g95_chainon_list (args, rse.string_length);
+  args = g95_chainon_list (args, rse.expr);
+  tmp = g95_build_function_call (g95_fndecl_concat_string, args);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_pre (se, stmt, stmt);
+
+  /* Add the cleanup for the operands.  */
+  g95_add_stmt_to_pre (se, rse.post, rse.post_tail);
+  g95_add_stmt_to_pre (se, lse.post, lse.post_tail);
+
+  se->expr = var;
+  se->string_length = len;
 }
 
 /* Translates an op expression. Common (binary) cases are handled by this
@@ -551,7 +807,8 @@ g95_conv_concat_op(g95_se * se ATTRIBUTE_UNUSED, g95_expr * expr ATTRIBUTE_UNUSE
    We use the fact that (op1.ts == op2.ts) (except for the power
    operand **).
    Operators need no special handling for scalarized expressions as long as
-   they call g95_conv_siple_val to get their operands.  */
+   they call g95_conv_siple_val to get their operands.
+   Character strings get special handling.  */
 static void
 g95_conv_expr_op (g95_se * se, g95_expr * expr)
 {
@@ -559,11 +816,13 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
   g95_se lse;
   g95_se rse;
   tree type;
+  int checkstring;
 
+  checkstring = 0;
   switch (expr->operator)
     {
     case INTRINSIC_UPLUS:
-      g95_conv_simple_val(se, expr->op1);
+      g95_conv_simple_val (se, expr->op1);
       return;
 
     case INTRINSIC_UMINUS:
@@ -571,7 +830,7 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
       return;
 
     case INTRINSIC_NOT:
-      g95_conv_unary_op(TRUTH_NOT_EXPR, se, expr);
+      g95_conv_unary_op (TRUTH_NOT_EXPR, se, expr);
       return;
 
     case INTRINSIC_PLUS:
@@ -597,11 +856,11 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
       break;
 
     case INTRINSIC_POWER:
-      g95_conv_power_op(se, expr);
+      g95_conv_power_op (se, expr);
       return;
 
     case INTRINSIC_CONCAT:
-      g95_conv_concat_op(se, expr);
+      g95_conv_concat_op (se, expr);
       return;
 
     case INTRINSIC_AND:
@@ -617,59 +876,105 @@ g95_conv_expr_op (g95_se * se, g95_expr * expr)
     case INTRINSIC_EQ:
     case INTRINSIC_EQV:
       code = EQ_EXPR;
+      checkstring = 1;
       break;
 
     case INTRINSIC_NE:
     case INTRINSIC_NEQV:
       code = NE_EXPR;
+      checkstring = 1;
       break;
 
     case INTRINSIC_GT:
       code = GT_EXPR;
+      checkstring = 1;
       break;
 
     case INTRINSIC_GE:
       code = GE_EXPR;
+      checkstring = 1;
       break;
 
     case INTRINSIC_LT:
       code = LT_EXPR;
+      checkstring = 1;
       break;
 
     case INTRINSIC_LE:
       code = LE_EXPR;
+      checkstring = 1;
       break;
 
     case INTRINSIC_USER:
-      g95_todo_error("User operatior");
+      g95_todo_error ("User operatior");
       return;
 
     case INTRINSIC_ASSIGN:
-      g95_todo_error("intrinsic assignment expr");
+      g95_todo_error ("intrinsic assignment expr");
       return;
 
     default:
-      fatal_error("Unknown intrinsic op");
+      fatal_error ("Unknown intrinsic op");
       return;
     }
+
+  /* The only exception to this is **, which is handled seperately anyway.  */
+  assert (expr->op1->ts.type == expr->op2->ts.type);
+
+  if (checkstring && expr->op1->ts.type == BT_CHARACTER)
+    g95_start_stmt ();
+  else
+    checkstring = 0;
+
   /* lhs */
-  g95_init_se(&lse, se);
-  g95_conv_simple_val(&lse, expr->op1);
+  g95_init_se (&lse, se);
+  g95_conv_simple_val (&lse, expr->op1);
 
   /* rhs */
-  g95_init_se(&rse, se);
-  g95_conv_simple_val(&rse, expr->op2);
+  g95_init_se (&rse, se);
+  g95_conv_simple_val (&rse, expr->op2);
 
-  /*SCALARIZE*/
-  type = g95_typenode_for_spec(&expr->ts);
+  if (checkstring)
+    {
+      tree assign;
+      tree stmt;
+      tree args;
 
-  se->expr = build(code, type, lse.expr, rse.expr);
+      args = NULL_TREE;
+      args = g95_chainon_list (args, lse.string_length);
+      args = g95_chainon_list (args, lse.expr);
+      args = g95_chainon_list (args, rse.string_length);
+      args = g95_chainon_list (args, rse.expr);
+
+      assign = g95_build_function_call (g95_fndecl_compare_string, args);
+      assign = build (MODIFY_EXPR, g95_int4_type_node, NULL_TREE, assign);
+      stmt = build_stmt (EXPR_STMT, assign);
+
+      g95_add_stmt_to_pre (&lse, rse.pre, rse.pre_tail);
+      g95_add_stmt_to_pre (&lse, stmt, stmt);
+      g95_add_stmt_to_pre (&lse, rse.post, rse.post_tail);
+      g95_add_stmt_to_pre (&lse, lse.post, lse.post_tail);
+      lse.post = lse.post_tail = NULL_TREE;
+      rse.pre = rse.pre_tail = NULL_TREE;
+      rse.post = rse.post_tail = NULL_TREE;
+
+      g95_finish_se_stmt (&lse);
+
+      /* Create the result variable outside the containing scope.  */
+      lse.expr = g95_create_tmp_var (g95_int4_type_node);
+      TREE_OPERAND (assign, 0) = lse.expr;
+      rse.expr = integer_zero_node;
+    }
+
+  type = g95_typenode_for_spec (&expr->ts);
+
+  se->expr = build (code, type, lse.expr, rse.expr);
 
   /* Combine the pre and post stmts.  */
-  g95_add_stmt_to_pre(se, lse.pre, lse.pre_tail);
-  g95_add_stmt_to_pre(se, rse.pre, rse.pre_tail);
-  g95_add_stmt_to_post(se, rse.post, rse.post_tail);
-  g95_add_stmt_to_post(se, lse.post, lse.post_tail);
+  g95_add_stmt_to_pre (se, lse.pre, lse.pre_tail);
+  g95_add_stmt_to_pre (se, rse.pre, rse.pre_tail);
+  assert (lse.post == NULL_TREE);
+  assert (rse.post == NULL_TREE);
 }
 
 static void
@@ -681,7 +986,7 @@ g95_conv_function_val (g95_se * se, g95_symbol * sym)
     {
       tmp = g95_get_symbol_decl (sym);
       assert (TREE_CODE (tmp) == POINTER_TYPE
-          && TREE_CODE (TREE_TYPE (tmp)) == FUNCTION_DECL);
+             && TREE_CODE (TREE_TYPE (tmp)) == FUNCTION_DECL);
 
       se->expr = g95_create_tmp_var (TREE_TYPE (tmp));
 
@@ -704,7 +1009,8 @@ g95_conv_function_val (g95_se * se, g95_symbol * sym)
 
 /* Translate a function call.  Note can return se->post != NULL.  */
 void
-g95_conv_function_call (g95_se * se, g95_symbol * sym, g95_actual_arglist * arg)
+g95_conv_function_call (g95_se * se, g95_symbol * sym,
+                       g95_actual_arglist * arg)
 {
   tree parms[G95_MAX_FUNCTION_ARGS];
   tree arglist;
@@ -727,11 +1033,11 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym, g95_actual_arglist * arg)
     }
 
   /* Evaluate the arguments.  */
-  for (nargs = 0 ; arg != NULL ; arg = arg->next, nargs++)
+  for (nargs = 0; arg != NULL; arg = arg->next)
     {
       /* We don't do alternate returns.  */
       assert (arg->expr != NULL);
-      if (nargs > G95_MAX_FUNCTION_ARGS)
+      if (nargs >= G95_MAX_FUNCTION_ARGS)
         fatal_error ("Too many function args");
 
       g95_init_se (&parmse, se);
@@ -758,14 +1064,16 @@ g95_conv_function_call (g95_se * se, g95_symbol * sym, g95_actual_arglist * arg)
         }
 
       g95_add_stmt_to_pre (se, parmse.pre, parmse.pre_tail);
-      g95_add_stmt_to_pre (se, parmse.post, parmse.post);
+      g95_add_stmt_to_post (se, parmse.post, parmse.post_tail);
 
-      parms[nargs] = parmse.expr;
+      if (parmse.string_length != NULL_TREE)
+        parms[nargs++] = parmse.string_length;
+      parms[nargs++] = parmse.expr;
     }
 
   /* Build the argument list.  */
   arglist = NULL_TREE;
-  for (n = nargs -1 ; n >= 0 ; n--)
+  for (n = nargs -1; n >= 0; n--)
     {
       arglist = tree_cons (NULL_TREE, parms[n], arglist);
     }
@@ -808,8 +1116,7 @@ g95_conv_function (g95_se * se, g95_expr * expr)
       psym = &sym;
     }
 
-  g95_conv_function_call (se, psym,
-      expr->value.function.actual);
+  g95_conv_function_call (se, psym, expr->value.function.actual);
 }
 
 /* Return a SIMPLE expression suitable for the RHS of an assignment.  */
@@ -843,12 +1150,12 @@ g95_conv_simple_rhs (g95_se * se, g95_expr * expr)
 tree
 g95_trans_pointer_assign (g95_code * code ATTRIBUTE_UNUSED)
 {
-  g95_internal_error("pointer assignment not implemented");
+  g95_internal_error ("pointer assignment not implemented");
 }
 
 /* Free a g95_ss chain.  */
 static void
-g95_free_ss (g95_ss *ss)
+g95_free_ss (g95_ss * ss)
 {
   g95_ss *next;
 
@@ -884,7 +1191,7 @@ g95_reverse_ss (g95_ss *ss)
 }
 
 static void
-g95_add_ss_stmts (g95_loopinfo * loop, g95_ss *ss)
+g95_add_ss_stmts (g95_loopinfo * loop, g95_ss * ss)
 {
   g95_se *se;
 
@@ -913,11 +1220,10 @@ g95_conv_ss_startstride (g95_loopinfo * loop)
   tree tmp;
   tree field;
   g95_ss *ss;
-  g95_expr *expr;
   g95_se se;
 
 
-  for (ss = loop->ss ; ss != g95_ss_terminator ; ss = ss->next)
+  for (ss = loop->ss; ss != g95_ss_terminator; ss = ss->next)
     {
       if (ss->dimen <= 0)
           continue;
@@ -934,14 +1240,18 @@ g95_conv_ss_startstride (g95_loopinfo * loop)
       info->descriptor = se.expr;
 
       /* Also the data pointer.  */
-      field = g95_get_data_component (TREE_TYPE (info->descriptor));
+      if (g95_use_gcc_arrays)
+        field = g95_get_data_component (TREE_TYPE (info->descriptor));
+      else
+        field = g95_get_base_component (TREE_TYPE (info->descriptor));
+
       info->data = g95_create_tmp_var (TREE_TYPE (field));
       tmp = build (COMPONENT_REF, TREE_TYPE (field), info->descriptor, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (field), info->data, tmp);
       tmp = build_stmt (EXPR_STMT, tmp);
       g95_add_stmt_to_pre (loop, tmp, tmp);
 
-      for ( n = 0 ; n < ss->dimen ; n++)
+      for (n = 0; n < ss->dimen; n++)
         {
           dim = info->dim[n];
 
@@ -950,24 +1260,14 @@ g95_conv_ss_startstride (g95_loopinfo * loop)
                 && info->ref->u.ar.start[dim]->expr_type == EXPR_CONSTANT)
             {
               g95_init_se (&se, NULL);
-              g95_conv_simple_val (&se, info->ref->u.ar.start[dim]);
+              g95_conv_simple_val_type (&se, info->ref->u.ar.start[dim],
+                                       g95_array_index_type);
               info->start[n] = se.expr;
             }
           else
             {
-              info->start[n] = NULL_TREE;
-              if (info->ref->u.ar.as->type != AS_DEFERRED)
-                {
-                  /* We may know the lower bound for assumed shape/size
-                     arrays and explicit shape arrays.  */
-                  expr = info->ref->u.ar.as->lower[dim];
-                  if (expr != NULL && expr->expr_type == EXPR_CONSTANT)
-                    {
-                      g95_init_se (&se, NULL);
-                      g95_conv_constant (&se, expr);
-                      info->start[n] = se.expr;
-                    }
-                }
+              info->start[n] =
+                G95_TYPE_DESCRIPTOR_LBOUND (TREE_TYPE (info->descriptor), n);
 
               if (info->start[n] == NULL_TREE)
                 {
@@ -989,7 +1289,8 @@ g95_conv_ss_startstride (g95_loopinfo * loop)
           else
             {
               g95_init_se (&se, NULL);
-              g95_conv_simple_val (&se, info->ref->u.ar.stride[dim]);
+              g95_conv_simple_val_type (&se, info->ref->u.ar.stride[dim],
+                                  g95_array_index_type);
               info->stride[n] = se.expr;
             }
         }
@@ -1006,112 +1307,225 @@ g95_conv_loopvars (g95_loopinfo * loop)
   g95_ss_info *info;
   g95_ss_info *specinfo;
   g95_ss *ss;
-  g95_expr *expr;
   tree tmp;
+  tree stmt;
   tree field;
   tree var;
+  tree type;
+  tree desc;
+  tree size;
+  tree sizevar;
+  tree tmpvar;
+  g95_ss *loopspec[G95_MAX_DIMENSIONS];
 
-  for ( n = 0 ; n < loop->dimen ; n++)
+  for (n = 0; n < loop->dimen; n++)
     {
-      loop->loopspec[n] = NULL;
+      loopspec[n] = NULL;
       /* Find a loop to get the range from.  */
       for (ss = loop->ss ; ss != g95_ss_terminator ; ss = ss->next)
         {
           if (ss->dimen <= 0)
             continue;
 
-          /* Criteria for choosing a loop specifier (in order of inportance):
-              stride of one
-              known stride
-              known lower bound
-             Failure to meet this criteria will just mean that more setup
-             code is needed for the loop.  */
-
           info = &ss->data.info;
-          if (loop->loopspec[n])
-            specinfo = &loop->loopspec[n]->data.info;
+          if (loopspec[n])
+            specinfo = &loopspec[n]->data.info;
           else
             specinfo = NULL;
           info = &ss->data.info;
 
+          /* Criteria for choosing a loop specifier (in order of importance):
+              stride of one
+              known stride
+              known lower bound
+              known upper bound
+           */
           if (! specinfo)
-            loop->loopspec[n] = ss;
+            loopspec[n] = ss;
           else if (integer_onep (info->stride[n])
                     && ! integer_onep (specinfo->stride[n]))
-            loop->loopspec[n] = ss;
+            loopspec[n] = ss;
           else if (INTEGER_CST_P (info->stride[n])
                     && ! INTEGER_CST_P (specinfo->stride[n]))
-            loop->loopspec[n] = ss;
+            loopspec[n] = ss;
           else if (INTEGER_CST_P (info->start[n])
-                    && ! INTEGER_CST_P (specinfo->stride[n]))
-            loop->loopspec[n] = ss;
+                    && ! INTEGER_CST_P (specinfo->start[n]))
+            loopspec[n] = ss;
+/* We don't work out the upper bound.
+          else if (INTEGER_CST_P (info->finish[n])
+                    && ! INTEGER_CST_P (specinfo->finish[n]))
+            loopspec[n] = ss;*/
         }
 
-      info = &loop->loopspec[n]->data.info;
+      info = &loopspec[n]->data.info;
 
       dim = info->dim[n];
 
       /* Set the extents of this range.  */
       loop->from[n] = info->start[n];
       info->delta[n] = integer_zero_node;
+      var = NULL_TREE;
       if (info->ref->u.ar.end[dim])
         {
           g95_init_se (&se, NULL);
-          g95_conv_simple_val (&se, info->ref->u.ar.end[dim]);
+          g95_conv_simple_val_type (&se, info->ref->u.ar.end[dim],
+                                   g95_array_index_type);
           loop->to[n] = se.expr;
         }
       else
         {
-          loop->to[n] = NULL_TREE;
-          if (info->ref->u.ar.as->type != AS_DEFERRED)
-            {
-              /* We may know the lower bound for assumed shape/size
-                 arrays and explicit shape arrays.  */
-              expr = info->ref->u.ar.as->upper[dim];
-              if (expr != NULL && expr->expr_type == EXPR_CONSTANT)
-                {
-                  g95_init_se (&se, NULL);
-                  g95_conv_constant (&se, expr);
-                  loop->to[n] = se.expr;
-                }
-            }
+          loop->to[n] =
+            G95_TYPE_DESCRIPTOR_UBOUND (TREE_TYPE (info->descriptor), n);
 
           if (loop->to[n] == NULL_TREE)
             {
-              loop->to[n] = g95_create_tmp_var (g95_array_index_type);
-              field = g95_get_ubound_component (
-                             TREE_TYPE (info->descriptor), dim);
+              var = g95_create_tmp_var (g95_array_index_type);
+
+              field = g95_get_ubound_component (TREE_TYPE (info->descriptor),
+                                               dim);
               tmp = build (COMPONENT_REF, g95_array_index_type,
-                             info->descriptor, field);
-              tmp = build (MODIFY_EXPR, g95_array_index_type,
-                              loop->to[n], tmp);
+                          info->descriptor, field);
+              tmp = build (MODIFY_EXPR, g95_array_index_type, var, tmp);
               tmp = build_stmt (EXPR_STMT, tmp);
               g95_add_stmt_to_pre (loop, tmp, tmp);
+              loop->to[n] = var;
             }
         }
 
-      /* We will want to divide by step.  However this complicates things.  */
       if (! integer_onep(info->stride[n]))
-          g95_todo_error ("expression with no unit stride ranges");
+        {
+          /* We don't have a convenient unit stride section.  */
+          /* Set the delta for this section.  */
+          info->delta[n] = loop->from[n];
+          /* Make the loop variable start at 0.  */
+          tmp = build (MINUS_EXPR, g95_array_index_type, loop->to[n],
+                      loop->from[n]);
+          loop->to[n] =
+            g95_simple_fold (tmp, &loop->pre, &loop->pre_tail, &var);
+          loop->from[n] = integer_zero_node;
+
+          /* Now divide by the stride.  */
+          tmp = build (TRUNC_DIV_EXPR, g95_array_index_type, loop->to[n],
+                      info->stride[n]);
+          loop->to[n] =
+            g95_simple_fold (tmp, &loop->pre, &loop->pre_tail, &var);
+        }
 
       /* Create the loop variable.  */
       loop->loopvar[n] = g95_create_tmp_var (g95_array_index_type);
     }
 
-  for (ss = loop->ss ; ss != g95_ss_terminator ; ss = ss->next)
+  /* If we're using a temporary create it.  */
+  if (loop->temp_ss != NULL)
+    {
+      info = &loop->temp_ss->data.info;
+      /* TODO: Maybe create array temporaries with a lower bound of one.  */
+      /* Set the lower bound to zero.  */
+      for (n = 0; n < loop->dimen; n++)
+        {
+          tmp = build (MINUS_EXPR, g95_array_index_type,
+                      loop->to[n], loop->from[n]);
+          loop->to[n] =
+            g95_simple_fold (tmp, &loop->pre, &loop->pre_tail, NULL);
+          loop->from[n] = integer_zero_node;
+          loopspec[n] = loop->temp_ss;
+
+          info->delta[n] = integer_zero_node;
+        }
+
+      /* Initialise the descriptor.  */
+      type = info->descriptor;
+      type = g95_get_array_type_bounds(type, loop->dimen, loop->from, loop->to);
+      desc = g95_create_tmp_var (type);
+      G95_DECL_PACKED_ARRAY (desc) = 1;
+      info->descriptor = desc;
+      tmpvar = NULL_TREE;
+      sizevar = NULL_TREE;
+      size = integer_one_node;
+      for (n = 0; n < loop->dimen ; n++)
+        {
+          /* Fill in the bounds and stride.  */
+          field = g95_get_stride_component (type, n);
+          tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
+              g95_use_gcc_arrays ? integer_zero_node : size);
+
+          field = g95_get_lbound_component (type, n);
+          tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, integer_zero_node);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (loop, stmt, stmt);
+
+          field = g95_get_ubound_component (type, n);
+          tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, loop->to[n]);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (loop, stmt, stmt);
+
+          tmp = build (PLUS_EXPR, g95_array_index_type,
+              loop->to[n], integer_one_node);
+          tmp = g95_simple_fold (tmp, &loop->pre, &loop->pre_tail, &tmpvar);
+
+          tmp = build (MULT_EXPR, g95_array_index_type, size, tmp);
+          size = g95_simple_fold (tmp, &loop->pre, &loop->pre_tail, &sizevar);
+        }
+
+      /* Set the size of the array.  */
+      tmp = build (MULT_EXPR, g95_array_index_type, size,
+          TYPE_SIZE_UNIT (g95_get_element_type (type)));
+      size = g95_simple_fold (tmp, &loop->pre, &loop->pre_tail, &sizevar);
+
+      field = g95_get_data_component (type);
+      tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
+      tmp = build1 (ADDR_EXPR, ppvoid_type_node, tmp);
+
+      info->pdata = g95_create_tmp_var (ppvoid_type_node);
+      tmp = build (MODIFY_EXPR, TREE_TYPE (info->pdata), info->pdata, tmp);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_pre (loop, stmt, stmt);
+
+      /* Build a call to allocate storage.  */
+      tmp = tree_cons (NULL_TREE, size, NULL_TREE);
+      tmp = tree_cons (NULL_TREE, info->pdata, tmp);
+
+      tmp = g95_build_function_call (g95_fndecl_internal_malloc, tmp);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_pre (loop, stmt, stmt);
+
+      field = g95_get_data_component (type);
+      tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
+      info->data = g95_create_tmp_var (TREE_TYPE (field));
+      tmp = build (MODIFY_EXPR, TREE_TYPE (field), info->data, tmp);
+      stmt = build_stmt (EXPR_STMT, tmp);
+      g95_add_stmt_to_pre (loop, stmt, stmt);
+
+      if (! g95_use_gcc_arrays)
+        {
+          /* The offset is zero because we create temporaries with a zero
+             lower bound.  */
+          field = g95_get_base_component (type);
+          tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (field), tmp, info->data);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (loop, stmt, stmt);
+        }
+    }
+
+  /* Calculate the offsets of the loops.  */
+  for (ss = loop->ss; ss != g95_ss_terminator; ss = ss->next)
     {
       if (ss->dimen <= 0)
         continue;
 
       info = &ss->data.info;
 
-      for ( n = 0 ; n < ss->dimen ; n++)
+      for (n = 0; n < ss->dimen; n++)
         {
           dim = info->dim[n];
 
           var = NULL_TREE;
-          /* If we are specifying the range the dela should already be set.  */
-          if (ss != loop->loopspec[n])
+          /* If we are specifying the range the delta should already be set.  */
+          if (ss != loopspec[n])
             {
               /* Calculate the offset relative to the loop variable.  */
               /* First multiply by the stride.  */
@@ -1131,23 +1545,35 @@ g95_conv_loopvars (g95_loopinfo * loop)
 
 /* Resolve array data dependancies.  */
 static void
-g95_conv_resolve_dependencies (g95_loopinfo *loop, g95_ss * dest, g95_ss * rss)
+g95_conv_resolve_dependencies (g95_loopinfo * loop, g95_ss * dest,
+                              g95_ss * rss)
 {
   g95_ss *ss;
   int n;
+  int need_temp;
 
-  for (n = 0 ; n < loop->dimen ; n++)
-    {
+  for (n = 0; n < loop->dimen; n++)
       loop->order[n] = n;
-    }
 
-  for (ss = rss ; ss != g95_ss_terminator ; ss = ss->next)
+  loop->temp_ss = NULL;
+  need_temp = 0;
+  for (ss = rss; ss != g95_ss_terminator; ss = ss->next)
     {
       if (ss->dimen <= 0)
         continue;
       if (ss->expr->symbol == dest->expr->symbol)
-        g95_todo_error ("array dependencies");
+        need_temp = 1;
     }
+
+  if (need_temp)
+    {
+      loop->temp_ss = g95_get_ss();
+      loop->temp_ss->data.info.descriptor =
+        g95_get_element_type (TREE_TYPE (dest->data.info.descriptor));
+      loop->temp_ss->dimen = loop->dimen;
+    }
+  else
+    loop->temp_ss = NULL;
 }
 
 /* Copies the loop variable info to a g95_se sructure. Does not copy the SS
@@ -1157,8 +1583,7 @@ g95_copy_loopinfo_to_se (g95_se * se, g95_loopinfo * loop)
 {
   int n;
 
-  se->dimen = loop->dimen;
-  for (n = 0 ; n < loop->dimen ; n++)
+  for (n = 0; n < loop->dimen; n++)
     {
       se->loopvar[n] = loop->loopvar[n];
     }
@@ -1166,7 +1591,7 @@ g95_copy_loopinfo_to_se (g95_se * se, g95_loopinfo * loop)
 
 /* Generates the actual loops for a scalarized expression.  */
 static tree
-g95_trans_scalarizing_loops (g95_loopinfo *loop, tree body)
+g95_trans_scalarizing_loops (g95_loopinfo * loop, tree body)
 {
   tree init;
   tree cond;
@@ -1175,18 +1600,18 @@ g95_trans_scalarizing_loops (g95_loopinfo *loop, tree body)
   int n;
   int dim;
 
-  for (dim = 0 ; dim < loop->dimen ; dim++)
+  for (dim = 0; dim < loop->dimen; dim++)
     {
       n = loop->order[dim];
       tmp = build (MODIFY_EXPR, g95_array_index_type,
-                    loop->loopvar[n], loop->from[n]);
+                  loop->loopvar[n], loop->from[n]);
       init = build_stmt (EXPR_STMT, tmp);
       cond = build (LE_EXPR, g95_array_index_type,
-                    loop->loopvar[n], loop->to[n]);
+                   loop->loopvar[n], loop->to[n]);
       tmp = build (PLUS_EXPR, g95_array_index_type,
-                    loop->loopvar[n], integer_one_node);
+                  loop->loopvar[n], integer_one_node);
       inc = build (MODIFY_EXPR, g95_array_index_type,
-                    loop->loopvar[n], tmp);
+                  loop->loopvar[n], tmp);
       body = build_stmt (FOR_STMT, init, cond, inc, body);
     }
 
@@ -1197,7 +1622,82 @@ g95_trans_scalarizing_loops (g95_loopinfo *loop, tree body)
 static void
 g95_init_loopinfo (g95_loopinfo * loop)
 {
-  memset(loop, 0, sizeof(g95_loopinfo));
+  memset (loop, 0, sizeof(g95_loopinfo));
+}
+
+static void
+g95_conv_tmp_ref (g95_se * se)
+{
+  tree pointer;
+  tree indices[G95_MAX_DIMENSIONS];
+  g95_ss_info *info;
+  int n;
+
+  assert (se->ss != NULL);
+
+  info = &se->ss->data.info;
+  pointer = info->data;
+  se->expr = info->descriptor;
+  for (n = 0; n < se->ss->dimen; n++)
+    indices[n] = se->loopvar[n];
+
+  g95_conv_array_index_ref (se, pointer, indices, se->ss->dimen);
+}
+
+/* Like chainon(list, listify(add)) except it ignores TREE_CHAIN(add).  */
+tree
+g95_chainon_list (tree list, tree add)
+{
+  tree l;
+
+  l = tree_cons (NULL_TREE, add, NULL_TREE);
+
+  return chainon (list, l);
+}
+
+/* Makes sure se is suitable for passing as a function string parameter.  */
+void
+g95_conv_string_parameter (g95_se *se)
+{
+  if (TREE_CODE (se->expr) == STRING_CST)
+    {
+      se->expr = build1 (ADDR_EXPR, pchar_type_node, se->expr);
+      return;
+    }
+
+  se->string_length =
+    g95_simple_fold (se->string_length, &se->pre, &se->pre_tail, NULL);
+  if (G95_SIZE_STRING_TYPE_P (TREE_TYPE (se->expr)))
+    se->expr = build1 (ADDR_EXPR, pchar_type_node, se->expr);
+
+  assert (TREE_CODE (TREE_TYPE (se->expr)) == POINTER_TYPE);
+
+  se->expr = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, NULL);
+}
+
+/* Translate a string assignment.  */
+static tree
+g95_trans_string_assign (g95_se * lse, g95_se * rse)
+{
+  tree tmp;
+  tree args;
+
+  args = NULL_TREE;
+
+  assert (lse->string_length != NULL_TREE && rse->string_length != NULL_TREE);
+
+  g95_conv_string_parameter (lse);
+  g95_conv_string_parameter (rse);
+
+  args = g95_chainon_list (args, lse->string_length);
+  args = g95_chainon_list (args, lse->expr);
+  args = g95_chainon_list (args, rse->string_length);
+  args = g95_chainon_list (args, rse->expr);
+
+  tmp = g95_build_function_call (g95_fndecl_copy_string, args);
+  tmp = build_stmt (EXPR_STMT, tmp);
+
+  return tmp;
 }
 
 /* Translate an assign statement.  */
@@ -1212,12 +1712,13 @@ g95_trans_assign (g95_code * code)
   g95_ss *rss;
   g95_loopinfo loop;
   tree assign;
+  tree tmp;
   tree body;
 
-  g95_start_stmt();
+  g95_start_stmt ();
 
-  g95_init_se(&lse, NULL);
-  g95_init_se(&rse, NULL);
+  g95_init_se (&lse, NULL);
+  g95_init_se (&rse, NULL);
 
   /* Setup the scalarization loop.  */
   lss = g95_walk_expr (g95_ss_terminator, code->expr);
@@ -1225,12 +1726,15 @@ g95_trans_assign (g95_code * code)
     {
       lss_section = lss;
 
+      if (code->expr->ts.type == BT_CHARACTER)
+        g95_todo_error ("Character array assignments");
+
       while (lss_section != g95_ss_terminator && lss_section->dimen <= 0)
         lss_section = lss_section->next;
 
       assert (lss_section != g95_ss_terminator);
 
-      g95_init_loopinfo(&loop);
+      g95_init_loopinfo (&loop);
       loop.dimen = lss_section->dimen;
 
       rss = g95_walk_expr (g95_ss_terminator, code->expr2);
@@ -1249,6 +1753,7 @@ g95_trans_assign (g95_code * code)
       g95_add_ss_stmts (&loop, rss);
 
       rss = g95_reverse_ss (rss);
+      lss = g95_reverse_ss (lss);
 
       lss_tail = lss_section;
       while (lss_tail->next != g95_ss_terminator)
@@ -1261,8 +1766,8 @@ g95_trans_assign (g95_code * code)
 
       /* Setup the scalarizing loops.  */
       g95_conv_ss_startstride (&loop);
-      g95_conv_resolve_dependencies(&loop, lss_section, rss);
-      g95_conv_loopvars(&loop);
+      g95_conv_resolve_dependencies (&loop, lss_section, rss);
+      g95_conv_loopvars (&loop);
       /* Break the lhs and rhs chains apart, otherwise we'll confuse the
          expression translator.  */
       lss_tail->next = g95_ss_terminator;
@@ -1270,8 +1775,12 @@ g95_trans_assign (g95_code * code)
       /* Setup the g95_se structures.  */
       g95_copy_loopinfo_to_se (&lse, &loop);
       g95_copy_loopinfo_to_se (&rse, &loop);
-      lse.ss = lss;
       rse.ss = rss;
+
+      if (loop.temp_ss == NULL)
+        lse.ss = lss;
+      else
+        lse.ss = loop.temp_ss;
 
       /* Enclose the loop body in it's own scope.  */
       g95_start_stmt ();
@@ -1280,26 +1789,71 @@ g95_trans_assign (g95_code * code)
     rss = NULL;
 
   /* Translate the expression.  */
-  g95_conv_simple_lhs(&lse, code->expr);
-  g95_conv_simple_rhs(&rse, code->expr2);
+  g95_conv_simple_rhs (&rse, code->expr2);
 
-  assign=build_stmt(EXPR_STMT, build(MODIFY_EXPR, TREE_TYPE(lse.expr),
-                      lse.expr, rse.expr));
+  if (lss != g95_ss_terminator && loop.temp_ss != NULL)
+    g95_conv_tmp_ref (&lse);
+  else
+    g95_conv_simple_lhs (&lse, code->expr);
+
+  if (code->expr->ts.type == BT_CHARACTER)
+    {
+      assign = g95_trans_string_assign (&lse, &rse);
+    }
+  else
+    {
+      tmp = build (MODIFY_EXPR, TREE_TYPE (lse.expr), lse.expr, rse.expr);
+      assign = build_stmt (EXPR_STMT, tmp);
+    }
 
   /* Chain all the stmts together.  */
-  g95_add_stmt_to_pre(&lse, rse.pre, rse.pre_tail);
-  g95_add_stmt_to_pre(&lse, assign, NULL);
-  g95_add_stmt_to_pre(&lse, rse.post, rse.post_tail);
-  g95_add_stmt_to_pre(&lse, lse.post, lse.post_tail);
+  g95_add_stmt_to_pre (&lse, rse.pre, rse.pre_tail);
+  g95_add_stmt_to_pre (&lse, assign, NULL_TREE);
+  g95_add_stmt_to_pre (&lse, rse.post, rse.post_tail);
+  g95_add_stmt_to_pre (&lse, lse.post, lse.post_tail);
   /* The whole statement in now held by lse.pre.  */
   body = g95_finish_stmt (lse.pre, lse.pre_tail);
 
   if (lss != g95_ss_terminator)
     {
       body = g95_trans_scalarizing_loops (&loop, body);
-
-      /* Add the loops to the end of pre chain and wrap up.  */
       g95_add_stmt_to_pre (&loop, body, NULL_TREE);
+
+      if (loop.temp_ss != NULL)
+        {
+          /* Create loops to copy the temporary.  */
+          g95_start_stmt ();
+          g95_init_se (&lse, NULL);
+          g95_init_se (&rse, NULL);
+          g95_copy_loopinfo_to_se (&lse, &loop);
+          g95_copy_loopinfo_to_se (&rse, &loop);
+
+          rse.ss = loop.temp_ss;
+          lse.ss = lss;
+
+          g95_conv_tmp_ref (&rse);
+          g95_conv_simple_lhs (&lse, code->expr);
+
+          tmp = build (MODIFY_EXPR, TREE_TYPE (lse.expr), lse.expr, rse.expr);
+          assign = build_stmt (EXPR_STMT, tmp);
+
+          g95_add_stmt_to_pre (&lse, rse.pre, rse.pre_tail);
+          g95_add_stmt_to_pre (&lse, assign, NULL_TREE);
+          g95_add_stmt_to_pre (&lse, rse.post, rse.post_tail);
+          g95_add_stmt_to_pre (&lse, lse.post, lse.post_tail);
+
+          body = g95_finish_stmt (lse.pre, lse.pre_tail);
+          body = g95_trans_scalarizing_loops (&loop, body);
+          g95_add_stmt_to_pre (&loop, body, NULL_TREE);
+
+          tmp = tree_cons (NULL_TREE, loop.temp_ss->data.info.pdata,
+              NULL_TREE);
+          tmp = g95_build_function_call (g95_fndecl_internal_free, tmp);
+          body = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (&loop, body, body);
+        }
+
+      /* Wrap the whole thing up.  */
       body = g95_finish_stmt (loop.pre, loop.pre_tail);
 
       g95_free_ss (lss);

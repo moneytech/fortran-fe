@@ -66,7 +66,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    is always TYPE.  This function implements all reasonable
    conversions; callers should filter out those that are
    not permitted by the language being compiled.  */
-
+/* We are assuming that given a SIMPLE val, the result will be a SIMPLE rhs.
+   If this is not the case, we will abort with an internal error.  */
 tree
 convert (tree type, tree expr)
 {

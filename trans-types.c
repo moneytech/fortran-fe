@@ -59,6 +59,7 @@ tree g95_type_nodes[NUM_F95_TYPES];
 int g95_array_index_kind;
 tree g95_array_index_type;
 tree ppvoid_type_node;
+tree pchar_type_node;
 
 
 /* Create the backend type nodes. We map them to their
@@ -69,8 +70,6 @@ void
 g95_init_types (void)
 {
   int n;
-
-  ppvoid_type_node = build_pointer_type (build_pointer_type (void_type_node));
 
   /* Name the types.  */
 #define PUSH_TYPE(name, node)                   \
@@ -85,7 +84,6 @@ g95_init_types (void)
   g95_int8_type_node = g95_type_for_size (64, 0 /*unsigned*/);
   PUSH_TYPE ("int8", g95_int8_type_node);
 #if (G95_USE_TYPES16 && (HOST_BITS_PER_WIDE_INT >= 64))
-  /* I can't find the standard size for a 128 bit int */
   g95_int16_type_node = g95_type_for_size (128, 0 /*unsigned*/);
   PUSH_TYPE ("int16", g95_int16_type_node);
 #endif
@@ -123,8 +121,15 @@ g95_init_types (void)
   PUSH_TYPE ("logical16", g95_logical16_type_node);
 #endif
 
+  g95_character1_type_node = build_type_variant (signed_char_type_node, 0, 0);
+  PUSH_TYPE ("char", g95_character1_type_node);
+
   PUSH_TYPE ("byte", unsigned_char_type_node);
+  PUSH_TYPE ("void", void_type_node);
 #undef PUSH_TYPE
+
+  ppvoid_type_node = build_pointer_type (build_pointer_type (void_type_node));
+  pchar_type_node = build_pointer_type (g95_character1_type_node);
 
   g95_array_index_kind = TYPE_PRECISION (integer_type_node) / 8;
   g95_array_index_type = g95_get_int_type (g95_array_index_kind);
@@ -212,23 +217,47 @@ g95_get_logical_type (int kind)
       return (g95_logical16_type_node);
 #endif
     default:
-      g95_todo_error ("logical kind=%d not available", kind);
-      return error_mark_node;
+      fatal_error ("logical kind=%d not available", kind);
     }
 }
-
-/* Get a type node for a character kind */
+
+/* Get a type node for a character kind.  Will be a pointer if the length is
+   unknown.  */
 tree
-g95_get_character_type (int kind)
+g95_get_character_type (int kind, g95_charlen * cl)
 {
+  tree base;
+  tree type;
+  tree len;
+  tree bounds;
+
   switch (kind)
     {
     case 1:
-      return (g95_character1_type_node);
+      base = g95_character1_type_node;
+      break;
+
     default:
-      g95_todo_error ("logical kind=%d not available", kind);
-      return error_mark_node;
+      fatal_error ("character kind=%d not available", kind);
     }
+
+  if (cl && cl->length && cl->length->expr_type == EXPR_CONSTANT)
+    {
+      len = g95_conv_mpz_to_tree (cl->length->value.integer,
+                                 cl->length->ts.kind);
+    }
+  else
+    len = NULL_TREE;
+
+  bounds = build_range_type (g95_array_index_type, integer_one_node, len);
+  type = build_array_type (base, bounds);
+  TYPE_STRING_FLAG (type) = 1;
+  if (len == NULL_TREE)
+    type = build_pointer_type (type);
+  else
+    G95_SIZE_STRING_TYPE_P (type) = 1;
+
+  return type;
 }
 
 /* Covert a basic type */
@@ -239,6 +268,10 @@ g95_typenode_for_spec (g95_typespec * spec)
 
   switch (spec->type)
     {
+    case BT_UNKNOWN:
+      abort ();
+      break;
+
     case BT_INTEGER:
       basetype = g95_get_int_type (spec->kind);
       break;
@@ -256,7 +289,7 @@ g95_typenode_for_spec (g95_typespec * spec)
       break;
 
     case BT_CHARACTER:
-      basetype = g95_get_character_type (spec->kind);
+      basetype = g95_get_character_type (spec->kind, spec->cl);
       break;
 
     case BT_DERIVED:
@@ -264,28 +297,40 @@ g95_typenode_for_spec (g95_typespec * spec)
       break;
 
     default:
-      g95_todo_error ("base type %d not implemented", spec->type);
-      return error_mark_node;
+      abort ();
+      break;
     }
   return basetype;
 }
 
-
 /* Used for array boundaries.  Returns either a constant or a placeholder
    for the specified field.  The C pretty-printer doesn't know about arrays
    with non-constant bounds, or about placeholders.  The SIMPLE tree expander
    does though, so the correct assembly is generated.  */
 static tree
-g95_build_spec_expr (g95_expr * expr, tree field)
+g95_build_spec_expr (tree expr, tree field)
 {
   tree placeholder;
-  if (expr != NULL && expr->expr_type == EXPR_CONSTANT)
-    return g95_conv_mpz_to_tree (expr->value.integer, g95_array_index_kind);
 
+  if (expr != NULL_TREE)
+    return expr;
+
+  assert (g95_use_gcc_arrays);
   placeholder = build (PLACEHOLDER_EXPR, TREE_TYPE (DECL_CONTEXT (field)));
   return build (COMPONENT_REF, g95_array_index_type, placeholder, field);
 }
+
+static tree
+g95_conv_array_bound (g95_expr * expr)
+{
+  /* If expr is an integer constant, return that.  */
+  if (expr != NULL && expr->expr_type == EXPR_CONSTANT)
+    return g95_conv_mpz_to_tree (expr->value.integer, g95_array_index_kind);
 
+  /* Otherwise return NULL.  */
+  return NULL_TREE;
+}
+
 /* Return a structure type for saving descriptors of specified rank.
    We need one member for each dimension. Type B arrays also need to
    store the data member. */
@@ -358,78 +403,96 @@ g95_get_descriptorsave_type(int rank)
   return typenode;
 
 }
+
+tree
+g95_get_element_type (tree type)
+{
+  tree element;
 
-/* Return the first bound component of an array descriptor type.  */
+  element = g95_get_data_component (type);
+  element = TREE_TYPE (element);
+
+  assert (TREE_CODE (element) == POINTER_TYPE);
+  element = TREE_TYPE (element);
+
+  while (TREE_CODE (element) == ARRAY_TYPE)
+    element = TREE_TYPE (element);
+
+  return element;
+}
+
 tree
 g95_get_lbound_component (tree type, int n)
 {
   tree field;
 
-  assert (TREE_CODE (type) == RECORD_TYPE);
+  assert (G95_DESCRIPTOR_TYPE_P (type));
 
-  field = g95_advance_chain (TYPE_FIELDS (type), n*3+1);
+  n = 2 * n + G95_TYPE_DESCRIPTOR_RANK (type) + 2;
+  field = g95_advance_chain (TYPE_FIELDS (type), n);
   assert (field != NULL_TREE && TREE_TYPE (field) == g95_array_index_type);
 
   return field;
 }
-
+
 tree
 g95_get_ubound_component (tree type, int n)
 {
   tree field;
 
-  assert (TREE_CODE (type) == RECORD_TYPE);
+  assert (G95_DESCRIPTOR_TYPE_P (type));
 
-  field = g95_advance_chain (TYPE_FIELDS (type), n*3+2);
+  n = 2 * n +  G95_TYPE_DESCRIPTOR_RANK (type) + 3;
+  field = g95_advance_chain (TYPE_FIELDS (type), n);
   assert (field != NULL_TREE && TREE_TYPE (field) == g95_array_index_type);
 
   return field;
 }
-
+
 tree
 g95_get_stride_component (tree type, int n)
 {
   tree field;
 
-  assert (TREE_CODE (type) == RECORD_TYPE);
+  assert (G95_DESCRIPTOR_TYPE_P (type));
 
-  field = g95_advance_chain (TYPE_FIELDS (type), n*3+3);
+  field = g95_advance_chain (TYPE_FIELDS (type), n + 2);
   assert (field != NULL_TREE && TREE_TYPE (field) == g95_array_index_type);
 
   return field;
 }
-
+
 tree
 g95_get_data_component (tree type)
 {
   tree field;
 
-  assert (TREE_CODE (type) == RECORD_TYPE);
+  assert (G95_DESCRIPTOR_TYPE_P (type));
 
   field = TYPE_FIELDS (type);
-  assert (TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
-            && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
+  assert (field != NULL_TREE
+          && TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
+          && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
 
   return field;
 }
-
+
 tree
-g95_get_block_component (tree type)
+g95_get_base_component (tree type)
 {
   tree field;
 
   assert (! g95_use_gcc_arrays);
-  assert (TREE_CODE (type) == RECORD_TYPE);
+  assert (G95_DESCRIPTOR_TYPE_P (type));
 
-  field = TYPE_FIELDS (type);
-  while (TREE_CHAIN (field))
-    field = TREE_CHAIN (field);
-  assert (TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
-            && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
+  field = g95_advance_chain (TYPE_FIELDS (type), 1);
+  assert (field != NULL_TREE
+          &&TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
+          && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
 
   return field;
 }
-
+
 /* Creates a type with the given size.  Used for holding array data.  */
 tree
 g95_get_stack_array_type (tree size)
@@ -442,7 +505,7 @@ g95_get_stack_array_type (tree size)
 
   return type;
 }
-
+
 /* Build an array. This function is called from g95_sym_type().
    Actualy returns array descriptor type.
 
@@ -450,24 +513,21 @@ g95_get_stack_array_type (tree size)
 
     struct g95_array_descriptor
     {
-      type *data
+      array *data
+      array *base;
       //index dimensions -  Maybe we should include this for error checking?
-      index lbound00;
-      index ubound00;
       index stride00;
-      index lbound01;
-      index ubound01;
       index stride01;
       ...
-      void *block; //Type B only
+      index lbound00;
+      index ubound00;
+      index lbound01;
+      index ubound01;
+      ...
     }
 
    Translation code should use g95_get_*_component rather than assuming a
    particular ordering.
-   TODO: Grouping stride components together may give better performance as
-   they will occupy less cache lines.  ?bound components are not used in normal
-   Type B array references. Similarly Type A references don't use the stride
-   components.
 
    This is represented internaly as a RECORD_TYPE. The index nodes are
    g95_array_index_type and the data node is a pointer to the data.
@@ -520,11 +580,58 @@ g95_get_stack_array_type (tree size)
    program.
 
    I've implemented simple runtime checking of array parameters to prevent
-   accidental mixing the two systems.  Performace hit is negligible as this is
-   only done in function entry code.
+   accidental mixing of the two systems.  Performace hit is negligible as this
+   is only done in function entry code.
    TODO: possibly disable this checking at -O2?  */
+
 static tree
 g95_build_array_type (tree type, g95_array_spec * as)
+{
+  tree lbound[G95_MAX_DIMENSIONS];
+  tree ubound[G95_MAX_DIMENSIONS];
+  int n;
+
+  for (n = 0 ; n < as->rank; n++)
+    {
+      /* Create expressions for the bounds of the array.
+         Note we re-use ubound and lbound.  */
+      switch (as->type)
+        {
+        case AS_EXPLICIT:
+          lbound[n] = g95_conv_array_bound (as->lower[n]);
+          ubound[n] = g95_conv_array_bound (as->upper[n]);
+          break;
+
+        case AS_ASSUMED_SIZE:
+          assert (as->rank == 1);
+
+          /* Fall through...  */
+
+        case AS_ASSUMED_SHAPE:
+          if (as->lower[n] == NULL)
+            lbound[n] = integer_one_node;
+          else
+            lbound[n] = g95_conv_array_bound (as->lower[n]);
+          ubound[n] = g95_conv_array_bound (as->upper[n]);
+          break;
+
+        case AS_DEFERRED:
+          lbound[n] = g95_conv_array_bound (as->lower[n]);
+          ubound[n] = g95_conv_array_bound (as->upper[n]);
+          break;
+
+        default:
+          internal_error ("Bad array spec type (%d)", as->type);
+          break;
+        }
+    }
+
+  return g95_get_array_type_bounds (type, as->rank, lbound, ubound);
+}
+
+/* Build an array type with given bounds.  */
+tree
+g95_get_array_type_bounds (tree type, int dimen, tree * lbound, tree * ubound)
 {
   tree fat_type, fat_pointer_type;
   tree fieldlist;
@@ -532,13 +639,20 @@ g95_build_array_type (tree type, g95_array_spec * as)
   tree decl;
   int n;
   char fieldname[7+G95_RANK_DIGITS];
-  tree lbound;
-  tree ubound;
+  tree lower;
+  tree upper;
+  tree stride;
+  tree tmp;
 
   /* Build the type node.  */
   fat_type = make_node (RECORD_TYPE);
+  G95_DESCRIPTOR_TYPE_P (fat_type) = 1;
+  TYPE_LANG_SPECIFIC (fat_type) = (struct lang_type *)
+    ggc_alloc_cleared (sizeof (struct lang_type));
+  G95_TYPE_DESCRIPTOR_RANK (fat_type) = dimen;
+
   /* Include the name of the element type in the array name.  */
-  sprintf (fieldname, "array"G95_RANK_PRINTF_FORMAT, as->rank);
+  sprintf (fieldname, "array"G95_RANK_PRINTF_FORMAT, dimen);
   TYPE_NAME (fat_type) = get_identifier (fieldname);
   TYPE_PACKED (fat_type) = 0;
 
@@ -549,83 +663,84 @@ g95_build_array_type (tree type, g95_array_spec * as)
 
   /* this will be the type of the array data.  Start with a single element.  */
   arraytype = type;
+  stride = integer_one_node;
 
-  for (n = 0 ; n < as->rank; n++)
+  for (n = 0 ; n < dimen; n++)
     {
-      /* Add boundary members.  Lower bound first.  */
-      sprintf (fieldname, "lbound"G95_RANK_PRINTF_FORMAT, n);
-      lbound = build_decl (FIELD_DECL, get_identifier (fieldname), g95_array_index_type);
-      DECL_CONTEXT (lbound) = fat_type;
-      DECL_INITIAL (lbound) = 0;
-      fieldlist = chainon (fieldlist, lbound);
+      G95_TYPE_DESCRIPTOR_STRIDE (fat_type, n) = stride;
+      if (lbound[n] != NULL_TREE)
+        {
+          assert (INTEGER_CST_P (lbound[n]));
+          G95_TYPE_DESCRIPTOR_LBOUND (fat_type, n) = lbound[n];
+        }
 
-      /* Now add upper bound.  */
-      fieldname[0] = 'u';
-      ubound = build_decl (FIELD_DECL, get_identifier (fieldname), g95_array_index_type);
-      DECL_CONTEXT (ubound) = fat_type;
-      DECL_INITIAL (ubound) = 0;
-      fieldlist = chainon (fieldlist, ubound);
+      if (ubound[n] != NULL_TREE)
+        {
+          assert (INTEGER_CST_P (ubound[n]));
+          G95_TYPE_DESCRIPTOR_UBOUND (fat_type, n) = ubound[n];
+        }
+
+      if (ubound[n] != NULL_TREE && lbound[n] != NULL_TREE
+          && stride != NULL_TREE)
+        {
+          tmp = fold (build (MINUS_EXPR, g95_array_index_type, ubound[n],
+                            lbound[n]));
+          tmp = fold (build (PLUS_EXPR, g95_array_index_type, tmp,
+                            integer_one_node));
+          stride = fold (build (MULT_EXPR, g95_array_index_type, tmp, stride));
+        }
+      else
+        stride = NULL_TREE;
 
       /* Add stride component.  */
       sprintf (fieldname, "stride"G95_RANK_PRINTF_FORMAT, n);
-      decl = build_decl (FIELD_DECL, get_identifier (fieldname), g95_array_index_type);
+      decl = build_decl (FIELD_DECL, get_identifier (fieldname),
+                        g95_array_index_type);
       DECL_CONTEXT (decl) = fat_type;
-      DECL_INITIAL (decl) = 0;
+      DECL_INITIAL (decl) = NULL_TREE;
       fieldlist = chainon (fieldlist, decl);
+    }
+
+  G95_TYPE_DESCRIPTOR_SIZE (fat_type) = stride;
+
+  for (n = 0 ; n < dimen; n++)
+    {
+      /* Add lower bound.  */
+      sprintf (fieldname, "lbound"G95_RANK_PRINTF_FORMAT, n);
+      lower = build_decl (FIELD_DECL, get_identifier (fieldname),
+                         g95_array_index_type);
+      DECL_CONTEXT (lower) = fat_type;
+      DECL_INITIAL (lower) = NULL_TREE;
+      fieldlist = chainon (fieldlist, lower);
+
+      /* Now add upper bound.  */
+      fieldname[0] = 'u';
+      upper = build_decl (FIELD_DECL, get_identifier (fieldname),
+                         g95_array_index_type);
+      DECL_CONTEXT (upper) = fat_type;
+      DECL_INITIAL (upper) = NULL_TREE;
+      fieldlist = chainon (fieldlist, upper);
 
       if (g95_use_gcc_arrays)
         {
-          /* Create expressions for the bounds of the array.
-             Note we re-use ubound and lbound.  */
-          switch (as->type)
-            {
-            case AS_EXPLICIT:
-              lbound = g95_build_spec_expr (as->lower[n], lbound);
-              ubound = g95_build_spec_expr (as->upper[n], ubound);
-              break;
-
-            case AS_ASSUMED_SIZE:
-              assert (as->rank == 1);
-
-              /* Fall through...  */
-
-            case AS_ASSUMED_SHAPE:
-              if (as->lower[n] == NULL)
-                lbound = integer_one_node;
-              else
-                lbound = g95_build_spec_expr (as->lower[n], lbound);
-              ubound = g95_build_spec_expr (as->upper[n], ubound);
-              break;
-
-            case AS_DEFERRED:
-              lbound = g95_build_spec_expr (as->lower[n], lbound);
-              ubound = g95_build_spec_expr (as->upper[n], ubound);
-              break;
-
-            default:
-              g95_todo_error ("unknown array spec type");
-              break;
-            }
-
+          lower = g95_build_spec_expr (lbound[n], lower);
+          upper = g95_build_spec_expr (ubound[n], upper);
           /* Build this dimension onto the array.  */
           arraytype = build_array_type (arraytype,
-                build_range_type (g95_array_index_type, lbound, ubound));
+                build_range_type (g95_array_index_type, lower, upper));
         }
     }
 
-  if (! g95_use_gcc_arrays)
-    {
-       /* We define data as an unknown size array. Much better than doing
-          pointer arithmetic.  */
-      arraytype = build_array_type (arraytype, build_range_type (
-            g95_array_index_type, integer_zero_node, NULL_TREE));
+   /* We define data as an unknown size array. Much better than doing
+      pointer arithmetic.  */
+  arraytype = build_array_type (arraytype, build_range_type (
+        g95_array_index_type, integer_zero_node, NULL_TREE));
 
-      /* Add the bock component to hold the actual storage for the array.  */
-      decl = build_decl (FIELD_DECL, get_identifier ("block"),
-                          build_pointer_type (arraytype));
-      DECL_CONTEXT (decl) = fat_type;
-      fieldlist = chainon (fieldlist, decl);
-    }
+  /* Add the base component for Type B arrays.  */
+  decl = build_decl (FIELD_DECL, get_identifier ("base"),
+                      build_pointer_type (arraytype));
+  DECL_CONTEXT (decl) = fat_type;
+  fieldlist = chainon (decl, fieldlist);
 
   /* The pointer to the array data.  */
   decl = build_decl (FIELD_DECL,
@@ -646,7 +761,7 @@ g95_build_array_type (tree type, g95_array_spec * as)
   return fat_type;
 }
 
-/* Build an pointer. This function is called from g95_sym_type().  */
+/* Build a pointer type. This function is called from g95_sym_type().  */
 static tree
 g95_build_pointer_type (g95_symbol * sym, tree type)
 {
@@ -682,23 +797,32 @@ g95_sym_type (g95_symbol * sym)
   if (sym->attr.dimension)
       type = g95_build_array_type (type, sym->as);
 
-  if (sym->attr.allocatable || sym->attr.pointer)
-    type = g95_build_pointer_type (sym, type);
+  if (sym->ts.type == BT_CHARACTER)
+    {
+      if ((sym->attr.allocatable || sym->attr.pointer || sym->attr.dummy)
+          && G95_SIZE_STRING_TYPE_P (type))
+        type = build_pointer_type (type);
+    }
+  else
+    {
+      if (sym->attr.allocatable || sym->attr.pointer)
+        type = g95_build_pointer_type (sym, type);
 
-  /* We currently pass all parameters by reference.
-     See f95_get_function_decl.  */
-  if (sym->attr.dummy)
-    type = build_reference_type (type);
+      /* We currently pass all parameters by reference.
+         See f95_get_function_decl.  */
+      if (sym->attr.dummy)
+        type = build_reference_type (type);
+    }
 
   return (type);
 }
-
+
 /* This is used by g95_get_derived_type.  Not sure what it was meant to do.  */
 static void
 g95_set_decl_attributes (tree type ATTRIBUTE_UNUSED, symbol_attribute * attr ATTRIBUTE_UNUSED)
 {
 }
-
+
 /* Build a tree node for a derived type.  */
 static tree
 g95_get_derived_type (g95_symbol * derived)
@@ -763,7 +887,7 @@ g95_get_derived_type (g95_symbol * derived)
 
   return typenode;
 }
-
+
 tree
 g95_get_function_type (g95_symbol * sym)
 {
@@ -788,20 +912,23 @@ g95_get_function_type (g95_symbol * sym)
             }
           else
             type = g95_sym_type (f->sym);
+
           /* Parameter Passing Convention
 
              We currently pass all parameters by reference.
-             Parameters with INTENT(IN) voud be passed by value.
-             The problem arises if a function is called vai and implicit
-             prototypes. In this situation the INTENT is not known.
+             Parameters with INTENT(IN) could be passed by value.
+             The problem arises if a function is called via an implicit
+             prototype. In this situation the INTENT is not known.
              For this reason all parameters to global functions must be
-             passed by reference.  Passing by valie would potentialy
-             generate bad code, worse there would be no way of telling that
-             this code wad bed, except that it would give incorrect results.
+             passed by reference.  Passing by value would potentialy
+             generate bad code.  Worse there would be no way of telling that
+             this code wad bad, except that it would give incorrect results.
 
              Module and contained procedures could pass by value as these are
-             never used without and explicit interface.
+             never used without an explicit interface.
            */
+          if (f->sym->ts.type == BT_CHARACTER)
+            typelist = chainon (typelist, listify (g95_strlen_type_node));
           typelist = chainon (typelist, listify (type));
         }
     }
@@ -817,7 +944,7 @@ g95_get_function_type (g95_symbol * sym)
 
   return type;
 }
-
+
 /* Routines for getting integer type nodes */
 
 
@@ -884,7 +1011,7 @@ g95_type_for_mode (enum machine_mode mode, int unsignedp)
   if (mode == TYPE_MODE (long_long_integer_type_node))
     return unsignedp ? long_long_unsigned_type_node : long_long_integer_type_node;
 
-/*TODO: We currently don't initialise this.
+/*TODO: see above
   if (mode == TYPE_MODE (widest_integer_literal_type_node))
     return unsignedp ? widest_unsigned_literal_type_node
                      : widest_integer_literal_type_node;
@@ -973,7 +1100,7 @@ g95_unsigned_type (tree type)
     return long_unsigned_type_node;
   if (type1 == long_long_integer_type_node)
     return long_long_unsigned_type_node;
-/*TODO:see others
+/*TODO :see others
   if (type1 == widest_integer_literal_type_node)
     return widest_unsigned_literal_type_node;
 */

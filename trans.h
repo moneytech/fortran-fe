@@ -37,6 +37,9 @@ typedef struct g95_se
   /* the result of the expression */
   tree expr;
 
+  /* The length of a character string value.  */
+  tree string_length;
+
   /* If not set 95_conv_variable will return an expression for the array
      descriptor.  Otherwise it will substitute scalarizing variables.  If no
      scalarizing variables have been setup, it will throw an error.
@@ -47,7 +50,6 @@ typedef struct g95_se
 
   /* Scalarization parameters.  */
   struct g95_se *parent;
-  int dimen;
   tree loopvar[G95_MAX_DIMENSIONS];
   struct g95_ss *ss;
 } g95_se;
@@ -62,6 +64,7 @@ typedef struct g95_ss_info
   g95_ref *ref;
   tree descriptor;
   tree data;
+  tree pdata;
   tree start[G95_MAX_DIMENSIONS];
   tree stride[G95_MAX_DIMENSIONS];
   tree delta[G95_MAX_DIMENSIONS];
@@ -98,14 +101,12 @@ typedef struct g95_loopinfo
   int dimen;
 
   g95_ss *ss;
+  g95_ss *temp_ss;
 
   tree loopvar[G95_MAX_DIMENSIONS];
   tree from[G95_MAX_DIMENSIONS];
   tree to[G95_MAX_DIMENSIONS];
   g95_ss *specloop[G95_MAX_DIMENSIONS];
-
-  /* Used to determine the range of the scalarization.  */
-  g95_ss *loopspec[G95_MAX_DIMENSIONS];
 
   /* Order in which the dimensions should be looped, innermost first.  */
   int order[G95_MAX_DIMENSIONS];
@@ -148,26 +149,41 @@ tree g95_create_tmp_var(tree);
  * repeatedly even if the original changes */
 void g95_make_safe_expr(g95_se * se);
 
-/* Only the following 4 functions should be used to translate
- * expressions outside of trans-expr.c */
+/* Makes sure se is suitable for passing as a function string parameter.  */
+void g95_conv_string_parameter (g95_se *se);
+
+/* Add an item to the end of TREE_LIST.  */
+tree g95_chainon_list (tree, tree);
+
+/* When using the g95_conv_* make sure you understand what they do, ie.
+   when a POST chain may be created, and what the retured expression may be
+   used for.  Note that character strings have special handling.  This
+   should not be a problem as most statements/operations only deal with
+   numeric/logical types.  */
 
 /* Suitable for array indices and function parameters
- * ie. either a constant of a variable.
- * Guaranteed to return post=NULL*/
+   ie. either a constant of a variable.
+   Guaranteed to return post=NULL for non-character values.  */
 void g95_conv_simple_val(g95_se *, g95_expr *);
-/* Suitable for use in if constructs, etc
- * Guaranteed to return post=NULL*/
+/* Like g95_conv_simple_val except the value will be of specified type.  Does
+   not work with character types.  */
+void g95_conv_simple_val_type(g95_se *, g95_expr *, tree);
+/* Suitable for use in if constructs, etc.
+   Guaranteed to return post=NULL for non-character values.  */
 void g95_conv_simple_cond(g95_se *, g95_expr *);
-/* Weturns an lvalue, throws error if not possble.
- * Guaranteed to return post=NULL*/
+/* Returns an lvalue, throws error if not possble.
+   Guaranteed to return post=NULL for non-character values.  */
 void g95_conv_simple_lhs(g95_se *, g95_expr *);
 
 /* Simple expression suitable for RHS of assignment.
- * Can return a non-NULL post tree */
+   Can return a non-NULL post tree */
 void g95_conv_simple_rhs(g95_se *, g95_expr *);
 
 /* Translate a expression to pass by reference.  */
 void g95_conv_simple_reference (g95_se *, g95_expr *);
+
+/* Intrinsic function handling.  */
+void g95_conv_intrinsic_function (g95_se *, g95_expr *);
 
 /* Also used to CALL subroutines.  */
 void g95_conv_function_call (g95_se *, g95_symbol *, g95_actual_arglist *);
@@ -230,22 +246,93 @@ tree poplevel (int, int, int);
 void expand_function_body (tree);
 tree getdecls(void);
 
+/* External IO function decls.  */
+struct g95_io_fndecl_t GTY(())
+{
+  char *name;
+  tree *ptype;
+  tree write;
+  tree read;
+};
+
+typedef struct g95_io_fndecl_t g95_io_fndecl_t;
+
+/* This must be consistent with g95_io_fndecls (see trans-io.c).  */
+typedef enum
+{
+  GFORIO_FNDECL_INT4=0,
+  GFORIO_FNDECL_INT8,
+  GFORIO_FNDECL_REAL4,
+  GFORIO_FNDECL_REAL8,
+  GFORIO_FNDECL_COMPLEX4,
+  GFORIO_FNDECL_COMPLEX8,
+  /* We convert all logical values to kind=4 before passing to IO.  */
+  GFORIO_FNDECL_LOGICAL,
+  GFORIO_NUM_FNDECLS
+} g95_io_fndecl_enum;
+
+extern struct g95_io_fndecl_t g95_io_fndecls[GFORIO_NUM_FNDECLS];
+
 /* Runtime library function decls.  */
 extern GTY(()) tree g95_fndecl_push_context;
 extern GTY(()) tree g95_fndecl_pop_context;
 extern GTY(()) tree g95_fndecl_array_mismatch;
 extern GTY(()) tree g95_fndecl_internal_malloc;
 extern GTY(()) tree g95_fndecl_internal_malloc64;
+extern GTY(()) tree g95_fndecl_internal_free;
 extern GTY(()) tree g95_fndecl_allocate;
 extern GTY(()) tree g95_fndecl_allocate64;
 extern GTY(()) tree g95_fndecl_deallocate;
 extern GTY(()) tree g95_fndecl_stop;
 
+/* String functions.  */
+extern GTY(()) tree g95_fndecl_copy_string;
+extern GTY(()) tree g95_fndecl_compare_string;
+extern GTY(()) tree g95_fndecl_concat_string;
+
+/* IO library decls.  */
+extern GTY(()) tree g95_fndecl_write_begin;
+extern GTY(()) tree g95_fndecl_write_character;
+
 /* True if node is an integer constant.  */
 #define INTEGER_CST_P(node) (TREE_CODE(node) == INTEGER_CST)
 
+/* G95-specific declaration information.  */
+
+/* Array types only.  */
+struct lang_type GTY (())
+{
+  int rank;
+  tree lbound[G95_MAX_DIMENSIONS];
+  tree ubound[G95_MAX_DIMENSIONS];
+  tree stride[G95_MAX_DIMENSIONS];
+  tree size;
+};
+
+/* String nodes only.  */
+struct lang_decl GTY (())
+{
+  tree stringlength;
+};
+
+#define G95_DECL_STRING_LENGTH(node) (DECL_LANG_SPECIFIC(node)->stringlength)
+#define G95_DECL_STRING(node) DECL_LANG_FLAG_0(node)
+#define G95_DECL_PACKED_ARRAY(node) DECL_LANG_FLAG_1(node)
+#define G95_DECL_PARTIAL_PACKED_ARRAY(node) DECL_LANG_FLAG_2(node)
+
+#define G95_SIZE_STRING_TYPE_P(node) TYPE_LANG_FLAG_0(node)
+#define G95_DESCRIPTOR_TYPE_P(node) TYPE_LANG_FLAG_1(node)
+#define G95_TYPE_DESCRIPTOR_LBOUND(node, dim) \
+  (TYPE_LANG_SPECIFIC(node)->lbound[dim])
+#define G95_TYPE_DESCRIPTOR_UBOUND(node, dim) \
+  (TYPE_LANG_SPECIFIC(node)->ubound[dim])
+#define G95_TYPE_DESCRIPTOR_STRIDE(node, dim) \
+  (TYPE_LANG_SPECIFIC(node)->stride[dim])
+#define G95_TYPE_DESCRIPTOR_RANK(node) (TYPE_LANG_SPECIFIC(node)->rank)
+#define G95_TYPE_DESCRIPTOR_SIZE(node) (TYPE_LANG_SPECIFIC(node)->size)
+
 /* I changed this from sorry(...) because it should not return.  */
 /* TODO: Removed g95_todo_error before releasing g95.  */
-#define g95_todo_error(args...) fatal_error("g95: Not Implemented: "args)
+#define g95_todo_error(args...) fatal_error("g95_todo: Not Implemented: " args)
 
 #endif /* G95_TRANS_H */

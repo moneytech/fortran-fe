@@ -228,7 +228,7 @@ g95_finish_se_stmt (g95_se * se)
 {
   tree decls;
 
-  /* This we've been called for an incomplete expression.  */
+  /* Check we haven't been called with an incomplete expression.  */
   assert (se->post == NULL_TREE);
   /* Should never happen.  */
   assert (se->pre != NULL_TREE);
@@ -612,5 +612,21 @@ g95_generate_module_code (g95_namespace * ns)
       g95_get_function_decl (n->proc_name);
       g95_generate_function_code (n);
     }
+}
+
+void
+g95_simple_convert (g95_se * se, tree type, tree * pvar)
+{
+  tree val;
+  tree tmp;
+
+  assert (is_simple_val (se->expr));
+
+  se->expr = convert (type, se->expr);
+
+  if (! is_simple_rhs (se->expr))
+    internal_error ("Convert broke SIMPLE");
+  if (! is_simple_val (se->expr))
+    se->expr = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, pvar);
 }
 

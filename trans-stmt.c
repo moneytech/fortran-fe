@@ -60,12 +60,34 @@ g95_trans_call (g95_code *code)
 {
   g95_se se;
   tree stmt;
+  g95_symbol sym;
+  g95_symbol *psym;
+
+  /* IO functions need special handling.  */
+  if (strncmp (code->sub_name, "_io_", 4) == 0)
+    return g95_trans_io_call (code);
 
   g95_start_stmt ();
 
   g95_init_se (&se, NULL);
 
-  g95_conv_function_call (&se, code->sym, code->ext.actual);
+  psym = code->sym;
+  if (psym == NULL)
+    {
+      /* The frontend does not create a symbol for some functions, so we
+         create one now.  */
+      memset (&sym, 0, sizeof (g95_symbol));
+
+      sym.ts.type = BT_PROCEDURE;
+      strcpy (sym.name, code->sub_name);
+      sym.attr.external = 1;
+      sym.attr.subroutine = 1;
+      sym.attr.proc = PROC_EXTERNAL;
+      sym.attr.flavor = FL_PROCEDURE;
+
+      psym = &sym;
+    }
+  g95_conv_function_call (&se, psym, code->ext.actual);
 
   TREE_SIDE_EFFECTS (se.expr) = 1;
   stmt = build_stmt (EXPR_STMT, se.expr);
@@ -99,7 +121,7 @@ g95_trans_stop (g95_code *code)
     {
       if (code->expr != NULL)
         {
-          g95_conv_simple_val (&se, code->expr);
+          g95_conv_simple_val_type (&se, code->expr, g95_int4_type_node);
           arg = se.expr;
         }
       else
@@ -288,10 +310,10 @@ exit_label:
 tree
 g95_trans_do (g95_code * code)
 {
-  g95_se  dovar;
-  g95_se  from;
-  g95_se  to;
-  g95_se  step;
+  g95_se dovar;
+  g95_se from;
+  g95_se to;
+  g95_se step;
   tree body;
   tree expr;
   tree count;
@@ -309,19 +331,18 @@ g95_trans_do (g95_code * code)
   g95_start_stmt ();
 
   /* Create SIMPLE versions of all expressions.  */
-  g95_init_se (&from, NULL);
-  g95_conv_simple_val (&from, code->ext.iterator->start);
-  g95_init_se (&to, NULL);
-  g95_conv_simple_val (&to, code->ext.iterator->end);
   g95_init_se (&dovar, NULL);
   g95_conv_simple_lhs (&dovar, code->ext.iterator->var);
+  type = TREE_TYPE (dovar.expr);
+  g95_init_se (&from, NULL);
+  g95_conv_simple_val_type (&from, code->ext.iterator->start, type);
+  g95_init_se (&to, NULL);
+  g95_conv_simple_val_type (&to, code->ext.iterator->end, type);
   g95_init_se (&step, NULL);
-  g95_conv_simple_val (&step, code->ext.iterator->step);
+  g95_conv_simple_val_type (&step, code->ext.iterator->step, type);
 
   /* We don't want this changing part way through.  */
   g95_make_safe_expr (&step);
-
-  type = TREE_TYPE (dovar.expr);
 
   countvar = NULL_TREE;
   init = init_tail = NULL_TREE;
@@ -356,7 +377,7 @@ g95_trans_do (g95_code * code)
 
       for_init = init_tail;
       if (init == for_init)
-          init = init_tail = NULL_TREE;
+        init = init_tail = NULL_TREE;
       else
         {
           init_tail = init;
@@ -440,8 +461,7 @@ g95_trans_do (g95_code * code)
   g95_add_stmt_to_pre (&dovar, stmt, NULL_TREE);
 
   /* Add label for exit if one exists.  */
-  if ((code->block->next != NULL)
-      && TREE_USED (exit_label))
+  if (code->block->next != NULL && TREE_USED (exit_label))
     {
       TREE_CHAIN (dovar.pre_tail) = build_stmt (LABEL_STMT, exit_label);
       dovar.pre_tail = TREE_CHAIN (dovar.pre_tail);
@@ -496,9 +516,26 @@ g95_trans_do_while (g95_code * code)
 
   /* Create a SIMPLE version of the exit condition.  */
   g95_init_se (&cond, NULL);
-  g95_conv_simple_cond (&cond, code->expr);
+  /* What we rally want to do is
+      if (! simple_cond_val)
+     However this doesn't seem to be allowed under SIMPLE rules,
+     so we have to do
+      tmp = ! simple_cond_val;
+      if (tmp)  */
+#if 0
+  g95_conv_simple_val (&cond, code->expr);
+  cond.expr = build1 (TRUTH_NOT_EXPR, TREE_TYPE (cond.expr), cond.expr);
+#else
+  {
+    tree var;
+    var = NULL_TREE;
+    g95_conv_simple_val (&cond, code->expr);
+    cond.expr = build1 (TRUTH_NOT_EXPR, TREE_TYPE (cond.expr), cond.expr);
+    cond.expr = g95_simple_fold (cond.expr, &cond.pre, &cond.pre_tail, &var);
+  }
+#endif
 
-  /* Build `IF (cond) GOTO exit_label.  */
+  /* Build `IF (! cond) GOTO exit_label.  */
   stmt = build_stmt (IF_STMT,
 		     cond.expr,
 		     build_stmt (GOTO_STMT, exit_label),
@@ -559,7 +596,7 @@ g95_trans_where (g95_code *code ATTRIBUTE_UNUSED)
    g95_trans_do(), it's in TREE_PURPOSE (backend_decl) of the g95_code
    node at the head of the loop. We must mark the label as used.  */
 tree
-g95_trans_cycle (g95_code *code)
+g95_trans_cycle (g95_code * code)
 {
   tree cycle_label;
 
@@ -572,7 +609,7 @@ g95_trans_cycle (g95_code *code)
    TREE_VALUE (backend_decl) of the g95_code node at the head of the
    loop.  */
 tree
-g95_trans_exit (g95_code *code)
+g95_trans_exit (g95_code * code)
 {
   tree exit_label;
 
@@ -582,7 +619,7 @@ g95_trans_exit (g95_code *code)
 }
 
 tree
-g95_trans_allocate (g95_code *code)
+g95_trans_allocate (g95_code * code)
 {
   g95_alloc *al;
   g95_expr *expr;
@@ -592,12 +629,35 @@ g95_trans_allocate (g95_code *code)
   tree stmt;
   g95_ref *ref;
   tree head;
+  tree stat;
+  tree pstat;
+  tree error_label;
+
+  if (! code->ext.alloc_list)
+    return NULL_TREE;
 
   g95_start_stmt ();
 
   head = NULL_TREE;
 
-  for (al = code->ext.alloc_list ; al != NULL ; al = al->next)
+  if (code->expr)
+    {
+      stat = g95_create_tmp_var (g95_int4_type_node);
+      TREE_ADDRESSABLE (stat) = 1;
+      pstat = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (stat)), stat);
+      pstat = g95_simple_fold (pstat, &head, &tmp, NULL);
+
+      error_label = g95_build_label_decl (NULL_TREE);
+      TREE_USED (error_label) = 1;
+    }
+  else
+    {
+      pstat = integer_zero_node;
+      stat = error_label = NULL_TREE;
+    }
+
+
+  for (al = code->ext.alloc_list; al != NULL; al = al->next)
     {
       g95_start_stmt ();
 
@@ -622,8 +682,7 @@ g95_trans_allocate (g95_code *code)
 
       if (ref != NULL)
         {
-          /* TODO: allocation stat variables.  */
-          g95_array_allocate (&se, ref, NULL);
+          g95_array_allocate (&se, ref, pstat);
         }
       else
         {
@@ -637,23 +696,43 @@ g95_trans_allocate (g95_code *code)
           g95_add_stmt_to_pre (&se, stmt, stmt);
 
           tmp = TYPE_SIZE_UNIT (TREE_TYPE (se.expr));
-          parm = tree_cons(NULL_TREE, tmp, NULL_TREE);
-          parm = tree_cons(NULL_TREE, val, NULL_TREE);
+          parm = g95_chainon_list (NULL_TREE, val);
+          parm = g95_chainon_list (parm, tmp);
+          parm = g95_chainon_list (parm, pstat);
           tmp = g95_build_function_call (g95_fndecl_allocate, parm);
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_pre (&se, stmt, stmt);
+
+          if (code->expr)
+            {
+              stmt = build_stmt (GOTO_STMT, error_label);
+              tmp =
+                build (NE_EXPR, boolean_type_node, stat, integer_zero_node);
+              stmt = build_stmt (IF_STMT, tmp, stmt, NULL_TREE);
+              g95_add_stmt_to_pre (&se, stmt, stmt);
+            }
         }
 
       stmt = g95_finish_stmt (se.pre, se.pre_tail);
       head = chainon (head, stmt);
     }
 
-  /* Only create the outer scope if there's more than one variable.  */
-  if (TREE_CHAIN (head) == NULL_TREE)
+  if (code->expr)
     {
-      assert (TREE_CODE (head) == COMPOUND_STMT);
-      g95_merge_stmt ();
+      stmt = build_stmt (LABEL_STMT, error_label);
+
+      g95_init_se (&se, NULL);
+      g95_conv_simple_rhs (&se, code->expr);
+      tmp = fold (convert (TREE_TYPE (se.expr), stat));
+      tmp = build (MODIFY_EXPR, TREE_TYPE (se.expr), se.expr, tmp);
+      stmt = chainon (stmt, build_stmt (EXPR_STMT, tmp));
+
+      head = chainon (head, stmt);
     }
+
+  /* Don't add the extra scope if it's not needed.  */
+  if (! (code->ext.alloc_list->next || code->expr))
+    g95_merge_stmt ();
   else
     head = g95_finish_stmt (head, NULL_TREE);
 
@@ -661,7 +740,7 @@ g95_trans_allocate (g95_code *code)
 }
 
 tree
-g95_trans_deallocate (g95_code *code)
+g95_trans_deallocate (g95_code * code)
 {
   g95_se se;
   g95_alloc *al;
@@ -675,7 +754,7 @@ g95_trans_deallocate (g95_code *code)
   g95_start_stmt ();
   head = NULL_TREE;
 
-  for (al = code->ext.alloc_list ; al != NULL ; al = al->next)
+  for (al = code->ext.alloc_list; al != NULL; al = al->next)
     {
       g95_start_stmt ();
 

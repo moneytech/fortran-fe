@@ -53,8 +53,8 @@ g95_ss* g95_ss_terminator = &g95_ss_terminator_var;
    for Type B arrays.  */
 tree
 g95_array_init_size (tree descriptor, int rank, tree * poffset,
-    g95_expr ** lower, g95_expr ** upper,
-    tree * phead, tree * ptail)
+                    g95_expr ** lower, g95_expr ** upper,
+                    tree * phead, tree * ptail)
 {
   tree type;
   tree tmp;
@@ -68,7 +68,6 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
   tree field;
   g95_se se;
   int n;
-  tree element_type;
 
   type = TREE_TYPE (descriptor);
 
@@ -79,7 +78,7 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
   offsetvar = NULL_TREE;
   offset = integer_zero_node;
 
-  for (n = 0 ; n < rank ; n++)
+  for (n = 0; n < rank; n++)
     {
       /* Lower bound.  */
       g95_init_se (&se, NULL);
@@ -88,7 +87,7 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
       else
         {
           assert (lower[n]);
-          g95_conv_simple_val (&se, lower[n]);
+          g95_conv_simple_val_type (&se, lower[n], g95_array_index_type);
         }
       g95_add_stmt_to_list (phead, ptail, se.pre, se.pre_tail);
       field = g95_get_lbound_component (type, n);
@@ -108,13 +107,13 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
         }
 
       size = build (MINUS_EXPR, g95_array_index_type,
-                      integer_one_node, se.expr);
+                   integer_one_node, se.expr);
       size = g95_simple_fold (size, phead, ptail, &tmpvar);
 
       /* Upper bound.  */
       g95_init_se (&se, NULL);
       assert (upper[n]);
-      g95_conv_simple_val (&se, upper[n]);
+      g95_conv_simple_val_type (&se, upper[n], g95_array_index_type);
       g95_add_stmt_to_list (phead, ptail, se.pre, se.pre_tail);
 
       field = g95_get_ubound_component (type, n);
@@ -148,16 +147,9 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
       offset = g95_simple_fold (offset, phead, ptail, &offsetvar);
     }
 
-  /* Get the type of a single element.  */
-  element_type = TREE_TYPE (g95_get_data_component (TREE_TYPE (descriptor)));
-  assert (TREE_CODE (element_type) == POINTER_TYPE);
-  element_type = TREE_TYPE (element_type);
-  while (TREE_CODE (element_type) == ARRAY_TYPE)
-    element_type = TREE_TYPE (element_type);
-
   /* The stride is the number of elements in the array, so multiply by the
      size of an element to get the total size.  */
-  tmp = TYPE_SIZE_UNIT (element_type);
+  tmp = TYPE_SIZE_UNIT (g95_get_element_type (type));
   stride = build (MULT_EXPR, g95_array_index_type, stride, tmp);
   stride = g95_simple_fold (stride, phead, ptail, &stridevar);
 
@@ -173,7 +165,7 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
 
 /* Initialises the descriptor and generates a call to __g95_allocate.  */
 void
-g95_array_allocate (g95_se * se, g95_ref * ref, tree stat)
+g95_array_allocate (g95_se * se, g95_ref * ref, tree pstat)
 {
   tree field;
   tree tmp;
@@ -182,7 +174,6 @@ g95_array_allocate (g95_se * se, g95_ref * ref, tree stat)
   tree allocate;
   tree offset;
   tree size;
-  tree pstat;
   g95_expr **lower;
   g95_expr **upper;
 
@@ -213,17 +204,10 @@ g95_array_allocate (g95_se * se, g95_ref * ref, tree stat)
   size = g95_array_init_size (se->expr, ref->u.ar.as->rank, &offset,
       lower, upper, &se->pre, &se->pre_tail);
 
-  if (g95_use_gcc_arrays)
-    field = g95_get_data_component (TREE_TYPE (se->expr));
-  else
-    field = g95_get_block_component (TREE_TYPE (se->expr));
-
+  field = g95_get_data_component (TREE_TYPE (se->expr));
   tmp = build (COMPONENT_REF, TREE_TYPE (field), se->expr, field);
   tmp = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (field)), tmp);
-  pointer = g95_create_tmp_var (TREE_TYPE (tmp));
-  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), pointer, tmp);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_pre (se, stmt, stmt);
+  pointer = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
 
   if (g95_array_index_type == g95_int4_type_node)
     allocate = g95_fndecl_allocate;
@@ -232,32 +216,16 @@ g95_array_allocate (g95_se * se, g95_ref * ref, tree stat)
   else
     abort();
 
-  pstat = g95_create_tmp_var (build_pointer_type (g95_int4_type_node));
-  if (stat == NULL_TREE)
-    {
-      tmp = integer_zero_node;
-    }
-  else
-    {
-      assert (TREE_TYPE (stat) == g95_int4_type_node);
-
-      TREE_ADDRESSABLE (pstat) = 1;
-      tmp = build1 (ADDR_EXPR, TREE_TYPE (pstat), stat);
-    }
-  tmp = build (MODIFY_EXPR, TREE_TYPE (pstat), pstat, tmp);
-  stmt = build_stmt (EXPR_STMT, tmp);
-  g95_add_stmt_to_pre (se, stmt, stmt);
-
-  tmp = tree_cons (NULL_TREE, pstat, NULL_TREE);
-  tmp = tree_cons (NULL_TREE, size, tmp);
-  tmp = tree_cons (NULL_TREE, pointer, tmp);
+  tmp = g95_chainon_list (NULL_TREE, pointer);
+  tmp = g95_chainon_list (tmp, size);
+  tmp = g95_chainon_list (tmp, pstat);
   tmp = g95_build_function_call (allocate, tmp);
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_pre (se, stmt, stmt);
 
   if (! g95_use_gcc_arrays)
     {
-      /* Set data = &base[offset].  */
+      /* Set base = &data[offset].  */
       tmp = build (COMPONENT_REF, TREE_TYPE (field), se->expr, field);
       if (! integer_zerop (offset))
         {
@@ -270,7 +238,7 @@ g95_array_allocate (g95_se * se, g95_ref * ref, tree stat)
           tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
           tmp = build1 (ADDR_EXPR, TREE_TYPE (pointer), tmp);
         }
-      field = g95_get_data_component(TREE_TYPE (se->expr));
+      field = g95_get_base_component(TREE_TYPE (se->expr));
       field = build (COMPONENT_REF, TREE_TYPE (field), se->expr, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (field), field, tmp);
       stmt = build_stmt (EXPR_STMT, tmp);
@@ -289,10 +257,8 @@ g95_array_deallocate (tree descriptor)
   tree field;
   tree stmt;
 
-  if (g95_use_gcc_arrays)
-    field = g95_get_data_component (TREE_TYPE (descriptor));
-  else
-    field = g95_get_block_component (TREE_TYPE (descriptor));
+  field = g95_get_data_component (TREE_TYPE (descriptor));
+
   /* TODO: check array type? */
   tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
   tmp = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (field)), tmp);
@@ -309,7 +275,7 @@ g95_array_deallocate (tree descriptor)
      done by __g95_free for Type A arrays.  */
   if (! g95_use_gcc_arrays)
     {
-      field = g95_get_data_component (TREE_TYPE (descriptor));
+      field = g95_get_base_component (TREE_TYPE (descriptor));
       tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, integer_zero_node);
       stmt = chainon (stmt, build_stmt (EXPR_STMT, tmp));
@@ -349,8 +315,7 @@ g95_array_deallocate (tree descriptor)
         }
       __g95_pop_context ()
     }
-
-   TODO: Place small arrays on the stack rather than the heap.  */
+ */
 tree
 g95_trans_auto_array_allocation (g95_symbol * sym)
 {
@@ -376,12 +341,7 @@ g95_trans_auto_array_allocation (g95_symbol * sym)
   size = g95_array_init_size (sym->backend_decl, sym->as->rank, &offset,
       lower, upper, &head, &tail);
 
-  /* For Type A arrays store the pointer in the data component, for Type B
-     arrays use the block component.  */
-  if (g95_use_gcc_arrays)
-    field = g95_get_data_component (TREE_TYPE (sym->backend_decl));
-  else
-    field = g95_get_block_component (TREE_TYPE (sym->backend_decl));
+  field = g95_get_data_component (TREE_TYPE (sym->backend_decl));
 
   if (INTEGER_CST_P (size)
       && (g95_option.max_stack_var_size < 0
@@ -425,17 +385,17 @@ g95_trans_auto_array_allocation (g95_symbol * sym)
 
       if (! integer_zerop (offset))
         {
-          /* pointer = array.block */
+          /* pointer = array.data */
           pointer = g95_create_tmp_var (TREE_TYPE (field));
           tmp = build (MODIFY_EXPR, TREE_TYPE (field), pointer, tmp);
           ADD_EXPR_STMT (tmp);
 
-          /* array.data = &pointer[offset] */
+          /* array.base = &pointer[offset] */
           tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pointer)), pointer);
           tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
           tmp = build1 (ADDR_EXPR, TREE_TYPE(pointer), tmp);
         }
-      field = g95_get_data_component (TREE_TYPE (sym->backend_decl));
+      field = g95_get_base_component (TREE_TYPE (sym->backend_decl));
       ref = build (COMPONENT_REF, TREE_TYPE (field), sym->backend_decl, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE(ref), ref, tmp);
       ADD_EXPR_STMT (tmp);
@@ -502,7 +462,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
   else
     offset = NULL_TREE;
 
-  /* First check that it's the corret type of descriptor.  If we will  call
+  /* First check that it's the correct type of descriptor.  If we will  call
      __g95_array_mismatch () which throws a runtime error.  */
   /* num = descriptor.stride00 */
   field = g95_get_stride_component(type, 0);
@@ -520,8 +480,8 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
 
   if (! g95_use_gcc_arrays)
     {
-      /* Save the data pointer.  */
-      field = g95_get_data_component (type);
+      /* Save the base data pointer.  */
+      field = g95_get_base_component (type);
       assert (TREE_CODE (TREE_TYPE (saved_field)) == POINTER_TYPE);
 
       tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
@@ -533,11 +493,12 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
     }
 
   offsetvar = NULL_TREE;
-  for (n = 0 ; n < sym->as->rank ; n++)
+  for (n = 0; n < sym->as->rank; n++)
     {
       g95_init_se (&lbound, NULL);
 
-      g95_conv_simple_val (&lbound, sym->as->lower[n]);
+      g95_conv_simple_val_type (&lbound, sym->as->lower[n],
+                               g95_array_index_type);
       g95_make_safe_expr (&lbound);
       g95_add_stmt_to_list (&head, &tail, lbound.pre, lbound.pre_tail);
 
@@ -612,14 +573,14 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
       tree pointer;
 
       /* Get the data component.  */
-      field = g95_get_data_component (type);
+      field = g95_get_base_component (type);
       pointer = g95_create_tmp_var (TREE_TYPE (field));
 
       tmp = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (field), pointer, tmp);
       ADD_EXPR_STMT (tmp);
 
-      /* array->data = &array->data[offset] */
+      /* array->base = &array->base[offset] */
       tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (pointer)), pointer);
       tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
       tmp = build1 (ADDR_EXPR, TREE_TYPE (pointer), tmp);
@@ -644,7 +605,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree body)
   if (! g95_use_gcc_arrays)
     {
       /* Restore the data pointer.  */
-      field = g95_get_data_component (type);
+      field = g95_get_base_component (type);
       dest = build (COMPONENT_REF, TREE_TYPE (field), descriptor, field);
       tmp = build (COMPONENT_REF, TREE_TYPE (field), saved, saved_field);
       tmp = build (MODIFY_EXPR, TREE_TYPE (field), dest, tmp);
@@ -727,8 +688,7 @@ g95_trans_deferred_array (g95_symbol * sym, tree body)
   body = chainon (stmt, body);
 
   /* Allocatable arrays meed to be free when they go out of scope.  */
-  /* TODO: Allocated arrays with the SAVE attribute.  */
-  if (sym->attr.allocatable)
+  if (sym->attr.allocatable && ! sym->attr.save)
     {
       g95_start_stmt ();
 
@@ -832,7 +792,8 @@ g95_walk_variable_expr (g95_ss * ss, g95_expr * expr)
                   head = indexss;
 
                   g95_init_se (&head->data.se, NULL);
-                  g95_conv_simple_val (&head->data.se, head->expr);
+                  g95_conv_simple_val_type (&head->data.se, head->expr,
+                                           g95_array_index_type);
                   break;
 
                 case DIMEN_RANGE:
@@ -902,7 +863,7 @@ g95_walk_op_expr (g95_ss * ss, g95_expr *expr)
     }
   else /* head2 == head */
     {
-      assert (head2 == head); /* Should be true if my logic is correct.  */
+      assert (head2 == head);
       /* Second operand is scalar.  */
       newss->next = head2;
       head2 = newss;

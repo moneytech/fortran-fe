@@ -53,13 +53,14 @@ tree g95_trans_deallocate (g95_code *);
 tree g95_trans_deallocate_array (tree);
 
 /* trans-io.c */
-tree g95_trans_open(g95_code *);
-tree g95_trans_close(g95_code *);
-tree g95_trans_read(g95_code *);
-tree g95_trans_write(g95_code *);
-tree g95_trans_iolength(g95_code *);
-tree g95_trans_backspace(g95_code *);
-tree g95_trans_endfile(g95_code *);
-tree g95_trans_inquire(g95_code *);
-tree g95_trans_rewind(g95_code *);
+tree g95_trans_open (g95_code *);
+tree g95_trans_close (g95_code *);
+tree g95_trans_read (g95_code *);
+tree g95_trans_write (g95_code *);
+tree g95_trans_iolength (g95_code *);
+tree g95_trans_backspace (g95_code *);
+tree g95_trans_endfile (g95_code *);
+tree g95_trans_inquire (g95_code *);
+tree g95_trans_rewind (g95_code *);
 
+tree g95_trans_io_call (g95_code *);

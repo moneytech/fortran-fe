@@ -69,7 +69,7 @@ G95_PARSER_OBJS = f95/arith.o f95/array.o f95/bbt.o f95/check.o f95/decl.o\
 G95_OBJS = $(G95_PARSER_OBJS) \
     f95/f95-lang.o f95/support.o f95/convert.o f95/trans.o \
     f95/trans-decl.o f95/trans-types.o f95/trans-const.o f95/trans-expr.o \
-    f95/trans-stmt.o f95/trans-io.o f95/trans-array.o
+    f95/trans-stmt.o f95/trans-io.o f95/trans-array.o f95/trans-intrinsic.o
 
 G95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o \
 	tree-cfg.o tree-dfa.o tree-optimize.o tree-ssa.o \
@@ -83,27 +83,9 @@ G95_LIBS = $(LIBS) -lgmp
 
 # Tell GNU make to ignore files by these names if they exist.
 
-.PHONY: f95 f95.clean f95.mostlyclean f95.distclean f95.extraclean f95.maintainer-clean testf95
+.PHONY: f95 f95.clean f95.mostlyclean f95.distclean f95.extraclean f95.maintainer-clean
 
 F95 f95: f951$(exeext)
-
-# Test program isn't compiled by default
-testf95: f95/testprog$(exeext)
-	f95/testprog$(exeext) > $(srcdir)/f95/test.out
-	diff -q f95/test.out f95/correct.out
-
-#test program
-f95/testprog$(exeext): f95/testprog.o f95/test.o
-	$(CC) $(ALL_CFLAGS) $(LDFLAGS) f95/testprog.o f95/test.o -o $@
-
-f95/test.f90:
-	touch $@
-
-f95/test.s: $(srcdir)/f95/test.f90 ./f951$(exeext)
-	./f951$(exeext) $(srcdir)/f95/test.f90 -o $@
-
-f95/test.o: f95/test.s
-	$(CC) $(ALL_CFLAGS) $(INCLUDES) -o $@ -c $<
 
 # The actual 'compiler' is called f951
 f951$(exeext): $(G95_OBJS) $(G95_ADDITIONAL_OBJS) \
@@ -226,3 +208,4 @@ f95/trans-expr.o: f95/g95.h f95/trans.h
 f95/trans-stmt.o: f95/g95.h f95/trans.h
 f95/trans-io.o: f95/g95.h f95/trans.h
 f95/trans-array.o: f95/g95.h f95/trans.h
+f95/trans-intrinsic.o: f95/g95.h f95/trans.h

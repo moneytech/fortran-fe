@@ -64,7 +64,7 @@ convert_mpf_to_tree (mpf_t f, int kind)
   mp_exp_t exp;
   char buff[53];
 
-  /* sonvert via. a string. This should have enough space for 128 bit
+  /* convert via. a string. This should have enough space for 128 bit
    * mantissa+32bit exponent */
   mpf_get_str (&buff[1], &exp, 10, 39, f);
   if (exp == 0)
@@ -84,6 +84,9 @@ convert_mpf_to_tree (mpf_t f, int kind)
 void
 g95_conv_constant (g95_se * se, g95_expr * expr)
 {
+  tree real;
+  tree imag;
+
   assert (expr->expr_type == EXPR_CONSTANT);
 
   if (se->ss != NULL)
@@ -111,8 +114,25 @@ g95_conv_constant (g95_se * se, g95_expr * expr)
       se->expr = build_int_2 (expr->value.logical, 0);
       break;
 
+    case BT_COMPLEX:
+      real = convert_mpf_to_tree (expr->value.complex.r, expr->ts.kind);
+      imag = convert_mpf_to_tree (expr->value.complex.i, expr->ts.kind);
+      se->expr = build_complex (NULL_TREE, real, imag);
+      break;
+
+    case BT_CHARACTER:
+      se->expr = build_string (expr->value.character.length,
+                              expr->value.character.string);
+      se->string_length = build_int_2 (expr->value.character.length, 0);
+      TREE_TYPE (se->expr) =
+        build_array_type (g95_character1_type_node,
+                         build_range_type (g95_strlen_type_node,
+                                          integer_one_node,
+                                          se->string_length));
+      break;
+
     default:
-      g95_todo_error ("can't handle constant type %d", expr->ts.type);
+      fatal_error ("invalid constant: type %d", expr->ts.type);
       break;
     }
 }
