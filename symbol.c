@@ -657,10 +657,10 @@ conflict:
 #undef conf2
 
 
-/* check_used()-- Common subroutine called by attribute
- * changing subroutine in order to prevent them from changing a symbol
- * that has been use-associated.  Returns zero if it is OK to change
- * the symbol, nonzero if not.  */
+/* check_used()-- Common subroutine called by attribute changing
+ * subroutines in order to prevent them from changing a symbol that
+ * has been use-associated.  Returns zero if it is OK to change the
+ * symbol, nonzero if not.  */
 
 static int check_used(symbol_attribute *attr, locus *loc) {
 
@@ -979,6 +979,33 @@ try g95_add_explicit_interface(g95_symbol *sym, ifsrc source,
   sym->formal = formal;
   sym->attr.if_source = source;
 
+  return SUCCESS;
+}
+
+
+/* g95_add_type()-- Add a type to a symbol. */
+
+try g95_add_type(g95_symbol *sym, g95_typespec *ts, locus *where) {
+sym_flavor flavor;
+
+  if (where == NULL) where = g95_current_locus();
+
+  if (sym->ts.type != BT_UNKNOWN) {
+    g95_error("Symbol '%s' at %L already has basic type of %s", sym->name,
+	      where, g95_basic_typename(sym->ts.type));
+    return FAILURE;
+  }
+
+  flavor = sym->attr.flavor;
+
+  if (flavor == FL_PROGRAM || flavor == FL_BLOCK_DATA || flavor == FL_MODULE ||
+      flavor == FL_LABEL || (flavor == FL_PROCEDURE && sym->attr.subroutine) ||
+      flavor == FL_DERIVED || flavor == FL_NAMELIST) {
+    g95_error("Symbol '%s' at %L cannot have a type", sym->name, where);
+    return FAILURE;
+  }
+
+  sym->ts = *ts;
   return SUCCESS;
 }
 

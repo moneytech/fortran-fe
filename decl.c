@@ -195,16 +195,8 @@ g95_expr *init;
 
   if (current_ts.type != BT_UNKNOWN &&
       (sym->attr.implicit_type == 0 ||
-       !g95_compare_types(&sym->ts, &current_ts))) {
-
-    if (sym->ts.type == BT_UNKNOWN)
-      sym->ts = current_ts;
-    else {
-      g95_error("Symbol at %L already has basic type of %s", var_locus,
-		g95_basic_typename(sym->ts.type));
-      return FAILURE;
-    }
-  }
+       !g95_compare_types(&sym->ts, &current_ts)) &&
+      g95_add_type(sym, &current_ts, var_locus) == FAILURE) return FAILURE;
 
 /* If this variable declaration is confirming an implicit parameter
  * type, then an initialization expression is not allowed. */
@@ -2114,6 +2106,12 @@ loop:
   }
 
   if (g95_get_symbol(name, NULL, &sym)) return MATCH_ERROR;
+
+  if (sym->ts.type != BT_UNKNOWN) {
+    g95_error("Derived type name '%s' at %C already has a basic type "
+	      "of %s", sym->name, g95_typename(&sym->ts));
+    return MATCH_ERROR;
+  }
 
 /* The symbol may already have the derived attribute without the
  * components.  The ways this can happen is via a function definition,

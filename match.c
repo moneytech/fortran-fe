@@ -1874,6 +1874,12 @@ match m, m2;
   if (m == MATCH_ERROR) goto error;
 
   for(;;) {
+    if (group_name->ts.type != BT_UNKNOWN) {
+      g95_error("Namelist group name '%s' at %C already has a basic type "
+		"of %s", group_name->name, g95_typename(&group_name->ts));
+      return MATCH_ERROR;
+    }
+
     if (group_name->attr.flavor != FL_NAMELIST &&
 	g95_add_flavor(&group_name->attr, FL_NAMELIST, NULL) == FAILURE)
       return MATCH_ERROR;

@@ -1198,6 +1198,7 @@ try g95_add_procedure(symbol_attribute *, procedure_type, locus *);
 try g95_add_intent(symbol_attribute *, sym_intent, locus *);
 try g95_add_explicit_interface(g95_symbol *, ifsrc, g95_formal_arglist *,
 			       locus *);
+try g95_add_type(g95_symbol *, g95_typespec *, locus *);
 
 int g95_compare_attr(symbol_attribute *, symbol_attribute *);
 void g95_clear_attr(symbol_attribute *);
