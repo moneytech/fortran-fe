@@ -1,5 +1,5 @@
 /* Compiler arithmetic
-   Copyright (C) 2000, 2001. 2002 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GNU G95.
@@ -1883,6 +1883,28 @@ runtime:
 }
 
 
+/* eval_type_intrinsic0() -- modify type of expression for zero size array */
+
+static g95_expr *eval_type_intrinsic0(g95_intrinsic_op operator, g95_expr *op) {
+
+  if (op == NULL) g95_internal_error("eval_type_intrinsic0(): op NULL");
+
+  switch(operator) {
+  case INTRINSIC_GE:  case INTRINSIC_LT:
+  case INTRINSIC_LE:  case INTRINSIC_GT:
+  case INTRINSIC_EQ:  case INTRINSIC_NE:
+    op->ts.type = BT_LOGICAL;
+    op->ts.kind = g95_default_logical_kind();
+    break;
+
+  default:
+    break;
+  }
+
+  return op;
+}
+
+
 /* g95_zero_size_array()-- Return nonzero if the expression is a zero
  * size array. */
 
@@ -1920,10 +1942,10 @@ static g95_expr *eval_intrinsic_f2(g95_intrinsic_op operator,
 g95_expr *result;
 
   if (op2 == NULL) {
-    if (g95_zero_size_array(op1)) return op1;
+    if (g95_zero_size_array(op1)) return eval_type_intrinsic0(operator, op1);
   } else {
     result = reduce_binary0(op1, op2);
-    if (result != NULL) return result;
+    if (result != NULL) return eval_type_intrinsic0(operator, result);
   }
 
   return eval_intrinsic(operator, eval, op1, op2);
@@ -1937,7 +1959,7 @@ static g95_expr *eval_intrinsic_f3(g95_intrinsic_op operator,
 g95_expr *result;
 
   result = reduce_binary0(op1, op2);
-  if (result != NULL) return result;
+  if (result != NULL) return eval_type_intrinsic0(operator, result);
 
   return eval_intrinsic(operator, eval, op1, op2);
 }
