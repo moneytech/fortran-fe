@@ -1849,6 +1849,8 @@ g95_symbol *p;
 
   if (ns == NULL) ns = g95_current_ns;
 
+  st = NULL;
+
   for(current_ns=ns; current_ns; current_ns=current_ns->parent) {
     st = g95_find_symtree(current_ns, name);
     if (st != NULL || !parent_flag) break;

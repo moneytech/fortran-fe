@@ -542,8 +542,8 @@ bt t1, t2;
 int args;
 
   args = 0;
-  t1 = BT_UNKNOWN;
-  t2 = BT_UNKNOWN;
+  t1 = t2 = BT_UNKNOWN;
+  i1 = i2 = INTENT_UNKNOWN;
 
   for(formal=intr->sym->formal; formal; formal=formal->next) {
     sym = formal->sym;
@@ -893,6 +893,8 @@ g95_symbol *sym;
 
   actual->next = g95_get_actual_arglist();
   actual->next->expr = rhs;
+
+  sym = NULL;
 
   for(; ns; ns=ns->parent) {
     sym = g95_search_interface(ns->operator[INTRINSIC_ASSIGN], 1, actual);
