@@ -906,7 +906,7 @@ symbol_attribute attr;
  * nonzero if compatible, zero if not compatible. */
 
 static int compare_parameter(g95_symbol *formal, g95_expr *actual,
-			     int ranks_must_agree) {
+			     int ranks_must_agree, int is_elemental) {
 g95_ref *ref;
 
   if (actual->ts.type == BT_PROCEDURE) {
@@ -928,8 +928,7 @@ g95_ref *ref;
 
   if (ranks_must_agree || formal->attr.pointer) return 0;
 
-  if (actual->rank != 0)
-    return formal->attr.dimension ? 1 : 0;   /* Passing an array */
+  if (actual->rank != 0) return is_elemental || formal->attr.dimension;
 
   /* At this point, we are considering a scalar passed to an array.
    * This is legal if the scalar is an array element of the right sort. */
@@ -958,7 +957,8 @@ g95_ref *ref;
 
 static int compare_actual_formal(g95_actual_arglist **ap,
 				 g95_formal_arglist *formal,
-				 int ranks_must_agree, locus *where) {
+				 int ranks_must_agree, int is_elemental,
+				 locus *where) {
 g95_actual_arglist **new, *a, *actual, temp;
 g95_formal_arglist *f;
 int i, n, na;
@@ -1027,7 +1027,7 @@ int i, n, na;
       return 0;
     }
 
-    if (compare_parameter(f->sym, a->expr, ranks_must_agree) == 0) {
+    if (!compare_parameter(f->sym, a->expr, ranks_must_agree, is_elemental)) {
       if (where) g95_error("Type/rank mismatch in argument '%s' at %L",
 			   f->sym->name, &a->expr->where);
       return 0;
@@ -1272,7 +1272,8 @@ sym_intent a_intent, f_intent;
 void g95_procedure_use(g95_symbol *sym, g95_actual_arglist **ap, locus *where){
 
   if (sym->attr.if_source == IFSRC_UNKNOWN ||
-      !compare_actual_formal(ap, sym->formal, 0, where)) return;
+      !compare_actual_formal(ap, sym->formal, 0, sym->attr.elemental, where))
+    return;
 
   check_intents(sym->formal, *ap);
   if (g95_option.aliasing)
@@ -1295,7 +1296,7 @@ int r;
 
     r = !intr->sym->attr.elemental;
 
-    if (compare_actual_formal(ap, intr->sym->formal, r, NULL)) {
+    if (compare_actual_formal(ap, intr->sym->formal, r, !r, NULL)) {
       check_intents(intr->sym->formal, *ap);
       if (g95_option.aliasing)
 	check_some_aliasing(intr->sym->formal, *ap);

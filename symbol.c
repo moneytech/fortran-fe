@@ -581,7 +581,9 @@ static char *dummy = "DUMMY", *save = "SAVE", *pointer = "POINTER",
 
   conf(external, intrinsic);
   conf(allocatable, pointer);
-  conf(allocatable, intent);   /* Allowed in Fortran 2000 */
+  conf(allocatable, dummy);    /* Allowed in Fortran 2000 */
+  conf(allocatable, function); /* Allowed in Fortran 2000 */
+  conf(allocatable, result);   /* Allowed in Fortran 2000 */
   conf(elemental, recursive);
 
   conf(in_common, dummy);

@@ -593,7 +593,7 @@ int pure;
     pure = g95_pure(e->value.function.esym);
     *name = e->value.function.esym->name;
   } else if (e->value.function.isym) {
-    pure = e->value.function.isym->pure;
+    pure = e->value.function.isym->pure || e->value.function.isym->elemental;
     *name = e->value.function.isym->name;
   } else {    /* Implicit functions are not pure */
     pure = 0;
@@ -2270,22 +2270,6 @@ int formal_ns_save, check_constant;
 		  &sym->declared_at);
 	return;
       }
-    }
-  }
-
-  /* Constraints on allocatable- Allowed in Fortran 2000. */
-
-  if (sym->attr.allocatable) {
-    if (sym->attr.dummy) {
-      g95_error("Dummy argument at %L cannot have the allocatable attribute",
-		&sym->declared_at);
-      return;
-    }
-
-    if (sym->attr.function || sym->attr.result) {
-      g95_error("Function at %L cannot have the allocatable attribute",
-		&sym->declared_at);
-      return;
     }
   }
 
