@@ -927,7 +927,8 @@ locus where;
 
   case MATCH_YES:
     g95_find_symbol(name, NULL, 1, &sym);
-    if (sym == NULL || sym->attr.flavor != FL_PROCEDURE) break;
+    if (sym == NULL || (sym->attr.flavor != FL_PROCEDURE &&
+			sym->attr.flavor != FL_MODULE_PROC)) break;
 
 /* Peek ahead yet again to see if the next character is a left
  * parenthesis.  If not, the actual argument is the procedure. */
