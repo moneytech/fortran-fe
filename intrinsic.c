@@ -2155,8 +2155,8 @@ char *name;
   c->sub_name = isym->lib_name;
 
   if (g95_pure(NULL) && !isym->elemental)
-    g95_error("Subroutine call to intrinsic '%s' at %L is not PURE", &c->loc,
-	      c->sub_name);
+    g95_error("Subroutine call to intrinsic '%s' at %L is not PURE",
+               c->sub_name, &c->loc);
 
   return SUCCESS;
 }
