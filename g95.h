@@ -838,7 +838,7 @@ void g95_status_char(char);
 try g95_open_status(char *);
 try g95_close_status(void);
 
-int g95_retcode(void);
+void g95_get_errors(int *, int *);
 
 /* parse.c */
 

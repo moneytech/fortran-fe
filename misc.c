@@ -241,7 +241,7 @@ static void init_options(void) {
 /* main()-- Compile a fortran program */
 
 int main(int argc, char *argv[]) {
-int i;
+int errors, warnings, i;
 
   if (argc == 1) display_help();
 
@@ -267,5 +267,10 @@ int i;
 
   g95_done_1();
 
-  return g95_retcode();
+  g95_get_errors(&warnings, &errors);
+  g95_status("Warnings: %d  Errors: %d\n", warnings, errors);
+
+  if (errors > 0) return 2;
+  if (warnings > 0) return 1;
+  return 0;
 }

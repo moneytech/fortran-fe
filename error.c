@@ -593,12 +593,10 @@ try g95_close_status(void) {
 }
 
 
-/* g95_retcode()-- Get a return code based on how many errors and
- * warnings we've seen. */
+/* g95_get_errors()-- Report warnings and errors to the caller */
 
-int g95_retcode(void) {
+void g95_get_errors(int *w, int *e) {
 
-  if (errors > 0) return 2;
-  if (warnings > 0) return 1;
-  return 0;
+  *w = warnings;
+  *e = errors;
 }
