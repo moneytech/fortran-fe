@@ -929,7 +929,6 @@ try t;
  * variable.  This sort of thing commonly happens for symbols in module. */
 
 static void resolve_symbol(g95_symbol *sym) {
-g95_symbol *result;
 
   if (sym->attr.flavor == FL_UNKNOWN) {
     if (sym->attr.external == 0 && sym->attr.intrinsic == 0)
@@ -945,17 +944,6 @@ g95_symbol *result;
     g95_error("Assumed size array at %L must be a dummy argument",
 	      &sym->declared_at);
     return;
-  }
-
-  /* For a function with a result variable, copy the type of the result. */
-
-  if (sym->attr.function && sym->ts.type == BT_UNKNOWN &&
-      sym->result != NULL) {
-    result = sym->result;
-
-    if (result->ts.type != BT_UNKNOWN ||
-	g95_set_default_type(result, 1, NULL) == SUCCESS)
-      sym->ts = result->ts;
   }
 
   /* Resolve inital values and make sure they are compatible with the
@@ -988,6 +976,25 @@ g95_symbol *result;
 }
 
 
+/* copy_result_type()-- Looks at symbols that are function nodes of
+ * unknown type with RESULT variables.  This has to happen before we
+ * set default types of all symbols, because the function's default
+ * type might get set before the result's. */
+
+void copy_result_type(g95_symbol *sym) {
+g95_symbol *result;
+
+  if (!sym->attr.function || sym->ts.type != BT_UNKNOWN ||
+      sym->result == NULL) return;
+
+  result = sym->result;
+
+  if (result->ts.type != BT_UNKNOWN ||
+      g95_set_default_type(result, 1, NULL) == SUCCESS)
+    sym->ts = result->ts;
+}
+
+
 /* g95_resolve()-- This function is called after a complete program
  * unit has been compiled.  Its purpose is to examine all of the
  * expressions associated with a program unit, assign types to all
@@ -1005,6 +1012,10 @@ g95_charlen *cl;
 
   resolve_modproc(ns);
 
+  g95_traverse_ns(ns, copy_result_type);
+
+  g95_set_sym_defaults(ns);
+
   g95_traverse_ns(ns, resolve_symbol);
 
   for(n=ns->contained; n; n=n->sibling) {
@@ -1015,8 +1026,6 @@ g95_charlen *cl;
   g95_current_ns = ns;
 
   if (ns->save_all) g95_save_all(ns);
-
-  g95_set_sym_defaults(ns);
 
   for(cl=ns->cl_list; cl; cl=cl->next) {
     if (cl->length == NULL || g95_resolve_expr(cl->length) == FAILURE)
