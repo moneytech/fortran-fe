@@ -1325,7 +1325,7 @@ match m;
       goto cleanup;
     }
 
-    if (attr.dimension && tail->expr->as == NULL) {
+    if (attr.dimension && tail->expr->shape == NULL) {
       g95_error("Array specification required in ALLOCATE statement at %C");
       goto cleanup;
     }

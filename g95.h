@@ -310,6 +310,15 @@ typedef struct {
 
 #define g95_get_array_spec() g95_getmem(sizeof(g95_array_spec))
 
+/* Array shape */
+
+typedef struct {
+  int rank;
+  struct g95_expr *shape[G95_MAX_DIMENSIONS];
+} g95_array_shape;
+
+#define g95_get_array_shape() g95_getmem(sizeof(g95_array_shape))
+
 /* Components of derived types */
 
 typedef struct g95_component {
@@ -581,9 +590,8 @@ typedef struct g95_ref {
 typedef struct g95_expr {
   expr_t expr_type;
 
-  g95_typespec ts;         /* These two refer to the overall expression   */
-
-  g95_array_spec *as;      /* Nonnull if the expression is array-valued */
+  g95_typespec ts;         /* These two refer to the overall expression */
+  g95_array_shape *shape;  /* Nonnull if the expression is array-valued */
 
   intrinsic_op operator;
   g95_symbol *symbol;   /* Nonnull for functions and structure constructors */
@@ -1204,6 +1212,8 @@ void g95_replace_expr(g95_expr *, g95_expr *);
 g95_expr *g95_int_expr(int);
 g95_expr *g95_logical_expr(int, locus *);
 g95_code *g95_build_call(g95_symbol *, ...);
+void g95_free_array_shape(g95_array_shape *);
+g95_array_shape *g95_copy_array_shape(g95_array_shape *p);
 g95_expr *g95_copy_expr(g95_expr *);
 
 void g95_show_expr(g95_expr *);

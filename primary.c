@@ -704,7 +704,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  if (sym->value->as != NULL) {
+  if (sym->value->shape != NULL) {
     g95_error("Scalar PARAMETER required in complex constant at %C");
     return MATCH_ERROR;
   }
@@ -1255,7 +1255,7 @@ match m;
     tail = extend_ref(primary, tail);
     tail->type = REF_ARRAY;
 
-    m = g95_match_array_ref(&tail->ar, primary->as, equiv_flag);
+    m = g95_match_array_ref(&tail->ar, primary->symbol->as, equiv_flag);
     if (m != MATCH_YES) return m;
   }
 

@@ -197,9 +197,9 @@ g95_expr *result;
 
 static try check_all_any(g95_expr *mask, g95_expr *dim) {
 
-  if (mask->ts.type != BT_LOGICAL || mask->as == NULL) return FAILURE;
+  if (mask->ts.type != BT_LOGICAL || mask->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -331,9 +331,9 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
 
 static try check_count(g95_expr *mask, g95_expr *dim) {
 
-  if (mask->ts.type != BT_LOGICAL || mask->as == NULL) return FAILURE;
+  if (mask->ts.type != BT_LOGICAL || mask->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -342,15 +342,15 @@ static try check_count(g95_expr *mask, g95_expr *dim) {
 
 static try check_cshift(g95_expr *array, g95_expr *shift, g95_expr *dim) {
 
-  if (array->as == NULL) return FAILURE;
+  if (array->shape == NULL) return FAILURE;
 
-  if (array->as->rank == 1) {
-    if (shift->as != NULL) return FAILURE;
+  if (array->shape->rank == 1) {
+    if (shift->shape != NULL) return FAILURE;
   } else {
     /* TODO: more requirements on shift parameter */
   }
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -391,8 +391,8 @@ static try check_dot_product(g95_expr *vector_a, g95_expr *vector_b) {
       (!g95_numeric_ts(&vector_a->ts) || !g95_numeric_ts(&vector_b->ts)))
     return FAILURE;
 
-  if (vector_a->as == NULL || vector_a->as->rank != 1) return FAILURE;
-  if (vector_b->as == NULL || vector_b->as->rank != 1) return FAILURE;
+  if (vector_a->shape == NULL || vector_a->shape->rank != 1) return FAILURE;
+  if (vector_b->shape == NULL || vector_b->shape->rank != 1) return FAILURE;
 
   return SUCCESS;
 }
@@ -411,12 +411,12 @@ static try check_epsilon(g95_expr *x) {
 static try check_eoshift(g95_expr *array, g95_expr *shift, g95_expr *boundary,
 			 g95_expr *dim) {
 
-  if (array->as == NULL) return FAILURE;
+  if (array->shape == NULL) return FAILURE;
 
   if (shift->ts.type != BT_INTEGER) return FAILURE;
 
-  if (array->as->rank == 1) {
-    if (shift->as != NULL) return FAILURE;
+  if (array->shape->rank == 1) {
+    if (shift->shape != NULL) return FAILURE;
   } else {
     /* TODO: more weird restrictions on shift */
   }
@@ -427,7 +427,7 @@ static try check_eoshift(g95_expr *array, g95_expr *shift, g95_expr *boundary,
     /* TODO: more restrictions on boundary */
   }
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -488,9 +488,9 @@ static try check_kind(g95_expr *x) {
 
 static try check_lbound(g95_expr *array, g95_expr *dim) {
 
-  if (array->as == NULL) return FAILURE;
+  if (array->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -605,10 +605,10 @@ static try check_matmul(g95_expr *matrix_a, g95_expr *matrix_b) {
       (!g95_numeric_ts(&matrix_a->ts) || !g95_numeric_ts(&matrix_b->ts)))
     return FAILURE;
 
-  if (matrix_a->as == NULL || matrix_b->as == NULL) return FAILURE;
+  if (matrix_a->shape == NULL || matrix_b->shape == NULL) return FAILURE;
 
-  if ((matrix_a->as->rank != 1 || matrix_b->as->rank != 2) &&
-      (matrix_a->as->rank != 2 || matrix_b->as->rank != 1)) return FAILURE;
+  if ((matrix_a->shape->rank != 1 || matrix_b->shape->rank != 2) &&
+      (matrix_a->shape->rank != 2 || matrix_b->shape->rank != 1)) return FAILURE;
 
   return SUCCESS;
 }
@@ -619,10 +619,10 @@ static try check_maxloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
   if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL)
     return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
-  if (mask != NULL && (mask->as != NULL || mask->ts.type != BT_LOGICAL))
+  if (mask != NULL && (mask->shape != NULL || mask->ts.type != BT_LOGICAL))
     return FAILURE;
 
   return SUCCESS;
@@ -632,12 +632,12 @@ static try check_maxloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 static try check_maxval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
   if (array->ts.type != BT_INTEGER || array->ts.type != BT_REAL ||
-      array->as == NULL) return FAILURE;
+      array->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as == NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape == NULL))
     return FAILURE;
 
-  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->as == NULL))
+  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->shape == NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -659,10 +659,10 @@ static try check_minloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
   if (array->ts.type != BT_INTEGER && array->ts.type != BT_REAL)
     return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
-  if (mask != NULL && (mask->as != NULL || mask->ts.type != BT_LOGICAL))
+  if (mask != NULL && (mask->shape != NULL || mask->ts.type != BT_LOGICAL))
     return FAILURE;
 
   return SUCCESS;
@@ -672,12 +672,12 @@ static try check_minloc(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 static try check_minval(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
   if (array->ts.type != BT_INTEGER || array->ts.type != BT_REAL ||
-      array->as == NULL) return FAILURE;
+      array->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as == NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape == NULL))
     return FAILURE;
 
-  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->as == NULL))
+  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->shape == NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -734,15 +734,15 @@ g95_ref *ref;
 
 static try check_pack(g95_expr *array, g95_expr *mask, g95_expr *vector) {
 
-  if (array->as == NULL) return FAILURE;
+  if (array->shape == NULL) return FAILURE;
 
-  if (mask->as == NULL || mask->ts.type != BT_INTEGER) return FAILURE;
+  if (mask->shape == NULL || mask->ts.type != BT_INTEGER) return FAILURE;
 
   if (vector != NULL) {
 
     if (!g95_compare_types(&array->ts, &vector->ts)) return FAILURE;
 
-    if (vector->as == NULL || vector->as->rank != 1) return FAILURE;
+    if (vector->shape == NULL || vector->shape->rank != 1) return FAILURE;
 
     /* TODO: More constraints here */
   }
@@ -776,12 +776,12 @@ static try check_present(g95_expr *a) {
 
 static try check_product(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
-  if (!g95_numeric_ts(&array->ts) || array->as == NULL) return FAILURE;
+  if (!g95_numeric_ts(&array->ts) || array->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
-  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->as == NULL))
+  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->shape == NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -823,21 +823,21 @@ static try check_real(g95_expr *a, g95_expr *kind) {
 static try check_reshape(g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
 
-  if (source->as == NULL) return FAILURE;
+  if (source->shape == NULL) return FAILURE;
 
-  if (shape->as == NULL) return FAILURE;
+  if (shape->shape == NULL) return FAILURE;
 
   if (shape->ts.type != BT_INTEGER) return FAILURE;
-  if (shape->as->rank != 1) return FAILURE;
+  if (shape->shape->rank != 1) return FAILURE;
 
   if (pad != NULL) {
     if (!g95_compare_types(&source->ts, &pad->ts)) return FAILURE;
 
-    if (pad->as == NULL) return FAILURE;
+    if (pad->shape == NULL) return FAILURE;
   }
 
   if (order != NULL) {
-    if (order->as == NULL) return FAILURE;
+    if (order->shape == NULL) return FAILURE;
   }
 
   return SUCCESS;
@@ -864,9 +864,9 @@ static try check_shape(g95_expr *source) {
 
 static try check_size(g95_expr *array, g95_expr *dim) {
 
-  if (array->as == NULL) return FAILURE;
+  if (array->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -884,12 +884,12 @@ static try check_sign(g95_expr *a, g95_expr *b) {
 
 static try check_spread(g95_expr *source, g95_expr *dim, g95_expr *ncopies) {
 
-  if (source->as != NULL && source->as->rank >= G95_MAX_DIMENSIONS)
+  if (source->shape != NULL && source->shape->rank >= G95_MAX_DIMENSIONS)
     return FAILURE;
 
-  if (dim->ts.type != BT_INTEGER || dim->as != NULL) return FAILURE;
+  if (dim->ts.type != BT_INTEGER || dim->shape != NULL) return FAILURE;
 
-  if (ncopies->ts.type != BT_INTEGER || ncopies->as != NULL) return FAILURE;
+  if (ncopies->ts.type != BT_INTEGER || ncopies->shape != NULL) return FAILURE;
 
   return SUCCESS;
 }
@@ -905,12 +905,12 @@ static try check_sqrt(g95_expr *x) {
 
 static try check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
-  if (!g95_numeric_ts(&array->ts) || array->as == NULL) return FAILURE;
+  if (!g95_numeric_ts(&array->ts) || array->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
-  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->as == NULL))
+  if (mask != NULL && (mask->ts.type != BT_LOGICAL || mask->shape == NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -919,7 +919,7 @@ static try check_sum(g95_expr *array, g95_expr *dim, g95_expr *mask) {
 
 static try check_transfer(g95_expr *source, g95_expr *mold, g95_expr *size) {
 
-  if (size != NULL && (size->ts.type != BT_INTEGER || size->as == NULL))
+  if (size != NULL && (size->ts.type != BT_INTEGER || size->shape == NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -928,7 +928,7 @@ static try check_transfer(g95_expr *source, g95_expr *mold, g95_expr *size) {
 
 static try check_transpose(g95_expr *matrix) {
 
-  if (matrix->as == NULL || matrix->as->rank != 2) return FAILURE;
+  if (matrix->shape == NULL || matrix->shape->rank != 2) return FAILURE;
 
   return SUCCESS;
 }
@@ -946,9 +946,9 @@ static try check_tiny(g95_expr *x) {
 
 static try check_ubound(g95_expr *array, g95_expr *dim) {
 
-  if (array->as == NULL) return FAILURE;
+  if (array->shape == NULL) return FAILURE;
 
-  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->as != NULL))
+  if (dim != NULL && (dim->ts.type != BT_INTEGER || dim->shape != NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -957,9 +957,9 @@ static try check_ubound(g95_expr *array, g95_expr *dim) {
 
 static try check_unpack(g95_expr *vector, g95_expr *mask, g95_expr *field) {
 
-  if (vector->as == NULL || vector->as->rank != 1) return FAILURE;
+  if (vector->shape == NULL || vector->shape->rank != 1) return FAILURE;
 
-  if (mask->as == NULL || mask->ts.type != BT_LOGICAL) return FAILURE;
+  if (mask->shape == NULL || mask->ts.type != BT_LOGICAL) return FAILURE;
 
   if (!g95_compare_types(&vector->ts, &field->ts)) return FAILURE;
 
@@ -1664,16 +1664,16 @@ int di, dr, dd, dl, dc, dz;
 static try check_date_and_time(g95_expr *date, g95_expr *time,
 			       g95_expr *zone, g95_expr *values) {
 
-  if (date != NULL && (date->ts.type != BT_CHARACTER || date->as != NULL))
+  if (date != NULL && (date->ts.type != BT_CHARACTER || date->shape != NULL))
     return FAILURE;
 
-  if (time != NULL && (time->ts.type != BT_CHARACTER || time->as != NULL))
+  if (time != NULL && (time->ts.type != BT_CHARACTER || time->shape != NULL))
     return FAILURE;
 
-  if (zone != NULL && (zone->ts.type != BT_CHARACTER || zone->as != NULL))
+  if (zone != NULL && (zone->ts.type != BT_CHARACTER || zone->shape != NULL))
     return FAILURE;
 
-  if (values != NULL && (values->ts.type != BT_INTEGER || values->as == NULL))
+  if (values != NULL && (values->ts.type != BT_INTEGER || values->shape == NULL))
     return FAILURE;
 
   return SUCCESS;
@@ -1698,13 +1698,13 @@ static try check_mvbits(g95_expr *from, g95_expr *frompos, g95_expr *len,
 
 static try check_random_number(g95_expr *size, g95_expr *put, g95_expr *get) {
 
-  if (size->as != NULL || size->ts.type != BT_INTEGER ||
+  if (size->shape != NULL || size->ts.type != BT_INTEGER ||
       size->ts.kind != g95_default_integer_kind()) return FAILURE;
 
-  if (put->as == NULL || put->ts.type != BT_INTEGER ||
+  if (put->shape == NULL || put->ts.type != BT_INTEGER ||
       put->ts.kind != g95_default_integer_kind()) return FAILURE;
 
-  if (get->as == NULL || get->ts.type != BT_INTEGER ||
+  if (get->shape == NULL || get->ts.type != BT_INTEGER ||
       get->ts.kind != g95_default_integer_kind()) return FAILURE;
 
   return SUCCESS;

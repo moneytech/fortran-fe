@@ -897,6 +897,33 @@ done:
 }
 
 
+static void mio_array_shape(g95_array_shape **asp) {
+g95_array_shape *as;
+int i;
+
+  mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    if (*asp == NULL) goto done;
+    as = *asp;
+  } else {
+    if (peek_atom() == ATOM_RPAREN) {
+      *asp = NULL;
+      goto done;
+    }
+
+    *asp = as = g95_get_array_shape();
+  }
+
+  mio_integer(&as->rank);
+
+  for(i=0; i<as->rank; i++)
+    mio_expr(&as->shape[i]);
+
+done:
+  mio_rparen();
+}
+
 
 #if 0
 static mstring array_ref_types[] = {
@@ -1294,7 +1321,7 @@ g95_expr *e;
   }
 
   mio_typespec(&e->ts);
-  mio_array_spec(&e->as);
+  mio_array_shape(&e->shape);
 
   switch(e->expr_type) {
   case EXPR_OP:

@@ -183,6 +183,10 @@ static void g95_free_expr0(g95_expr *e) {
   default:
     g95_internal_error("g95_free_expr0(): Bad expr type");
   }
+
+  if (e->shape != NULL) g95_free_array_shape(e->shape);
+
+  memset(e, '\0', sizeof(g95_expr));
 }
 
 
@@ -256,6 +260,35 @@ g95_ref *dest;
 }
 
 
+/* g95_free_array_shape()-- Free an array shape structure */
+
+void g95_free_array_shape(g95_array_shape *p) {
+int i;
+
+  for(i=0; i<p->rank; i++)
+    g95_free(p->shape[i]);
+
+  g95_free(p);
+}
+
+
+/* g95_copy_array_shape()-- Copy an array shape structure */
+
+g95_array_shape *g95_copy_array_shape(g95_array_shape *p) {
+g95_array_shape *q;
+int i;
+
+  q = g95_get_array_shape();
+
+  q->rank = p->rank;
+
+  for(i=0; i<p->rank; i++)
+    q->shape[i] = g95_copy_expr(p->shape[i]);
+
+  return q;
+}
+
+
 /* g95_copy_expr()-- Given an expression pointer, return a copy of the
  * expression.  This subroutine is recursive. */
 
@@ -268,7 +301,7 @@ char *s;
   q = g95_get_expr();
   *q = *p;
 
-  q->as = g95_copy_array_spec(p->as);
+  q->shape = g95_copy_array_shape(p->shape);
 
   switch(q->expr_type) {
   case EXPR_SUBSTRING:
@@ -1127,19 +1160,19 @@ try t;
   case INTRINSIC_NEQV:    case INTRINSIC_EQ:     case INTRINSIC_NE:
   case INTRINSIC_GT:      case INTRINSIC_GE:     case INTRINSIC_LT:
   case INTRINSIC_LE:
-    if (op1->as == NULL && op2->as == NULL) e->as = NULL;
-    if (op1->as != NULL && op2->as == NULL)
-      e->as = g95_copy_array_spec(op1->as);
-    if (op1->as == NULL && op2->as != NULL)
-      e->as = g95_copy_array_spec(op2->as);
+    if (op1->shape == NULL && op2->shape == NULL) e->shape = NULL;
+    if (op1->shape != NULL && op2->shape == NULL)
+      e->shape = g95_copy_array_shape(op1->shape);
+    if (op1->shape == NULL && op2->shape != NULL)
+      e->shape = g95_copy_array_shape(op2->shape);
 
 /* TODO: we should really be comparing array refs where possible */
 
-    if (op1->as != NULL && op2->as != NULL) {
+    if (op1->shape != NULL && op2->shape != NULL) {
 
-      /* g95_check_conformability(op1->as, op2->as); */
+      /* g95_check_conformability(op1->shape, op2->shape); */
 
-      e->as = g95_copy_array_spec(op1->as);
+      e->shape = g95_copy_array_shape(op1->shape);
     }
 
     break;
@@ -1147,7 +1180,7 @@ try t;
   case INTRINSIC_NOT:
   case INTRINSIC_UPLUS:
   case INTRINSIC_UMINUS:
-    e->as = g95_copy_array_spec(op1->as);
+    e->shape = g95_copy_array_shape(op1->shape);
     break;           /* Simply copy arrayness attribute */
 
   default:
@@ -1194,16 +1227,22 @@ match m;
  * scalar */
 
 match g95_match_scalar_expr(g95_expr **result) {
+g95_ref *ref;
 g95_expr *e;
 match m;
 
   m = g95_match_expr(&e);
   if (m != MATCH_YES) return m;
 
-  if (e->as != NULL) {
-    g95_error("Expression at %C must be scalar valued, not array valued");
-    g95_free_expr(e);
-    return MATCH_ERROR;
+  if (e->shape != NULL) {
+    for(ref=e->ref; ref->next;)
+      ref = ref->next;
+
+    if (ref->type == REF_ARRAY && ref->ar.type != AR_ELEMENT) {
+      g95_error("Expression at %C must be scalar valued, not array valued");
+      g95_free_expr(e);
+      return MATCH_ERROR;
+    }
   }
 
   *result = e;

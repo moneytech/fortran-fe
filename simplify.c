@@ -2559,7 +2559,7 @@ g95_expr *g95_simplify_reshape(g95_expr *source, g95_expr *shape_exp,
 int i, rank, nsource, npad, x[G95_MAX_DIMENSIONS];
 int order[G95_MAX_DIMENSIONS], shape[G95_MAX_DIMENSIONS];
 g95_constructor *head, *tail;
-g95_array_spec *as;
+g95_array_shape *s;
 mpz_t index;
 g95_expr *e;
 
@@ -2725,15 +2725,12 @@ g95_expr *e;
   e->value.constructor = head;
   e->ts = head->expr->ts;
 
-  e->as = as = g95_get_array_spec();
+  e->shape = s = g95_get_array_shape();
 
-  as->rank = rank;
-  as->type = AS_EXPLICIT;
+  s->rank = rank;
 
-  for(i=0; i<rank; i++) {
-    as->shape[i].lower = g95_int_expr(1);
-    as->shape[i].upper = g95_int_expr(shape[i]);
-  }
+  for(i=0; i<rank; i++)
+    s->shape[i] = g95_int_expr(shape[i]);
 
   return e;
 
