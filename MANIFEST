@@ -1,4 +1,5 @@
 arith.c error.c expr.c intrinsic.c match.c parse.c scanner.c st.c symbol.c
 array.c misc.c decl.c interface.c select.c io.c format.c matchexp.c module.c
 simplify.c primary.c date.c simplify.h g95.h
-CONTRIB COPYING MANIFEST BUGS Makefile doc
+configure.in configure config.guess config.sub Makefile.in
+CONTRIB COPYING MANIFEST BUGS Makefile
