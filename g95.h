@@ -671,8 +671,11 @@ typedef struct g95_equiv {
 typedef struct g95_case {
   g95_expr *low, *high;
 
-  struct g95_case *left, *right, *next;
+  struct g95_case *link[2], *next;
   struct g95_code *back;
+
+  int balance;
+  char cache;			/* Used during insertion in AVL tree */
  
 } g95_case;
 
