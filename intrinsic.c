@@ -939,6 +939,8 @@ g95_expr *x;
   if (arg == NULL) return FAILURE;
 
   x = arg->expr;
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
   return check_rest(x->ts.type, x->ts.kind, arg);
 }
 
@@ -949,6 +951,8 @@ g95_expr *x;
   if (arg == NULL) return FAILURE;
 
   x = arg->expr;
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
   return check_rest(x->ts.type, x->ts.kind, arg);
 }
 
@@ -959,6 +963,8 @@ g95_expr *x;
   if (arg == NULL) return FAILURE; 
 
   x = arg->expr;
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
   return check_rest(BT_INTEGER, x->ts.kind, arg);
 }
 
@@ -969,6 +975,8 @@ g95_expr *x;
   if (arg == NULL) return FAILURE; 
 
   x = arg->expr;
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
   return check_rest(BT_INTEGER, x->ts.kind, arg);
 }
 
@@ -979,6 +987,8 @@ g95_expr *x;
   if (arg == NULL) return FAILURE;
 
   x = arg->expr;
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
   return check_rest(BT_REAL, x->ts.kind, arg);
 }
 
@@ -989,6 +999,8 @@ g95_expr *x;
   if (arg == NULL) return FAILURE;
 
   x = arg->expr;
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
   return check_rest(BT_REAL, x->ts.kind, arg);
 }
 
