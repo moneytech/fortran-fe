@@ -1498,7 +1498,7 @@ int kind;
 
   switch(e->ts.type) {
   case BT_INTEGER:
-    mpz_set_f(result->value.integer, e->value.real);
+    mpz_set(result->value.integer, e->value.integer);
     break;
 
   case BT_REAL:
