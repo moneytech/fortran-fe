@@ -1890,7 +1890,6 @@ match m;
 
   if (g95_state_stack->state != COMP_INTERFACE ||
       g95_state_stack->previous == NULL ||
-      g95_state_stack->previous->state != COMP_MODULE ||
       current_interface.type == INTERFACE_NAMELESS) {
     g95_error("MODULE PROCEDURE at %C must be in a generic module interface");
     return MATCH_ERROR;
