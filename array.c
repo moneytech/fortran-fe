@@ -1166,7 +1166,9 @@ g95_expr *e;
  * enough. */
 
 try g95_expand_constructor(g95_expr *e) {
+g95_constructor *head_save, *tail_save;
 g95_expr *f;
+try rc;
 
   f = g95_get_array_element(e, G95_MAX_AC_EXPAND);
   if (f != NULL) {
@@ -1174,20 +1176,30 @@ g95_expr *f;
     return SUCCESS;
   }
 
+  head_save = new_head; 
+  tail_save = new_tail;
   new_head = new_tail = NULL;
+
   iter_stack = NULL;
 
   expand_work_function = expand;
 
   if (expand_constructor(e->value.constructor.head) == FAILURE) {
     g95_free_constructor(new_head);
-    return FAILURE;
+    rc = FAILURE;
+    goto done;
   }
 
   g95_free_constructor(e->value.constructor.head);
   e->value.constructor.head = new_head;
 
-  return SUCCESS;
+  rc = SUCCESS;
+
+done:
+  new_head = head_save;
+  new_tail = tail_save;
+
+  return rc;
 }
 
 
