@@ -2034,6 +2034,8 @@ int ncopies;
 int i, len, m;
 char *copy;
 
+   return NULL;
+/*
   if (e->expr_type != EXPR_CONSTANT || n->expr_type != EXPR_CONSTANT)  
     return NULL;
 
@@ -2073,6 +2075,7 @@ char *copy;
     }
     return result;
   }
+*/
 
 }
 
