@@ -465,11 +465,7 @@ match m;
   if (g95_match_char('*') == MATCH_YES) return AS_ASSUMED_SIZE;
 
   m = g95_match_expr(upper);
-  if (m == MATCH_ERROR) {
-    g95_free_expr(*lower);
-    return AS_UNKNOWN;
-  }
-
+  if (m == MATCH_ERROR) return AS_UNKNOWN;
   if (m == MATCH_NO) return AS_ASSUMED_SHAPE;
 
   return AS_EXPLICIT;
@@ -577,7 +573,6 @@ int i;
 
 cleanup:
   g95_free_array_spec(as);
-
   return MATCH_ERROR;
 }
 
