@@ -577,7 +577,7 @@ done:
  * specification.  Not doing so is needed for matching an IMPLICIT
  * statement correctly. */
 
-match g95_match_type_spec(g95_typespec *ts, int kind_flag, int type_decl) {
+match g95_match_type_spec(g95_typespec *ts, int kind_flag, int data_decl) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 match m;
@@ -592,7 +592,7 @@ match m;
 
   if (g95_match(" character") == MATCH_YES) {
     ts->type = BT_CHARACTER;
-    return match_char_spec(ts, type_decl);
+    return match_char_spec(ts, data_decl);
   }
 
   if (g95_match(" real") == MATCH_YES) {
@@ -628,16 +628,27 @@ match m;
   m = g95_match(" type ( %n )", name);
   if (m != MATCH_YES) return m;
 
-/* New type names are always created in the current namespace without
- * searching any parents.  This is necessary because the type might be
- * actually created in the host at a later time.  If not, we'll copy
- * the component list from a parent namespace */
+  if (data_decl) {  /* Require type to exist now */
+    if (g95_find_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
 
-  if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+    if (sym == NULL) {
+      g95_error("Derived type '%s' at %C has not been defined", name);
+      return MATCH_ERROR;
+    }
 
-  if (sym->attr.flavor != FL_DERIVED &&
-      g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
-    return MATCH_ERROR;
+    if (sym->attr.flavor != FL_DERIVED) {
+      g95_error("Name '%s' at %C is not a derived type", name);
+      return MATCH_ERROR;
+    }
+
+  } else {     /* Allow the type to be defined later. */
+
+    if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
+
+    if (sym->attr.flavor != FL_DERIVED &&
+	g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
+      return MATCH_ERROR;
+  }
 
   ts->type = BT_DERIVED;
   ts->kind = 0;
@@ -1951,8 +1962,9 @@ loop:
 
 /* The symbol may already have the derived attribute without the
  * components.  The only way this can happen is during a function
- * definition.  The first part of the AND clause is true if a the
- * symbol is not the return value of a function. */
+ * definition or INTRINSIC statement.  The first part of the AND
+ * clause is true if a the symbol is not the return value of a
+ * function. */
 
   if (sym->attr.flavor != FL_DERIVED &&
       g95_add_flavor(&sym->attr, FL_DERIVED, NULL) == FAILURE)
@@ -1963,6 +1975,9 @@ loop:
 	      sym->name);
     return MATCH_ERROR;
   }
+
+  if (g95_add_access(&sym->attr, attr.access, NULL) == FAILURE)
+    return MATCH_ERROR;
 
   g95_new_block = sym;
 

@@ -860,6 +860,7 @@ g95_state_data s;
   accept_statement(ST_DERIVED_DECL);
   push_state(&s, COMP_DERIVED, g95_new_block);
 
+  g95_new_block->component_access = ACCESS_PUBLIC;
   seen_private = 0;
   seen_sequence = 0;
   seen_component = 0;

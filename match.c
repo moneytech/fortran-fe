@@ -345,49 +345,6 @@ match m;
 }
 
 
-/* g95_match_compound()-- Match a variable, possible compound.  The
- * first part must be a symbol in the current context, while zero or
- * more component specifications can be present. */
-
-match g95_match_compound(g95_symbol **sym, int **offset, g95_typespec *ts) {
-char name[G95_MAX_SYMBOL_LEN+1];
-g95_symbol *structure;
-g95_component *c;
-match m;
-
-  m = g95_match_symbol(sym);
-  if (m != MATCH_YES) return m;
-
-  structure = *sym;
-  *offset = 0;
-
-  while(structure->ts.type == BT_DERIVED) {
-    if (g95_match(" %%") != MATCH_YES) break;
-    m = g95_match_name(name);
-
-    if (m == MATCH_ERROR) return MATCH_ERROR;
-    if (m == MATCH_NO) {
-      g95_error("Expected a component name after '%%' at %C");
-      return MATCH_ERROR;
-    }
-
-    c = g95_find_component(structure, name);
-    if (c == NULL) {
-      g95_error("At %C, structure '%s' has no member named '%s'",
-		structure->name, name);
-      return MATCH_ERROR;
-    }
-
-    if (c->ts.type != BT_DERIVED) break;
-
-    structure = c->ts.derived;
-  }
-
-  *ts = c->ts;
-  return MATCH_YES;
-}
-
-
 static mstring operators[] = {
   minit("+", INTRINSIC_PLUS),      minit("-", INTRINSIC_MINUS),
   minit("**", INTRINSIC_POWER),    minit("//", INTRINSIC_CONCAT),

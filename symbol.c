@@ -1049,12 +1049,12 @@ g95_component *tail, *new;
 
 /* g95_find_component()-- Given a derived type node and a component
  * name, try to locate the component structure.  Returns the NULL
- * pointer if the component is not found.  If the component has no
- * components and is not use-associated, we search for a derived type
- * of the same name in parent program units.  Use-associated derived
- * types have no component list if the components were PRIVATE in the
- * module.  If found, we copy the component list, in effect defining
- * an identical type. */
+ * pointer if the component is not found or the components are private.
+ *
+ * If the component has no components and is not use-associated, we
+ * search for a derived type of the same name in parent program units.
+ * If found, we copy the component list, in effect defining an
+ * identical type. */
 
 g95_component *g95_find_component(g95_symbol *sym, char *name) {
 g95_namespace *ns;
@@ -1076,6 +1076,17 @@ g95_symbol *s;
 
   for(p=sym->components; p; p=p->next)
     if (strcmp(p->name, name) == 0) break;
+
+  if (p == NULL)
+    g95_error("'%s' at %C is not a member of the '%s' structure",
+	      name, sym->name);
+  else {
+    if (sym->attr.use_assoc && sym->component_access == ACCESS_PRIVATE) {
+      g95_error("Component '%s' at %C is a PRIVATE component of '%s'",
+		name, sym->name);
+      p = NULL;
+    }
+  }
 
   return p;
 }

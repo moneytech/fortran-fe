@@ -1180,11 +1180,7 @@ match m;
     if (m != MATCH_YES) return MATCH_ERROR;
 
     component = g95_find_component(sym, name);
-    if (component == NULL) {
-      g95_error("'%s' at %C is not a member of the '%s' structure",
-		name, sym->name);
-      return MATCH_ERROR;
-    }
+    if (component == NULL) return MATCH_ERROR;
 
     tail = extend_ref(primary, tail);
     tail->type = REF_COMPONENT;

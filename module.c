@@ -19,7 +19,7 @@ along with GNU G95; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-/* module.c-- Handle modules, which amount to loading and saving symbols */
+/* module.c-- Handle modules, which amounts to loading and saving symbols */
 
 #include <string.h>
 #include <stdio.h>
@@ -700,6 +700,13 @@ attr_bits[] = {
   minit("FUNCTION",    AB_FUNCTION),    minit("SUBROUTINE",   AB_SUBROUTINE),
   minit("SEQUENCE",    AB_SEQUENCE),    minit("ELEMENTAL",    AB_ELEMENTAL),
   minit("PURE",        AB_PURE),        minit("RECURSIVE",    AB_RECURSIVE),
+  minit(NULL, -1)
+},
+
+access_types[] = {
+  minit("UNKNOWN",   ACCESS_UNKNOWN),
+  minit("PRIVATE",   ACCESS_PRIVATE),
+  minit("PUBLIC",    ACCESS_PUBLIC),
   minit(NULL, -1)
 };
 
@@ -1395,7 +1402,6 @@ static void write_namespace(g95_namespace *);
 
 
 static void mio_symbol(g95_symbol *sym) {
-g95_component *dummy = NULL;
 
   mio_lparen();
 
@@ -1413,10 +1419,13 @@ g95_component *dummy = NULL;
 
   mio_symbol_ref(&sym->result);
 
-  if (iomode == IO_OUTPUT && sym->component_access == ACCESS_PRIVATE)
-    mio_component_list(&dummy);
-  else
-    mio_component_list(&sym->components);
+/* Note that components are always saved, even if they are supposed
+ * to be private.  Component access is checked during searching */
+
+  mio_component_list(&sym->components);
+
+  if (sym->components != NULL)
+    sym->component_access = mio_name(sym->component_access, access_types);
 
   mio_symbol_ref(&sym->common_head);
   mio_symbol_ref(&sym->common_next);
@@ -1424,7 +1433,6 @@ g95_component *dummy = NULL;
   // Save/restore namespaces
 
   mio_rparen();
-
 }
 
 
@@ -1522,6 +1530,12 @@ g95_symtree *st;
   mio_lparen();
 
   for(i=0; i<sym_num; i++) {
+    require_atom(ATOM_INTEGER);
+    serial = atom_int;
+
+    if (serial < 0 || serial >= sym_num)
+      bad_module("Symbol serial number out of range");
+
     require_atom(ATOM_NAME);
     strcpy(true_module, atom_name);
 
@@ -1541,7 +1555,7 @@ g95_symtree *st;
       strcpy(sym->module, true_module);
     }
 
-    sym_table[i] = sym;
+    sym_table[serial] = sym;
     sym->mark = (search_result == NULL);
   }
 
@@ -1668,6 +1682,21 @@ int i;
 }
 
 
+/* save_derived()-- Save a derived type as a hidden symbol.  This
+ * function recurses into any subtypes */
+
+static void save_derived(g95_symbol *sym) {
+g95_component *c;
+
+  if (sym->serial != -1) return;
+
+  sym->serial = sym_num++;
+
+  for(c=sym->components; c; c=c->next)
+    if (c->ts.type == BT_DERIVED) save_derived(sym->ts.derived);
+}
+
+
 /* find_invisibles()-- Worker function called by g95_traverse_ns to
  * find those symbols that aren't scheduled to be written, but need to
  * be written as invisible symbols. */
@@ -1682,6 +1711,8 @@ g95_interface *intr;
 
   for(intr=sym->generic; intr; intr=intr->next)
     if (intr->sym->serial == -1) intr->sym->serial = sym_num++;
+
+  if (sym->ts.type == BT_DERIVED) save_derived(sym->ts.derived);
 }
 
 
@@ -1754,6 +1785,7 @@ static void write_true_name(g95_symbol *sym) {
 
   if (sym->module[0] == '\0') strcpy(sym->module, g95_state_stack->sym->name);
 
+  write_atom(ATOM_INTEGER, &sym->serial);
   write_atom(ATOM_NAME, sym->module);
   write_atom(ATOM_NAME, sym->name);
 }
