@@ -33,7 +33,6 @@ Boston, MA 02111-1307, USA.  */
 #define G95_MAX_SYMBOL_LEN 31
 
 #define G95_REAL_BITS 100  /* Number of bits in g95's floating point numbers */
-#define G95_DEBUG 1
 
 #define G95_MAX_LINE 132        /* Characters beyond this are not seen */
 
