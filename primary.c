@@ -31,31 +31,26 @@ Boston, MA 02111-1307, USA.  */
  * If successful, sets the kind value to the correct integer.  */
 
 static match match_kind_param(int *kind) {
+char *p, name[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
-char *p;
 match m;
 
   m = g95_match_small_literal_int(kind);
   if (m != MATCH_NO) return m;
 
-  m = g95_match_symbol(&sym);
+  m = g95_match_name(name);
   if (m != MATCH_YES) return m;
 
-  if (sym->attr.flavor != FL_PARAMETER) {
-    g95_error("Kind parameter at %C doesn't have the PARAMETER attribute");
-    return MATCH_ERROR;
-  }
+  if (g95_find_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
+
+  if (sym == NULL) return MATCH_NO;
+
+  if (sym->attr.flavor != FL_PARAMETER) return MATCH_NO;
 
   p = g95_extract_int(sym->value, kind);
-  if (p != NULL) {
-    g95_error(p);
-    return MATCH_ERROR;
-  }
+  if (p != NULL) return MATCH_NO;
 
-  if (*kind < 0) {
-    g95_error("Kind parameter at %C is negative");
-    return MATCH_ERROR;
-  }
+  if (*kind < 0) return MATCH_NO;
 
   return MATCH_YES;
 }
@@ -80,60 +75,100 @@ match m;
 }
 
 
-/* match_integer_constant()-- Match an integer (digit string and
- * optional kind). */
+/* check_digit()-- Given a character and a radix, see if the character
+ * is a valid digit in that radix. */
 
-#define MAX_INT_CHARS 100
+static int check_digit(int c, int radix) {
+int r;
 
-static match match_integer_constant(g95_expr **result, int signflag) {
-char buffer[MAX_INT_CHARS+1];
-int i, c, kind;
+  switch(radix) {
+  case 2:
+    r = ('0' <= c && c <= '1');
+    break;
+
+  case 8:
+    r = ('0' <= c && c <= '7');
+    break;
+
+  case 10:
+    r = ('0' <= c && c <= '9');
+    break;
+
+  case 16:
+    r = ('0' <= c && c <= '9') || ('a' <= c && c <= 'f');
+    break;
+  }
+
+  return r;
+}
+
+
+/* match_digits()-- Match the digit string part of an integer.
+ * If the buffer is NULL, we just count characters for the second
+ * pass.  Returns the number of characters matched, -1 for no match. */
+
+static match match_digits(int signflag, int radix, char *buffer) {
 locus old_loc;
-g95_expr *e;
+int length, c;
 
-  old_loc = *g95_current_locus();
-  g95_gobble_whitespace();
-
+  length = 0;
   c = g95_next_char();
 
-  i = 0;
-
   if (signflag && (c == '+' || c == '-')) {
-    buffer[i++] = c;
+    if (buffer != NULL) *buffer++ = c;
     c = g95_next_char();
+    length++;
   }
 
-  if (!isdigit(c)) {
-    g95_set_locus(&old_loc);
-    return MATCH_NO;
-  }
+  if (!check_digit(c, radix)) return -1;
 
-  buffer[i++] = c;
+  length++;
+  if (buffer != NULL) *buffer++ = c;
 
   for(;;) {
     old_loc = *g95_current_locus();
     c = g95_next_char();
 
-    if (!isdigit(c)) break;
+    if (!check_digit(c, radix)) break;
 
-    buffer[i++] = c;
-    if (i >= MAX_INT_CHARS) {
-      g95_error("Digit-string at %C is more than " stringize(MAX_INT_CHARS)
-		" characters long");
-      return MATCH_ERROR;
-    }
+    if (buffer != NULL) *buffer++ = c;
+    length++;
   }
 
   g95_set_locus(&old_loc);
-  buffer[i] = '\0';
+
+  return length;
+}
+
+
+/* match_integer_constant()-- Match an integer (digit string and
+ * optional kind). */
+
+static match match_integer_constant(g95_expr **result, int signflag) {
+int length, kind;
+locus old_loc;
+char *buffer;
+g95_expr *e;
+
+  old_loc = *g95_current_locus();
+  g95_gobble_whitespace();
+
+  length = match_digits(signflag, 10, NULL);
+  g95_set_locus(&old_loc);
+  if (length == -1) return MATCH_NO;
+
+  buffer = g95_getmem(length+1);
+  g95_gobble_whitespace();
+
+  match_digits(signflag, 10, buffer);
 
   kind = get_kind();
   if (kind == -2) kind = g95_default_integer_kind();
-  if (kind == -1) return MATCH_ERROR;
+  if (kind == -1) goto error;
 
   if (g95_validate_kind(BT_INTEGER, kind) == -1) {
     g95_error("Integer kind %d at %C not available", kind);
-    return MATCH_ERROR;
+    goto error;
   }
 
   e = g95_convert_integer(buffer, kind, 10);
@@ -143,11 +178,17 @@ g95_expr *e;
     g95_error("Integer too big for its kind at %C");
 
     g95_free_expr(e);
-    return MATCH_ERROR;
+    goto error;
   }
+
+  g95_free(buffer);
 
   *result = e;
   return MATCH_YES;
+
+error:
+  g95_free(buffer);
+  return MATCH_ERROR;
 }
 
 
@@ -155,16 +196,15 @@ g95_expr *e;
  * constant that can be found in a DATA statement */
 
 static match match_boz_constant(g95_expr **result) {
-char *rname, buffer[MAX_INT_CHARS+1];
-int i, c, radix, delim;
+int radix, delim, length;
+char *rname, *buffer;
 locus old_loc;
 g95_expr *e;
 
   old_loc = *g95_current_locus();
   g95_gobble_whitespace();
 
-  c = g95_next_char();
-  switch (c) {
+  switch (g95_next_char()) {
   case 'b':  radix = 2;  rname = "binary";       break;
   case 'o':  radix = 8;  rname = "octal";        break;
   case 'z':  radix = 16; rname = "hexadecimal";  break;
@@ -175,48 +215,35 @@ g95_expr *e;
 
   delim = g95_next_char();
   if (delim != '\'' && delim != '\"') goto backup;
-    
-  i = 0;
 
-  for(;;) {
-    c = g95_next_char();
-    if (c == delim) break;
-
-    switch(radix) {
-    case 2:
-      if (c < '0' || c > '1') goto baddigit;
-      break;
-
-    case 8:
-      if (c < '0' || c > '7') goto baddigit;
-      break;
-
-    case 16:
-      if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) goto baddigit;
-      break;
-    }
-
-    buffer[i++] = c;
-    if (i >= MAX_INT_CHARS) {
-      g95_error("%s constant at %C is more than " stringize(MAX_INT_CHARS)
-		" characters long", rname);
-      return MATCH_ERROR;
-    }
-  }
-
-  if (i == 0) {
+  old_loc = *g95_current_locus();
+  
+  length = match_digits(0, radix, NULL);
+  if (length == -1) {
     g95_error("Empty set of digits in %s constants at %C", rname);
     return MATCH_ERROR;
   }
 
-  buffer[i] = '\0';
+  if (g95_next_char() != delim) {
+    g95_error("Illegal character in %s constant at %C.", rname);
+    return MATCH_ERROR;
+  }
+
+  g95_set_locus(&old_loc);
+
+  buffer = g95_getmem(length+1);
+
+  match_digits(0, radix, buffer);
+  g95_next_char();
 
   e = g95_convert_integer(buffer, g95_default_integer_kind(), radix);
   e->where = *g95_current_locus();
 
-  if (g95_check_integer_range(e->value.integer, g95_default_integer_kind()) !=
-      ARITH_OK) {
-    g95_error("Integer too big for its kind at %C");
+  g95_free(buffer);
+
+  if (g95_check_integer_range(e->value.integer, g95_default_integer_kind())
+      != ARITH_OK) {
+    g95_error("Integer too big for default integer kind at %C");
 
     g95_free_expr(e);
     return MATCH_ERROR;
@@ -228,32 +255,26 @@ g95_expr *e;
 backup:
   g95_set_locus(&old_loc);
   return MATCH_NO;
-
-baddigit:
-  g95_error("Illegal character in %s constant at %C.", rname);
-  return MATCH_ERROR;
 }
 
 
 /* match_real_constant()-- Match a real constant of some sort. */
 
-#define MAX_DOUBLE_CHARS 100
-
 static match match_real_constant(g95_expr **result, int signflag) {
-int kind, c, count, seen_dp, seen_digits, exp_char, negative;
-char *p, buffer[MAX_DOUBLE_CHARS+1];
+int kind, c, count, seen_dp, seen_digits, exp_char;
 locus old_loc, temp_loc;
+char *p, *buffer;
 g95_expr *e;
 
   old_loc = *g95_current_locus();
   g95_gobble_whitespace();
 
   e = NULL;
+  buffer = NULL;
 
   count = 0;
   seen_dp = 0;
   seen_digits = 0;
-  negative = 0;
   exp_char = ' ';
 
   c = g95_next_char();
@@ -329,16 +350,12 @@ done:
     return MATCH_NO;
   }
 
-  if (count > MAX_DOUBLE_CHARS) {
-    g95_error("Real constant is more than " stringize(MAX_DOUBLE_CHARS)
-	      " characters long at %C");
-    return MATCH_ERROR;
-  }
-
 /* Convert the number */
 
   g95_set_locus(&old_loc);
   g95_gobble_whitespace();
+
+  buffer = g95_getmem(count+1);
 
   p = buffer;
   while(count>0) {
@@ -348,15 +365,13 @@ done:
     count--;
   }
 
-  *p = '\0';
-
   kind = get_kind();
-  if (kind == -1) return MATCH_ERROR;
+  if (kind == -1) goto cleanup;
 
   if (exp_char == 'd') {
     if (kind != -2) {
       g95_error("Real number at %C has a 'd' exponent and an explicit kind");
-      return MATCH_ERROR;
+      goto cleanup;
     }
     kind = g95_default_double_kind();
 
@@ -365,12 +380,15 @@ done:
 
     if (g95_validate_kind(BT_REAL, kind) == -1) {
       g95_error("Invalid real kind %d at %C", kind);
-      return MATCH_ERROR;
+      goto cleanup;
     }
   }
 
   e = g95_convert_real(buffer, kind);
   e->where = *g95_current_locus();
+
+  g95_free(buffer);
+  buffer = NULL;
 
   switch(g95_check_real_range(e->value.real, kind)) {
     case ARITH_OK: break;
@@ -390,6 +408,7 @@ done:
   return MATCH_YES;
 
 cleanup:
+  if (buffer != NULL) g95_free(buffer);
   g95_free_expr(e);
   return MATCH_ERROR;
 }
@@ -451,12 +470,12 @@ int c;
  * generates errors too quickly. */
 
 static match match_string_constant(g95_expr **result) {
+char *p, name[G95_MAX_SYMBOL_LEN+1];
 int i, c, kind, length, delimiter;
 locus old_locus, start_locus;
 g95_symbol *sym;
 g95_expr *e;
 match m;
-char *p;
 
   old_locus = *g95_current_locus();
 
@@ -482,10 +501,11 @@ char *p;
   } else {
     g95_set_locus(&old_locus);
 
-    m = g95_match(" %s", &sym);
+    m = g95_match_name(name);
     if (m != MATCH_YES) goto no_match;
 
-    if (sym->attr.flavor != FL_PARAMETER) goto no_match;
+    if (g95_find_symbol(name, NULL, 1, &sym) || sym == NULL ||
+	sym->attr.flavor != FL_PARAMETER) goto no_match;
 
     kind = -1;
     c = g95_next_char();
@@ -672,12 +692,12 @@ error:
  * match_real_constant() are automatically created as floating point
  * numbers.  The messiness involved with making sure a decimal point
  * belongs to the number and not a trailing operator is not necessary
- * here (Hooray!). */
+ * here either (Hooray!). */
 
 static match match_const_complex_part(g95_expr **result) {
-char *p, c, exp_char, buffer[MAX_DOUBLE_CHARS+1];
 int kind, seen_digits, seen_dp, count;
-locus old_loc; 
+char *p, c, exp_char, *buffer;
+locus old_loc;
 
   old_loc = *g95_current_locus(); 
   g95_gobble_whitespace();
@@ -734,16 +754,12 @@ locus old_loc;
 done:
   if (!seen_digits) goto no_match;
 
-  if (count > MAX_DOUBLE_CHARS) {
-    g95_error("Real constant is more than " stringize(MAX_DOUBLE_CHARS)
-	      " characters long at %C");
-    return MATCH_ERROR;
-  }
-
 /* Convert the number */
 
   g95_set_locus(&old_loc);
   g95_gobble_whitespace();
+
+  buffer = g95_getmem(count+1);
 
   p = buffer;
   while(count>0) {
@@ -756,20 +772,19 @@ done:
   *p = '\0';
 
   kind = get_kind();
-  if (kind == -1) return MATCH_ERROR;
+  if (kind == -1) goto cleanup;
 
 /* If the number looked like an integer, forget about a kind we may
  * have seen, otherwise validate the kind against real kinds. */
 
   if (seen_dp == 0 && exp_char == ' ') {
     if (kind == -2) kind = g95_default_integer_kind();
-    *result = g95_convert_real(buffer, kind);
 
   } else {
     if (exp_char == 'd') {
       if (kind != -2) {
 	g95_error("Real number at %C has a 'd' exponent and an explicit kind");
-	return MATCH_ERROR;
+	goto cleanup;
       }
       kind = g95_default_double_kind();
       
@@ -779,16 +794,22 @@ done:
 
     if (g95_validate_kind(BT_REAL, kind) == -1) {
       g95_error("Invalid real kind %d at %C", kind);
-      return MATCH_ERROR;
+      goto cleanup;
     }
-    *result = g95_convert_real(buffer, kind);
   }
+
+  *result = g95_convert_real(buffer, kind);
+  g95_free(buffer);
 
   return MATCH_YES;
 
 no_match:
   g95_set_locus(&old_loc);
   return MATCH_NO;
+
+cleanup:
+  g95_free(buffer);
+  return MATCH_ERROR;
 }
 
 
