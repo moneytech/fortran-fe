@@ -308,52 +308,47 @@ g95_symbol *sym;
 /* g95_check_pointer_assign()-- Check that a pointer assignment is OK */
 
 try g95_check_pointer_assign(g95_expr *lvalue, g95_expr *rvalue) {
-int failure;  
-
-  failure = 0;
 
   if (lvalue->symbol->ts.type == BT_UNKNOWN) {
     g95_error("Pointer assignment target is not a POINTER at %L",
 	      &lvalue->where);
-    return FAILURE; /* Further checks are impossible and worthless 
-		       in this case */
+    return FAILURE;
   }
 
   if (lvalue->ts.type == BT_DERIVED && rvalue->ts.type == BT_DERIVED &&
       lvalue->ts.derived != rvalue->ts.derived) {
     g95_error("Incompatible derived types in pointer assignment at %L",
 	      &lvalue->where);
-    failure = 1 ;
+    return FAILURE;
   }
 
   if (lvalue->ts.type != rvalue->ts.type) {
     g95_error("Different types in pointer assignment at %L",
 	      &lvalue->where);
-    failure = 1; 
+    return FAILURE;
   }
 
   if (lvalue->ts.kind != rvalue->ts.kind) {
     g95_error("Different kind type parameters in pointer assignment at %L",
 	      &lvalue->where);
-    failure = 1; 
+    return FAILURE;
   }
 
   if (!lvalue->symbol->attr.pointer) {
     g95_error("Pointer assignment to non-POINTER at %L",
 	      &lvalue->where);
-    failure = 1; 
+    return FAILURE;
   }
 
   if (!lvalue->symbol->attr.target && !lvalue->symbol->attr.pointer) {
     g95_error("Pointer assignment target is neither TARGET nor POINTER at %L",
 	      &rvalue->where);
-    failure = 1;
+    return FAILURE;
   }
 
 /* TODO: further checks required */
-  g95_warning("Checks for pointer assignment are incomplete.");
 
-  if (failure) return FAILURE; 
+  g95_warning("Checks for pointer assignment are incomplete.");
 
   return SUCCESS;
 }

@@ -85,7 +85,7 @@ typedef enum { BT_UNKNOWN=1, BT_INTEGER, BT_REAL, BT_COMPLEX,
 /* Expression node types */
 
 typedef enum { EXPR_OP=1, EXPR_FUNCTION, EXPR_CONSTANT, EXPR_VARIABLE,
-	       EXPR_SUBSTRING, EXPR_STRUCTURE, EXPR_ARRAY
+	       EXPR_SUBSTRING, EXPR_STRUCTURE, EXPR_ARRAY, EXPR_NULL
 } expr_t;
 
 /* Intent types */
@@ -580,6 +580,7 @@ typedef struct g95_ref {
  * EXPR_CONSTANT   A scalar constant: Logical, String, Real, Int or Complex
  * EXPR_VARIABLE   An Lvalue with a root symbol and possible reference list
  *                 which expresses structure, array and substring refs.
+ * EXPR_NULL       The NULL pointer value (which also has a basic type).
  * EXPR_SUBSTRING  A substring of a constant string
  * EXPR_STRUCTURE  A structure constructor
  * EXPR_ARRAY      An array constructor
@@ -1167,6 +1168,7 @@ match g95_match_forall(g95_statement *);
 extern g95_symbol *g95_new_derived;
 extern g95_symbol *g95_new_block;
 
+match g95_match_null(g95_expr **);
 match g95_match_kind_spec(g95_typespec *);
 match g95_match_old_kind_spec(g95_typespec *);
 match g95_match_type_spec(g95_typespec *, int, int);

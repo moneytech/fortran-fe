@@ -262,6 +262,40 @@ g95_component *c;
 }
 
 
+/* g95_match_null()-- Match a 'NULL()', and possibly take care of some
+ * side effects. */
+
+match g95_match_null(g95_expr **result) {
+g95_symbol *sym;
+g95_expr *e;
+match m;
+
+  m = g95_match(" null ( )");
+  if (m != MATCH_YES) return m;
+
+  /* The NULL symbol now has to be/become an intrinsic function */
+
+  if (g95_get_symbol("null", NULL, 0, &sym)) {
+    g95_error("NULL() initialization at %C is ambiguous");
+    return MATCH_ERROR;
+  }
+
+  if (sym->attr.proc != PROC_INTRINSIC &&
+      (g95_add_procedure(&sym->attr, PROC_INTRINSIC, NULL) == FAILURE ||
+       g95_add_function(&sym->attr, NULL) == FAILURE))
+    return MATCH_ERROR;
+
+  e = g95_get_expr();
+  e->where = *g95_current_locus();
+  e->expr_type = EXPR_NULL;
+  e->ts.type = BT_UNKNOWN;
+
+  *result = e;
+
+  return MATCH_YES;
+}
+
+
 /* variable_decl()-- Match a variable name with an optional
  * initializer.  When this subroutine is called, a variable is
  * expected to be parsed next.  Depending on what is happening at the
@@ -315,11 +349,31 @@ try t;
  * Otherwise the statement is ambiguous with an assignment statement. */
 
   if (colon_seen) {
-    if (g95_match(" =>") == MATCH_YES)
-      g95_internal_error("variable_decl(): Not ready for pointer "
-			 "initializers yet");
+    if (g95_match(" =>") == MATCH_YES) {
 
-    if (g95_match(" =") == MATCH_YES) {
+      if (!current_attr.pointer) {
+	g95_error("Initialization at %C isn't for a pointer variable");
+	m = MATCH_ERROR;
+	goto cleanup;
+      }
+
+      m = g95_match_null(&initializer);
+      if (m == MATCH_NO) {
+	g95_error("Pointer initialization requires a NULL at %C");
+	m = MATCH_ERROR;
+      }
+
+      if (m != MATCH_YES) goto cleanup;
+
+      initializer->ts = current_ts;
+
+    } else if (g95_match(" =") == MATCH_YES) {
+      if (current_attr.pointer) {
+	g95_error("Pointer initialization at %C requires '=>', not '='");
+	m = MATCH_ERROR;
+	goto cleanup;
+      }
+
       m = g95_match_init_expr(&initializer);
       if (m == MATCH_NO)
 	g95_error("Expected an initialization expression at %C");

@@ -402,7 +402,7 @@ int kind;
 
 g95_expr *g95_simplify_anint(g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *result;
-int kind;
+int kind, cmp;
 
   kind = get_kind(k, "ANINT", e->ts.kind);
   if (kind == -1) return &g95_bad_expr;
@@ -411,31 +411,30 @@ int kind;
 
   rtrunc = g95_copy_expr(e);
 
-  if ( mpf_cmp_si(e->value.real,0) > 0 ) {
+  cmp = mpf_cmp_si(e->value.real, 0);
+
+  if (cmp > 0) {
     mpf_ceil(rtrunc->value.real,e->value.real);
-    }
-  else if ( mpf_cmp_si(e->value.real,0) < 0 ) {
+  } else if (cmp < 0) {
     mpf_floor(rtrunc->value.real,e->value.real);
-  }
-  else 
+  } else 
     mpf_set_si(rtrunc->value.real,0);
 
-  result=g95_real2real(rtrunc,kind);
-  if ( result == NULL ) {
+  result = g95_real2real(rtrunc,kind);
+  if (result == NULL) {
     g95_error("Result of ANINT() overflows its kind at %L", &e->where);
     g95_free_expr(rtrunc);
     return &g95_bad_expr;
   }
-  else {
-    g95_free_expr(rtrunc);
-    return range_check(result,"ANINT");
-  }
+
+  g95_free_expr(rtrunc);
+  return range_check(result,"ANINT");
 }
 
 
 g95_expr *g95_simplify_dnint(g95_expr *e) {
 g95_expr *rtrunc, *result;
-int kind;
+int kind, cmp;
 
   kind = e->ts.kind;
   if (kind != g95_default_double_kind()) {
@@ -447,25 +446,24 @@ int kind;
 
   rtrunc = g95_copy_expr(e);
 
-  if ( mpf_cmp_si(e->value.real,0) > 0 ) {
+  cmp = mpf_cmp_si(e->value.real, 0);
+
+  if (cmp > 0) {
     mpf_ceil(rtrunc->value.real,e->value.real);
-    }
-  else if ( mpf_cmp_si(e->value.real,0) < 0 ) {
+  } else if (cmp < 0 ) {
     mpf_floor(rtrunc->value.real,e->value.real);
-  }
-  else 
+  } else 
     mpf_set_si(rtrunc->value.real,0);
 
-  result=g95_real2real(rtrunc,kind);
-  if ( result == NULL ) {
+  result = g95_real2real(rtrunc,kind);
+  if (result == NULL) {
     g95_error("Result of DNINT() overflows its kind at %L", &e->where);
     g95_free_expr(rtrunc);
     return &g95_bad_expr;
   }
-  else {
-    g95_free_expr(rtrunc);
-    return range_check(result,"DNINT");
-  }
+
+  g95_free_expr(rtrunc);
+  return range_check(result, "DNINT");
 }
 
 
@@ -490,12 +488,14 @@ g95_expr *g95_simplify_atan2(g95_expr *y, g95_expr *x) {
   return NULL;
 
   /* Evaluation of transcendentals not implemented yet 
-  if ( x == NULL ) {
+  if (x == NULL) {
     g95_error("Second argument of ATAN2 missing at %L", &x->where);
     return &g95_bad_expr;
   }
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL; 
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL; 
+
   if (x->ts.kind != y->ts.kind) {
     g95_error("KIND of arguments of ATAN2 at %L must agree", &x->where);
     return &g95_bad_expr;
@@ -542,8 +542,8 @@ int kind;
   
   ceil = g95_copy_expr(e);
   mpf_ceil(ceil->value.real, e->value.real);
-  result=g95_real2int(ceil, kind);
 
+  result = g95_real2int(ceil, kind);
   g95_free_expr(ceil);
 
   return range_check(result, "CEILING");
@@ -600,56 +600,61 @@ int kind;
   if (kind == -1) return &g95_bad_expr;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL; 
-  if ( y!= NULL && y->expr_type != EXPR_CONSTANT) return NULL; 
+  if (y != NULL && y->expr_type != EXPR_CONSTANT) return NULL; 
 
   if (y == NULL) {
-  switch (x->ts.type) {
-	case BT_COMPLEX:
-	      result = g95_complex2complex(x,kind); 
-              return result;
-	case BT_INTEGER:
-	      result = g95_int2complex(x,kind);
-              return result;
-	case BT_REAL:
-	      result = g95_real2complex(x, kind);
-              return result;
-	default :
-	      g95_error("Argument of CMPLX at %L is not a valid type",
-			      &x->where);
-	      return &g95_bad_expr;
-  }
-  }
-  else {
-  switch (x->ts.type) {
-	case BT_COMPLEX:
-      	      g95_error("CMPLX at %L cannot take two arguments if the first is complex",
-  	 	  &x->where);
-              return &g95_bad_expr;
-	case BT_INTEGER:
-	      result = g95_constant_result(BT_COMPLEX, kind);
-  	      result->where = x->where;
-	      mpf_set_z(result->value.complex.r, x->value.integer);
-	      if ( y->ts.type == BT_INTEGER ) 
-      	        mpf_set_z(result->value.complex.i, y->value.integer);
-	      if ( y->ts.type == BT_REAL )
-      	        mpf_set(result->value.complex.i, y->value.real);
-              return result;
-	case BT_REAL:
-	      result = g95_constant_result(BT_COMPLEX, kind);
-  	      result->where = x->where;
-	      mpf_set(result->value.complex.r, x->value.real);
-	      if ( y->ts.type == BT_INTEGER ) 
-      	        mpf_set_z(result->value.complex.i, y->value.integer);
-	      if (y->ts.type == BT_REAL )
-      	        mpf_set(result->value.complex.i, y->value.real);
-              return result;
-	default :
-	      g95_error("Argument of CMPLX at %L is not a valid type",
-			      &x->where);
-	      return &g95_bad_expr;
-  }
+    switch (x->ts.type) {
+    case BT_COMPLEX:
+      return g95_complex2complex(x, kind);
+
+    case BT_INTEGER:
+      return g95_int2complex(x, kind);
+
+    case BT_REAL:
+      return g95_real2complex(x, kind);
+
+    default:
+      g95_error("Argument of CMPLX at %L is not a valid type", &x->where);
+      return &g95_bad_expr;
+    }
   }
 
+  switch (x->ts.type) {
+  case BT_COMPLEX:
+    g95_error("CMPLX at %L cannot take two arguments if the first is complex",
+	      &x->where);
+    return &g95_bad_expr;
+
+  case BT_INTEGER:
+    result = g95_constant_result(BT_COMPLEX, kind);
+    result->where = x->where;
+    mpf_set_z(result->value.complex.r, x->value.integer);
+
+    if (y->ts.type == BT_INTEGER)
+      mpf_set_z(result->value.complex.i, y->value.integer);
+
+    if (y->ts.type == BT_REAL)
+      mpf_set(result->value.complex.i, y->value.real);
+
+    return result;
+
+  case BT_REAL:
+    result = g95_constant_result(BT_COMPLEX, kind);
+    result->where = x->where;
+    mpf_set(result->value.complex.r, x->value.real);
+
+    if (y->ts.type == BT_INTEGER)
+      mpf_set_z(result->value.complex.i, y->value.integer);
+
+    if (y->ts.type == BT_REAL)
+      mpf_set(result->value.complex.i, y->value.real);
+
+    return result;
+
+  default:
+    g95_error("Argument of CMPLX at %L is not a valid type", &x->where);
+    return &g95_bad_expr;
+  }
 }
 
 
@@ -686,19 +691,21 @@ g95_expr *result;
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   switch (e->ts.type) {
-	  case BT_INTEGER:
-		  result = g95_int2real(e, g95_default_double_kind());
-		  break;
-	  case BT_REAL:
-	          result = g95_real2real(e, g95_default_double_kind());
-		  break;
-	  case BT_COMPLEX:
-		  result = g95_complex2real(e, g95_default_double_kind());
-		  break;
-	  default:
-	          g95_error("Argument of DBLE at %L is not a valid type",
-			      &e->where);
-		  return &g95_bad_expr;
+  case BT_INTEGER:
+    result = g95_int2real(e, g95_default_double_kind());
+    break;
+
+  case BT_REAL:
+    result = g95_real2real(e, g95_default_double_kind());
+    break;
+
+  case BT_COMPLEX:
+    result = g95_complex2real(e, g95_default_double_kind());
+    break;
+
+  default:
+    g95_error("Argument of DBLE at %L is not a valid type", &e->where);
+    return &g95_bad_expr;
   }
 
   return range_check(result, "DBLE");
@@ -733,9 +740,10 @@ int i, digits;
 g95_expr *g95_simplify_dim(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL;
 
-  if ( y == NULL ) {
+  if (y == NULL) {
     g95_error("Second argument of DIM missing at %L", &x->where);
     return &g95_bad_expr;
   }
@@ -772,7 +780,8 @@ g95_expr *g95_simplify_dprod(g95_expr *x, g95_expr *y) {
 g95_expr *mult1, *mult2, *result;
 int kx, ky;
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT) return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL;
 
   if (y == NULL) {
     g95_error("Second argument of DPROD missing at %L", &x->where);
@@ -781,9 +790,10 @@ int kx, ky;
 
   kx = g95_validate_kind(x->ts.type, x->ts.kind);
   ky = g95_validate_kind(y->ts.type, y->ts.kind);
-  if ( kx != g95_default_real_kind() || ky != g95_default_real_kind() ) {
+  if (kx != g95_default_real_kind() || ky != g95_default_real_kind()) {
     g95_error("Arguments of DPROD at %L must be of default real kind",
 	      x->where);
+    return &g95_bad_expr;
   }
 
   result = g95_constant_result(BT_REAL, g95_default_double_kind());
@@ -849,32 +859,32 @@ g95_expr *result;
 
 
 g95_expr *g95_simplify_exponent(g95_expr *x) {
-g95_expr *result;
 mpf_t i2, absv, ln2, lnx;
+g95_expr *result;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-  result=g95_constant_result(BT_INTEGER,g95_default_integer_kind());
+  result=g95_constant_result(BT_INTEGER, g95_default_integer_kind());
   result->where = x->where;
 
   if (mpf_cmp(x->value.real,mpf_zero) == 0) {
-    mpz_set_ui(result->value.integer,0);
+    mpz_set_ui(result->value.integer, 0);
     return result;
   }
 
-  mpf_init_set_ui(i2,2);
+  mpf_init_set_ui(i2, 2);
   mpf_init(absv);
   mpf_init(ln2);
   mpf_init(lnx);
 
-  natural_logarithm(&i2,&ln2);
+  natural_logarithm(&i2, &ln2);
 
-  mpf_abs(absv,x->value.real);
-  natural_logarithm(&absv,&lnx);
+  mpf_abs(absv, x->value.real);
+  natural_logarithm(&absv, &lnx);
 
-  mpf_div(lnx,lnx,ln2);
-  mpf_trunc(lnx,lnx);
-  mpf_add_ui(lnx,lnx,1);
+  mpf_div(lnx, lnx, ln2);
+  mpf_trunc(lnx, lnx);
+  mpf_add_ui(lnx, lnx, 1);
   mpz_set_f(result->value.integer,lnx);
 
   mpf_clear(i2);
@@ -883,7 +893,6 @@ mpf_t i2, absv, ln2, lnx;
   mpf_clear(absv);
 
   return range_check(result,"EXPONENT");
-
 }
 
 
@@ -916,7 +925,6 @@ int kind;
   g95_free_expr(floor);
 
   return range_check(result, "FLOOR");
-
 }
 
 
@@ -927,33 +935,33 @@ unsigned long exp2;
 
   if (x->expr_type != EXPR_CONSTANT) return NULL;
 
-  result=g95_constant_result(BT_REAL,x->ts.kind);
+  result = g95_constant_result(BT_REAL, x->ts.kind);
   result->where = x->where;
 
-  if (mpf_cmp(x->value.real,mpf_zero) == 0) {
-    mpf_set(result->value.real,mpf_zero);
+  if (mpf_cmp(x->value.real, mpf_zero) == 0) {
+    mpf_set(result->value.real, mpf_zero);
     return result;
   }
 
-  mpf_init_set_ui(i2,2);
+  mpf_init_set_ui(i2, 2);
   mpf_init(absv);
   mpf_init(ln2);
   mpf_init(lnx);
   mpf_init(pow2);
 
-  natural_logarithm(&i2,&ln2);
+  natural_logarithm(&i2, &ln2);
 
-  mpf_abs(absv,x->value.real);
-  natural_logarithm(&absv,&lnx);
+  mpf_abs(absv, x->value.real);
+  natural_logarithm(&absv, &lnx);
 
-  mpf_div(lnx,lnx,ln2);
-  mpf_trunc(lnx,lnx);
-  mpf_add_ui(lnx,lnx,1);
+  mpf_div(lnx, lnx, ln2);
+  mpf_trunc(lnx, lnx);
+  mpf_add_ui(lnx, lnx, 1);
 
   exp2 = (unsigned long) mpf_get_d(lnx);
-  mpf_pow_ui(pow2,i2,exp2);
+  mpf_pow_ui(pow2, i2, exp2);
 
-  mpf_div(result->value.real,absv,pow2);
+  mpf_div(result->value.real, absv, pow2);
 
   mpf_clear(i2);
   mpf_clear(ln2);
@@ -962,7 +970,6 @@ unsigned long exp2;
   mpf_clear(pow2);
 
   return range_check(result,"FRACTION");
-
 }
 
 
@@ -1001,7 +1008,7 @@ char c;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  if (e->value.character.length != 1 ) {
+  if (e->value.character.length != 1) {
     g95_error("Argument of IACHAR at %L must be of length one", &e->where);
     return &g95_bad_expr;
   }
@@ -1010,57 +1017,55 @@ char c;
 
   c = e->value.character.string[0];
 
-  if ( iscntrl(c) ) {
-    if ( c == '\?' ) index = 127;
+  if (iscntrl(c)) {
+    if (c == '\?')
+      index = 127;
     else {
-      for ( i=0; i<=31; ++i ) {
-	if ( c == ascii_table[i] ) index = i;
+      for(i=0; i<=31; i++) {
+	if (c == ascii_table[i])
+	  index = i;
 	else {
-	  g95_error("Argument of IACHAR at %L cannot be represented by this processor or is not implemented", e->where);
+	  g95_error("Argument of IACHAR at %L cannot be represented by "
+		    "this processor or is not implemented", &e->where);
 	  return &g95_bad_expr;
 	}
       }
     }
-  }
-  else if ( isspace(c) ) index = 32;
-  else if ( ispunct(c) ) {
-    for ( i=33; i<=47; ++i ) { 
-      if ( c == ascii_table[i] ) index = i;
-    }
-    for ( i=58; i<=64; ++i ) { 
-      if ( c == ascii_table[i] ) index = i;
-    }
-    for ( i=91; i<=96; ++i ) { 
-      if ( c == ascii_table[i] ) index = i;
-    }
-    for ( i=123; i<=126; ++i ) { 
-      if ( c == ascii_table[i] ) index = i;
-    }
-  }
-  else if ( isdigit(c) ) {
-    for ( i=48; i<=57; ++i ) {
-      if ( c == ascii_table[i] ) index = i;
-    }
-  }
-  else if ( isupper(c) ) {
-    for ( i=65; i<=90; ++i ) {
-      if ( c == ascii_table[i] ) index = i;
-    }
-  }
-  else if ( islower(c) ) {
-    for ( i=97; i<=122; ++i ) {
-      if ( c == ascii_table[i] ) index = i;
-    }
-  }
-  else {
-    g95_error("Argument of IACHAR at %L cannot be represented by this processor", e->where);
+  } else if (isspace(c))
+    index = 32;
+  else if (ispunct(c)) {
+    for(i=33; i<=47; i++)
+      if (c == ascii_table[i]) index = i;
+
+    for(i=58; i<=64; i++)
+      if (c == ascii_table[i]) index = i;
+
+    for(i=91; i<=96; i++)
+      if (c == ascii_table[i]) index = i;
+
+    for (i=123; i<=126; i++)
+      if (c == ascii_table[i]) index = i;
+    
+  } else if (isdigit(c)) {
+    for(i=48; i<=57; i++)
+      if (c == ascii_table[i]) index = i;
+  } else if (isupper(c)) {
+    for(i=65; i<=90; i++)
+      if (c == ascii_table[i]) index = i;
+  } else if (islower(c)) {
+    for(i=97; i<=122; i++)
+      if (c == ascii_table[i]) index = i;
+
+  } else {
+    g95_error("Argument of IACHAR at %L cannot be represented by this "
+	      "processor", e->where);
     return &g95_bad_expr;
   }
 /* End of lookup */
 
-
-  if ( index < CHAR_MIN || index > CHAR_MAX ) {
-    g95_error("Argument of IACHAR at %L out of range of this processor", &e->where);
+  if (index < CHAR_MIN || index > CHAR_MAX) {
+    g95_error("Argument of IACHAR at %L out of range of this processor",
+	      &e->where);
     return &g95_bad_expr;
   }
 
@@ -1075,20 +1080,15 @@ char c;
 g95_expr *g95_simplify_iand(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 
-  if (x->ts.kind != y->ts.kind) {
-    g95_error("KIND of arguments of IAND at %L must agree", &x->where);
-    return &g95_bad_expr;
-  }
-
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL;
 
   result = g95_constant_result(BT_REAL, x->ts.kind);
   result->where = x->where;
 
   mpz_and(result->value.integer, x->value.integer, y->value.integer);
 
-  return range_check(result,"IAND");
-
+  return result;
 }
 
 
@@ -1096,25 +1096,26 @@ g95_expr *g95_simplify_ibclr(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 int k, pos;
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL;
 
   result = g95_copy_expr(x);
   result->where = x->where;
 
-  if (g95_extract_int(y, &pos) != NULL || pos < 0 ) {
+  if (g95_extract_int(y, &pos) != NULL || pos < 0) {
     g95_error("Invalid second argument of IBCLR at %L", &y->where);
     return &g95_bad_expr;
   }
 
   k = g95_validate_kind(BT_INTEGER, x->ts.kind);
 
-  if ( pos > g95_integer_kinds[k].bit_size ) {
+  if (pos > g95_integer_kinds[k].bit_size) {
     g95_error("Second argument of IBCLR exceeds bit size at %L", &y->where);
     return &g95_bad_expr;
   }
 
   mpz_clrbit(result->value.integer,pos);
-  return range_check(result,"IBCLR");
+  return result;
 }
 
 
@@ -1124,18 +1125,18 @@ int pos, len;
 int i, k, bitsize;
 int *bits;
 
-   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT ||  
-		   z->expr_type != EXPR_CONSTANT ) return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT ||  
+      z->expr_type != EXPR_CONSTANT) return NULL;
 
   result = g95_constant_result(BT_INTEGER, x->ts.kind);
   result->where = x->where;
 
-  if (g95_extract_int(y, &pos) != NULL || pos < 0 ) {
+  if (g95_extract_int(y, &pos) != NULL || pos < 0) {
     g95_error("Invalid second argument of IBITS at %L", &y->where);
     return &g95_bad_expr;
   }
 
-  if (g95_extract_int(z, &len) != NULL || len < 0 ) {
+  if (g95_extract_int(z, &len) != NULL || len < 0) {
     g95_error("Invalid third argument of IBITS at %L", &z->where);
     return &g95_bad_expr;
   }
@@ -1144,30 +1145,26 @@ int *bits;
 
   bitsize = g95_integer_kinds[k].bit_size;
 
-  if ( pos+len > bitsize ) {
-    g95_error("Sum of second and third arguments of IBITS exceeds bit size at %L", 
-		    &y->where);
+  if (pos+len > bitsize) {
+    g95_error("Sum of second and third arguments of IBITS exceeds bit size "
+	      "at %L", &y->where);
     return &g95_bad_expr;
   }
 
   bits = g95_getmem(bitsize*sizeof(int));
 
-  for ( i=0; i<bitsize; ++i ) {
+  for(i=0; i<bitsize; i++)
     bits[i] = 0;
-  }
 
-  for ( i=0; i<len; ++i ) {
+  for(i=0; i<len; i++)
     bits[i] = mpz_tstbit(x->value.integer,i+pos);
-  }
 
-  for ( i=0; i<bitsize; ++i ) {
-    if ( bits[i] == 0 ) {
+  for(i=0; i<bitsize; i++) {
+    if (bits[i] == 0) {
       mpz_clrbit(result->value.integer,i);
-    }
-    else if ( bits[i] == 1) {
+    } else if (bits[i] == 1) {
       mpz_setbit(result->value.integer,i);
-    }
-    else {
+    } else {
       g95_internal_error("IBITS: Bad bit");
     }
   }
@@ -1175,7 +1172,6 @@ int *bits;
   g95_free(bits);
 
   return range_check(result,"IBITS");
-
 }
 
 
@@ -1183,23 +1179,24 @@ g95_expr *g95_simplify_ibset(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 int k, pos;
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL;
 
   result = g95_copy_expr(x);
 
-  if (g95_extract_int(y, &pos) != NULL || pos < 0 ) {
+  if (g95_extract_int(y, &pos) != NULL || pos < 0) {
     g95_error("Invalid second argument of IBSET at %L", &y->where);
     return &g95_bad_expr;
   }
 
   k = g95_validate_kind(BT_INTEGER, x->ts.kind);
 
-  if ( pos > g95_integer_kinds[k].bit_size ) {
+  if (pos > g95_integer_kinds[k].bit_size) {
     g95_error("Second argument of IBSET exceeds bit size at %L", &y->where);
     return &g95_bad_expr;
   }
 
-  mpz_setbit(result->value.integer,pos);
+  mpz_setbit(result->value.integer, pos);
   return range_check(result,"IBSET");
 }
 
@@ -1237,14 +1234,15 @@ g95_expr *result;
     return &g95_bad_expr;
   }
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL;
 
   result = g95_constant_result(BT_INTEGER, x->ts.kind);
   result->where = x->where;
 
   mpz_xor(result->value.integer, x->value.integer, y->value.integer);
 
-  return range_check(result,"IEOR");
+  return range_check(result, "IEOR");
 }
 
 
@@ -1261,13 +1259,15 @@ int i, j, k, count, index, start;
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  
     return NULL;
 
-  if ( b != NULL && b->ts.type != BT_LOGICAL) {
+  if (b != NULL && b->ts.type != BT_LOGICAL) {
     g95_error("Optional argument of INDEX at %L must be logical", &b->where);
     return &g95_bad_expr;
   }
 
-  if ( b != NULL && b->value.logical != 0  ) back = 1;
-  else back = 0;
+  if (b != NULL && b->value.logical != 0)
+    back = 1;
+  else
+    back = 0;
 
   result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
   result->where = x->where;
@@ -1275,42 +1275,38 @@ int i, j, k, count, index, start;
   len    = x->value.character.length;
   lensub = y->value.character.length;
 
-  if ( len < lensub ) {
+  if (len < lensub) {
     mpz_set_si(result->value.integer,0);
     return result;
   }
 
-  if ( back == 0  ) {
+  if (back == 0) {
 
     if (lensub == 0) {
       mpz_set_si(result->value.integer,1);
       return result;
-    }
-
-    else if (lensub == 1) {
-      for ( i=0; i<len; ++i ) {
-        for ( j=0; j<lensub; ++j ) {
-    	  if ( y->value.character.string[j] == x->value.character.string[i] ) {
+    } else if (lensub == 1) {
+      for(i=0; i<len; i++) {
+        for(j=0; j<lensub; j++) {
+    	  if (y->value.character.string[j] == x->value.character.string[i]) {
 	    index = i+1;
 	    goto done;
 	  }
 	}
       }
-    }
-
-    else {
+    } else {
       index = 0;
-      for ( i=0; i<len; ++i ) {
-        for ( j=0; j<lensub; ++j ) {
-	  if (y->value.character.string[j] == x->value.character.string[i] ) {
+      for(i=0; i<len; i++) {
+        for(j=0; j<lensub; j++) {
+	  if (y->value.character.string[j] == x->value.character.string[i]) {
 	    start = i;
 	    count = 0;
-	    for (k=0; k<lensub; ++k) {
+
+	    for(k=0; k<lensub; k++) {
     	      if (y->value.character.string[k] ==
-			      x->value.character.string[k+start] ) {
-		  ++count;
-	      }
+		  x->value.character.string[k+start]) count++;
 	    }
+
 	    if (count == lensub ) {
 	      index = start+1;
 	      goto done;
@@ -1319,47 +1315,39 @@ int i, j, k, count, index, start;
 	}
       }
     }
-  }
-
-  else {
-
+  } else {
     if (lensub == 0) {
       mpz_set_si(result->value.integer,len+1);
       return result;
     }
 
     else if (lensub == 1) {
-      for ( i=index; i<len; ++i ) {
-        for ( j=0; j<lensub; ++j ) {
+      for(i=index; i<len; i++) {
+        for(j=0; j<lensub; j++) {
 	  if (y->value.character.string[j]==x->value.character.string[len-i]) {
 	    index = len-i+1;
 	    goto done;
 	  }
 	}
       }
-    }
-
-    else {
+    } else {
 
       index = 0;
-      for ( i=0; i<len; ++i ) {
-        for ( j=0; j<lensub; ++j ) {
+      for(i=0; i<len; i++) {
+        for(j=0; j<lensub; j++) {
 	  if (y->value.character.string[j]==x->value.character.string[len-i]) {
 	    start = len-i;
-	    if ( start <= len-lensub ) {
+	    if (start <= len-lensub) {
 	      count = 0;
-	      for (k=0; k<lensub; ++k) {
+	      for(k=0; k<lensub; k++)
     	        if (y->value.character.string[k] ==
-			      x->value.character.string[k+start] ) {
-	  	  ++count;
-	        }
-	      }
+		    x->value.character.string[k+start]) count++;
+
 	      if (count == lensub ) {
 	        index = start+1;
 	        goto done;
 	      }
-	    }
-	    else {
+	    } else {
 	      continue;
 	    }
 	  }
@@ -1369,9 +1357,8 @@ int i, j, k, count, index, start;
   }
 
 done:
-    mpz_set_si(result->value.integer,index);
-    return result;
-
+  mpz_set_si(result->value.integer,index);
+  return result;
 }
 
 
@@ -1384,29 +1371,32 @@ int kind;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  switch ( e->ts.type ) {
-          case BT_INTEGER:
-  		result = g95_int2int(e, kind);
-		return range_check(result,"INT");
-          case BT_REAL:
-                rtrunc = g95_copy_expr(e);
-		mpf_trunc(rtrunc->value.real, e->value.real);
-                result = g95_real2int(rtrunc, kind);
-                g95_free_expr(rtrunc);
-		return range_check(result,"INT");
-          case BT_COMPLEX:
-  		rpart = g95_complex2real(e, kind);
-                rtrunc = g95_copy_expr(rpart);
-		mpf_trunc(rtrunc->value.real, rpart->value.real);
-                result = g95_real2int(rtrunc, kind);
-                g95_free_expr(rtrunc);
-		return range_check(result,"INT");
-	  default:
-	        g95_error("Argument of INT at %L is not a valid type",
-			      &e->where);
-		return &g95_bad_expr;
+  switch(e->ts.type) {
+  case BT_INTEGER:
+    result = g95_int2int(e, kind);
+    break;
+
+  case BT_REAL:
+    rtrunc = g95_copy_expr(e);
+    mpf_trunc(rtrunc->value.real, e->value.real);
+    result = g95_real2int(rtrunc, kind);
+    g95_free_expr(rtrunc);
+    break;
+
+  case BT_COMPLEX:
+    rpart = g95_complex2real(e, kind);
+    rtrunc = g95_copy_expr(rpart);
+    mpf_trunc(rtrunc->value.real, rpart->value.real);
+    result = g95_real2int(rtrunc, kind);
+    g95_free_expr(rtrunc);
+    break;
+
+  default:
+    g95_error("Argument of INT at %L is not a valid type", &e->where);
+    return &g95_bad_expr;
   }
 
+  return range_check(result,"INT");
 }
 
 
@@ -1425,9 +1415,9 @@ int kind;
   rtrunc = g95_copy_expr(e);
   mpf_trunc(rtrunc->value.real, e->value.real);
   result = g95_real2int(rtrunc, kind);
+
   g95_free_expr(rtrunc);
   return range_check(result,"IFIX");
-
 }
 
 
@@ -1446,9 +1436,9 @@ int kind;
   rtrunc = g95_copy_expr(e);
   mpf_trunc(rtrunc->value.real, e->value.real);
   result = g95_real2int(rtrunc, kind);
+
   g95_free_expr(rtrunc);
   return range_check(result,"IDINT");
-
 }
 
 
@@ -1460,7 +1450,8 @@ g95_expr *result;
     return &g95_bad_expr;
   }
 
-  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  return NULL;
+  if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)
+    return NULL;
 
   if (x->ts.type != BT_INTEGER || x->ts.type != BT_INTEGER) {
     g95_error("Arguments of IEOR at %L must be integer", &x->where);
@@ -1471,16 +1462,14 @@ g95_expr *result;
   result->where = x->where;
 
   mpz_ior(result->value.integer, x->value.integer, y->value.integer);
-
   return range_check(result,"IOR");
 }
 
 
 g95_expr *g95_simplify_ishft(g95_expr *e, g95_expr *s) {
+int shift, isize, k;
 g95_expr *result;
-int shift;
-int isize, k;
-long e_int, new_int;
+long e_int;
 
   if (e->expr_type != EXPR_CONSTANT || s->expr_type != EXPR_CONSTANT)  
     return NULL;
@@ -1491,10 +1480,9 @@ long e_int, new_int;
   }
 
   k = g95_validate_kind(BT_INTEGER, e->ts.kind);
-
   isize = g95_integer_kinds[k].bit_size;
 
-  if ( shift > isize ) {
+  if (shift > isize) {
     g95_error("Second argument of ISHFT exceeds bit size at %L", &s->where);
     return &g95_bad_expr;
   }
@@ -1509,90 +1497,83 @@ long e_int, new_int;
     return &g95_bad_expr;
   }
 
-  if (shift > 0) {
-    new_int = e_int << shift;
-    mpz_set_si(result->value.integer, new_int);
-    return range_check(result,"ISHFT");
-  }
+  if (shift > 0)
+    mpz_set_si(result->value.integer, e_int << shift);
+  else
+    mpz_set_si(result->value.integer, e_int >> shift);
 
-  new_int = e_int >> shift;
-  mpz_set_si(result->value.integer, new_int);
-  return range_check(result,"ISHFT");
+  return range_check(result, "ISHFT");
 }
 
 
 g95_expr *g95_simplify_ishftc(g95_expr *e, g95_expr *s, g95_expr *sz) {
 g95_expr *result;
 int shift, isize, delta, k;
-int i;
-int *bits;
+int i, *bits;
 
   if (e->expr_type != EXPR_CONSTANT || s->expr_type != EXPR_CONSTANT)  
     return NULL;
 
-  if (g95_extract_int(s, &shift) != NULL || shift < 0 ) {
+  if (g95_extract_int(s, &shift) != NULL || shift < 0) {
     g95_error("Invalid second argument of ISHFTC at %L", &s->where);
     return &g95_bad_expr;
   }
 
   k = g95_validate_kind(BT_INTEGER, e->ts.kind);
 
-  if (sz !=NULL ) {
-    if (g95_extract_int(sz, &isize) != NULL || isize < 0 ) {
+  if (sz !=NULL) {
+    if (g95_extract_int(sz, &isize) != NULL || isize < 0) {
       g95_error("Invalid third argument of ISHFTC at %L", &sz->where);
       return &g95_bad_expr;
     }
-  }
-  else
+  } else
     isize = g95_integer_kinds[k].bit_size;
 
-  if ( shift > isize ) {
+  if (shift > isize) {
     g95_error("Second argument of ISHFTC exceeds bit size at %L", &s->where);
     return &g95_bad_expr;
   }
 
   result = g95_copy_expr(e);
 
-  if ( shift == 0 ) {
-    return result;
-  }
+  if (shift == 0) return result;
 
   bits = g95_getmem(isize*sizeof(int));
 
-  for ( i=0; i<isize; ++i ) {
+  for(i=0; i<isize; i++)
     bits[i] = mpz_tstbit(e->value.integer,i);
-  }
 
   delta = isize-shift;
 
-  if (shift == 0 ) {
+  if (shift == 0)
     return result;
-  }
-  else if ( shift > 0 ) {
-    for ( i=0; i<delta; ++i ) {
-      if ( bits[i] == 0 ) mpz_clrbit(result->value.integer, i+shift);
-      if ( bits[i] == 1)  mpz_setbit(result->value.integer, i+shift);
+  else if (shift > 0) {
+    for(i=0; i<delta; i++) {
+      if (bits[i] == 0) mpz_clrbit(result->value.integer, i+shift);
+      if (bits[i] == 1) mpz_setbit(result->value.integer, i+shift);
     }
-    for ( i=delta; i<isize; ++i ) {
-      if ( bits[i] == 0 ) mpz_clrbit(result->value.integer, i-delta);
-      if ( bits[i] == 1 ) mpz_setbit(result->value.integer, i-delta);
+
+    for(i=delta; i<isize; i++) {
+      if (bits[i] == 0) mpz_clrbit(result->value.integer, i-delta);
+      if (bits[i] == 1) mpz_setbit(result->value.integer, i-delta);
     }
+
     return range_check(result,"ISHFTC");
-  }
-  else {
-    for ( i=shift; i<isize; ++i ) {
-      if ( bits[i] == 0 ) mpz_clrbit(result->value.integer, i-shift);
-      if ( bits[i] == 1 ) mpz_setbit(result->value.integer, i-shift);
+  } else {
+    for(i=shift; i<isize; i++) {
+      if (bits[i] == 0) mpz_clrbit(result->value.integer, i-shift);
+      if (bits[i] == 1) mpz_setbit(result->value.integer, i-shift);
     }
-    for ( i=0; i<shift; ++i) {
-      if ( bits[i] == 0 ) mpz_clrbit(result->value.integer, i+delta);
-      if ( bits[i] == 1 ) mpz_setbit(result->value.integer, i+delta);
+
+    for(i=0; i<shift; i++) {
+      if (bits[i] == 0) mpz_clrbit(result->value.integer, i+delta);
+      if (bits[i] == 1) mpz_setbit(result->value.integer, i+delta);
     }
-    return range_check(result,"ISHFTC");
+
+    return range_check(result, "ISHFTC");
   }
 
   g95_free(bits);
-
 }
 
 
@@ -1615,15 +1596,14 @@ g95_expr *result;
   result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
   result->where = e->where;
 
-  mpz_set_si(result->value.integer,e->value.character.length);
+  mpz_set_si(result->value.integer, e->value.character.length);
   return result;
 }
 
 
 g95_expr *g95_simplify_len_trim(g95_expr *e) {
 g95_expr *result;
-int count, len, lentrim;
-int i;
+int count, len, lentrim, i;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
@@ -1632,16 +1612,16 @@ int i;
 
   len = e->value.character.length;
 
-  for (count=0, i=1; i<=len; ++i) {
-    if (e->value.character.string[len-i] == ' ') ++count;
-    else break; 
-  }
+  for(count=0, i=1; i<=len; i++)
+    if (e->value.character.string[len-i] == ' ')
+      count++;
+    else
+      break; 
 
   lentrim = len-count;
 
-  mpz_set_si(result->value.integer,lentrim);
+  mpz_set_si(result->value.integer, lentrim);
   return result;
-
 }
 
 /* FIXME */
@@ -1654,15 +1634,15 @@ int tv;
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0 ) {
+  if (a->value.character.length == 0 && b->value.character.length == 0)
     return g95_logical_expr( 1, &a->where);
-  }
 
-  if ( strcmp(a->value.character.string, b->value.character.string) >= 0 ) 
+  if (strcmp(a->value.character.string, b->value.character.string) >= 0) 
     tv = 1;
-  else tv = 0;
+  else
+    tv = 0;
 
-  return g95_logical_expr( tv, &a->where);
+  return g95_logical_expr(tv, &a->where);
 }
 
 
@@ -1672,9 +1652,8 @@ int tv;
   if (a->expr_type != EXPR_CONSTANT || b->expr_type != EXPR_CONSTANT)
     return NULL;
 
-  if (a->value.character.length == 0 && b->value.character.length == 0) {
+  if (a->value.character.length == 0 && b->value.character.length == 0)
     return g95_logical_expr( 0, &a->where);
-  }
 
   if (strcmp(a->value.character.string, b->value.character.string) > 0)
     tv = 1;
@@ -1699,7 +1678,7 @@ int tv;
   else
     tv = 0;
 
-  return g95_logical_expr( tv, &a->where);
+  return g95_logical_expr(tv, &a->where);
 }
 
 
@@ -1710,14 +1689,14 @@ int tv;
     return NULL;
 
   if (a->value.character.length == 0 && b->value.character.length == 0)
-    return g95_logical_expr( 0, &a->where);
+    return g95_logical_expr(0, &a->where);
 
   if (strcmp(a->value.character.string, b->value.character.string) < 0)
     tv = 1;
   else
     tv = 0;
 
-  return g95_logical_expr( tv, &a->where);
+  return g95_logical_expr(tv, &a->where);
 }
 
 
@@ -1733,45 +1712,47 @@ mpf_t ri;
   switch(x->ts.type) {
   case BT_INTEGER:
     if (g95_option.pedantic == 1) 
-    g95_warning("Integer initialization constant to LOG at %L is nonstandard",
-                 &x->where);
-    if ( mpz_cmp(x->value.integer, mpz_zero) <= 0 ) {
-    g95_error("Argument of LOG at %L cannot be less than or equal to zero",
-                  &x->where);
-    return &g95_bad_expr;
-    }
-    mpf_init(ri);
-    mpf_set_z(ri,x->value.integer);
+      g95_warning("Integer initialization constant to LOG at %L is "
+		  "nonstandard", &x->where);
 
-    natural_logarithm(&ri,&result->value.real);
+    if (mpz_cmp(x->value.integer, mpz_zero) <= 0) {
+      g95_error("Argument of LOG at %L cannot be less than or equal to zero",
+		&x->where);
+      return &g95_bad_expr;
+    }
+
+    mpf_init(ri);
+    mpf_set_z(ri, x->value.integer);
+
+    natural_logarithm(&ri, &result->value.real);
     break;
 
   case BT_REAL:
-    if ( mpf_cmp(x->value.real, mpf_zero) <= 0 ) {
+    if (mpf_cmp(x->value.real, mpf_zero) <= 0) {
       g95_error("Argument of LOG at %L cannot be less than or equal to zero",
-                  &x->where);
+		&x->where);
       return &g95_bad_expr;
     }
 
-    natural_logarithm(&x->value.real,&result->value.real);
+    natural_logarithm(&x->value.real, &result->value.real);
     break;
 
   case BT_COMPLEX:
-    if ( (mpf_cmp(x->value.complex.r, mpf_zero) == 0) &&
-         (mpf_cmp(x->value.complex.i, mpf_zero) == 0) ) {
+    if ((mpf_cmp(x->value.complex.r, mpf_zero) == 0) &&
+	(mpf_cmp(x->value.complex.i, mpf_zero) == 0)) {
       g95_error("Complex argument of LOG at %L cannot be zero",
-                  &x->where);
+		&x->where);
       return &g95_bad_expr;
     }
-    g95_warning("LOG at %L not done for complex expressions yet",&x->where);
+
+    g95_warning("LOG at %L not done for complex expressions yet", &x->where);
     break;
 
   default:
     g95_internal_error("g95_simplify_max: bad type");
   }
 
-  return range_check(result,"LOG");
-
+  return range_check(result, "LOG");
 }
 
 
@@ -1787,24 +1768,28 @@ mpf_t ri;
   switch(x->ts.type) {
   case BT_INTEGER:
     if (g95_option.pedantic == 1) 
-        g95_warning("Integer initialization constant to LOG10 at %L is nonstandard", &x->where);
-    if ( mpz_cmp(x->value.integer, mpz_zero) <= 0 ) {
+      g95_warning("Integer initialization constant to LOG10 at %L is "
+		  "nonstandard", &x->where);
+
+    if (mpz_cmp(x->value.integer, mpz_zero) <= 0) {
       g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
-                  &x->where);
+		&x->where);
       return &g95_bad_expr;
     }
-    mpf_init(ri);
-    mpf_set_z(ri,x->value.integer);
 
-    common_logarithm(&ri,&result->value.real);
+    mpf_init(ri);
+    mpf_set_z(ri, x->value.integer);
+
+    common_logarithm(&ri, &result->value.real);
     break;
 
   case BT_REAL:
-    if ( mpf_cmp(x->value.real, mpf_zero) <= 0 ) {
-    g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
+    if (mpf_cmp(x->value.real, mpf_zero) <= 0) {
+      g95_error("Argument of LOG10 at %L cannot be less than or equal to zero",
                 &x->where);
-    return &g95_bad_expr;
+      return &g95_bad_expr;
     }
+
     common_logarithm(&x->value.real,&result->value.real);
     break;
 
@@ -1813,7 +1798,6 @@ mpf_t ri;
   }
 
   return range_check(result,"LOG10");
-
 }
 
 
@@ -1832,7 +1816,6 @@ int kind;
   result->value.logical = e->value.logical;
 
   return result;
-
 }
 
 /* Max family */
@@ -1847,7 +1830,7 @@ int my_kind;
   x   = arg->expr;
   arg = arg->next;
 
-  if ( x->expr_type != EXPR_CONSTANT ) { /* Skip nonconstant argument */
+  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
     x   = arg->expr;
     arg = arg->next;
   }
@@ -1881,6 +1864,7 @@ int my_kind;
         if (mpz_cmp(y->value.integer, max_val) > 0)
        	  mpz_set(max_val, y->value.integer);
       }
+
       if (my_type == BT_REAL) {
         if (mpf_cmp(y->value.real, rmax_val) > 0)
  	  mpf_set(rmax_val, y->value.real);
@@ -1890,19 +1874,17 @@ int my_kind;
     }
   }
 
-  if ( my_type == BT_INTEGER ) {
+  if (my_type == BT_INTEGER) {
     result=g95_constant_result(BT_INTEGER,my_kind);
     mpz_set(result->value.integer, max_val);
     mpz_clear(max_val);
-  }
-  else if ( my_type == BT_REAL ) {
+  } else if (my_type == BT_REAL) {
     result=g95_constant_result(BT_REAL,my_kind);
     mpf_set(result->value.real, rmax_val);
     mpf_clear(rmax_val);
   }
 
   return result;
-
 }
 
 
@@ -1918,34 +1900,32 @@ int i, kind;
   i = g95_validate_kind(BT_INTEGER, kind);
   if (i < 0) g95_internal_error("g95_simplify_amax0(): Bad kind");
 
-  if ( x->expr_type != EXPR_CONSTANT ) { /* Skip nonconstant argument */
+  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
     x   = arg->expr;
     arg = arg->next;
   }
 
   mpz_init_set(max_val, x->value.integer);
 
-  while ( arg != NULL ) {
-    y=arg->expr;
-    if ( y->expr_type != EXPR_CONSTANT ) {
-      x=y;
-      arg=arg->next;
-    }
-    else {
-      if ( mpz_cmp(y->value.integer, max_val) > 0 ) {
-        mpz_set(max_val, y->value.integer);
-      }
-      x=y;
-      arg=arg->next;
+  while(arg != NULL) {
+    y = arg->expr;
+    if (y->expr_type != EXPR_CONSTANT) {
+      x = y;
+      arg = arg->next;
+    } else {
+      if (mpz_cmp(y->value.integer, max_val) > 0)
+	mpz_set(max_val, y->value.integer);
+
+      x = y;
+      arg = arg->next;
     }
   }
 
-  r = g95_constant_result(BT_INTEGER,kind);
+  r = g95_constant_result(BT_INTEGER, kind);
   mpz_set(r->value.integer, max_val);
   mpz_clear(max_val);
 
   result = g95_int2real(r, kind);
-
   g95_free_expr(r);
 
   return result;
@@ -1964,38 +1944,35 @@ int i, kind;
   i    = g95_validate_kind(BT_REAL, kind);
   if (i < 0) g95_internal_error("g95_simplify_max1(): Bad kind");
 
-  if ( x->expr_type != EXPR_CONSTANT ) { /* Skip nonconstant argument */
+  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
     x   = arg->expr;
     arg = arg->next;
   }
 
   mpf_init_set(max_val, x->value.real);
 
-  while ( arg != NULL ) {
-    y=arg->expr;
-    if ( y->expr_type != EXPR_CONSTANT ) {
-      x=y;
-      arg=arg->next;
-    }
-    else {
-      if ( mpf_cmp(y->value.real, max_val) > 0 ) {
-        mpf_set(max_val, y->value.real);
-      }
-      x=y;
-      arg=arg->next;
+  while(arg != NULL) {
+    y = arg->expr;
+    if (y->expr_type != EXPR_CONSTANT) {
+      x = y;
+      arg = arg->next;
+    } else {
+      if (mpf_cmp(y->value.real, max_val) > 0)
+	mpf_set(max_val, y->value.real);
+
+      x = y;
+      arg = arg->next;
     }
   }
 
-  r = g95_constant_result(BT_REAL,kind);
+  r = g95_constant_result(BT_REAL, kind);
   mpf_set(r->value.real, max_val);
   mpf_clear(max_val);
 
   result = g95_real2int(r, kind);
 
   g95_free_expr(r);
-
   return result;
-
 }
 
 /* End of max functions */
@@ -2051,39 +2028,35 @@ int my_kind;
     g95_internal_error("g95_simplify_min(): bad type"); /* noreturn */
   }
 
-  while ( arg != NULL ) {
-    y=arg->expr;
-    if ( y->expr_type != EXPR_CONSTANT ) {
-      x=y;
-      arg=arg->next;
-    }
-    else {
-      if ( my_type == BT_INTEGER ) {
-        if ( mpz_cmp(y->value.integer, min_val) < 0 ) 
+  while(arg != NULL) {
+    y = arg->expr;
+    if (y->expr_type != EXPR_CONSTANT) {
+      x = y;
+      arg = arg->next;
+    } else {
+      if (my_type == BT_INTEGER) {
+        if (mpz_cmp(y->value.integer, min_val) < 0)
        	  mpz_set(min_val, y->value.integer);
-      }
-      if ( my_type == BT_REAL ) {
-        if ( mpf_cmp(y->value.real, rmin_val) < 0 )
+      } if (my_type == BT_REAL) {
+        if (mpf_cmp(y->value.real, rmin_val) < 0)
  	  mpf_set(rmin_val, y->value.real);
       }
-      x=y;
-      arg=arg->next;
+      x = y;
+      arg = arg->next;
     }
   }
 
-  if ( my_type == BT_INTEGER ) {
-    result=g95_constant_result(BT_INTEGER,my_kind);
+  if (my_type == BT_INTEGER) {
+    result = g95_constant_result(BT_INTEGER, my_kind);
     mpz_set(result->value.integer, min_val);
     mpz_clear(min_val);
-  }
-  else if ( my_type == BT_REAL ) {
-    result=g95_constant_result(BT_REAL,my_kind);
+  } else if (my_type == BT_REAL) {
+    result = g95_constant_result(BT_REAL, my_kind);
     mpf_set(result->value.real, rmin_val);
     mpf_clear(rmin_val);
   }
 
   return result;
-
 }
 
 
@@ -2099,38 +2072,35 @@ int i, kind;
   i = g95_validate_kind(BT_INTEGER, x->ts.kind);
   if (i < 0) g95_internal_error("g95_simplify_amin0(): Bad kind");
 
-  if ( x->expr_type != EXPR_CONSTANT ) { /* Skip nonconstant argument */
+  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
     x   = arg->expr;
     arg = arg->next;
   }
 
   mpz_init_set(min_val, x->value.integer);
 
-  while ( arg != NULL ) {
-    y=arg->expr;
-    if ( y->expr_type != EXPR_CONSTANT ) {
-      x=y;
-      arg=arg->next;
-    }
-    else {
-      if ( mpz_cmp(y->value.integer, min_val) < 0 ) {
+  while(arg != NULL) {
+    y = arg->expr;
+    if (y->expr_type != EXPR_CONSTANT) {
+      x = y;
+      arg = arg->next;
+    } else {
+      if (mpz_cmp(y->value.integer, min_val) < 0)
         mpz_set(min_val, y->value.integer);
-      }
-      x=y;
-      arg=arg->next;
+
+      x = y;
+      arg = arg->next;
     }
   }
 
-  r = g95_constant_result(BT_INTEGER,kind);
+  r = g95_constant_result(BT_INTEGER, kind);
   mpz_set(r->value.integer, min_val);
   mpz_clear(min_val);
 
   result = g95_int2real(r, kind);
-
   g95_free_expr(r);
 
   return result;
-
 }
 
 
@@ -2146,25 +2116,24 @@ int i, kind;
   i = g95_validate_kind(BT_REAL, x->ts.kind);
   if (i < 0) g95_internal_error("g95_simplify_min1(): Bad kind");
 
-  if ( x->expr_type != EXPR_CONSTANT ) { /* Skip nonconstant argument */
+  if (x->expr_type != EXPR_CONSTANT) { /* Skip nonconstant argument */
     x   = arg->expr;
     arg = arg->next;
   }
 
   mpf_init_set(min_val, x->value.real);
 
-  while ( arg != NULL ) {
-    y=arg->expr;
-    if ( y->expr_type != EXPR_CONSTANT ) {
-      x=y;
-      arg=arg->next;
-    }
-    else {
-      if ( mpf_cmp(y->value.real, min_val) < 0 ) {
+  while(arg != NULL) {
+    y = arg->expr;
+    if (y->expr_type != EXPR_CONSTANT) {
+      x = y;
+      arg = arg->next;
+    } else {
+      if (mpf_cmp(y->value.real, min_val) < 0)
         mpf_set(min_val, y->value.real);
-      }
-      x=y;
-      arg=arg->next;
+
+      x = y;
+      arg = arg->next;
     }
   }
 
@@ -2173,15 +2142,12 @@ int i, kind;
   mpf_clear(min_val);
 
   result = g95_real2int(r, kind);
-
   g95_free_expr(r);
 
   return result;
-
 }
 
 /* End of min functions */
-
 
 
 g95_expr *g95_simplify_minexponent(g95_expr *x) {
@@ -2213,7 +2179,7 @@ mpf_t quot, iquot, term;
       return &g95_bad_expr;
     }
 
-    result = g95_constant_result(BT_INTEGER,a->ts.kind);
+    result = g95_constant_result(BT_INTEGER, a->ts.kind);
     result->where = a->where;
     mpz_tdiv_r(result->value.integer, a->value.integer, p->value.integer);
     break;
@@ -2226,13 +2192,13 @@ mpf_t quot, iquot, term;
       return &g95_bad_expr;
     }
 
-    result =g95_constant_result(BT_REAL,a->ts.kind);
+    result =g95_constant_result(BT_REAL, a->ts.kind);
     result->where = a->where;
     
     mpf_init(quot);
     mpf_init(iquot);
     mpf_init(term);
-    mpf_div(quot, a->value.real,p->value.real);
+    mpf_div(quot, a->value.real, p->value.real);
     mpf_trunc(iquot, quot);
     mpf_mul(term, iquot, p->value.real);
     mpf_sub(result->value.real, a->value.real, term);
@@ -2265,7 +2231,7 @@ mpf_t quot, iquot, term;
       return &g95_bad_expr;
     }
 
-    result =g95_constant_result(BT_INTEGER,a->ts.kind);
+    result = g95_constant_result(BT_INTEGER, a->ts.kind);
     result->where = a->where;
     mpz_fdiv_r(result->value.integer, a->value.integer, p->value.integer);
 
@@ -2278,14 +2244,14 @@ mpf_t quot, iquot, term;
       return &g95_bad_expr;
     }
 
-    result =g95_constant_result(BT_REAL,a->ts.kind);
+    result =g95_constant_result(BT_REAL, a->ts.kind);
     result->where = a->where;
 
     mpf_init(quot);
     mpf_init(iquot);
     mpf_init(term);
 
-    mpf_div(quot, a->value.real,p->value.real);
+    mpf_div(quot, a->value.real, p->value.real);
     mpf_floor(iquot, quot);
     mpf_mul(term, iquot, p->value.real);
 
@@ -2305,7 +2271,9 @@ mpf_t quot, iquot, term;
 
 
 /* simplify_mvbits() */
-g95_expr *g95_simplify_mvbits(g95_expr *f, g95_expr *fp, g95_expr *l, g95_expr *to, g95_expr *tp) {
+
+g95_expr *g95_simplify_mvbits(g95_expr *f, g95_expr *fp, g95_expr *l,
+			      g95_expr *to, g95_expr *tp) {
   return NULL;
 }
 
@@ -2317,27 +2285,26 @@ g95_expr *g95_simplify_nearest(g95_expr *e) {
 
 g95_expr *g95_simplify_nint(g95_expr *e, g95_expr *k) {
 g95_expr *rtrunc, *result;
-int kind;
+int kind, cmp;
 
   kind = get_kind(k, "NINT", e->ts.kind);
   if (kind == -1) return &g95_bad_expr;
 
-  if (e->expr_type != EXPR_CONSTANT ) return NULL;
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   rtrunc = g95_copy_expr(e);
 
-  if ( mpf_cmp_si(e->value.real,0) > 0 ) {
+  cmp = mpf_cmp_si(e->value.real, 0);
+
+  if (cmp > 0) {
     mpf_ceil(rtrunc->value.real,e->value.real);
-  }
-  else if ( mpf_cmp_si(e->value.real,0) < 0 ) {
-    mpf_floor(rtrunc->value.real,e->value.real);
-  }
-  else {
-    mpf_set_si(rtrunc->value.real,0);
+  } else if (cmp < 0) {
+    mpf_floor(rtrunc->value.real, e->value.real);
+  } else {
+    mpf_set_si(rtrunc->value.real, 0);
   }
 
   result = g95_real2int(rtrunc, kind);
-
   if (result == NULL) {
     g95_error("Result of NINT() overflows its kind at %L", &e->where);
     g95_free_expr(rtrunc);
@@ -2351,7 +2318,7 @@ int kind;
 
 g95_expr *g95_simplify_idnint(g95_expr *e) {
 g95_expr *rtrunc, *result;
-int kind;
+int kind, cmp;
 
   kind = e->ts.kind;
   if (kind != g95_default_double_kind()) {
@@ -2363,18 +2330,17 @@ int kind;
 
   rtrunc = g95_copy_expr(e);
 
-  if ( mpf_cmp_si(e->value.real,0) > 0 ) {
-    mpf_ceil(rtrunc->value.real,e->value.real);
-  }
-  else if ( mpf_cmp_si(e->value.real,0) < 0 ) {
+  cmp = mpf_cmp_si(e->value.real, 0);
+
+  if (cmp > 0) {
+    mpf_ceil(rtrunc->value.real, e->value.real);
+  } else if (cmp < 0) {
     mpf_floor(rtrunc->value.real,e->value.real);
-  }
-  else {
-    mpf_set_si(rtrunc->value.real,0);
+  } else {
+    mpf_set_si(rtrunc->value.real, 0);
   }
 
   result = g95_real2int(rtrunc, kind);
-
   if (result == NULL) {
     g95_error("Result of IDNINT() overflows its kind at %L", &e->where);
     g95_free_expr(rtrunc);
@@ -2397,7 +2363,6 @@ int i;
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   isize = g95_integer_kinds[k].bit_size;
-
   result = g95_copy_expr(e);
 
   for ( i=0; i<isize; ++i ) {
@@ -2413,8 +2378,23 @@ int i;
   }
 
   return result;
+}
 
-} 
+
+g95_expr *g95_simplify_null(g95_expr *mold) {
+g95_expr *result;
+
+  result = g95_get_expr();
+
+  result->expr_type = EXPR_NULL;
+
+  if (mold == NULL)
+    result->ts.type = BT_UNKNOWN;
+  else
+    result->ts = mold->ts;
+
+  return result;
+}
 
 
 g95_expr *g95_simplify_precision(g95_expr *e) {
@@ -2486,7 +2466,6 @@ int i;
 }
 
 
-
 g95_expr *g95_simplify_real(g95_expr *e, g95_expr *k) {
 g95_expr *result;
 int kind;
@@ -2497,22 +2476,24 @@ int kind;
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
   switch (e->ts.type) {
-	case BT_INTEGER:
-	    result = g95_int2real(e, kind);
-            return range_check(result, "REAL");
-	case BT_REAL:
-	    result = g95_real2real(e, kind);
-            return range_check(result, "REAL");
-	case BT_COMPLEX:
-	    result = g95_complex2real(e, kind);
-            return range_check(result, "REAL");
-	    break;
+  case BT_INTEGER:
+    result = g95_int2real(e, kind);
+    break;
 
-        default:
-       	    g95_internal_error("bad type in REAL");
-	    return &g95_bad_expr;
+  case BT_REAL:
+    result = g95_real2real(e, kind);
+    break;
+
+  case BT_COMPLEX:
+    result = g95_complex2real(e, kind);
+    break;
+
+  default:
+    g95_internal_error("bad type in REAL");
+    return &g95_bad_expr;
   }
 
+  return range_check(result, "REAL");
 }
 
 g95_expr *g95_simplify_repeat(g95_expr *e, g95_expr *n) {
@@ -2522,11 +2503,9 @@ int i, j, len, ncopies, nlen;
   if (e->expr_type != EXPR_CONSTANT || n->expr_type != EXPR_CONSTANT)  
     return NULL;
 
-  if (n !=NULL ) {
-    if (g95_extract_int(n, &ncopies) != NULL || ncopies < 0 ) {
-      g95_error("Invalid second argument of REPEAT at %L", &n->where);
-      return &g95_bad_expr;
-    }
+  if (n !=NULL && (g95_extract_int(n, &ncopies) != NULL || ncopies < 0)) {
+    g95_error("Invalid second argument of REPEAT at %L", &n->where);
+    return &g95_bad_expr;
   }
 
   len    = e->value.character.length;
@@ -2540,18 +2519,16 @@ int i, j, len, ncopies, nlen;
     result->value.character.string='\0';
     return result;
   }
-  else {
-    result->value.character.length=nlen;
-    result->value.character.string=g95_getmem(nlen+1);
-    for (i=0; i<ncopies; ++i) {
-      for (j=0; j<len; ++j) {
-	result->value.character.string[j+i*len] = e->value.character.string[j];
-      }
-    }
-    result->value.character.string[nlen] = '\0';  /* For debugger */
-    return result;
-  }
 
+  result->value.character.length=nlen;
+  result->value.character.string=g95_getmem(nlen+1);
+
+  for(i=0; i<ncopies; i++)
+    for(j=0; j<len; j++)
+      result->value.character.string[j+i*len] = e->value.character.string[j];
+
+  result->value.character.string[nlen] = '\0';  /* For debugger */
+  return result;
 }
 
 
@@ -2648,10 +2625,9 @@ g95_expr *e;
 
   npad = 0;
 
-  if (pad != NULL) {
+  if (pad != NULL)
     for(;; npad++)
       if (g95_get_array_element(pad, npad) == NULL) break;
-  }
 
   nsource = 0;
 
@@ -2773,21 +2749,21 @@ int i, p;
   mpf_init(frac);
   mpf_init(pow2);
 
-  natural_logarithm(&i2,&ln2);
+  natural_logarithm(&i2, &ln2);
 
-  mpf_abs(absv,x->value.real);
-  natural_logarithm(&absv,&lnx);
+  mpf_abs(absv, x->value.real);
+  natural_logarithm(&absv, &lnx);
 
-  mpf_div(lnx,lnx,ln2);
-  mpf_trunc(lnx,lnx);
-  mpf_add_ui(lnx,lnx,1);
+  mpf_div(lnx, lnx, ln2);
+  mpf_trunc(lnx, lnx);
+  mpf_add_ui(lnx, lnx, 1);
 
   exp2 = (unsigned long) mpf_get_d(lnx);
-  mpf_pow_ui(pow2,i2,exp2);
-  mpf_div(frac,absv,pow2);
+  mpf_pow_ui(pow2, i2, exp2);
+  mpf_div(frac, absv, pow2);
 
   exp2 = (unsigned long) p;
-  mpf_mul_2exp(result->value.real,frac,exp2);
+  mpf_mul_2exp(result->value.real, frac, exp2);
 
   mpf_clear(i2);
   mpf_clear(ln2);
@@ -2797,7 +2773,6 @@ int i, p;
   mpf_clear(pow2);
 
   return range_check(result,"RRSPACING");
-
 }
 
 
@@ -2807,28 +2782,27 @@ int kind;
 long exp;
 unsigned long exp2;
 
-  if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT) return NULL;
+  if (x->expr_type != EXPR_CONSTANT || i->expr_type != EXPR_CONSTANT)
+    return NULL;
 
   kind = g95_validate_kind(x->ts.type, x->ts.kind);
   if (kind < 0) g95_internal_error("g95_simplify_scale(): bad kind");
 
-  result=g95_constant_result(BT_REAL,x->ts.kind);
+  result = g95_constant_result(BT_REAL, x->ts.kind);
   result->where = x->where;
 
   exp = (long) mpz_get_d(i->value.integer);
 
-  if ( exp >= 0 ) {
+  if (exp >= 0) {
     exp2 = (unsigned) exp;
-    mpf_mul_2exp(result->value.real,x->value.real,exp2);
-  }
-  else {
+    mpf_mul_2exp(result->value.real, x->value.real,exp2);
+  } else {
     exp = -exp;
     exp2 = (unsigned) exp;
-    mpf_div_2exp(result->value.real,x->value.real,exp2);
+    mpf_div_2exp(result->value.real, x->value.real,exp2);
   }
 
-  return range_check(result,"SCALE");
-
+  return range_check(result, "SCALE");
 }
 
 
@@ -2845,8 +2819,10 @@ int indx, len, lenc;
     return &g95_bad_expr;
   }
 
-  if ( b != NULL && b->value.logical != 0  ) back = 1;
-  else back = 0;
+  if (b != NULL && b->value.logical != 0)
+    back = 1;
+  else
+    back = 0;
 
   result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
   result->where = e->where;
@@ -2854,18 +2830,16 @@ int indx, len, lenc;
   len  = e->value.character.length;
   lenc = c->value.character.length;
 
-  if ( len == 0 || lenc == 0 ) {
+  if (len == 0 || lenc == 0) {
     indx = 0;
-  }
-  else {
+  } else {
     indx = strcspn(e->value.character.string,c->value.character.string) + 1;
-    if ( indx > len ) indx=0;
-    if ( back != 0 && indx != 0 ) indx = len-indx+1;
+    if (indx > len) indx=0;
+    if (back != 0 && indx != 0) indx = len - indx + 1;
   }
 
   mpz_set_si(result->value.integer,indx);
   return result;
-
 }
 
 
@@ -2928,7 +2902,6 @@ g95_expr *result;
     kind = 0;
 
     if (!found_precision) kind = -1;
-
     if (!found_range) kind -= 2;
   }
 
@@ -2962,24 +2935,24 @@ unsigned long exp2;
   mpf_init(pow2);
   mpf_init(frac);
 
-  natural_logarithm(&i2,&ln2);
+  natural_logarithm(&i2, &ln2);
 
-  mpf_abs(absv,x->value.real);
-  natural_logarithm(&absv,&lnx);
+  mpf_abs(absv, x->value.real);
+  natural_logarithm(&absv, &lnx);
 
-  mpf_div(lnx,lnx,ln2);
-  mpf_trunc(lnx,lnx);
-  mpf_add_ui(lnx,lnx,1);
+  mpf_div(lnx, lnx, ln2);
+  mpf_trunc(lnx, lnx);
+  mpf_add_ui(lnx, lnx, 1);
 
 /* old exponent value, and fraction */
   exp2 = (unsigned long) mpf_get_d(lnx);
-  mpf_pow_ui(pow2,i2,exp2);
+  mpf_pow_ui(pow2, i2, exp2);
 
-  mpf_div(frac,absv,pow2);
+  mpf_div(frac, absv, pow2);
 
 /* New exponent */
   exp2 = (unsigned long) mpz_get_d(i->value.integer);
-  mpf_mul_2exp(result->value.real,frac,exp2);
+  mpf_mul_2exp(result->value.real, frac, exp2);
 
   mpf_clear(i2);
   mpf_clear(ln2);
@@ -2989,7 +2962,6 @@ unsigned long exp2;
   mpf_clear(frac);
 
   return range_check(result,"SET_EXPONENT");
-
 }
 
 
@@ -3002,12 +2974,12 @@ int sgn;
   if (x->expr_type != EXPR_CONSTANT || y->expr_type != EXPR_CONSTANT)  
     return NULL;
 
-  if ( (x->ts.type != y->ts.type) ) {
+  if (x->ts.type != y->ts.type) {
     g95_error("Type of arguments of SIGN at %L must agree", &x->where);
     return &g95_bad_expr;
   }
 
-  if ( (x->ts.kind != y->ts.kind) ) {
+  if (x->ts.kind != y->ts.kind) {
     g95_error("Kind of arguments of SIGN at %L must agree", &x->where);
     return &g95_bad_expr;
   }
@@ -3015,28 +2987,30 @@ int sgn;
   absv   = g95_copy_expr(x);
   result = g95_copy_expr(x);
 
-  switch (x->ts.type) {
-	case BT_INTEGER:
-        	sgn = mpz_sgn(y->value.integer);
-		mpz_init_set_si(sgnz,sgn);
-		mpz_abs(absv->value.integer,x->value.integer);
-		mpz_mul(result->value.integer, absv->value.integer, sgnz);
-		mpz_clear(sgnz);
-		g95_free_expr(absv);
-		return result;
-	case BT_REAL:
-        	sgn = mpf_sgn(y->value.real);
-		mpf_abs(absv->value.real,x->value.real);
-		mpf_init_set_si(sgnf,sgn);
-		mpf_mul(result->value.real, absv->value.real, sgnf);
-		mpf_clear(sgnf);
-		g95_free_expr(absv);
-		return result;
-	  default:
-	    ;;
-	    g95_internal_error("Bad type in g95_simplify_sign");
-	    return &g95_bad_expr;
+  switch(x->ts.type) {
+  case BT_INTEGER:
+    sgn = mpz_sgn(y->value.integer);
+    mpz_init_set_si(sgnz, sgn);
+    mpz_abs(absv->value.integer, x->value.integer);
+    mpz_mul(result->value.integer, absv->value.integer, sgnz);
+    mpz_clear(sgnz);
+    break;
+
+  case BT_REAL:
+    sgn = mpf_sgn(y->value.real);
+    mpf_abs(absv->value.real, x->value.real);
+    mpf_init_set_si(sgnf, sgn);
+    mpf_mul(result->value.real, absv->value.real, sgnf);
+    mpf_clear(sgnf);
+    break;
+
+  default:
+    g95_internal_error("Bad type in g95_simplify_sign");
+    return &g95_bad_expr;
   }
+
+  g95_free_expr(absv);
+  return result;
 }
 
 
@@ -3093,30 +3067,29 @@ int i, p;
     return result;
   }
 
-  mpf_init_set_ui(i1,1);
-  mpf_init_set_ui(i2,2);
+  mpf_init_set_ui(i1, 1);
+  mpf_init_set_ui(i2, 2);
   mpf_init(ln2);
   mpf_init(absv);
   mpf_init(lnx);
 
-  natural_logarithm(&i2,&ln2);
+  natural_logarithm(&i2, &ln2);
 
-  mpf_abs(absv,x->value.real);
-  natural_logarithm(&absv,&lnx);
+  mpf_abs(absv, x->value.real);
+  natural_logarithm(&absv, &lnx);
 
-  mpf_div(lnx,lnx,ln2);
-  mpf_trunc(lnx,lnx);
-  mpf_add_ui(lnx,lnx,1);
+  mpf_div(lnx, lnx, ln2);
+  mpf_trunc(lnx, lnx);
+  mpf_add_ui(lnx, lnx, 1);
 
   diff = (long) mpf_get_d(lnx) - (long) p;
-
-  if ( diff >= 0 ) {
+  if (diff >= 0) {
     exp2 = (unsigned) diff;
-    mpf_mul_2exp(result->value.real,i1,exp2);
+    mpf_mul_2exp(result->value.real, i1, exp2);
   } else {
     diff = -diff;
     exp2 = (unsigned) diff;
-    mpf_div_2exp(result->value.real,i1,exp2);
+    mpf_div_2exp(result->value.real, i1, exp2);
   }
 
   mpf_clear(i1);
@@ -3125,11 +3098,10 @@ int i, p;
   mpf_clear(absv);
   mpf_clear(lnx);
 
-  if ( mpf_cmp(result->value.real,g95_real_kinds[i].tiny) < 0 ) 
-    mpf_set(result->value.real,g95_real_kinds[i].tiny);
+  if (mpf_cmp(result->value.real, g95_real_kinds[i].tiny) < 0)
+    mpf_set(result->value.real, g95_real_kinds[i].tiny);
 
-  return range_check(result,"SPACING");
-
+  return range_check(result, "SPACING");
 }
 
 
@@ -3183,43 +3155,43 @@ mpf_t ac, ad, s, t, w;
     mpf_abs(ad,e->value.complex.i);
 
     if (mpf_cmp(ac, ad) >= 0) {
-      mpf_div(t,e->value.complex.i,e->value.complex.r);
-      mpf_mul(t,t,t);
-      mpf_add_ui(t,t,1);
-      mpf_sqrt(t,t);
-      mpf_add_ui(t,t,1);
-      mpf_div_ui(t,t,2);
-      mpf_sqrt(t,t);
-      mpf_sqrt(s,ac);
-      mpf_mul(w,s,t);
+      mpf_div(t, e->value.complex.i, e->value.complex.r);
+      mpf_mul(t, t, t);
+      mpf_add_ui(t, t, 1);
+      mpf_sqrt(t, t);
+      mpf_add_ui(t, t, 1);
+      mpf_div_ui(t, t, 2);
+      mpf_sqrt(t, t);
+      mpf_sqrt(s, ac);
+      mpf_mul(w, s, t);
     } else {
-      mpf_div(s,e->value.complex.r,e->value.complex.i);
-      mpf_mul(t,s,s);
-      mpf_add_ui(t,t,1);
-      mpf_sqrt(t,t);
-      mpf_abs(s,s);
-      mpf_add(t,t,s);
-      mpf_div_ui(t,t,2);
-      mpf_sqrt(t,t);
-      mpf_sqrt(s,ad);
-      mpf_mul(w,s,t);
+      mpf_div(s, e->value.complex.r, e->value.complex.i);
+      mpf_mul(t, s, s);
+      mpf_add_ui(t, t, 1);
+      mpf_sqrt(t, t);
+      mpf_abs(s, s);
+      mpf_add(t, t, s);
+      mpf_div_ui(t, t, 2);
+      mpf_sqrt(t, t);
+      mpf_sqrt(s, ad);
+      mpf_mul(w, s, t);
     }
 
-    if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0) >=0){
-      mpf_mul_ui(t,w,2);
-      mpf_div(result->value.complex.i,e->value.complex.i,t);
-      mpf_set(result->value.complex.r,w);
-    } else if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0)<0 &&
-	     mpf_cmp_ui(e->value.complex.i,0)>=0) {
-      mpf_mul_ui(t,w,2);
-      mpf_div(result->value.complex.r,e->value.complex.i,t);
-      mpf_set(result->value.complex.i,w);
-    } else if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0)<0 &&
-	     mpf_cmp_ui(e->value.complex.i,0)<0) {
-      mpf_mul_ui(t,w,2);
-      mpf_div(result->value.complex.r,ad,t);
-      mpf_neg(w,w);
-      mpf_set(result->value.complex.i,w);
+    if (mpf_cmp_ui(w,0) !=0 && mpf_cmp_ui(e->value.complex.r,0) >=0) {
+      mpf_mul_ui(t, w, 2);
+      mpf_div(result->value.complex.i, e->value.complex.i, t);
+      mpf_set(result->value.complex.r, w);
+    } else if (mpf_cmp_ui(w, 0) !=0 && mpf_cmp_ui(e->value.complex.r, 0) < 0 &&
+	       mpf_cmp_ui(e->value.complex.i,0) >= 0) {
+      mpf_mul_ui(t, w, 2);
+      mpf_div(result->value.complex.r, e->value.complex.i, t);
+      mpf_set(result->value.complex.i, w);
+    } else if (mpf_cmp_ui(w, 0) !=0 && mpf_cmp_ui(e->value.complex.r, 0) < 0 &&
+	       mpf_cmp_ui(e->value.complex.i, 0) < 0) {
+      mpf_mul_ui(t, w, 2);
+      mpf_div(result->value.complex.r, ad, t);
+      mpf_neg(w, w);
+      mpf_set(result->value.complex.i, w);
     } else {
       g95_internal_error("invalid complex argument of SQRT at %L", 
 			 &e->where);
@@ -3296,8 +3268,10 @@ int count, i, len, lentrim;
   result->where = e->where;
 
   for (count=0, i=1; i<=len; ++i) {
-    if (e->value.character.string[len-i] == ' ') ++count;
-    else break; 
+    if (e->value.character.string[len-i] == ' ')
+      count++;
+    else
+      break; 
   }
 
   lentrim = len-count;
@@ -3305,9 +3279,8 @@ int count, i, len, lentrim;
   result->value.character.length = lentrim;
   result->value.character.string = g95_getmem(lentrim+1);
 
-  for ( i=0; i<lentrim; ++i) {
+  for(i=0; i<lentrim; i++)
     result->value.character.string[i] = e->value.character.string[i];
-  }
 
   result->value.character.string[lentrim] = '\0';   /* For debugger */
 
@@ -3328,13 +3301,15 @@ int index;
   if (s->expr_type != EXPR_CONSTANT || set->expr_type != EXPR_CONSTANT)  
     return NULL;
 
-  if ( b != NULL && b->ts.type != BT_LOGICAL) {
+  if (b != NULL && b->ts.type != BT_LOGICAL) {
     g95_error("Optional argument of INDEX at %L must be logical", &b->where);
     return &g95_bad_expr;
   }
 
-  if ( b != NULL && b->value.logical != 0  ) back = 1;
-  else back = 0;
+  if (b != NULL && b->value.logical != 0)
+    back = 1;
+  else
+    back = 0;
 
   result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
   result->where = s->where;
@@ -3342,35 +3317,33 @@ int index;
   len    = s->value.character.length;
   lenset = set->value.character.length;
 
-  if ( len == 0 ) {
-    mpz_set_si(result->value.integer,0);
+  if (len == 0) {
+    mpz_set_si(result->value.integer, 0);
     return result;
   }
 
-  if ( back == 0 ) {
+  if (back == 0) {
     if (lenset == 0) {
       mpz_set_si(result->value.integer,len);
       return result;
     }
-    else {
-      index = strspn(s->value.character.string,set->value.character.string)+1;
-      if ( index > len ) index = 0;
+
+    index = strspn(s->value.character.string, set->value.character.string) + 1;
+    if (index > len) index = 0;
+
+  } else {
+    if (lenset == 0) {
+      mpz_set_si(result->value.integer,1);
+      return result;
     }
-  }
-  else {
-    if ( lenset == 0 ) {
-       mpz_set_si(result->value.integer,1);
-       return result;
-    }
-    else {
-      index = len-strspn(s->value.character.string,set->value.character.string);
-    }
+
+    index = len-strspn(s->value.character.string, set->value.character.string);
   }
 
-  mpz_set_si(result->value.integer,index);
+  mpz_set_si(result->value.integer, index);
   return result;
-
 }
+
 
 /****************************************************************************
  * Helper functions

@@ -1313,7 +1313,8 @@ static mstring expr_types[] = {
   minit("OP",         EXPR_OP),         minit("FUNCTION",   EXPR_FUNCTION),
   minit("CONSTANT",   EXPR_CONSTANT),   minit("VARIABLE",   EXPR_VARIABLE),
   minit("SUBSTRING",  EXPR_SUBSTRING),  minit("STRUCTURE",  EXPR_STRUCTURE),
-  minit("ARRAY",      EXPR_ARRAY),      minit(NULL, -1)
+  minit("ARRAY",      EXPR_ARRAY),      minit("NULL",       EXPR_NULL),
+  minit(NULL, -1)
 },
 
 /* INTRINSIC_ASSIGN is missing because it is used as an index for
@@ -1444,6 +1445,9 @@ g95_expr *e;
       bad_module("Bad type in constant expression");
     }
 
+    break;
+
+  case EXPR_NULL:
     break;
   }
 

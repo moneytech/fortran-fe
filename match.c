@@ -2072,6 +2072,9 @@ match m;
 
   if (m == MATCH_ERROR) return MATCH_ERROR;
 
+  m = g95_match_null(result);
+  if (m != MATCH_NO) return m;
+
   m = g95_match(" %s", &sym);
   if (m != MATCH_YES) return m;
 

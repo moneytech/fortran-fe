@@ -180,6 +180,9 @@ static void g95_free_expr0(g95_expr *e) {
     g95_free(e->value.character.string);
     break;
 
+  case EXPR_NULL:
+    break;
+
   default:
     g95_internal_error("g95_free_expr0(): Bad expr type");
   }
@@ -375,6 +378,9 @@ char *s;
   case EXPR_STRUCTURE:
   case EXPR_ARRAY:
     q->value.constructor = g95_copy_constructor(p->value.constructor);
+    break;
+
+  case EXPR_NULL:
     break;
   }
 
@@ -649,6 +655,7 @@ int rv;
     break;
 
   case EXPR_CONSTANT:
+  case EXPR_NULL:
     rv = 1;
     break;
 
@@ -823,6 +830,7 @@ g95_actual_arglist *ap;
 
   switch(p->expr_type) {
   case EXPR_CONSTANT:
+  case EXPR_NULL:
     break;
 
   case EXPR_FUNCTION:
@@ -1026,6 +1034,7 @@ try t;
 
   case EXPR_SUBSTRING:
   case EXPR_CONSTANT:
+  case EXPR_NULL:
     return t;
 
   case EXPR_ARRAY:
@@ -1441,6 +1450,7 @@ try t;
     break;
 
   case EXPR_CONSTANT:
+  case EXPR_NULL:
     t = SUCCESS;
     break;
 
@@ -1570,6 +1580,13 @@ try t;
     g95_error("Variable '%s' cannot appear in the specification expression ",
 	      "at %L", sym->name, &e->where);
 
+    break;
+
+
+  case EXPR_NULL:
+    g95_error("NULL at %L cannot appear in a specification expression",
+	      &e->where);
+    t = FAILURE;
     break;
 
   case EXPR_CONSTANT:
@@ -1712,6 +1729,10 @@ int i;
     g95_status("(/ ");
     show_constructor(p->value.constructor);
     g95_status(" /)");
+    break;
+
+  case EXPR_NULL:
+    g95_status("NULL()");
     break;
 
   case EXPR_CONSTANT:
