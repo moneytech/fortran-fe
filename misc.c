@@ -388,7 +388,7 @@ int i;
     return 1;
   }
 
-  if (strcmp(option, "-F") == 0) {
+  if (strcmp(option, "-std=F") == 0) {
     g95_option.fmode = 1;
     return 1;
   }

@@ -29,7 +29,7 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
 	 "explicit IMPLICIT statements") },
 { "-Wsurprising",
       N_("Warn about \"suspicious\" constructs") },
-{ "-F",
+{ "-std=F",
       N_("Parse an F program") },
 { "-d8",
       N_("Set the default real and integer kinds to double precision") },
