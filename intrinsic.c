@@ -2172,9 +2172,12 @@ char *name;
 
 try g95_convert_type(g95_expr *expr, g95_typespec *ts, int eflag) {
 g95_intrinsic_sym *sym;
+g95_typespec from_ts;
 locus old_where;
-g95_expr *new, *reale;
+g95_expr *new;
 int rank;
+
+  from_ts = expr->ts;        /* expr->ts gets clobbered */
 
   if (ts->type == BT_UNKNOWN) goto bad;
 
@@ -2219,18 +2222,14 @@ int rank;
   return SUCCESS;  
 
 bad:
-  reale = expr;
-  if (expr->expr_type == EXPR_FUNCTION)
-    reale = expr->value.function.actual->expr;
   if (eflag == 1) {
     g95_error("Can't convert %s to %s at %L",
-	      g95_typename(&reale->ts), g95_typename(ts), &reale->where);
+	      g95_typename(&from_ts), g95_typename(ts), &expr->where);
     return FAILURE;
   }
 
   g95_internal_error("Can't convert %s to %s at %L",
-		     g95_typename(&reale->ts), g95_typename(ts), 
-		     &reale->where);
+		     g95_typename(&from_ts), g95_typename(ts), &expr->where);
 
   return FAILURE;
 }
