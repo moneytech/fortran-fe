@@ -614,11 +614,9 @@ int di, dr, dd, dl, dc, dz;
 	  x, BT_UNKNOWN, dr, 0,   y, BT_UNKNOWN, dr, 1,
 	  kind, BT_INTEGER, di, 1, NULL);
 
-  /* FIXME: returns double complex of default double kind. */
   add_sym("dcmplx", 0, 1, BT_COMPLEX, dd,
 	  g95_check_cmplx, g95_simplify_cmplx, NULL,
-	  x, BT_UNKNOWN, dd, 0,   y, BT_UNKNOWN, dd, 1,
-	  kind, BT_INTEGER, di, 1, NULL); /* Extension */
+	  x, BT_UNKNOWN, dd, 0,   y, BT_UNKNOWN, dd, 1, NULL);  /* Extension */
 
   make_generic("cmplx");
 
