@@ -1386,7 +1386,7 @@ check_substring:
 
 symbol_attribute g95_variable_attr(g95_expr *expr, g95_typespec *ts) {
 symbol_attribute attr;
-int add_array;
+int add_array, pointer;
 g95_ref *ref;
 
   add_array = 0;
@@ -1396,6 +1396,8 @@ g95_ref *ref;
 
   ref = expr->ref;
   attr = expr->symbol->attr;
+  pointer = expr->symbol->attr.pointer;
+
   if (ts != NULL && expr->ts.type == BT_UNKNOWN) *ts = expr->symbol->ts;
 
 new_attr:
@@ -1417,8 +1419,9 @@ new_attr:
     case REF_COMPONENT:
       g95_get_component_attr(&attr, ref->u.c.component);
       if (ts != NULL) *ts = ref->u.c.component->ts;
-      ref = ref->next;
+      pointer |= ref->u.c.component->pointer;
 
+      ref = ref->next;
       goto new_attr;
 
     case REF_SUBSTRING:
@@ -1426,10 +1429,39 @@ new_attr:
     }
 
   if (add_array) attr.dimension = 1;
+  if (pointer) attr.pointer = 1;
 
   return attr;
 }
 
+
+/* g95_expr_attr()-- Return the attribute from a general expression */
+
+symbol_attribute g95_expr_attr(g95_expr *e) {
+symbol_attribute attr;
+
+  switch(e->expr_type) {
+  case EXPR_VARIABLE:
+    attr = g95_variable_attr(e, NULL);
+    break;
+
+  case EXPR_FUNCTION:
+    g95_clear_attr(&attr);
+
+    if (e->value.function.esym != NULL)
+      attr = e->value.function.esym->result->attr;
+
+    /* NULL() returns pointers.  May have to take care of this here */
+
+    break;
+
+  default:
+    g95_clear_attr(&attr);
+    break;
+  }
+
+  return attr;
+}
 
 
 /* match_structure_constructor()-- Match a structure constructor.  The

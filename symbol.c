@@ -424,10 +424,10 @@ int is_pure;
       return FAILURE;
     }
 
-    attr = g95_variable_attr(rvalue,NULL);
+    attr = g95_expr_attr(rvalue);
     if (!attr.target && !attr.pointer) {
-      g95_error("Pointer assignment target is neither TARGET nor POINTER at %L",
-                 &rvalue->where);
+      g95_error("Pointer assignment target is neither TARGET nor POINTER at "
+		"%L", &rvalue->where);
       return FAILURE;
     }
 
@@ -436,10 +436,6 @@ int is_pure;
 		&rvalue->where);
     }
   }
-
-/* TODO: further checks required
-   g95_warning("Checks for pointer assignment are incomplete.");
-*/
 
   return SUCCESS;
 }

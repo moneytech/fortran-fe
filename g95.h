@@ -1352,6 +1352,7 @@ void g95_free_actual_arglist(g95_actual_arglist *);
 int g95_next_string_char(char);
 match g95_match_literal_constant(g95_expr **, int);
 symbol_attribute g95_variable_attr(g95_expr *, g95_typespec *);
+symbol_attribute g95_expr_attr(g95_expr *);
 void g95_show_actual_arglist(g95_actual_arglist *);
 match g95_match_init_expr(g95_expr **);
 

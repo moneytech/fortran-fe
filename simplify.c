@@ -128,63 +128,59 @@ int kind;
 }
 
 
-/*********************** Simplification functions ******************************/
-
-
-/* The abs family*/
+/********************** Simplification functions *****************************/
 
 
 g95_expr *g95_simplify_abs(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_constant_result(BT_REAL, e->ts.kind);
-  result->where = e->where;
-
-  mpf_abs(result->value.real, e->value.real);
-
-  return range_check(result, "ABS");
-}
-
-g95_expr *g95_simplify_iabs(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_constant_result(BT_INTEGER, e->ts.kind);
-  result->where = e->where;
-
-  mpz_abs(result->value.integer, e->value.integer);
-
-  return range_check(result, "IABS");
-}
-
-
-g95_expr *g95_simplify_cabs(g95_expr *e) {
 g95_expr *result;
 mpf_t a, b;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  result = g95_constant_result(BT_COMPLEX, e->ts.kind);
-  result->where = e->where;
+  switch(e->ts.type) {
+  case BT_INTEGER:
+    result = g95_constant_result(BT_INTEGER, e->ts.kind);
+    result->where = e->where;
 
-  mpf_init(a);
-  mpf_mul(a, e->value.complex.r, e->value.complex.r);
+    mpz_abs(result->value.integer, e->value.integer);
 
-  mpf_init(b);
-  mpf_mul(b, e->value.complex.i, e->value.complex.i);
+    result = range_check(result, "IABS");
+    break;
 
-  mpf_add(a, a, b);
-  mpf_sqrt(result->value.real, a);
+  case BT_REAL:
+    result = g95_constant_result(BT_REAL, e->ts.kind);
+    result->where = e->where;
 
-  mpf_clear(a);
-  mpf_clear(b);
+    mpf_abs(result->value.real, e->value.real);
 
-  return range_check(result, "CABS");
+    result = range_check(result, "ABS");
+    break;
+
+  case BT_COMPLEX:
+    result = g95_constant_result(BT_REAL, e->ts.kind);
+    result->where = e->where;
+
+    mpf_init(a);
+    mpf_mul(a, e->value.complex.r, e->value.complex.r);
+
+    mpf_init(b);
+    mpf_mul(b, e->value.complex.i, e->value.complex.i);
+
+    mpf_add(a, a, b);
+    mpf_sqrt(result->value.real, a);
+
+    mpf_clear(a);
+    mpf_clear(b);
+
+    result = range_check(result, "CABS");
+    break;
+
+  default:
+    g95_internal_error("g95_simplify_abs(): Bad type");
+  }
+
+  return result;
 }
-/* end of abs family */
 
 
 g95_expr *g95_simplify_achar(g95_expr *e) {
@@ -753,7 +749,6 @@ g95_expr *result;
   hypercos(&x->value.real, &result->value.real);
 
   return range_check(result, "COSH");
-
 }
 
 
