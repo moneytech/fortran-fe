@@ -583,7 +583,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("dint", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_dint, g95_resolve_aint,
+	  NULL, g95_simplify_dint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
 
   make_generic("aint");
@@ -601,7 +601,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("dnint", 1, 1, BT_REAL, dd,
-	  NULL, g95_simplify_dnint, g95_resolve_anint,
+	  NULL, g95_simplify_dnint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
 
   make_generic("anint");
@@ -655,6 +655,8 @@ int di, dr, dd, dl, dc, dz;
   add_sym("ceiling", 1, 1, BT_INTEGER, di,
 	  g95_check_a_kind, g95_simplify_ceiling, g95_resolve_ceiling,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
+
+  make_generic("ceiling");
 
   add_sym("char", 1, 0, BT_CHARACTER, dc,
 	  g95_check_char, g95_simplify_char, g95_resolve_char,
@@ -729,6 +731,8 @@ int di, dr, dd, dl, dc, dz;
 	  g95_check_dble, g95_simplify_dble, g95_resolve_dble,
 	  a, BT_REAL, dr, 0, NULL);
 
+  make_generic("dble");
+
   add_sym("digits", 0, 1, BT_INTEGER, di,
 	  g95_check_digits, g95_simplify_digits, g95_resolve_digits,
 	  x, BT_UNKNOWN, dr, 0, NULL);
@@ -798,6 +802,8 @@ int di, dr, dd, dl, dc, dz;
 	  g95_check_a_kind, g95_simplify_floor, g95_resolve_floor,
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
+  make_generic("floor");
+
   add_sym("fraction", 1, 1, BT_REAL, dr,
 	  g95_check_x, g95_simplify_fraction, g95_resolve_fraction,
 	  x, BT_REAL, dr, 0, NULL);
@@ -853,7 +859,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0, NULL);
 
   add_sym("idint", 1, 0, BT_INTEGER, di,
-	  NULL, g95_simplify_idint, g95_resolve_int,
+	  NULL, g95_simplify_idint, NULL,
 	  a, BT_REAL, dd, 0, NULL);
 
   make_generic("int");
@@ -1076,7 +1082,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   add_sym("idnint", 1, 1, BT_INTEGER, di,
-	  g95_check_idnint, g95_simplify_idnint, g95_resolve_nint,
+	  g95_check_idnint, g95_simplify_idnint, NULL,
 	  a, BT_REAL, dd, 0,   kind, BT_INTEGER, di, 1, NULL);
 
   make_generic("nint");

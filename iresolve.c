@@ -237,7 +237,8 @@ void g95_resolve_cos(g95_expr *f, g95_expr *x) {
 void g95_resolve_count(g95_expr *f, g95_expr *mask, g95_expr *dim) {
 static char count0[] = "__count0", count1[] = "__count1";
 
-  f->ts = mask->ts;
+  f->ts.type = BT_INTEGER;
+  f->ts.kind = g95_default_integer_kind();
 
   if (dim == NULL || mask->rank == 1)
     f->value.function.name = count0;
@@ -512,13 +513,12 @@ static char maxloc0[] = "__maxloc0", maxloc1[] = "__maxloc1";
 
   f->ts = array->ts;
 
-  if (dim == NULL || mask->rank == 1) {
+  if (dim == NULL) {
     f->value.function.name = maxloc0;
     f->rank = 1;
-  }
-  else {
+  } else {
     f->value.function.name = maxloc1;
-    f->rank = mask->rank - 1;
+    f->rank = array->rank - 1;
   }
 }
 
@@ -579,13 +579,12 @@ static char minloc0[] = "__minloc0", minloc1[] = "__minloc1";
 
   f->ts = array->ts;
 
-  if (dim == NULL || mask->rank == 1) {
+  if (dim == NULL) {
     f->value.function.name = minloc0;
     f->rank = 1;
-  }
-  else {
+  } else {
     f->value.function.name = minloc1;
-    f->rank = mask->rank - 1;
+    f->rank = array->rank - 1;
   }
 }
 
@@ -647,10 +646,9 @@ void g95_resolve_not(g95_expr *f, g95_expr *i) {
 
 
 void g95_resolve_pack(g95_expr *f, g95_expr *array, g95_expr *mask,
-			                          g95_expr *vector) {
+		      g95_expr *vector) {
 
-  f->ts.type = array->ts.type;
-  f->ts.kind = array->ts.kind;
+  f->ts = array->ts;
   f->rank = 1;
 
   f->value.function.name =
