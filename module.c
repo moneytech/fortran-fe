@@ -73,6 +73,14 @@ Boston, MA 02111-1307, USA.  */
 #define MODULE_EXTENSION ".mod"
 
 
+/* The ifdefs for __GLIBC__ are for debugging on Andy's system and
+ * need to be removed someday (perhaps when he upgrades glibc) */
+
+#ifdef __GLIBC__
+#include <mcheck.h>
+#endif
+
+
 /* Structure that descibes a position within a module file */
 
 typedef struct {
@@ -2012,15 +2020,18 @@ static void mio_symbol_interface(char *name, char *module,
 }
 
 
-static void mio_namespace_ref(g95_namespace **ns) {
+static void mio_namespace_ref(g95_namespace **nsp) {
+g95_namespace *ns;
 pointer_info *p;
 
-  p = mio_pointer_ref(ns);
+  p = mio_pointer_ref(nsp);
 
   if (p->type == P_UNKNOWN) p->type = P_NAMESPACE;
 
-  if (iomode == IO_INPUT && p->integer != 0 && p->u.pointer == NULL)
-    associate_integer_pointer(p, g95_get_namespace());
+  if (iomode == IO_INPUT && p->integer != 0 && p->u.pointer == NULL) {
+    ns = g95_get_namespace();
+    associate_integer_pointer(p, ns);
+  }
 }
 
 
@@ -2188,9 +2199,16 @@ g95_symbol *sym;
     q = get_integer(p->u.rsym.ns);
 
     ns = (g95_namespace *) q->u.pointer;
-    if (ns == NULL) {   /* Create an interface namespace if necessary */
+    if (ns == NULL) {
+
+      /* Create an interface namespace if necessary.  These are the
+       * namespaces that hold the formal parameters of module procedures. */
+
       ns = g95_get_namespace();
       associate_integer_pointer(q, ns);
+
+      ns->sibling = g95_current_ns->contained;
+      g95_current_ns->contained = ns;
     }
 
     sym = g95_new_symbol(p->u.rsym.true_name, ns);
@@ -2619,8 +2637,17 @@ time_t now;
   while(g->next)
     g = g->next;
 
+#ifdef __GLIBC__
+  muntrace();
+#endif
+
   now = time(NULL);
-  p = ctime(&now);
+  p = ctime(&now);  /* GLIBC 2.1 has a memory leak here */
+
+#ifdef __GLIBC__
+  mtrace();
+#endif
+
   *strchr(p, '\n') = '\0';
 
   fprintf(module_fp, "G95 module created from %s on %s\n", g->filename, p);
