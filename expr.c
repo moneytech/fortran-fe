@@ -1236,6 +1236,40 @@ not_numeric:
 }
 
 
+
+/* check_numeric_inquiry()-- Numeric inquiry functions are
+ * specifically allowed to have variable arguments, which is an
+ * exception to the normal requirement that an initialization function
+ * have initialization arguments.  We head off this problem here.  */
+
+static try check_numeric_inquiry(g95_expr *e) {
+char *name;
+static char *inquiry_function[] = {
+  "digits", "epsilon", "huge", "maxexponent", "minexponent",
+  "precision", "radix", "range", "tiny", NULL
+};
+
+int i;
+
+  if (e->value.function.actual == NULL ||
+      e->value.function.actual->next != NULL)  /* Doesn't have one arg */
+    return FAILURE;
+
+  name = e->symbol->name;
+
+  for(i=0; inquiry_function[i]; i++)
+    if (strcmp(inquiry_function[i], name) == 0) break;
+
+  if (inquiry_function[i] == NULL) return FAILURE;
+
+  e = e->value.function.actual->expr;
+
+  if (e == NULL || e->expr_type != EXPR_VARIABLE) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 /* check_init_expr()-- Verify that an expression is an
  * initialization expression.  A side effect is that the expression
  * tree is reduced to a single constant node if all goes well.  This
@@ -1261,11 +1295,14 @@ try t;
   case EXPR_FUNCTION:
     t = SUCCESS;
 
-    for(ap=e->value.function.actual; ap; ap=ap->next)
-      if (check_init_expr(ap->expr) == FAILURE) {
-	t = FAILURE;
-	break;
-      }
+    if (check_numeric_inquiry(e) != SUCCESS) {
+      t = SUCCESS;
+      for(ap=e->value.function.actual; ap; ap=ap->next)
+	if (check_init_expr(ap->expr) == FAILURE) {
+	  t = FAILURE;
+	  break;
+	}
+    }
 
     if (t == SUCCESS) {
       m = g95_intrinsic_func_interface(e);
