@@ -334,14 +334,14 @@ g95_alloc *a;
 
     case EXEC_DO_WHILE:
       if (code->expr != NULL && code->expr->ts.type != BT_LOGICAL)
-	g95_error("Argument of DO WHILE loop at %L must of type LOGICAL",
+	g95_error("Argument of DO WHILE loop at %L must be of type LOGICAL",
 		  &code->expr->where);
       break;
 
     case EXEC_ALLOCATE:
       if (code->expr->ts.type != BT_INTEGER)
-	g95_error("STAT tag in ALLOCATE statement at %L must of type INTEGER",
-		  &code->expr->where);
+	g95_error("STAT tag in ALLOCATE statement at %L must be "
+		  "of type INTEGER", &code->expr->where);
 
       for(a=code->ext; a; a=a->next)
 	g95_resolve_expr(a->expr);
@@ -349,7 +349,7 @@ g95_alloc *a;
 
     case EXEC_DEALLOCATE:
       if (code->expr->ts.type != BT_INTEGER)
-	g95_error("STAT tag in DEALLOCATE statement at %L must of type "
+	g95_error("STAT tag in DEALLOCATE statement at %L must be of type "
 		  "INTEGER", &code->expr->where);
 
       for(a=code->ext; a; a=a->next)
