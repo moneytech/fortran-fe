@@ -39,7 +39,7 @@
 # - define the names for selecting the language in LANGUAGES.
 # $(srcdir) must be set to the gcc/ source directory (*not* gcc/f95/).
 
-#^L
+#
 # Actual name to use when installing a native compiler.
 G95_INSTALL_NAME = `echo g95|sed '$(program_transform_name)'`
 
@@ -54,22 +54,24 @@ STAMP = echo timestamp >
 # this is in addition to th warning flags defined by default
 f95-warn = -Wno-write-strings
 
-F95_PARSER_OBJS = f95/arith.o f95/array.o f95/bbt.o f95/check.o f95/decl.o\
-    f95/error.o f95/expr.o f95/format.o f95/interface.o f95/intrinsic.o \
-    f95/io.o f95/iresolve.o f95/match.o f95/matchexp.o f95/misc.o \
-    f95/module.o f95/parse.o f95/primary.o f95/options.o f95/resolve.o \
-    f95/scanner.o f95/select.o f95/simplify.o f95/st.o f95/symbol.o
+F95_PARSER_OBJS = f95/arith.o f95/array.o f95/bbt.o f95/check.o f95/data.o \
+    f95/decl.o f95/error.o f95/expr.o f95/format.o f95/interface.o	   \
+    f95/intrinsic.o f95/io.o f95/iresolve.o f95/match.o f95/matchexp.o	   \
+    f95/misc.o f95/module.o f95/parse.o f95/primary.o f95/options.o	   \
+    f95/resolve.o f95/scalarize.o f95/scanner.o f95/select.o		   \
+    f95/simplify.o f95/st.o f95/symbol.o
 
-F95_OBJS = $(F95_PARSER_OBJS) \
-    f95/f95-lang.o f95/support.o f95/convert.o f95/trans.o \
-    f95/trans-decl.o f95/trans-types.o f95/trans-const.o f95/trans-expr.o \
-    f95/trans-stmt.o f95/trans-io.o f95/trans-array.o f95/trans-intrinsic.o \
-    f95/f95-tree.o f95/dependency.o
+F95_OBJS = $(F95_PARSER_OBJS)						\
+    f95/f95-lang.o f95/support.o f95/convert.o f95/trans.o		\
+    f95/trans-common.o f95/trans-decl.o f95/trans-types.o		\
+    f95/trans-const.o f95/trans-expr.o f95/trans-stmt.o f95/trans-io.o	\
+    f95/trans-array.o f95/trans-intrinsic.o f95/f95-tree.o
 
-F95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o c-dump.o \
-	tree-cfg.o tree-dfa.o tree-optimize.o tree-simple.o \
-	tree-ssa.o tree-ssa-pre.o tree-ssa-ccp.o tree-ssa-dce.o \
-	disjoint-set.o tree-alias-common.o tree-alias-ecr.o \
+
+F95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o c-dump.o	\
+	tree-cfg.o tree-dfa.o tree-optimize.o tree-simple.o	\
+	tree-ssa.o tree-ssa-pre.o tree-ssa-ccp.o tree-ssa-dce.o	\
+	disjoint-set.o tree-alias-common.o tree-alias-ecr.o	\
 	tree-alias-type.o tree-alias-steen.o gimplify.o
 
 #
@@ -102,7 +104,7 @@ f951$(exeext): $(F95_OBJS) $(F95_ADDITIONAL_OBJS) \
 	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ \
 		$(F95_OBJS) $(F95_ADDITIONAL_OBJS) $(BACKEND) $(F95_LIBS)
 
-gt-f95-f95-lang.h gtype-f95.h gt-f95-trans-decl.h gt-f95-trans.h gt-f95-trans-io.h gt-f95-trans-types.h: s-gtype; @true
+gt-f95-f95-lang.h gtype-f95.h gt-f95-trans-decl.h gt-f95-trans.h gt-f95-trans-io.h: s-gtype; @true
 
 # Generated files
 # The files from lex and yacc are put into the source directory
@@ -114,7 +116,7 @@ force:
 
 $(INTL_TARGETS):
 
-#
+#
 # Build hooks:
 
 f95.all.build: g95$(exeext)
@@ -127,7 +129,7 @@ f95.info:
 f95.dvi:
 f95.generated-manpages:
 
-#
+#
 # Install hooks:
 
 # Nothing to do here.
@@ -161,7 +163,7 @@ f95.uninstall:
 	-rm -rf $(bindir)/$(G95_INSTALL_NAME)$(exeext)
 	-rm -rf $(bindir)/$(G95_CROSS_NAME)$(exeext)
 
-#
+#
 # Clean hooks:
 # A lot of the ancillary files are deleted by the main makefile.
 # We just have to delete files specific to us.
@@ -178,7 +180,7 @@ f95.distclean:
 f95.extraclean:
 f95.maintainer-clean:
 
-#
+#
 # Stage hooks:
 # The toplevel makefile has already created stage?/f95 at this point.
 
@@ -190,7 +192,7 @@ f95.stage3: stage3-start
 	-mv f95/*$(objext) stage3/f95
 f95.stage4: stage4-start
 	-mv f95/*$(objext) stage4/f95
-#
+#
 # Maintenance hooks:
 
 # This target creates the files that can be rebuilt, but go in the
@@ -212,9 +214,7 @@ check-f95-fix: force
 # Everything depends on g95.h
 $(F95_PARSER_OBJS): f95/g95.h f95/intrinsic.h
 
-G95_TRANS_DEPS = f95/g95.h f95/intrinsic.h f95/trans-array.h \
-    f95/trans-const.h f95/trans-const.h f95/trans.h f95/trans-stmt.h \
-    f95/trans-types.h
+G95_TRANS_DEPS = f95/g95.h f95/intrinsic.h f95/trans.h
 
 f95/f95-lang.o: $(G95_TRANS_DEPS) f95/g95-support.h gt-f95-f95-lang.h \
     gtype-f95.h
@@ -223,7 +223,7 @@ f95/support.o: $(G95_TRANS_DEPS) f95/g95-support.h
 f95/convert.o: $(G95_TRANS_DEPS) f95/g95-support.h
 f95/trans.o: $(G95_TRANS_DEPS)
 f95/trans-decl.o: $(G95_TRANS_DEPS) gt-f95-trans-decl.h
-f95/trans-types.o: $(G95_TRANS_DEPS) gt-f95-trans-types.h
+f95/trans-types.o: $(G95_TRANS_DEPS)
 f95/trans-const.o: $(G95_TRANS_DEPS)
 f95/trans-expr.o: $(G95_TRANS_DEPS)
 f95/trans-stmt.o: $(G95_TRANS_DEPS)

@@ -207,6 +207,7 @@ g95_expr *g95_simplify_verify(g95_expr *, g95_expr *, g95_expr *);
 /* Resolution functions */
 
 void g95_resolve_abs(g95_expr *, g95_expr *);
+void g95_resolve_achar(g95_expr *, g95_expr *);
 void g95_resolve_acos(g95_expr *, g95_expr *);
 void g95_resolve_aimag(g95_expr *, g95_expr *);
 void g95_resolve_aint(g95_expr *, g95_expr *, g95_expr *);
@@ -252,13 +253,12 @@ void g95_resolve_log(g95_expr *, g95_expr *);
 void g95_resolve_log10(g95_expr *, g95_expr *);
 void g95_resolve_logical(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_matmul(g95_expr *, g95_expr *, g95_expr *);
-void g95_resolve_max(g95_expr *, g95_expr *);
 void g95_resolve_maxloc(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_maxval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_merge(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
-void g95_resolve_min(g95_expr *, g95_expr *);
 void g95_resolve_minloc(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_minval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
+void g95_resolve_min_max(g95_expr *, g95_intrinsic_sym *, g95_expr *);
 void g95_resolve_mod(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_modulo(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_nint(g95_expr *, g95_expr *, g95_expr *);
@@ -339,6 +339,7 @@ enum g95_generic_isym_id {
   G95_ISYM_FRACTION,
   G95_ISYM_IACHAR,
   G95_ISYM_IAND,
+  G95_ISYM_IARGC,
   G95_ISYM_IBCLR,
   G95_ISYM_IBITS,
   G95_ISYM_IBSET,
@@ -379,6 +380,8 @@ enum g95_generic_isym_id {
   G95_ISYM_REPEAT,
   G95_ISYM_RESHAPE,
   G95_ISYM_SCAN,
+  G95_ISYM_SELECTED_INT_KIND,
+  G95_ISYM_SELECTED_REAL_KIND,
   G95_ISYM_SET_EXPONENT,
   G95_ISYM_SHAPE,
   G95_ISYM_SIGN,

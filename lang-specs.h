@@ -9,6 +9,8 @@ This file is licensed under the GPL.
 /* This is the contribution to the `default_compilers' array in gcc.c for
    the f95 language.  */
 
+  {".f",     "@f95", 0},
+  {".F",     "@f95", 0},
   {".f90",   "@f95", 0},
   {".f95",   "@f95", 0},
   {"@f95",

@@ -14,7 +14,6 @@ stagestuff="g951\$(exeext)"
 
 target_libs=target-libgfor
 
-gtfiles="\$(srcdir)/f95/f95-lang.c \$(srcdir)/f95/trans-decl.c \$(srcdir)/f95/trans-intrinsic.c \$(srcdir)/f95/trans-io.c \$(srcdir)/f95/trans-types.c \$(srcdir)/f95/trans-types.h \$(srcdir)/f95/trans.h \$(srcdir)/f95/trans-const.h"
+gtfiles="\$(srcdir)/f95/f95-lang.c \$(srcdir)/f95/trans-decl.c \$(srcdir)/f95/trans-intrinsic.c \$(srcdir)/f95/trans-io.c \$(srcdir)/f95/trans-types.c \$(srcdir)/f95/trans.h"
 
 #outputs=g95/Makefile
-
