@@ -38,6 +38,9 @@ extern g95_integer_info g95_integer_kinds[];
 extern g95_real_info g95_real_kinds[];
 extern g95_expr g95_bad_expr;
 
+static int is_intrinsic;
+
+
 /* If a validation of an intrinsic symbol/interface fails for some
  * reason, the text of the reason is here. */
 
@@ -1610,11 +1613,17 @@ try t;
  *  MATCH_NO     if the call does not correspond to an intrinsic
  *
  *  MATCH_ERROR  if the call corresponds to an intrinsic but there was an
- *               error during the simplification process. 
+ *               error during the simplification process.
+ *
+ * The intrinsic_flag lets this subroutine and callers know that the
+ * function reference is to an intrinsic and an error should be
+ * generated even if a MATCH_NO is returned.
  */
 
-match g95_intrinsic_func_interface(g95_expr *expr) {
+match g95_intrinsic_func_interface(g95_expr *expr, int intrinsic_flag) {
 intrinsic_sym *isym, *specific;
+
+  is_intrinsic = intrinsic_flag;
 
   isym = find_function(expr->symbol->name);
   if (isym == NULL) return MATCH_NO;

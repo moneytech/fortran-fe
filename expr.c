@@ -798,7 +798,7 @@ g95_actual_arglist *ap;
     for(ap=p->value.function.actual; ap; ap=ap->next) 
       if (g95_simplify_expr(ap->expr, type) == FAILURE) return FAILURE;
 
-    if (g95_intrinsic_func_interface(p) == MATCH_ERROR) return FAILURE;
+    if (g95_intrinsic_func_interface(p, 0) == MATCH_ERROR) return FAILURE;
     break;
 
   case EXPR_SUBSTRING:
@@ -863,7 +863,7 @@ try t;
 /* Now resolve the function itself.  For now, we just see if the function
  * is compatible with an intrinsic. */
 
-  if (g95_intrinsic_func_interface(expr) == MATCH_NO) {
+  if (g95_intrinsic_func_interface(expr, 0) == MATCH_NO) {
     expr->value.function.name = expr->symbol->name;
     expr->ts = expr->symbol->ts;
   }
@@ -1379,7 +1379,7 @@ try t;
     }
 
     if (t == SUCCESS) {
-      m = g95_intrinsic_func_interface(e);
+      m = g95_intrinsic_func_interface(e, 1);
 
       if (m == MATCH_NO)
 	g95_error("Function '%s' in initialization expression at %L "
@@ -1488,7 +1488,7 @@ try t;
       }
 
     if (t == SUCCESS) {
-      m = g95_intrinsic_func_interface(e);
+      m = g95_intrinsic_func_interface(e, 0);
 
       if (m == MATCH_NO)
 	g95_error("Function '%s' in specification expression at %L "
