@@ -445,10 +445,10 @@ g95_statement st;
 #define case_executable case ST_ALLOCATE: case ST_BACKSPACE: case ST_CALL: \
   case ST_CLOSE: case ST_CONTINUE: case ST_DEALLOCATE: case ST_END_FILE: \
   case ST_GOTO: case ST_INQUIRE: case ST_NULLIFY: case ST_OPEN: \
-  case ST_READ: case ST_RETURN: case ST_REWIND: case ST_STOP: \
-  case ST_WRITE: case ST_ASSIGNMENT: case ST_POINTER_ASSIGNMENT: \
-  case ST_EXIT: case ST_CYCLE: case ST_ARITHMETIC_IF: case ST_WHERE: \
-  case ST_FORALL
+  case ST_READ: case ST_RETURN: case ST_REWIND: case ST_SIMPLE_IF: \
+  case ST_STOP: case ST_WRITE: case ST_ASSIGNMENT: \
+  case ST_POINTER_ASSIGNMENT: case ST_EXIT: case ST_CYCLE: \
+  case ST_ARITHMETIC_IF: case ST_WHERE: case ST_FORALL
 
 /* Statements that mark other executable statements */
 
@@ -599,6 +599,7 @@ char *p;
   case ST_POINTER_ASSIGNMENT:   p = "pointer assignment"; break;
   case ST_SELECT_CASE:          p = "SELECT CASE"; break;
   case ST_SEQUENCE:             p = "SEQUENCE"; break;
+  case ST_SIMPLE_IF:            p = "Simple IF"; break;
   case ST_STATEMENT_FUNCTION:   p = "STATEMENT FUNCTION"; break;
   default:
     g95_internal_error("g95_ascii_statement(): Bad statement code");

@@ -783,11 +783,10 @@ match m, n;
  * re-matching a block label.  From what we've got so far, try
  * matching an assignment. */
 
+  *if_type = ST_SIMPLE_IF;
+
   m = g95_match_assignment();
-  if (m == MATCH_YES) {
-    *if_type = ST_ASSIGNMENT;
-    goto got_match;
-  }
+  if (m == MATCH_YES) goto got_match;
 
   g95_free_expr(expr);
   g95_undo_symbols();
@@ -796,10 +795,7 @@ match m, n;
   g95_match(" if ( %e ) ", &expr);  /* Guaranteed to match */
 
   m = g95_match_pointer_assignment();
-  if (m == MATCH_YES) {
-    *if_type = ST_POINTER_ASSIGNMENT;
-    goto got_match;
-  }
+  if (m == MATCH_YES) goto got_match;
 
   g95_free_expr(expr);
   g95_undo_symbols();
@@ -812,8 +808,7 @@ match m, n;
  * restore between tries. */
 
 #define match(string, subr, statement) \
-  if (g95_match(string) == MATCH_YES) { \
-      *if_type = statement; m = subr(); goto got_match; }
+  if (g95_match(string) == MATCH_YES) { m = subr(); goto got_match; }
 
   g95_clear_error();
 
