@@ -971,7 +971,7 @@ g95_component *q;
   for(; p; p=q) {
     q = p->next;
 
-    g95_free_array_spec(&p->as);
+    g95_free_array_spec(p->as);
     g95_free_expr(p->initializer);
 
     g95_free(p);
@@ -986,7 +986,7 @@ g95_component *c;
   for(c=sym->components; c; c=c->next) {
     g95_status("(%s", c->name);
     g95_show_typespec(&c->ts);
-    g95_show_array_spec(&c->as);
+    g95_show_array_spec(c->as);
     g95_show_attr(&c->attr);
     g95_status(")");
   }
@@ -1148,7 +1148,7 @@ done:
 static g95_symbol *changed = NULL;
 
 #define NIL &sentinel           /* all leaves are sentinels */
-static g95_symtree sentinel = { { '\0' }, NULL, 0, NIL, NIL, NIL, BLACK };
+static g95_symtree sentinel = { { '\0' }, 0, NULL, NIL, NIL, NIL, BLACK };
 
 #define CompLT(a,b) (strcmp(a,b) < 0)
 #define CompEQ(a,b) (strcmp(a,b) == 0)
@@ -1441,7 +1441,7 @@ g95_symtree *x, *y, *z;
 
   if (y != z) {  /* Copy non red/black information */
     z->sym = y->sym;
-    z->serial = y->serial;
+    z->ambiguous = y->ambiguous;
     strcpy(z->name, y->name);
   }
 
@@ -1473,7 +1473,7 @@ g95_symtree *current = ns->root;
 
 void g95_free_symbol(g95_symbol *sym) {
 
-  if (sym->attr.dimension) g95_free_array_spec(&sym->as);
+  g95_free_array_spec(sym->as);
 
   free_components(sym->components);
 
@@ -1648,8 +1648,8 @@ g95_symbol *p, *q, *old;
       p->value = NULL;
     }
 
-    if (p->as.rank != old->as.rank) {
-      g95_free_array_spec(&p->as);
+    if (p->as != old->as) {
+      if (p->as) g95_free_array_spec(p->as);
       p->as = old->as;
     }
 
@@ -1805,7 +1805,7 @@ g95_symbol *s;
 
   g95_show_expr(sym->value);
 
-  g95_show_array_spec(&sym->as);
+  g95_show_array_spec(sym->as);
 
   g95_status_char('(');
   for(s=sym->common_head; s; s=s->common_next) {
@@ -1825,16 +1825,31 @@ g95_symbol *s;
 }
 
 
-/* g95_traverse_symtree()-- Recursively traverse the symtree nodes. */
+/* clear_sym_mark()-- Clear mark bits from symbol nodes associated
+ * with a symtree node */
 
-void g95_traverse_symtree(g95_symtree *st, void (*func)(g95_symtree *)) {
+static void clear_sym_mark(g95_symtree *st) {
+
+  st->sym->mark = 0;
+}
+
+
+/* traverse_symtree()-- Recursively traverse the symtree nodes. */
+
+static void traverse_symtree(g95_symtree *st, void (*func)(g95_symtree *)) {
 
   if (st != NIL) {
     (*func)(st);
 
-    g95_traverse_symtree(st->left, func);
-    g95_traverse_symtree(st->right, func);
+    traverse_symtree(st->left, func);
+    traverse_symtree(st->right, func);
   }
+}
+
+
+void g95_traverse_symtree(g95_namespace *ns, void (*func)(g95_symtree *)) {
+
+  traverse_symtree(ns->root, func);
 }
 
 
@@ -1843,17 +1858,22 @@ void g95_traverse_symtree(g95_symtree *st, void (*func)(g95_symtree *)) {
 static void traverse_ns(g95_symtree *rb, void (*func)(g95_symbol *)) {
 
   if (rb != NIL) {
-    (*func)(rb->sym);
+    if (rb->sym->mark == 0) (*func)(rb->sym);
+    rb->sym->mark = 1;
 
     traverse_ns(rb->left, func);
     traverse_ns(rb->right, func);
   }
 }
 
+
 /* g95_traverse_ns()-- Call a given function for all symbols in the
- * namespace */
+ * namespace.  We take care that each g95_symbol node is called
+ * exactly once. */
 
 void g95_traverse_ns(g95_namespace *ns, void (*func)(g95_symbol *)) {
+
+  g95_traverse_symtree(ns, clear_sym_mark);
 
   traverse_ns(ns->root, func);
 }

@@ -361,18 +361,17 @@ int i;
 /* g95_free_array_spec()-- Free all of the expressions associated with
  * array bounds specifications */
 
-void g95_free_array_spec(g95_array_spec *a) {
+void g95_free_array_spec(g95_array_spec *as) {
 int i;
 
-  for(i=0; i<a->rank; i++) {
-    g95_free_expr(a->shape[i].lower);
-    g95_free_expr(a->shape[i].upper);
+  if (as == NULL) return; 
 
-    a->shape[i].lower = NULL;
-    a->shape[i].upper = NULL;
+  for(i=0; i<as->rank; i++) {
+    g95_free_expr(as->shape[i].lower);
+    g95_free_expr(as->shape[i].upper);
   }
 
-  a->rank = 0;
+  g95_free(as);
 }
 
 
@@ -466,11 +465,17 @@ match m;
 /* g95_match_array_spec()-- Matches an array specification,
  * incidentally figuring out what sort it is.  */
 
-match g95_match_array_spec(g95_array_spec *as) {
+match g95_match_array_spec(g95_array_spec **asp) {
 array_type current_type;
+g95_array_spec *as;
 int i;
 
-  if (g95_match(" (") != MATCH_YES) return MATCH_NO;
+  if (g95_match(" (") != MATCH_YES) {
+    *asp = NULL;
+    return MATCH_NO;
+  }
+
+  as = g95_get_array_spec();
 
   for(i=0; i<G95_MAX_DIMENSIONS; i++) {
     as->shape[i].lower = NULL;
@@ -533,7 +538,7 @@ int i;
       goto cleanup;
     }
 
-    if (as->rank == G95_MAX_DIMENSIONS) {
+    if (as->rank >= G95_MAX_DIMENSIONS) {
       g95_error("Array specification at %C has more than "
 		stringize(G95_MAX_DIMENSIONS) " dimensions");
       goto cleanup;
@@ -551,26 +556,26 @@ int i;
     }
   }
 
+  *asp = as;
   return MATCH_YES;
 
 /* Something went wrong */
 
 cleanup:
   g95_free_array_spec(as);
+
   return MATCH_ERROR;
 }
 
 
-
 /* g95_set_array_spec()-- Given a symbol and an array specification,
- * modify the symbol to have array specification.  The error locus is
- * needed in case something goes wrong.  The array specification is
- * copied verbatim.  On failure, the caller must free the spec. */
+ * modify the symbol to have that array specification.  The error
+ * locus is needed in case something goes wrong.  On failure, the
+ * caller must free the spec. */
 
 try g95_set_array_spec(g95_symbol *sym, g95_array_spec *as, locus *error_loc) {
-int i;
 
-  if (as->rank == 0) return SUCCESS;
+  if (as == NULL) return SUCCESS;
 
   if (g95_add_dimension(&sym->attr, error_loc) == FAILURE) return FAILURE;
 
@@ -579,17 +584,7 @@ int i;
     return FAILURE;
   }
 
-  sym->as = *as;
-
-/* Clear the original array spec so that freeing it doesn't cause problems */
-
-  as->rank = 0;
-  as->type = AS_UNKNOWN;
-
-  for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-    as->shape[i].lower = NULL;
-    as->shape[i].upper = NULL;
-  }
+  sym->as = as;
 
   return SUCCESS;
 }
@@ -597,8 +592,16 @@ int i;
 
 /* copy_array_spec()-- Copy an array specification. */
 
-void g95_copy_array_spec(g95_array_spec *dest, g95_array_spec *src) {
+void g95_copy_array_spec(g95_array_spec **destp, g95_array_spec *src) {
+g95_array_spec *dest;
 int i;
+
+  if (src == NULL) {
+    *destp = NULL;
+    return;
+  }
+
+  dest = *destp = g95_get_array_spec();
 
   *dest = *src;
 

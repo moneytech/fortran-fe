@@ -1117,7 +1117,7 @@ match m;
 
     primary->ts = component->ts;
 
-    if (component->as.rank != 0) {
+    if (component->as->rank != 0) {
       tail = extend_ref(primary, tail);
       tail->type = REF_ARRAY;
 

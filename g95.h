@@ -307,12 +307,14 @@ typedef struct {
 
 } g95_array_spec;
 
+#define g95_get_array_spec() g95_getmem(sizeof(g95_array_spec))
+
 /* Components of derived types */
 
 typedef struct g95_component {
   char name[G95_MAX_SYMBOL_LEN+1];
   g95_typespec ts;
-  g95_array_spec as;
+  g95_array_spec *as;
   symbol_attribute attr;
   locus loc;
   struct g95_expr *initializer;
@@ -398,7 +400,7 @@ typedef struct g95_symbol {
   struct g95_interface *operator, *interface, *generic;
 
   struct g95_expr *value;           /* Parameter/Initializer value */
-  g95_array_spec as;
+  g95_array_spec *as;
   struct g95_symbol *result;        /* function result symbol */
   g95_component *components;        /* Derived type components */
 
@@ -414,7 +416,7 @@ typedef struct g95_symbol {
  * the old symbol. */
 
   struct g95_symbol *old_symbol, *tlink;
-  int mark;
+  int mark, serial;
   struct g95_namespace *ns;    /* namespace containing this symbol */
 
 } g95_symbol;
@@ -441,8 +443,8 @@ typedef struct g95_symbol {
 
 typedef struct g95_symtree {
   char name[G95_MAX_SYMBOL_LEN+1];
+  int ambiguous;
   g95_symbol *sym;             /* Symbol associated with this node */
-  int serial;
 
   struct g95_symtree *left, *right, *parent;
   enum { BLACK, RED } color;   /* node color (BLACK, RED) */
@@ -529,6 +531,8 @@ typedef struct g95_array_ref {
 
   struct g95_expr *offset;
 } g95_array_ref;
+
+#define g95_get_array_ref() g95_getmem(sizeof(g95_array_ref))
 
 
 /* Component reference nodes.  A variable is stored as an expression
@@ -841,6 +845,7 @@ int g95_string2code(mstring *, char *);
 void g95_init_1(void);
 void g95_init_2(void);
 void g95_done_1(void);
+void g95_done_2(void);
 
 /* error.c */
 
@@ -998,7 +1003,7 @@ void g95_symbol_init_2(void);
 void g95_symbol_done_2(void);
 void g95_show_symbol(g95_symbol *);
 
-void g95_traverse_symtree(g95_symtree *, void (*)(g95_symtree *));
+void g95_traverse_symtree(g95_namespace *, void (*)(g95_symtree *));
 void g95_traverse_ns(g95_namespace *, void (*)(g95_symbol *));
 void g95_save_all(g95_namespace *);
 
@@ -1069,9 +1074,6 @@ match g95_match_data(void);
 match g95_match_where(g95_statement *);
 match g95_match_elsewhere(void);
 match g95_match_forall(g95_statement *);
-match g95_match_module(void);
-void g95_free_rename(void);
-match g95_match_use(void);
 
 /* decl.c */
 
@@ -1162,8 +1164,6 @@ void g95_show_code(int, g95_code *);
 
 /* array.c */
 
-#define g95_get_array_ref() g95_getmem(sizeof(g95_array_ref))
-
 void g95_free_array_spec(g95_array_spec *);
 void g95_show_array_spec(g95_array_spec *);
 void g95_free_array_ref(g95_array_ref *);
@@ -1171,9 +1171,9 @@ void g95_show_array_ref(g95_array_ref *);
 g95_array_ref *g95_copy_array_ref(g95_array_ref *);
 
 try g95_set_array_spec(g95_symbol *, g95_array_spec *, locus *);
-void g95_copy_array_spec(g95_array_spec *, g95_array_spec *);
+void g95_copy_array_spec(g95_array_spec **, g95_array_spec *);
 void g95_resolve_array_spec(g95_array_spec *);
-match g95_match_array_spec(g95_array_spec *);
+match g95_match_array_spec(g95_array_spec **);
 
 match g95_match_array_ref(g95_array_ref *);
 try g95_resolve_array_ref(g95_array_ref *, g95_array_spec *);
@@ -1245,3 +1245,13 @@ match g95_match_format(void);
 
 match g95_match_defined_op(g95_symbol **, int);
 match g95_match_expr(g95_expr **);
+
+
+/* module.c */
+
+void g95_module_init_2(void);
+void g95_module_done_2(void);
+match g95_match_module(void);
+void g95_free_rename(void);
+match g95_match_use(void);
+void g95_dump_module(char *);

@@ -1601,7 +1601,7 @@ cleanup:
 
 match g95_match_common(void) {
 g95_symbol *sym, *common_name, **head, *tail;
-g95_array_spec as;
+g95_array_spec *as;
 match m, m2;
 
   if (g95_match_eos() == MATCH_YES) goto syntax;
@@ -1611,7 +1611,7 @@ match m, m2;
     g95_match(" / /");
   }
 
-  as.rank = 0;
+  as = NULL;
 
   for(;;) {
     if (common_name == NULL)
@@ -1657,7 +1657,7 @@ match m, m2;
       if (m == MATCH_ERROR) goto cleanup;
 
       if (m == MATCH_YES) {
-	if (as.type != AS_EXPLICIT) {
+	if (as->type != AS_EXPLICIT) {
 	  g95_error("Array specification for symbol '%s' in COMMON at %C "
 		    "must be explicit", sym->name);
 	  goto cleanup;
@@ -1672,7 +1672,6 @@ match m, m2;
 	}
 
 	sym->as = as;
-	as.rank = 0;
       }
 
       if (g95_match_eos() == MATCH_YES) goto done;
@@ -1697,7 +1696,7 @@ syntax:
   g95_syntax_error(ST_COMMON);
 
 cleanup:
-  if (as.rank != 0) g95_free_array_spec(&as);
+  g95_free_array_spec(as);
 
   return MATCH_ERROR;
 }

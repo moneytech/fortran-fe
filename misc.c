@@ -195,6 +195,7 @@ void g95_init_1(void) {
 void g95_init_2(void) {
 
   g95_symbol_init_2();
+  g95_module_init_2();
 }
 
 
@@ -206,6 +207,15 @@ void g95_done_1(void) {
 
   g95_scanner_done_1();
   g95_intrinsic_done_1();
+}
+
+
+/* g95_done_2()-- Per program unit destructors */
+
+void g95_done_2(void) {
+
+  g95_symbol_done_2();
+  g95_module_done_2();
 }
 
 

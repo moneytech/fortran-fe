@@ -38,7 +38,7 @@ static int old_char_selector;
 static g95_typespec current_ts;
 
 static symbol_attribute current_attr;
-static g95_array_spec current_as;
+static g95_array_spec *current_as;
 static int colon_seen;
 
 /* g95_new_block points to the symbol of a newly matched block. */
@@ -142,7 +142,7 @@ normal:
  * to the symbol table. */
 
 static try build_sym(char *name, g95_charlen *cl, g95_expr **initp,
-		     g95_array_spec *as, locus *var_locus) {
+		     g95_array_spec **as, locus *var_locus) {
 symbol_attribute attr;
 g95_symbol *sym;
 g95_expr *init;
@@ -166,8 +166,8 @@ g95_expr *init;
 
 /* Add dimension attribute if present. */
 
-  if (as->rank != 0 && g95_set_array_spec(sym, as, var_locus) == FAILURE)
-    return FAILURE;
+  if (g95_set_array_spec(sym, *as, var_locus) == FAILURE) return FAILURE;
+  *as = NULL;
 
 /* Add attribute to symbol.  The copy is so that we can reset the
  * dimension attribute. */
@@ -205,7 +205,7 @@ g95_expr *init;
  * name to a structure being built. */
 
 static try build_struct(char *name, g95_charlen *cl, g95_expr **init,
-			g95_array_spec *as) {
+			g95_array_spec **as) {
 g95_component *c;
 
   if ((current_ts.type == BT_DERIVED) &&
@@ -215,8 +215,8 @@ g95_component *c;
     return FAILURE;
   }
 
-  if (g95_current_block()->attr.pointer && as->rank != 0) {
-    if (as->type != AS_DEFERRED && as->type != AS_EXPLICIT) {
+  if (g95_current_block()->attr.pointer && (*as)->rank != 0) {
+    if ((*as)->type != AS_DEFERRED && (*as)->type != AS_EXPLICIT) {
       g95_error("Array component of structure at %C must have explicit "
 		"or deferred shape");
       return FAILURE;
@@ -233,7 +233,8 @@ g95_component *c;
   c->initializer = *init;
   *init = NULL;
 
-  g95_copy_array_spec(&c->as, as);
+  c->as = *as;
+  *as = NULL;
 
   return SUCCESS;
 }
@@ -248,13 +249,12 @@ g95_component *c;
 static match variable_decl(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
 g95_expr *initializer, *char_len;
-g95_array_spec as;
+g95_array_spec *as;
 g95_charlen *cl;
 locus var_locus;
 match m;
 try t;
 
-  as.rank = 0;
   initializer = NULL;
 
   m = g95_match_name(name);
@@ -264,7 +264,7 @@ try t;
 
   m = g95_match_array_spec(&as);
   if (m == MATCH_ERROR) goto cleanup;
-  if (m == MATCH_NO) g95_copy_array_spec(&as, &current_as);
+  if (m == MATCH_NO) g95_copy_array_spec(&as, current_as);
 
   char_len = NULL;
   cl = NULL;
@@ -327,7 +327,7 @@ try t;
 
 cleanup:
   g95_free_expr(initializer);
-  g95_free_array_spec(&as);
+  g95_free_array_spec(as);
 
   return m;
 }
@@ -702,11 +702,7 @@ try t;
   g95_clear_attr(&current_attr);
   start = *g95_current_locus();
 
-  current_as.rank = 0;
-  for(i=0; i<G95_MAX_DIMENSIONS; i++) {
-    current_as.shape[i].lower = NULL;
-    current_as.shape[i].upper = NULL;    
-  }
+  current_as = NULL;
 
 /* See if we get all of the keywords up to the final double colon */
 
@@ -720,13 +716,10 @@ try t;
     seen[d]++;
     seen_at[d] = *g95_current_locus();
 
-    if (d == DECL_DIMENSION) {
-      g95_free_array_spec(&current_as);
-
-      if (g95_match_array_spec(&current_as) != MATCH_YES) {
-	m = MATCH_NO;  /* If we had an error here, it'll be back */
-	goto cleanup;
-      }
+    if (d == DECL_DIMENSION &&
+	g95_match_array_spec(&current_as) != MATCH_YES) {
+      m = MATCH_NO;  /* If we had an error here, it'll be back */
+      goto cleanup;
     }
   }
 
@@ -855,7 +848,8 @@ try t;
 
 cleanup:
   g95_set_locus(&start);
-  g95_free_array_spec(&current_as);
+  g95_free_array_spec(current_as);
+  current_as = NULL;
   return m;
 }
 
@@ -898,7 +892,8 @@ match m;
   }
 
 cleanup:
-  g95_free_array_spec(&current_as);
+  g95_free_array_spec(current_as);
+  current_as = NULL;
   return m;
 }
 
@@ -1075,7 +1070,6 @@ match m;
   g95_clear_attr(&current_attr);
 
   current_ts.type = BT_UNKNOWN;
-  current_as.rank = 0;
 
   arglist = NULL;
   old_loc = *g95_current_locus();
@@ -1131,15 +1125,12 @@ match m;
 
   sym->ts = current_ts; 
   sym->result = result;
-  sym->as = current_as;
 
   g95_new_block = sym;
   return MATCH_YES;
 
 cleanup:
   g95_reject_statement();
-
-  g95_free_array_spec(&current_as);
   g95_set_locus(&old_loc);
   return m;
 }
@@ -1426,12 +1417,12 @@ cleanup:
 
 static match attr_decl1(void) {
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_array_spec as;
+g95_array_spec *as;
 g95_symbol *sym;
 locus var_locus;
 match m;
 
-  as.rank = 0;
+  as = NULL;
 
   m = g95_match_name(name);
   if (m != MATCH_YES) goto cleanup;
@@ -1455,7 +1446,7 @@ match m;
     }
 
     if ((current_attr.allocatable || current_attr.pointer) &&
-	  (m == MATCH_YES) && (as.type != AS_DEFERRED)) {
+	  (m == MATCH_YES) && (as->type != AS_DEFERRED)) {
       g95_error("Array specification must be deferred at %L",
 		&var_locus);
       m = MATCH_ERROR;
@@ -1471,7 +1462,8 @@ match m;
     goto cleanup;
   }
 
-  if (as.rank != 0 && g95_set_array_spec(sym, &as, &var_locus) == FAILURE) {
+  if (g95_set_array_spec(sym, as, &var_locus) == FAILURE) {
+    g95_free_array_spec(as);
     m = MATCH_ERROR;
     goto cleanup;
   }
@@ -1479,13 +1471,13 @@ match m;
   return MATCH_YES;
 
 cleanup:
-  g95_free_array_spec(&as);
+  g95_free_array_spec(as);
   return m;
 }
 
 
 /* attr_decl()-- Generic attribute declaration subroutine.  Used for
- * attributes that just have a list of names */
+ * attributes that just have a list of names. */
 
 static match attr_decl(void) {
 match m;

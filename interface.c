@@ -307,7 +307,7 @@ g95_component *dt1, *dt2;
 
     if (g95_compare_attr(&dt1->attr, &dt2->attr) == 0) return 0;
 
-    if (g95_compare_array_spec(&dt1->as, &dt2->as) == 0) return 0;
+    if (g95_compare_array_spec(dt1->as, dt2->as) == 0) return 0;
       
     if (g95_compare_types(&dt1->ts, &dt2->ts) == 0) return 0;
 
@@ -335,7 +335,7 @@ g95_symbol *s1, *s2;
 
     if (g95_compare_types(&s1->ts, &s2->ts) == 0) return 0;
 
-    if (g95_compare_array_spec(&s1->as, &s2->as) == 0) return 0;
+    if (g95_compare_array_spec(s1->as, s2->as) == 0) return 0;
 
     a1 = a1->next;
     a2 = a2->next;

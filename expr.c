@@ -861,7 +861,7 @@ g95_array_spec *as;
 g95_ref *ref;
 try t;
 
-  as = &expr->symbol->as;
+  as = expr->symbol->as;
   t = SUCCESS;
 
   for(ref=expr->ref; ref; ref=ref->next)
@@ -872,7 +872,7 @@ try t;
       break;
 
     case REF_COMPONENT:
-      as = &ref->component->as;   /* In case an array ref is next */
+      as = ref->component->as;   /* In case an array ref is next */
       break;
 
     case REF_SUBSTRING:

@@ -393,6 +393,16 @@ g95_alloc *a;
 }
 
 
+/* resolve_symbol()-- Do anything necessary to resolve a symbol.
+ * Right now, we just assume that an otherwise unknown symbol is a
+ * variable.  This sort of thing commonly happens for symbols in module. */
+
+static void resolve_symbol(g95_symbol *sym) {
+
+  if (sym->attr.flavor == FL_UNKNOWN) sym->attr.flavor = FL_VARIABLE;
+}
+
+
 /* g95_resolve()-- This function is called after a complete
  * program unit has been compiled.  Its purpose is to examine all of
  * the expressions associated with the program unit, assign types to
@@ -419,6 +429,8 @@ g95_charlen *cl;
   }
 
   g95_check_st_labels(ns);
+
+  g95_traverse_ns(ns, resolve_symbol);
 }
 
 

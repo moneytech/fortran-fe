@@ -1864,13 +1864,18 @@ loop:
 
   g95_current_ns->code = s.head;
 
-  if (g95_option.resolve) g95_resolve(g95_current_ns);
-
-/* generate_code(g95_current_ns); */
+  if (s.state == COMP_MODULE) {
+    g95_resolve(g95_current_ns);
+    g95_dump_module(s.sym->name);
+  } else {
+    if (g95_option.resolve) g95_resolve(g95_current_ns);
+    // generate_code(g95_current_ns);
+  }
 
   if (g95_option.verbose) g95_show_namespace(g95_current_ns);
 
   pop_state();
+  g95_done_2();
   goto loop;
 
 done:

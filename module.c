@@ -24,6 +24,7 @@ Boston, MA 02111-1307, USA.  */
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include "g95.h"
 
@@ -44,7 +45,6 @@ static char module_name[G95_MAX_SYMBOL_LEN+1];
 static g95_use_rename *g95_rename_list;
 static int only_flag;
 
-
 static FILE *module_fp;
 static int module_line, module_column;
 static enum { IO_INPUT, IO_OUTPUT } iomode;
@@ -52,6 +52,7 @@ static enum { IO_INPUT, IO_OUTPUT } iomode;
 static int sym_num;
 static g95_symtree *name_index;
 
+static g95_symbol **sym_table;
 
 
 /* g95_free_rename()-- Free the rename list left behind by a USE
@@ -136,6 +137,85 @@ cleanup:
 
 
 
+/*****************************************************************/
+
+/* The next couple of subroutines keep track of which modules have
+ * been loaded in the current program unit.  Modules that haven't been
+ * seen before can be loaded much faster the first time. */
+
+typedef struct g95_module {
+  char name[G95_MAX_SYMBOL_LEN+1];
+  struct g95_module *next;
+} g95_module;
+
+static g95_module *loaded_modules, *new_modules;
+
+
+/* find_module()-- See if a module can be found in a list of modules.
+ * Returns zero if not, nonzero if so. */
+
+static int find_module(g95_module *m, char *name) {
+
+  for(; m; m=m->next)
+    if (strcmp(name, m->name) == 0) return 1;
+
+  return 0;
+}
+
+
+/* check_module()-- See if a we've seen a particular module name
+ * before.  Returns zero if not, nonzero if we have.  As a side
+ * effect, not-seen before modules are placed in the new_modules list. */
+
+static int check_module(char *name) {
+g95_module *m;
+
+  if (find_module(loaded_modules, name)) return 1;
+
+  if (!find_module(new_modules, name)) {
+    m = g95_getmem(sizeof(g95_module));
+
+    strcpy(m->name, name);
+    m->next = new_modules;
+
+    new_modules = m;
+  }
+
+  return 0;
+}
+
+
+/* save_modules()-- Concatenate the new_modules list with the
+ * loaded_modules lists.  Called after a USE is complete. */
+
+static void save_modules(void) {
+g95_module *m;
+
+  if (new_modules == NULL) return; 
+
+  m = new_modules;
+  while(m->next != NULL)
+    m = m->next;
+
+  m->next = loaded_modules;
+
+  loaded_modules = new_modules;
+  new_modules = NULL;
+}
+
+
+static void free_module_list(g95_module *m) {
+g95_module *next;
+
+  for(;m; m=next) {
+    next = m->next;
+    g95_free(m);
+  }
+}
+
+
+
+/*****************************************************************/
 
 
 /* Module reading and writing */
@@ -143,6 +223,9 @@ cleanup:
 typedef enum {
   ATOM_NAME, ATOM_LPAREN, ATOM_RPAREN, ATOM_INTEGER, ATOM_STRING, ATOM_EOF
 } atom_type;
+
+
+static atom_type last_atom;
 
 
 typedef struct {
@@ -410,7 +493,8 @@ int i;
 
 static void write_char(char out) {
 
-  if (fputc(out, module_fp) == EOF) bad_module("I/O error");
+  if (fputc(out, module_fp) == EOF)
+    g95_fatal_error("Error writing modules file: %s", sys_errlist[errno]);
 
   if (out == '\n')
     module_column = 1;
@@ -426,11 +510,11 @@ static void write_char(char out) {
  * of a deal, since the file really isn't meant to be read by people
  * anyway. */
 
-static void write_atom(atom_type type, void *v) {
+static void write_atom(atom_type atom, void *v) {
 char *p, buffer[20];
 int len;
 
-  switch(type) {
+  switch(atom) {
   case ATOM_STRING:
   case ATOM_NAME:
     p = v;
@@ -455,21 +539,26 @@ int len;
 
   len = strlen(p);
 
-  if (type != ATOM_RPAREN) {
+  if (atom != ATOM_RPAREN) {
     if (module_column + len > 72)
       write_char('\n');
-    else
-      write_char(' ');
+    else {
+
+      if (last_atom != ATOM_LPAREN)
+	write_char(' ');
+    }
   }
 
-  if (type == ATOM_STRING) write_char('\'');
+  if (atom == ATOM_STRING) write_char('\'');
 
   while(*p) {
-    if (type == ATOM_STRING && *p == '\'') write_char('\'');
+    if (atom == ATOM_STRING && *p == '\'') write_char('\'');
     write_char(*p++);
   }
 
-  if (type == ATOM_STRING) write_char('\'');
+  if (atom == ATOM_STRING) write_char('\'');
+
+  last_atom = atom;
 }
 
 
@@ -619,7 +708,7 @@ atom_type t;
   attr->intent = mio_name(attr->intent, intents);
   attr->scope = mio_name(attr->scope, scopes);
 
-  if (iomode == IO_INPUT) {
+  if (iomode == IO_OUTPUT) {
     if (attr->allocatable)   mio_name(AB_ALLOCATABLE, attr_bits);
     if (attr->dimension)     mio_name(AB_DIMENSION, attr_bits);
     if (attr->external)      mio_name(AB_EXTERNAL, attr_bits);
@@ -725,10 +814,23 @@ static mstring array_spec_types[] = {
 };
 
 
-static void mio_array_spec(g95_array_spec *as) {
+static void mio_array_spec(g95_array_spec **asp) {
+g95_array_spec *as;
 int i;
 
   mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    if (*asp == NULL) goto done;
+    as = *asp;
+  } else {
+    if (peek_atom() == ATOM_RPAREN) {
+      *asp = NULL;
+      goto done;
+    }
+
+    *asp = as = g95_get_array_spec();
+  }
 
   mio_integer(&as->rank);
   as->type = mio_name(as->type, array_spec_types);
@@ -738,6 +840,7 @@ int i;
     mio_expr(&as->shape[i].upper);
   }
 
+done:
   mio_rparen();
 }
 
@@ -797,6 +900,39 @@ static void mio_component(g95_component *c) {
 }
 
 
+static void mio_component_list(g95_component **cp) {
+g95_component *c, *tail;
+
+  mio_lparen();
+
+  if (iomode == IO_OUTPUT) {
+    for(c=*cp; c; c=c->next)
+      mio_component(c);
+  } else {
+
+    *cp = NULL;
+    tail = NULL;
+
+    for(;;) {
+      if (peek_atom() == ATOM_RPAREN) break;
+
+      c = g95_getmem(sizeof(g95_component));
+      mio_component(c);
+
+      if (tail == NULL)
+	*cp = c;
+      else
+	tail->next = c;
+
+      tail = c;
+    }
+  }
+
+  mio_rparen();
+}
+
+
+
 static void mio_actual_arg(g95_actual_arglist *a) {
 
   mio_lparen();
@@ -838,6 +974,11 @@ g95_actual_arglist *a, *tail;
 }
 
 
+static void mio_interface(g95_interface **p) {
+
+
+}
+
 
 /* mio_symbol_ref()-- Saves a *reference* to a symbol.  An entity's
  * real name is its address in memory, which is guaranteed to be
@@ -847,11 +988,26 @@ g95_actual_arglist *a, *tail;
 
 static void mio_symbol_ref(g95_symbol **symp) {
 
+  if (iomode == IO_OUTPUT) {
+    if (*symp != NULL)
+      write_atom(ATOM_INTEGER, &((*symp)->serial));
+    else {
+      mio_lparen();
+      mio_rparen();
+    }
+  } else {
 
-
+    if (peek_atom() == ATOM_LPAREN) {
+      mio_lparen();
+      mio_rparen();
+      *symp = NULL;
+    } else {
+      require_atom(ATOM_INTEGER);
+      if (atom_int >= sym_num) bad_module("Symbol number out of range");
+      *symp = sym_table[atom_int];
+    }
+  }
 }
-
-
 
 
 
@@ -1155,28 +1311,39 @@ g95_expr *e;
 
 
 
+/* mio_symbol()-- Unlike most other routines, the address of the
+ * symbol node is already fixed on input and the name/module has
+ * already been filled in */
+
+static void mio_symbol(g95_symbol *sym) {
+
+  mio_lparen();
+
+  mio_typespec(&sym->ts);
+  mio_symbol_attribute(&sym->attr);
+
+  mio_interface(&sym->operator);
+  mio_interface(&sym->interface);
+  mio_interface(&sym->generic);
+
+  mio_expr(&sym->value);
+  mio_array_spec(&sym->as);
+
+  mio_symbol_ref(&sym->result);
+
+  mio_component_list(&sym->components);
+
+  mio_symbol_ref(&sym->common_head);
+  mio_symbol_ref(&sym->common_next);
+
+  //  sym->ns = g95_current_ns;
+
+  mio_rparen();
+
+}
+
+
 /************************* Top level subroutines *************************/
-
-
-/* number_symbol()-- Worker function called by g95_traverse_symtree to
- * assign a serial number to each symtree node within a namespace */
-
-static void number_symbol(g95_symtree *st) {
-
-  st->serial = sym_num++;
-}
-
-
-/* write_symtree()-- Write a symtree name on the output */
-
-static void write_symtree(g95_symtree *st) {
-
-  write_atom(ATOM_NAME, st->name);
-}
-
-
-
-
 
 
 
@@ -1203,30 +1370,103 @@ int i, n;
 
 
 
+/* find_writables()-- Worker function called by g95_traverse_ns to
+ * find those symbols that should be written to the module file and
+ * assign a number to them.  Symbols that should not be written are
+ * assigned a number of -1.  */
 
+static void find_writables(g95_symbol *sym) {
 
-static void write_symbol(g95_symtree *st) {
+  sym->serial = -1;
 
+  switch(sym->attr.flavor) {
+  case FL_UNKNOWN:      case FL_PROGRAM:     case FL_BLOCK_DATA:
+  case FL_MODULE:       case FL_LABEL:       case FL_ST_FUNCTION:
+  case FL_DUMMY_PROC:  /* Can't happen or don't save cases */
+    break;
 
+  case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
+  case FL_PROCEDURE:    case FL_DERIVED:     case FL_NAMELIST:
+  case FL_GENERIC:
+    if (sym->attr.private == 0) sym->serial = sym_num++;
+    break;
+  }
 }
 
-static void write_name(g95_symtree *st) {
 
 
+/* write_symbol()-- Write a symbol to the module.  Different symbol
+ * classes are written at different times in order to be able to
+ * always reconstruct things. */
+
+static int phase;
+
+static void write_symbol(g95_symbol *sym) {
+
+  if (sym->serial == -1) return;
+
+  switch(sym->attr.flavor) {
+  case FL_DERIVED:
+    if (phase == 1) mio_symbol(sym);
+    break;
+
+  case FL_VARIABLE:     case FL_PARAMETER:   case FL_MODULE_PROC:
+  case FL_PROCEDURE:    case FL_NAMELIST:    case FL_GENERIC:
+    if (phase == 2) mio_symbol(sym);
+    break;
+
+  default:
+    g95_internal_error("write_symbol(): Bad symbol class");
+  }
 }
 
 
+/* write_true_name()-- Given a symbol, write it's true name.  For
+ * symbols that don't have a module name, we give it the name of the
+ * current module. */
 
-static void write_ns(g95_namespace *ns) {
+static void write_true_name(g95_symbol *sym) {
+
+  if (sym->serial == -1) return;
+
+  if (sym->module[0] == '\0') strcpy(sym->module, g95_state_stack->sym->name);
+
+  write_atom(ATOM_NAME, sym->module);
+  write_atom(ATOM_NAME, sym->name);
+}
+
+
+/* write_symtree()-- Write a symtree node that points to a symbol that
+ * we are going to save */
+
+static void write_symtree(g95_symtree *st) {
+
+  if (st->sym->serial == -1) return;
+
+  mio_lparen();
+  write_atom(ATOM_NAME, st->name);
+  write_atom(ATOM_INTEGER, &st->sym->serial);
+  write_atom(ATOM_INTEGER, &st->ambiguous);
+  mio_rparen();
+}
+
+
+static void write_module(void) {
 
   sym_num = 0;
 
-  g95_traverse_symtree(ns->root, number_symbol);
+  g95_traverse_ns(g95_current_ns, find_writables);
 
+  mio_lparen();
   write_atom(ATOM_INTEGER, &sym_num);
 
-  g95_traverse_symtree(ns->root, write_name);  /* Traversal is in same order */
+  mio_lparen();
+  g95_traverse_ns(g95_current_ns, write_true_name);
+  mio_rparen();
 
+  mio_lparen();
+  g95_traverse_symtree(g95_current_ns, write_symtree);
+  mio_rparen();
 
 /* Write symbols.  The only ordering issue I can think of at the
  * moment is that structure definitions have to be written first in
@@ -1234,8 +1474,13 @@ static void write_ns(g95_namespace *ns) {
  * appears to be OK to write the structure references themselves in
  * any order */
 
-  g95_traverse_symtree(ns->root, write_symbol);
+  mio_lparen();
 
+  for(phase=1; phase<=2; phase++)
+    g95_traverse_ns(g95_current_ns, write_symbol);
+
+  mio_rparen();
+  mio_rparen();
 }
 
 
@@ -1249,18 +1494,15 @@ g95_symtree *name_index_save;
   name_index_save = name_index;
   name_index = NULL;
 
-
   mio_lparen();
 
   /* The first task is to list the symbols we're about to spew */
-
 
   mio_rparen();
 
   if (name_index != NULL) g95_free(name_index);
   name_index = name_index_save;
 }
-
 
 
 /* g95_dump_module()-- Given module, dump it to disk */
@@ -1271,10 +1513,36 @@ char filename[G95_MAX_SYMBOL_LEN+5];
   strcpy(filename, name);
   strcat(filename, MODULE_EXTENSION);
 
-  if (g95_open_status(filename) == FAILURE) return;
+  module_fp = fopen(filename, "w");
+  if (module_fp == NULL)
+    g95_fatal_error("Can't open module file '%s' for writing: %s", 
+		    filename, sys_errlist[errno]);
 
-  g95_status("G95 Module: Do not edit\n");
+  fputs("G95 Module: Do not edit\n\n", module_fp);
+
+  iomode = IO_OUTPUT;
+
+  write_module();
+
+  write_char('\n');
+
+  if (fclose(module_fp))
+    g95_fatal_error("Error writing module file '%s' for writing: %s", 
+		    filename, sys_errlist[errno]);
+}
 
 
-  g95_close_status();
+void g95_module_init_2(void) {
+
+  loaded_modules = NULL;
+  new_modules = NULL;
+
+  last_atom = ATOM_LPAREN;
+}
+
+
+void g95_module_done_2(void) {
+
+  free_module_list(loaded_modules);
+  free_module_list(new_modules);
 }
