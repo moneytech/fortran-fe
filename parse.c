@@ -469,8 +469,8 @@ g95_statement st;
 /* Block end statements.  Errors associated with interchanging these
  * are detected in g95_match_end(). */
 
-#define case_end case ST_END: case ST_END_BLOCK_DATA: case ST_END_FUNCTION: \
-   case ST_END_PROGRAM: case ST_END_SUBROUTINE
+#define case_end case ST_END_BLOCK_DATA: case ST_END_FUNCTION: \
+                 case ST_END_PROGRAM: case ST_END_SUBROUTINE
 
 
 /* push_state()-- Push a new state onto the stack */
@@ -516,12 +516,13 @@ g95_sl_type type;
   if (g95_statement_label == 0) return;
 
   switch(st) {
-  case ST_ENDDO:  case ST_ENDIF:  case ST_END_SELECT:
+  case ST_END_PROGRAM:    case ST_END_FUNCTION:  case ST_END_SUBROUTINE:
+  case ST_ENDDO:          case ST_ENDIF:         case ST_END_SELECT:
   case_executable:
   case_exec_markers:
-  new_st.here = g95_statement_label;
-  type = ST_LABEL_TARGET;
-  break;
+    new_st.here = g95_statement_label;
+    type = ST_LABEL_TARGET;
+    break;
 
   case ST_FORMAT:
     new_st.here = g95_statement_label;
@@ -588,7 +589,6 @@ const char *p;
   case ST_ELSE:           p = "ELSE"; break;
   case ST_ELSEIF:         p = "ELSE IF"; break;
   case ST_ELSEWHERE:      p = "ELSEWHERE"; break;
-  case ST_END:            p = "END"; break;
   case ST_END_BLOCK_DATA: p = "END BLOCK DATA"; break;
   case ST_ENDDO:          p = "END DO"; break;
   case ST_END_FILE:       p = "END FILE"; break;
@@ -699,12 +699,18 @@ static void accept_statement(g95_statement st) {
     g95_current_ns->proc_name = g95_new_block;
     break;
 
+  case ST_END_PROGRAM:
+  case ST_END_FUNCTION:
+  case ST_END_SUBROUTINE:
   case ST_ENDIF:
   case ST_ENDDO:
   case ST_END_SELECT:
-    if (g95_statement_label == 0) break;
+    /* These are all branch targets. If the end statement has
+     * a label, we fake the statement with a labeled EXEC_NOP. */
 
+    if (g95_statement_label == 0) break;
     new_st.op = EXEC_NOP;
+
     /* Fall through */
  
   case_executable:
@@ -1839,7 +1845,6 @@ loop:
   st = next_statement();
   switch(st) {
   case ST_NONE:
-  case ST_END:
     goto done;
 
   case ST_PROGRAM:
