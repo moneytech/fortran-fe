@@ -1028,7 +1028,11 @@ int i, n, na;
   i = 0;
   for(f=formal; f; f=f->next, i++) {
     if (new[i] != NULL) continue;
-    if (!f->sym->attr.optional) return 0;
+    if (!f->sym->attr.optional) {
+      if (where) g95_error("Missing actual argument for argument '%s' at %L",
+			   f->sym->name, where);
+      return 0;
+    }
   }
 
   /* The argument lists are compatible.  We now relink a new actual
