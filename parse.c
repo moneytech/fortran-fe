@@ -1244,6 +1244,7 @@ g95_statement st;
     default:
       g95_error("Unexpected %s statement in WHERE block at %C",
 		g95_ascii_statement(st));
+      g95_reject_statement();
       break;
     }
 
@@ -1779,11 +1780,10 @@ g95_statement st;
 
   st = parse_spec(ST_NONE);
 
-  for(;;) {
-    if (st == ST_END_BLOCK_DATA) break;
+  while(st != ST_END_BLOCK_DATA) {
     g95_error("Unexpected %s statement in BLOCK DATA at %C",
 	      g95_ascii_statement(st));
-
+    g95_reject_statement();
     st = next_statement();
   }
 }
@@ -1813,6 +1813,7 @@ loop:
     g95_error("Unexpected %s statement in MODULE at %C",
 	      g95_ascii_statement(st));
 
+    g95_reject_statement();
     st = next_statement();
     goto loop;
   }
