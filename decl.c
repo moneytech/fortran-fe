@@ -1001,7 +1001,7 @@ match m;
 
 /* Duplicate symbols in an argument list are detected when we add the
  * DUMMY flavor.  We don't add the VARIABLE flavor because the name
- * could be a dummy subroutine or function */
+ * could be a dummy procedure */
 
     if (sym != NULL && (g95_add_dummy(&sym->attr, NULL) == FAILURE ||
 			g95_missing_attr(&sym->attr, NULL) == FAILURE)) {

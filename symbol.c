@@ -451,7 +451,7 @@ static char *dummy = "DUMMY", *parameter = "PARAMETER", *save = "SAVE",
   *elemental = "ELEMENTAL", *private = "PRIVATE", *sequence = "SEQUENCE",
   *recursive = "RECURSIVE", *in_common = "COMMON", *result = "RESULT",
   *in_namelist = "NAMELIST", *public = "PUBLIC", *optional = "OPTIONAL",
-  *entry = "ENTRY";
+  *entry = "ENTRY", *function = "FUNCTION", *subroutine = "SUBROUTINE";
 
   if (loc == NULL) loc = g95_current_locus();
 
@@ -496,6 +496,8 @@ static char *dummy = "DUMMY", *parameter = "PARAMETER", *save = "SAVE",
   conf(in_namelist, allocatable);
 
   conf(entry, result);
+
+  conf(function, subroutine);
 
   a1 = g95_code2string(flavors, attr->flavor);
 
@@ -557,12 +559,28 @@ try g95_add_dimension(symbol_attribute *attr, locus *loc) {
 try g95_add_external(symbol_attribute *attr, locus *loc) {
 
   attr->external = 1;
+
+  if (attr->dummy) {
+    if (g95_add_flavor(attr, FL_DUMMY_PROC, loc) == FAILURE) return FAILURE;
+  } else {
+    if (g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+    attr->scope = SCOPE_EXTERNAL;
+  }
+
   return check_conflict(attr, loc);
 }
 
 try g95_add_intrinsic(symbol_attribute *attr, locus *loc) {
 
   attr->intrinsic = 1;
+
+  if (attr->dummy) {
+    if (g95_add_flavor(attr, FL_DUMMY_PROC, loc) == FAILURE) return FAILURE;
+  } else {
+    if (g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+    attr->scope = SCOPE_INTRINSIC;
+  }
+
   return check_conflict(attr, loc);
 }
 
@@ -680,16 +698,21 @@ try g95_add_entry(symbol_attribute *attr, locus *loc) {
 
 try g95_add_function(symbol_attribute *attr, locus *loc) {
 
+  if (attr->flavor != FL_PROCEDURE && attr->flavor != FL_DUMMY_PROC &&
+      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+
   attr->function = 1;
   return check_conflict(attr, loc);
 }
 
 try g95_add_subroutine(symbol_attribute *attr, locus *loc) {
 
+  if (attr->flavor != FL_PROCEDURE &&
+      g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
+
   attr->subroutine = 1;
   return check_conflict(attr, loc);
 }
-
 
 try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 
@@ -706,7 +729,6 @@ try g95_add_flavor(symbol_attribute *attr, sym_flavor f, locus *loc) {
 
   return FAILURE;
 }
-
 
 try g95_add_intent(symbol_attribute *attr, sym_intent intent, locus *loc) {
 
@@ -806,8 +828,6 @@ try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src, locus *loc) {
 
   if (src->allocatable && g95_add_allocatable(dest, loc) == FAILURE) goto fail;
   if (src->dimension && g95_add_dimension(dest, loc) == FAILURE) goto fail;
-  if (src->external && g95_add_external(dest, loc) == FAILURE) goto fail;
-  if (src->intrinsic && g95_add_intrinsic(dest, loc) == FAILURE) goto fail;
   if (src->optional && g95_add_optional(dest, loc) == FAILURE) goto fail;
   if (src->pointer && g95_add_pointer(dest, loc) == FAILURE) goto fail;
   if (src->private && g95_add_private(dest, loc) == FAILURE) goto fail;
@@ -839,6 +859,13 @@ try g95_copy_attr(symbol_attribute *dest, symbol_attribute *src, locus *loc) {
       g95_add_intent(dest, src->intent, loc) == FAILURE) goto fail;
 
   if (g95_missing_attr(dest, loc) == FAILURE) goto fail;
+
+/* The subroutines that set these bits also cause flavors to be set,
+ * and that has already happened in the original, so don't let to
+ * happen again. */
+
+  if (src->external) dest->external = 1;
+  if (src->intrinsic) dest->intrinsic = 1;
 
   return SUCCESS;
 

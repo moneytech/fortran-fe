@@ -1280,7 +1280,6 @@ match g95_match_rvalue(g95_expr **result) {
 g95_symbol *sym;
 locus where;
 g95_expr *e;
-int lparen;
 match m;
 
   m = g95_match_symbol(&sym);
@@ -1312,17 +1311,34 @@ match m;
     if (m == MATCH_YES) e->symbol = sym;
     break;
 
-/* See if we have a function of some kind */
 
-  function0:
+/* If we're here, then the name is known to be the name of a
+ * procedure, yet it is not sure to be the name of a function. */
+
+  case FL_PROCEDURE:
+    if (sym->attr.subroutine) {
+      e = g95_get_expr();
+      e->symbol = sym;
+
+      e->expr_type = EXPR_VARIABLE;
+      e->ts.type = BT_PROCEDURE;
+      m = MATCH_YES;
+      break;
+    }
+
+/* At this point, the name has to be a function and can either be a
+ * function call or dummy reference.  Fall through */
+
   case FL_ST_FUNCTION:
+  function0:
     e = g95_get_expr();
     e->symbol = sym;
 
     m = g95_match_actual_arglist(0, &e->value.function.actual, NULL);
     if (m == MATCH_NO) {
       if (sym->attr.flavor == FL_ST_FUNCTION)
-	g95_error("Function '%s' requires argument list at %C", sym->name);
+	g95_error("Statement function '%s' requires argument list at %C",
+		  sym->name);
       else {
 	e->expr_type = EXPR_VARIABLE;
 	e->ts.type = BT_PROCEDURE;
@@ -1336,8 +1352,13 @@ match m;
       break;
     }
 
+    if (!sym->attr.function && g95_add_function(&sym->attr, NULL) == FAILURE) {
+      m = MATCH_ERROR;
+      break;
+    }
+
     e->expr_type = EXPR_FUNCTION;
-    m = match_varspec(e);
+    m = MATCH_YES;
     break;
 
   case FL_UNKNOWN:
@@ -1357,27 +1378,12 @@ match m;
       break;
     }
 
-    g95_gobble_whitespace();
-    lparen = (g95_peek_char() == '(');
-
-    if (sym->attr.external || sym->attr.intrinsic) {
-      if (lparen) goto have_function;
-
-      if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) {
-	m = MATCH_ERROR;
-	break;
-      }
-
-      e->expr_type = EXPR_VARIABLE;
-      m = MATCH_YES;
-      break;      
-    }
-
 /* Name is not an array, so we peek to see if a '(' implies a function
  * call or a substring reference.  Otherwise the variable is just a
  * scalar. */
 
-    if (!lparen) {   /* Not a function call, assume a scalar */
+    g95_gobble_whitespace();
+    if (g95_peek_char() != '(') {   /* Assume a scalar variable */
       e->expr_type = EXPR_VARIABLE;
 
       if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) {
@@ -1390,7 +1396,8 @@ match m;
       break;
     }
 
-    /* See if this could possibly be a substring reference */
+    /* See if this could possibly be a substring reference of a name
+     * that we're not sure is a variable yet. */
 
     if ((e->ts.type == BT_UNKNOWN || e->ts.type == BT_CHARACTER) &&
 	g95_match_substring(&e->ref) == MATCH_YES) {
@@ -1414,20 +1421,18 @@ match m;
       break;
     }
 
-  have_function:    /* Give up, assume we have a function */
+    /* Give up, assume we have a function */
 
     e->expr_type = EXPR_FUNCTION;
 
-    if (sym->attr.function ||
-	g95_add_flavor(&sym->attr, FL_PROCEDURE, NULL) == FAILURE ||
-	g95_add_function(&sym->attr, NULL) == FAILURE) {
+    if (!sym->attr.function && g95_add_function(&sym->attr, NULL) == FAILURE) {
       m = MATCH_ERROR;
       break;
     }
 
     m = g95_match_actual_arglist(0, &e->value.function.actual, NULL);
     if (m == MATCH_NO)
-      g95_error("Incomplete argument list in function at %C");
+      g95_error("Missing argument list in function '%s' at %C", sym->name);
 
     if (m != MATCH_YES) {
       m = MATCH_ERROR;
