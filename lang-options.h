@@ -24,6 +24,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
       N_("Output namespace and code structures") },
 { "-Wline-truncation",
       N_("Warn about truncated source lines") },
+{ "-Waliasing",
+      N_("Warn about possible aliasing of dummy arguments") },
 { "-Wimplicit",
       N_("Specify that no implicit typing is allowed, unless overridden by "
 	 "explicit IMPLICIT statements") },

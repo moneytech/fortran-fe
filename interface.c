@@ -1058,6 +1058,140 @@ int i, n, na;
   return 1;
 }
 
+typedef struct {
+  g95_formal_arglist *f;
+  g95_actual_arglist *a;
+} argpair;
+
+/* pair_cmp()-- qsort comparison function with the following order:
+ *  - p->a->expr == NULL
+ *  - p->a->expr->expr_type != EXPR_VARIABLE
+ *  - growing p->a->expr->symbol
+ */
+static int pair_cmp(const void *p1, const void *p2){
+const g95_actual_arglist *a1, *a2;
+
+  /* *p1 and *p2 are elements of the to-be-sorted array */
+  a1 = ((const argpair *)p1)->a;
+  a2 = ((const argpair *)p2)->a;
+  if (!a1->expr) {
+    if (!a2->expr) return 0;
+    return -1;
+  }
+  if (!a2->expr)
+    return 1;
+  if (a1->expr->expr_type != EXPR_VARIABLE) {
+    if (a2->expr->expr_type != EXPR_VARIABLE)
+      return 0;
+    return -1;
+  }
+  if (a2->expr->expr_type != EXPR_VARIABLE)
+    return 1;
+  return a1->expr->symbol < a2->expr->symbol;
+}
+
+/* compare_ref()-- Given two expressions from some actual arguments, test 
+ * whether they refer to the same expression. The analysis is conservative.
+ * Returning FAILURE will produce no warning. */
+
+static try compare_actual_expr(g95_expr *e1, g95_expr *e2){
+const g95_ref *r1, *r2;
+  
+  if (!e1 || !e2 ||
+      e1->expr_type != EXPR_VARIABLE ||
+      e2->expr_type != EXPR_VARIABLE ||
+      e1->symbol != e2->symbol)
+    return FAILURE;
+
+  /* TODO improve comparison see expr.c 'show_ref' */
+
+  for(r1 = e1->ref, r2 = e2->ref; r1 && r2; r1 = r1->next, r2 = r2->next){
+    if (r1->type != r2->type)
+      return FAILURE;
+    switch (r1->type) {
+    case REF_ARRAY:
+      if (r1->u.ar.type != r2->u.ar.type)
+	return FAILURE;
+      /* at the moment, consider only full arrays;
+       * we could do better.  */
+      if (r1->u.ar.type != AR_FULL ||
+	  r2->u.ar.type != AR_FULL )
+	return FAILURE;
+      break;
+    case REF_COMPONENT:
+      if (r1->u.c.component != r2->u.c.component)
+	return FAILURE;
+      break;
+    case REF_SUBSTRING:
+      return FAILURE;
+      break;
+    default:
+      g95_internal_error("compare_actual_expr(): Bad component code");
+    }
+  }
+  if (!r1 && !r2)
+    return SUCCESS;
+  return FAILURE;
+}
+
+/* check_some_aliasing()-- Given formal and actual argument lists that
+ * correspond to one another, check that identical actual arguments
+ * aren't not associated with some incompatible INTENTs.  */
+
+static try check_some_aliasing(g95_formal_arglist *f, g95_actual_arglist *a) {
+sym_intent f1_intent, f2_intent;
+g95_formal_arglist *f1;
+g95_actual_arglist *a1;
+size_t n, i, j;
+argpair *p;
+try t = SUCCESS;
+
+  n = 0; 
+  for(f1=f, a1=a;; f1=f1->next, a1=a1->next) {
+    if (f1 == NULL && a1 == NULL) break;
+    if (f1 == NULL || a1 == NULL)
+      g95_internal_error("check_some_aliasing(): List mismatch");
+    n++;
+  }
+  if (n == 0)
+    return t;
+  p = (argpair*) alloca(n*sizeof(argpair));
+
+  for(i=0, f1=f, a1=a ; i<n; i++, f1=f1->next, a1=a1->next){
+    p[i].f = f1;
+    p[i].a = a1;
+  }
+
+  qsort(p, n, sizeof(argpair), pair_cmp);
+
+  for(i=0; i<n; i++){
+    if (!p[i].a->expr || 
+	p[i].a->expr->expr_type != EXPR_VARIABLE || 
+	p[i].a->expr->ts.type == BT_PROCEDURE)
+      continue;
+    f1_intent = p[i].f->sym->attr.intent;
+    for(j=i+1; j<n; j++){ 
+      /* expected order after the sort */
+      if (!p[j].a->expr || p[j].a->expr->expr_type != EXPR_VARIABLE)
+	g95_internal_error("check_some_aliasing(): corrupted data");
+      /* are the expression the same ? */
+      if (compare_actual_expr(p[i].a->expr, p[j].a->expr) == FAILURE)
+	break;
+      f2_intent = p[j].f->sym->attr.intent;
+      if ((f1_intent == INTENT_IN && f2_intent == INTENT_OUT) || 
+	  (f1_intent == INTENT_OUT && f2_intent == INTENT_IN)) {
+	g95_warning("Same actual argument associated with INTENT(%s) "
+		    "argument '%s' and INTENT(%s) argument '%s' at %L",
+		    g95_intent_string(f1_intent), p[i].f->sym->name,
+		    g95_intent_string(f2_intent), p[j].f->sym->name,
+		    &p[i].a->expr->where);
+	t = FAILURE;
+      }
+    }
+  }
+      
+  return t;
+}
 
 /* check_intents()-- Given formal and actual argument lists that
  * correspond to one another, check that they are compatible in the
@@ -1115,6 +1249,8 @@ void g95_procedure_use(g95_symbol *sym, g95_actual_arglist **ap, locus *where){
       !compare_actual_formal(ap, sym->formal, 0, where)) return;
 
   check_intents(sym->formal, *ap);
+  if (g95_option.aliasing)
+    check_some_aliasing(sym->formal, *ap);
 }
 
 
@@ -1135,6 +1271,8 @@ int r;
 
     if (compare_actual_formal(ap, intr->sym->formal, r, NULL)) {
       check_intents(intr->sym->formal, *ap);
+      if (g95_option.aliasing)
+	check_some_aliasing(intr->sym->formal, *ap);
       return intr->sym;
     }
   }
