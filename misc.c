@@ -123,6 +123,8 @@ char *p;
 FILE *g95_open_file(char *name) {
 struct stat statbuf;
 
+  if (! *name) return stdin;
+
   if (stat(name, &statbuf) < 0) return NULL;
 
   if (!S_ISREG(statbuf.st_mode)) return NULL;
@@ -403,7 +405,7 @@ int i;
     return 1;
   }
 
-  if (strcmp(option, "-fimplicit-none") == 0 || 
+  if (strcmp(option, "-fimplicit-none") == 0 ||
       strcmp(option, "-Wimplicit") == 0) {
     g95_option.implicit_none = 1;
     return 1;

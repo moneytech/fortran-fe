@@ -21,6 +21,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* io.c-- Deal with input/output statements */
 
+#include <string.h>
 #include "g95.h"
 
 static g95_st_label format_asterisk_ =
@@ -28,7 +29,7 @@ static g95_st_label format_asterisk_ =
 
 static g95_st_label * format_asterisk = &format_asterisk_;
 
-typedef struct { 
+typedef struct {
   char *name, *spec;
   bt type;
 } io_tag;
@@ -239,7 +240,7 @@ try g95_resolve_open(g95_open *open) {
   RESOLVE_TAG(&tag_status, open->status);
   RESOLVE_TAG(&tag_e_form, open->form);
   RESOLVE_TAG(&tag_e_recl, open->recl);
-  
+
   RESOLVE_TAG(&tag_e_blank, open->blank);
   RESOLVE_TAG(&tag_e_position, open->position);
   RESOLVE_TAG(&tag_e_action, open->action);
@@ -558,7 +559,7 @@ locus where;
 g95_expr *e;
 g95_st_label *label;
 
-  where = *g95_current_locus(); 
+  where = *g95_current_locus();
 
   if (g95_match_char('*') == MATCH_YES) {
     if (dt->format_expr != NULL || dt->format_label != NULL) goto conflict;
@@ -801,12 +802,38 @@ char *name;
 
 
 /* gen_io_pointer()-- Given an expression, generate code structure(s)
- * that call the IO library with a pointer(s) to the correct thing. 
+ * that call the IO library with a pointer(s) to the correct thing.
  * This possibly generates a store to a temporary */
 
-static g95_code *gen_io_pointer(g95_expr *e) {
+static g95_code *gen_io_pointer(io_kind k, g95_expr *e) {
 g95_code *c;
 
+/* The IO library currently handles reads and writes seperately, and
+   the type can be deduced from the expression.  The old system also
+   didn't take account of different types.  */
+  switch (k){
+  case M_READ:
+    c = g95_build_call("_io_read", e, NULL);
+    break;
+
+  case M_WRITE:
+    c = g95_build_call("_io_write", e, NULL);
+    break;
+
+  case M_INQUIRE:
+    c = g95_build_call("_io_inquire", e, NULL);
+    break;
+
+  case M_PRINT:
+    c = g95_build_call("_io_print", e, NULL);
+    break;
+
+  default:
+    g95_internal_error("gen_io_pointer(): bad IO kind");
+  }
+
+  return c;
+#if 0
   switch(e->ts.type) {
   case BT_UNKNOWN:
     c = g95_build_call("_io_unknown", e, NULL);
@@ -852,6 +879,7 @@ g95_code *c;
   }
 
   return c;
+#endif
 }
 
 
@@ -871,7 +899,7 @@ match m;
 int n;
 
   iter = NULL;
-  head = tail = NULL; 
+  head = tail = NULL;
   old_loc = *g95_current_locus();
 
   if (g95_match_char('(') != MATCH_YES) return MATCH_NO;
@@ -941,7 +969,7 @@ static match match_io_element(io_kind k, g95_code **c) {
 g95_expr *expr;
 match m;
 
-  expr = NULL; 
+  expr = NULL;
 
   m = match_io_iterator(k, c);
   if (m == MATCH_YES) return MATCH_YES;
@@ -993,7 +1021,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  *c = gen_io_pointer(expr);
+  *c = gen_io_pointer(k, expr);
   return MATCH_YES;
 }
 
@@ -1005,7 +1033,7 @@ static match match_io_list(io_kind k, g95_code **head_p) {
 g95_code *head, *tail, *new;
 match m;
 
-  *head_p = head = tail = NULL; 
+  *head_p = head = tail = NULL;
   if (g95_match_eos() == MATCH_YES) return MATCH_YES;
 
   for(;;) {
@@ -1035,10 +1063,31 @@ cleanup:
 /* terminate_io()-- Generate a call that ends this I/O statement and
  * append it to the current list.  */
 
-static void terminate_io(g95_code **io_code) {
+static void terminate_io(io_kind k, g95_code **io_code) {
 g95_code *term;
 
-  term = g95_build_call("_io_done", NULL);
+  switch (k)
+    {
+    case M_READ:
+      term = g95_build_call("_gforio_read_end", NULL);
+      break;
+
+    case M_WRITE:
+      term = g95_build_call("_gforio_write_end", NULL);
+      break;
+
+    case M_PRINT:
+      term = g95_build_call("_gforio_print_end", NULL);
+      break;
+
+    case M_INQUIRE:
+      term = g95_build_call("_gforio_inquire_end", NULL);
+      break;
+
+    default:
+      g95_internal_error ("terminate_io(): Bad IO kind");
+      return;
+    }
 
   if (*io_code == NULL)
     *io_code = term;
@@ -1060,7 +1109,7 @@ g95_dt *dt;
 match m;
 
   m = MATCH_NO;
- 
+
   comma_flag = 0;
   current_dt = dt = g95_getmem(sizeof(g95_dt));
 
@@ -1082,7 +1131,7 @@ match m;
   if (match_dt_unit(k, dt) != MATCH_YES) goto loop;
 
   if (g95_match_char(')') == MATCH_YES) goto get_io_list;
-  if (g95_match_char(',') != MATCH_YES) goto syntax; 
+  if (g95_match_char(',') != MATCH_YES) goto syntax;
 
   m = match_dt_element(k, dt);
   if (m == MATCH_YES) goto next;
@@ -1108,7 +1157,7 @@ match m;
 
 next:
   if (g95_match_char(')') == MATCH_YES) goto get_io_list;
-  if (g95_match_char(',') != MATCH_YES) goto syntax; 
+  if (g95_match_char(',') != MATCH_YES) goto syntax;
 
 loop:
   for(;;) {
@@ -1137,7 +1186,7 @@ get_io_list:
     if (m == MATCH_NO) goto syntax;
   }
 
-  terminate_io(&io_code);
+  terminate_io(k, &io_code);
 
 /* A full IO statement has been matched */
 
@@ -1235,7 +1284,7 @@ void g95_free_inquire(g95_inquire *inquire) {
 
 /* match_inquire_element()-- Match an element of an INQUIRE statement */
 
-#define RETM   if (m != MATCH_NO) return m; 
+#define RETM   if (m != MATCH_NO) return m;
 
 static match match_inquire_element(g95_inquire *inquire) {
 match m;
@@ -1301,7 +1350,7 @@ match m;
     if (m == MATCH_ERROR) goto cleanup;
     if (m == MATCH_NO) goto syntax;
 
-    terminate_io(&code);
+    terminate_io(M_INQUIRE, &code);
 
     new_st.op = EXEC_IOLENGTH;
     new_st.expr = inquire->iolength;
