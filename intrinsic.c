@@ -276,7 +276,7 @@ symbol_attribute attr;
   /* Target argument is optional */
 
   attr = g95_variable_attr(target, NULL);
-  if (!attr.pointer || !attr.target) return FAILURE;
+  if (!attr.pointer && !attr.target) return FAILURE;
 
   return SUCCESS;
 }
