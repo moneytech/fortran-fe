@@ -488,8 +488,6 @@ g95_formal_arglist *f1, *f2;
   if (count_types_test(f1, f2)) return 0;
   if (count_types_test(f2, f1)) return 0;
 
-  g95_status("Correspondence test\n");
-
   if (correspondence_test(f1, f2)) return 0;
   if (correspondence_test(f2, f1)) return 0;
 
@@ -631,13 +629,25 @@ int args;
     break;
   }
 
-  if (i1 != INTENT_IN)
-    g95_error("First argument of operator interface at %L must be INTENT(IN)",
-	      &intr->where);
+  /* Check intents on operator interfaces */
 
-  if (operator != INTRINSIC_ASSIGN && args == 2 && i2 != INTENT_IN)
-    g95_error("Second argument of operator interface at %L must be INTENT(IN)",
-	      &intr->where);
+  if (operator == INTRINSIC_ASSIGN) {
+    if (i1 != INTENT_OUT && i1 != INTENT_INOUT)
+      g95_error("First argument of defined assignment at %L must be "
+		"INTENT(IN) or INTENT(INOUT)", &intr->where);
+
+    if (i2 != INTENT_IN)
+      g95_error("Second argument of defined assignment at %L must be "
+		"INTENT(IN)", &intr->where);
+  } else {
+    if (i1 != INTENT_IN)
+      g95_error("First argument of operator interface at %L must be "
+		"INTENT(IN)", &intr->where);
+
+    if (args == 2 && i2 != INTENT_IN)
+      g95_error("Second argument of operator interface at %L must be "
+		"INTENT(IN)", &intr->where);
+  }
 
   return;
 
