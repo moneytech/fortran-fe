@@ -1325,6 +1325,9 @@ match m;
       if (g95_add_entry(&entry->attr, NULL) == FAILURE ||
 	  g95_add_function(&entry->attr, NULL) == FAILURE)
 	return MATCH_ERROR;
+
+      entry->result = function->result;
+
     } else {
       m = match_result(function, &result);
       if (m == MATCH_NO) g95_syntax_error(ST_ENTRY);

@@ -1779,9 +1779,9 @@ match m;
     break;
 
   case FL_PROCEDURE:  /* Check for a nonrecursive function result */
-    if (sym->attr.function && sym->result == sym) {
+    if (sym->attr.function && (sym->result == sym || sym->attr.entry)) {
 
-      /* If a function results is a derived type, then the derived
+      /* If a function result is a derived type, then the derived
        * type may still have to be resolved. */
 
       if (sym->ts.type == BT_DERIVED &&
