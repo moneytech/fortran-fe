@@ -55,26 +55,28 @@ void g95_free(void *p) {
 /* add_path()-- adds path to the list pointed to by list */
 
 static void add_path(g95_directorylist **list, const char *path) {
-g95_directorylist *this; 
+g95_directorylist *this;
+const char *p;
 
-  if (*path == '\0')
-    return; 
+  p = path; 
+  while (*p == ' ' || *p == '\t') /* someone might do 'g95 "-I include"' */
+    if (*p++ == '\0') return;
 
   this = *list; 
-  if (this) {
+  if (!this) {
+    this = *list = (g95_directorylist *)g95_getmem(sizeof(g95_directorylist));
+  } else {
     while(this->next) {
       this = this->next;
     }
     this->next = (g95_directorylist *)g95_getmem(sizeof(g95_directorylist));
     this = this->next;
-  } else {
-    this = *list = (g95_directorylist *)g95_getmem(sizeof(g95_directorylist));
   }
 
   this->next = NULL;
-  this->path = (char *)g95_getmem(strlen(path)+1);
-  strcpy(this->path, path);
-  strcpy(&this->path[strlen(path)], "/"); /* make '/' last character */ 
+  this->path = (char *)g95_getmem(strlen(p)+1);
+  strcpy(this->path, p);
+  strcpy(&this->path[strlen(p)], "/"); /* make '/' last character */ 
 }
 
 
@@ -82,20 +84,20 @@ g95_directorylist *this;
 /* g95_open_file()-- opens file for reading, searching thorugh list if necessary */
 
 FILE *g95_open_file(g95_directorylist *list, const char *name) {
-g95_directorylist *this;
+g95_directorylist *p;
 FILE *f;
 char fullname[PATH_MAX];
 
-  if((f = fopen(name, "r")) != NULL)
-    return f;
+  f = fopen(name, "r"); 
+  if (f != NULL) return f;
 
-  this = list;
-  while(this != NULL) {
-    strcpy(fullname, this->path);
+  p = list;
+  while(p != NULL) {
+    strcpy(fullname, p->path);
     strcat(fullname, name);
-    if((f = fopen(fullname, "r")) != NULL)
-      return f;
-    this = this->next;
+    f = fopen(fullname, "r");
+    if (f != NULL) return f;
+    p = p->next;
   }
 
   return NULL;
@@ -221,7 +223,7 @@ static void display_help(void) {
     "  -ffixed-line-length-80    80 character line width in fixed mode\n"
     "  -pedantic                 Warn about use of non-standard features\n"
     "  -r                        Run the resolution phase\n"
-    "  -I[directory]             Search for include files in directory\n\n"
+    "  -I[directory]             Add directory to the include file search path\n\n"
     "See http://g95.sourceforge.net for more information.\n\n");
 
   exit(0);
@@ -264,10 +266,18 @@ char *option;
   }
 
   if (option[0] == '-' && option[1] == 'I') {
-    add_path(&g95_option.include_dirs, &option[2]);
-    return 1;
+    if (option[2] != '\0') {
+      add_path(&g95_option.include_dirs, &option[2]);
+      return 1;
+    } else {
+      if (argv[1][0] == '-') {
+	g95_status("g95: Directory required after -I\n");
+	exit(3);
+      }
+      add_path(&g95_option.include_dirs, argv[1]);
+      return 2;
+    }
   }
-    
 
   if (option[0] == '-') {
     g95_status("g95: Unrecognised option '%s'\n", option);
