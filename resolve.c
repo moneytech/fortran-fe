@@ -62,8 +62,7 @@ g95_symbol *sym;
 
   for(; f; f=f->next) {
     sym = f->sym;
-    if (sym->ts.type != BT_UNKNOWN) continue;
-    g95_set_default_type(sym, 1, sym->ns);
+    if (sym->ts.type == BT_UNKNOWN) g95_set_default_type(sym, 1, sym->ns);
 
     /* If the flavor is unknown at this point, it has to be a variable.
      * A procedure specification would have already set the type */
