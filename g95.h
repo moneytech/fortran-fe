@@ -1306,6 +1306,7 @@ const char *g95_extract_int(g95_expr *, int *);
 g95_expr *g95_build_funcall(g95_symbol *func, ...);
 void g95_free_ref_list(g95_ref *);
 void g95_type_convert_binary(g95_expr *);
+int g95_is_constant_expr(g95_expr *);
 try g95_simplify_expr(g95_expr *, int);
 void g95_expr_init_1(void);
 
@@ -1339,7 +1340,6 @@ void g95_show_code(int, g95_code *);
 
 /* resolve.c */
 
-void g95_resolve_formal_arglist(g95_formal_arglist *);
 try g95_resolve_expr(g95_expr *);
 void g95_resolve_code(g95_code *, g95_namespace *);
 void g95_resolve(g95_namespace *);

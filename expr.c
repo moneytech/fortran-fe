@@ -617,19 +617,19 @@ done:
 /* is_constant_constructor()-- Recursively checks all elements of a
  * constructor to see if everything is constant. */
 
-static int is_constant_expr(g95_expr *);
+int g95_is_constant_expr(g95_expr *);
 
 static int is_constant_constructor(g95_constructor *c) {
 
   if (c == NULL) return 1;
 
   for(; c; c=c->next) {
-    if (!is_constant_expr(c->expr)) return 0;
+    if (!g95_is_constant_expr(c->expr)) return 0;
 
     if (c->iterator != NULL) {
-      if (!is_constant_expr(c->iterator->start)) return 0;
-      if (!is_constant_expr(c->iterator->end))   return 0;
-      if (!is_constant_expr(c->iterator->step))  return 0;
+      if (!g95_is_constant_expr(c->iterator->start)) return 0;
+      if (!g95_is_constant_expr(c->iterator->end))   return 0;
+      if (!g95_is_constant_expr(c->iterator->step))  return 0;
     }
   }
 
@@ -637,12 +637,12 @@ static int is_constant_constructor(g95_constructor *c) {
 }
 
 
-/* is_constant_expr()-- Function to determine if an expression is
+/* g95_is_constant_expr()-- Function to determine if an expression is
  * constant or not.  This function expects that the expression has
  * already been simplified.  Mutually recursive with
  * constant_constructor().  */
 
-static int is_constant_expr(g95_expr *e) {
+int g95_is_constant_expr(g95_expr *e) {
 int rv;
 
   if (e == NULL) return 1; 
@@ -660,7 +660,7 @@ int rv;
     break;
 
   case EXPR_SUBSTRING:
-    rv = is_constant_expr(e->op1) && is_constant_expr(e->op2);
+    rv = g95_is_constant_expr(e->op1) && g95_is_constant_expr(e->op2);
     break;
 
   case EXPR_STRUCTURE:
@@ -669,7 +669,7 @@ int rv;
     break;
 
   default:
-    g95_internal_error("is_constant_expr(): Unknown expression type");
+    g95_internal_error("g95_is_constant_expr(): Unknown expression type");
   }
 
   return rv;
@@ -689,7 +689,7 @@ g95_expr *op1, *op2, *result;
   if (g95_simplify_expr(op1, type) == FAILURE) return FAILURE;
   if (g95_simplify_expr(op2, type) == FAILURE) return FAILURE;
 
-  if (!is_constant_expr(op1) || (op2 != NULL && !is_constant_expr(op2)))
+  if (!g95_is_constant_expr(op1) || (op2 != NULL && !g95_is_constant_expr(op2)))
     return SUCCESS;
 
 /* Rip p apart */
@@ -1150,7 +1150,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  if (!is_constant_expr(expr))
+  if (!g95_is_constant_expr(expr))
     g95_internal_error("Initialization expression didn't reduce %C");
 
   *result = expr;

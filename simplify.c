@@ -2344,9 +2344,18 @@ g95_expr *e;
 
 /* Unpack the shape array */
 
-  if (source->expr_type != EXPR_ARRAY || shape_exp->expr_type != EXPR_ARRAY ||
-      (pad != NULL && pad->expr_type != EXPR_ARRAY) ||
-      (order_exp != NULL && order_exp->expr_type != EXPR_ARRAY))
+  if (source->expr_type != EXPR_ARRAY || !g95_is_constant_expr(source))
+    return NULL;
+
+  if (shape_exp->expr_type != EXPR_ARRAY || !g95_is_constant_expr(shape_exp))
+    return NULL;
+
+  if (pad != NULL &&
+      (pad->expr_type != EXPR_ARRAY || !g95_is_constant_expr(pad)))
+    return NULL;
+
+  if (order_exp != NULL &&
+      (order_exp->expr_type != EXPR_ARRAY || !g95_is_constant_expr(order_exp)))
     return NULL;
 
   mpz_init(index);
