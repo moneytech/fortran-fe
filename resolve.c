@@ -68,7 +68,18 @@ g95_symbol *sym;
     if (sym->attr.subroutine || sym->attr.external || sym->attr.intrinsic)
       continue;
 
-    if (sym->ts.type == BT_UNKNOWN) g95_set_default_type(sym, 1, sym->ns);
+    if (sym->ts.type == BT_UNKNOWN) {
+      if (!sym->attr.function || sym->result == sym)
+	g95_set_default_type(sym, 1, sym->ns);
+      else {    /* Set the type of the RESULT, then copy */
+
+	if (sym->result->ts.type == BT_UNKNOWN)
+	  g95_set_default_type(sym->result, 1, sym->result->ns);
+
+	sym->ts = sym->result->ts;
+	if (sym->as == NULL) sym->as = g95_copy_array_spec(sym->result->as);
+      }
+    }
 
     /* If the flavor is unknown at this point, it has to be a variable.
      * A procedure specification would have already set the type */

@@ -222,6 +222,7 @@ void g95_resolve_minval(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_mod(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_modulo(g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_not(g95_expr *, g95_expr *);
+void g95_resolve_product(g95_expr *, g95_expr *, g95_expr *, g95_expr *);
 void g95_resolve_reshape(g95_expr *, g95_expr *, g95_expr *, g95_expr *,
 			 g95_expr *);
 void g95_resolve_rrspacing(g95_expr *, g95_expr *);

@@ -307,6 +307,16 @@ void g95_resolve_not(g95_expr *f, g95_expr *i) {
 }
 
 
+void g95_resolve_product(g95_expr *f, g95_expr *array, g95_expr *dim,
+			 g95_expr *mask) {
+
+  f->ts = array->ts;
+  f->value.function.name =
+    get_string("__product_%c_%d", g95_type_letter(array->ts.type),
+	       array->ts.kind);
+}
+
+
 void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
 

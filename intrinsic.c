@@ -1060,7 +1060,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0, NULL);
 
   add_sym("product", 0, 1, BT_REAL, dr,
-	  g95_check_product, NULL, NULL,
+	  g95_check_product, NULL, g95_resolve_product,
 	  ar, BT_REAL, dr, 0,   dm, BT_INTEGER, di, 1,
 	  msk, BT_LOGICAL, dl, 1, NULL);
 
