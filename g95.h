@@ -1304,7 +1304,7 @@ match g95_match_print(void);
 /* intrinsic.c */
 
 extern char g95_intrinsic_diagnostic[];
-match g95_intrinsic_func_interface(g95_expr *, int *, int);
+match g95_intrinsic_func_interface(g95_expr *, int);
 try g95_intrinsic_sub_interface(g95_code *);
 
 /* format.c */

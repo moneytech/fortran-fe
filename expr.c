@@ -780,7 +780,6 @@ static try simplify_constructor(g95_constructor *c, int type) {
 
 try g95_simplify_expr(g95_expr *p, int type) {
 g95_actual_arglist *ap;
-int *type_flag;
 
   if (p == NULL) return SUCCESS;
 
@@ -794,7 +793,7 @@ int *type_flag;
     for(ap=p->value.function.actual; ap; ap=ap->next) 
       if (g95_simplify_expr(ap->expr, type) == FAILURE) return FAILURE;
 
-    if (g95_intrinsic_func_interface(p, type_flag, 0) == MATCH_ERROR) 
+    if (g95_intrinsic_func_interface(p, 0) == MATCH_ERROR) 
         return FAILURE;
     break;
 
@@ -843,7 +842,6 @@ int *type_flag;
 static try resolve_function(g95_expr *expr) {
 g95_actual_arglist *arg;
 try t;
-int *type_flag;
 
   arg = expr->value.function.actual;
   t = SUCCESS;
@@ -861,7 +859,7 @@ int *type_flag;
 /* Now resolve the function itself.  For now, we just see if the function
  * is compatible with an intrinsic. */
 
-  if (g95_intrinsic_func_interface(expr, type_flag, 0) == MATCH_NO) {
+  if (g95_intrinsic_func_interface(expr, 0) == MATCH_NO) {
     expr->value.function.name = expr->symbol->name;
     expr->ts = expr->symbol->ts;
   }
@@ -1354,7 +1352,6 @@ static try check_init_expr(g95_expr *e) {
 g95_actual_arglist *ap;
 match m;
 try t;
-int *type_flag;
 
   if (e == NULL) return SUCCESS;
 
@@ -1378,17 +1375,11 @@ int *type_flag;
     }
 
     if (t == SUCCESS) {
-      m = g95_intrinsic_func_interface(e, type_flag, 1);
+      m = g95_intrinsic_func_interface(e, 1);
 
       if (m == MATCH_NO)
 	g95_error("Function '%s' in initialization expression at %L "
 		  "must be an intrinsic function", e->symbol->name, &e->where);
-
-/* Trying to get pedantic warning for types not integer or character
-      if (m == MATCH_YES && *type_flag && g95_option.pedantic) 
-	g95_error("Type in initialization expression '%s' at %L is nonstandard",
-                   e->symbol->name, &e->where);
-*/
 
       if (m != MATCH_YES) t = FAILURE;
     }
@@ -1479,7 +1470,6 @@ g95_actual_arglist *ap;
 g95_symbol *sym;
 match m;
 try t;
-int type_flag;
 
   if (e == NULL) return SUCCESS;
 
@@ -1500,7 +1490,7 @@ int type_flag;
       }
 
     if (t == SUCCESS) {
-      m = g95_intrinsic_func_interface(e, 0, type_flag);
+      m = g95_intrinsic_func_interface(e, 0);
 
       if (m == MATCH_NO)
 	g95_error("Function '%s' in specification expression at %L "

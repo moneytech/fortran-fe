@@ -152,12 +152,27 @@ int kind;
 
 /* The abs family*/
 
+
+g95_expr *g95_simplify_abs(g95_expr *e) {
+g95_expr *result;
+
+  if (e->expr_type != EXPR_CONSTANT) return NULL;
+
+  result = g95_constant_result(BT_REAL, e->ts.kind);
+  result->where = e->where;
+
+  mpf_abs(result->value.real, e->value.real);
+
+  return range_check(result, "ABS");
+}
+
 g95_expr *g95_simplify_iabs(g95_expr *e) {
 g95_expr *result;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  result = g95_copy_expr(e);
+  result = g95_constant_result(BT_INTEGER, e->ts.kind);
+  result->where = e->where;
 
   mpz_abs(result->value.integer, e->value.integer);
 
@@ -173,26 +188,13 @@ g95_expr *result;
 }
 
 
-g95_expr *g95_simplify_rabs(g95_expr *e) {
-g95_expr *result;
-
-  if (e->expr_type != EXPR_CONSTANT) return NULL;
-
-  result = g95_copy_expr(e);
-
-  mpf_abs(result->value.real, e->value.real);
-
-  return range_check(result, "ABS");
-}
-
-
 g95_expr *g95_simplify_cabs(g95_expr *e) {
 g95_expr *result;
 mpf_t a, b;
 
   if (e->expr_type != EXPR_CONSTANT) return NULL;
 
-  result = g95_constant_result(BT_REAL, e->ts.kind);
+  result = g95_constant_result(BT_COMPLEX, e->ts.kind);
   result->where = e->where;
 
   mpf_init(a);
@@ -207,7 +209,7 @@ mpf_t a, b;
   mpf_clear(a);
   mpf_clear(b);
 
-  return range_check(result, "CABS");
+  return result;
 }
 /* end of abs family */
 
@@ -593,8 +595,6 @@ int c, kind;
 g95_expr *g95_simplify_cmplx(g95_expr *x, g95_expr *y, g95_expr *k) {
 g95_expr *result;
 int kind;
-
-    printf("In simplify_cmplx\n");
 
   kind = get_kind(k, "CMPLX", g95_default_real_kind()); 
   if (kind == -1) return &g95_bad_expr;

@@ -22,8 +22,8 @@ Boston, MA 02111-1307, USA.  */
 
 /* Prototypes for the simplification functions */
 
+g95_expr *g95_simplify_abs(g95_expr *);
 g95_expr *g95_simplify_iabs(g95_expr *);
-g95_expr *g95_simplify_rabs(g95_expr *);
 g95_expr *g95_simplify_cabs(g95_expr *);
 g95_expr *g95_simplify_achar(g95_expr *);
 g95_expr *g95_simplify_achar(g95_expr *);

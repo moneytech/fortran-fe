@@ -195,6 +195,27 @@ g95_expr *result;
 
 /***** Check functions *****/
 
+/* Abs family */
+
+static try check_dabs(g95_expr *x) {
+
+  if (x->ts.type != BT_REAL || x->ts.kind != g95_default_double_kind()) 
+    return FAILURE;
+
+    type_match = 0;
+
+  return SUCCESS;
+}
+
+static try check_iabs(g95_expr *x) {
+
+  if (x->ts.type != BT_INTEGER) return FAILURE;
+
+    type_match = 1;
+
+  return SUCCESS;
+}
+
 
 static try check_aint(g95_expr *a, g95_expr *kind) {
 
@@ -408,28 +429,23 @@ static try check_log10(g95_expr *x) {
 }
 
 
+/* Min/max family */
 
 static try check_min_max(g95_actual_arglist *arg) {
 g95_expr *x, *y;
-g95_actual_arglist *argument;
 
   x = arg->expr;
-  argument = arg->next;
+  arg = arg->next;
 
-  if (argument->expr == NULL) {
-    g95_error("Too few arguments to intrinsic at %L",&x->where);
-    return FAILURE;
-  }
+  if (arg == NULL) return FAILURE;
 
-  type_match = 1;
-
-  while(argument != NULL) {
-    y = argument->expr;
+  while(arg != NULL) {
+    y = arg->expr;
     if ((x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) ||
         (x->ts.type != y->ts.type)||(x->ts.kind != y->ts.kind)) return FAILURE;
     if (x->ts.type != BT_INTEGER) type_match=0;
     x = y;
-    argument = argument->next;
+    arg = arg->next;
   }
 
   return SUCCESS;
@@ -442,10 +458,7 @@ g95_expr *x, *y;
   x = arg->expr;
   arg = arg->next;
 
-  if ( arg == NULL ) {
-    g95_error("Too few arguments to intrinsic at %L",&x->where);
-    return FAILURE;
-  }
+  if ( arg == NULL ) return FAILURE;
 
   while ( arg != NULL ) {
     y=arg->expr;
@@ -454,8 +467,6 @@ g95_expr *x, *y;
     x=y;
     arg=arg->next;
   }
-
-  type_match=1;
 
   return SUCCESS;
 }
@@ -467,10 +478,7 @@ g95_expr *x, *y;
   x = arg->expr;
   arg = arg->next;
 
-  if (arg == NULL) {
-    g95_error("Too few arguments to intrinsic at %L",&x->where);
-    return FAILURE;
-  }
+  if (arg == NULL) return FAILURE;
 
   while(arg != NULL) {
     y=arg->expr;
@@ -484,6 +492,71 @@ g95_expr *x, *y;
 
   return SUCCESS;
 }
+
+
+static try check_amin0_amax0(g95_actual_arglist *arg) {
+g95_expr *x, *y;
+
+  x = arg->expr;
+  arg = arg->next;
+
+  if (arg == NULL) return FAILURE;
+
+  while(arg != NULL) {
+    y=arg->expr;
+    if (x->ts.type != BT_INTEGER    ||
+        x->ts.type != y->ts.type || x->ts.kind != y->ts.kind ||
+	x->ts.kind != g95_default_integer_kind()) return FAILURE;
+    x = y;
+    arg = arg->next;
+  }
+
+  return SUCCESS;
+}
+
+
+static try check_amin1_amax1(g95_actual_arglist *arg) {
+g95_expr *x, *y;
+
+  x = arg->expr;
+  arg = arg->next;
+
+  if (arg == NULL) return FAILURE;
+
+  while(arg != NULL) {
+    y=arg->expr;
+    if (x->ts.type != BT_REAL    ||
+        x->ts.type != y->ts.type || x->ts.kind != y->ts.kind ||
+	x->ts.kind != g95_default_real_kind()) return FAILURE;
+    x = y;
+    arg = arg->next;
+  }
+
+  return SUCCESS;
+}
+
+
+static try check_dmin1_dmax1(g95_actual_arglist *arg) {
+g95_expr *x, *y;
+
+  x = arg->expr;
+  arg = arg->next;
+
+  if (arg == NULL) return FAILURE;
+
+  while(arg != NULL) {
+    y=arg->expr;
+    if (x->ts.type != BT_REAL    ||
+        x->ts.type != y->ts.type || x->ts.kind != y->ts.kind ||
+	x->ts.kind != g95_default_double_kind()) return FAILURE;
+    x = y;
+    arg = arg->next;
+  }
+
+  return SUCCESS;
+}
+
+/* End of min/max family */
 
 
 static try check_min_max_exponent(g95_expr *x) {
@@ -669,9 +742,11 @@ g95_expr *a1, *a2, *a3, *a4;
 try t;
 
 /* Max and min require special handling due to the variable number of args */
-  if ( specific->check_function == check_min_max    ||
-       specific->check_function == check_min0_max0  ||
-       specific->check_function == check_min1_max1 ) {
+  if ( strcmp(specific->name,"min")  ==0 || strcmp(specific->name,"max")  ==0||
+       strcmp(specific->name,"min0") ==0 || strcmp(specific->name,"max0") ==0||
+       strcmp(specific->name,"min1") ==0 || strcmp(specific->name,"max1") ==0||
+       strcmp(specific->name,"amin0")==0 || strcmp(specific->name,"amax0")==0||
+       strcmp(specific->name,"amin1")==0 || strcmp(specific->name,"amax1")==0) {
     t = (*specific->check_function)(arg);
     return t;
   }
@@ -892,11 +967,11 @@ int di, dr, dd, dl, dc, dz;
   dc = g95_default_character_kind();
   dz = g95_default_complex_kind();
 
-  add_sym("abs",  0, BT_REAL,    dr, g95_simplify_rabs, NULL,
+  add_sym("abs",  0, BT_REAL,    dr, g95_simplify_abs, NULL,
 	  a, BT_REAL, dr, 0, NULL);
-  add_sym("iabs", 0, BT_INTEGER, di, g95_simplify_iabs, NULL,
+  add_sym("iabs", 0, BT_INTEGER, di, g95_simplify_iabs, check_iabs,
 	  a, BT_INTEGER, di, 0, NULL);
-  add_sym("dabs", 0, BT_REAL,    dd, g95_simplify_rabs, NULL,
+  add_sym("dabs", 0, BT_REAL,    dd, g95_simplify_abs, check_dabs,
 	  a, BT_REAL, dd, 0, NULL);
   add_sym("cabs", 0, BT_REAL,    dr, g95_simplify_cabs, NULL,
 	  a, BT_COMPLEX, dz, 0, NULL);
@@ -1152,15 +1227,14 @@ int di, dr, dd, dl, dc, dz;
 	  a1, BT_UNKNOWN,    dr, 0, a2, BT_UNKNOWN,    dr, 0, NULL);
   add_sym("max0",  0, BT_INTEGER, di, g95_simplify_max, check_min0_max0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
-  add_sym("amax1", 0, BT_REAL,    dr, g95_simplify_max, check_min1_max1,
-	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  add_sym("dmax1", 0, BT_REAL,    dd, g95_simplify_max, check_min1_max1,
-	  a1, BT_REAL,    dd, 0, a2, BT_REAL,    dd, 0, NULL);
-  add_sym("amax0", 0, BT_REAL,    dr, g95_simplify_amax0, check_min0_max0,
-	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
   add_sym("max1",  0, BT_INTEGER, di, g95_simplify_max1, check_min1_max1,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  make_generic("max");
+  add_sym("amax1", 0, BT_REAL,    dr, g95_simplify_max, check_amin1_amax1,
+	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
+  add_sym("dmax1", 0, BT_REAL,    dd, g95_simplify_max, check_dmin1_dmax1,
+	  a1, BT_REAL,    dd, 0, a2, BT_REAL,    dd, 0, NULL);
+  add_sym("amax0", 0, BT_REAL,    dr, g95_simplify_amax0, check_amin0_amax0,
+	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
 
   add_sym("maxexponent", 1, BT_INTEGER, di, g95_simplify_maxexponent,
 	  check_min_max_exponent, x, BT_UNKNOWN, dr, 0, NULL);
@@ -1186,15 +1260,14 @@ int di, dr, dd, dl, dc, dz;
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
   add_sym("min0",  0, BT_INTEGER, di, g95_simplify_min, check_min0_max0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
-  add_sym("amin1", 0, BT_REAL,    dr, g95_simplify_min, check_min1_max1,
+  add_sym("amin1", 0, BT_REAL,    dr, g95_simplify_min, check_amin1_amax1,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  add_sym("dmin1", 0, BT_REAL,    dd, g95_simplify_min, check_min1_max1,
+  add_sym("dmin1", 0, BT_REAL,    dd, g95_simplify_min, check_dmin1_dmax1,
 	  a1, BT_REAL,    dd, 0, a2, BT_REAL,    dd, 0, NULL);
-  add_sym("amin0", 0, BT_REAL,    dr, g95_simplify_amin0, check_min0_max0,
+  add_sym("amin0", 0, BT_REAL,    dr, g95_simplify_amin0, check_amin0_amax0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
   add_sym("min1",  0, BT_INTEGER, di, g95_simplify_min1, check_min1_max1,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-  make_generic("min");
 
   add_sym("minexponent", 1, BT_INTEGER, di, g95_simplify_minexponent,
 	  check_min_max_exponent, x, BT_UNKNOWN, dr, 0, NULL);
@@ -1676,7 +1749,7 @@ do_sort:
 
 /* check_arglist()-- Compare an actual argument list with an
  * intrinsic's formal argument list.  The lists are checked for
- * agreement of type and kind.  We don't check for arrayness here. */
+ * agreement of type.  We don't check for arrayness here. */
 
 static try check_arglist(g95_actual_arglist **ap, intrinsic_sym *sym) {
 g95_actual_arglist *actual;
@@ -1684,8 +1757,6 @@ intrinsic_arg *formal;
 
   formal = sym->arg;
   actual = *ap;
-
-  type_match = 1;
 
   for(; formal; formal=formal->next, actual=actual->next) {
     if (actual->expr == NULL) continue;
@@ -1695,14 +1766,6 @@ intrinsic_arg *formal;
 		      "be %s, not %s", actual->arg_number, sym->name,
 		      g95_typename(formal->ts.type),
 		      g95_typename(actual->expr->ts.type));
-      return FAILURE;
-    }
-
-    if (formal->ts.kind != actual->expr->ts.kind) {
-      intrinsic_error("Kind of argument %d in call to %s at %%L should "
-		      "be %d, not %d", actual->arg_number, sym->name,
-		      formal->ts.kind,
-		      actual->expr->ts.kind);
       return FAILURE;
     }
 
@@ -1810,9 +1873,11 @@ try t;
   lib_name = NULL;
 
 /* Don't attempt to sort the argument list for min or max */
-  if ( specific->check_function == check_min_max    ||
-       specific->check_function == check_min0_max0  ||
-       specific->check_function == check_min1_max1 ) {
+  if ( strcmp(specific->name,"min")  ==0 || strcmp(specific->name,"max")  ==0||
+       strcmp(specific->name,"min0") ==0 || strcmp(specific->name,"max0") ==0||
+       strcmp(specific->name,"min1") ==0 || strcmp(specific->name,"max1") ==0||
+       strcmp(specific->name,"amin0")==0 || strcmp(specific->name,"amax0")==0||
+       strcmp(specific->name,"amin1")==0 || strcmp(specific->name,"amax1")==0) {
     t=do_check(specific, *ap);
     return t;
   } 
@@ -1823,8 +1888,9 @@ try t;
   if (specific->check_function == NULL) {
     t = check_arglist(ap, specific);
     if (t == SUCCESS) expr->ts = specific->ts;
-  } else
-    t = do_check(specific, *ap);
+  } 
+  else 
+  t = do_check(specific, *ap);
 
   return t;
 }
@@ -1848,7 +1914,7 @@ try t;
 match g95_intrinsic_func_interface(g95_expr *expr, int intrinsic_flag ) {
 intrinsic_sym *isym, *specific;
 char *name;
-int is_inittype;
+int is_intrinsic;
 
   is_intrinsic = intrinsic_flag;
 
@@ -1857,7 +1923,6 @@ int is_inittype;
 
   isym = find_function(name);
   if (isym == NULL) return MATCH_NO;
-
 
 /* If the function is generic, check all of its specific incarnations.
  * If the generic name is also a specific, we check that name last, so
@@ -1878,14 +1943,14 @@ int is_inittype;
 
   while ( isym->arg != NULL) {
     if (isym->arg->ts.type == BT_INTEGER || isym->arg->ts.type == BT_CHARACTER)
-      is_inittype = 1;
+      is_intrinsic = 1;
     else
-      is_inittype = 0;
+      is_intrinsic = 0;
     isym->arg = isym->arg->next;
   }
 
   if (g95_option.pedantic == 1) {
-    if ( !is_inittype ) 
+    if ( !is_intrinsic ) 
       intrinsic_error("Evaluation of initialization for '%s' at %%L is nonstandard");
   }
 
