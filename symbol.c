@@ -1700,9 +1700,6 @@ void g95_free_symbol(g95_symbol *sym) {
 
   g95_free_formal_arglist(sym->formal);
 
-  g95_free_symbol(sym->result);
-  g95_free_symbol(sym->old_symbol);
-
   g95_free(sym);
 }
 
