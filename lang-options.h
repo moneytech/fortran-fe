@@ -41,6 +41,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
       N_("Assume that the source file is free form") },
 { "-ffixed-form",
       N_("Assume that the source file is fixed form") },
+{ "-fmodule-private",
+      N_("Set default accessibility of module entities to PRIVATE") },
 { "-fqkind=<n>",
       N_("Set the kind for a real with the 'q' exponent") },
 { "-fpack-derived",

@@ -418,6 +418,11 @@ int i;
     return 1;
   }
 
+  if (strcmp(option, "-fmodule-private") == 0) {
+    g95_option.module_access_private = 1;
+    return 1;
+  }
+
   if (strcmp(option, "-fdollar-ok") == 0) {
     g95_option.dollar = 1;
     return 1;
@@ -530,6 +535,7 @@ void g95_init_options(void) {
   g95_option.line_truncation = 0;
   g95_option.implicit_none = 0;
   g95_option.fixed_line_length = 72;
+  g95_option.module_access_private = 0;
   g95_option.fmode = 0;
   g95_option.dollar = 0;
   g95_option.form = FORM_UNKNOWN;

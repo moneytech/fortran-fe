@@ -2119,9 +2119,13 @@ static int check_access(g95_access specific_access,
 
   if (specific_access == ACCESS_PUBLIC) return 1;
 
-  if (default_access != ACCESS_PRIVATE &&
-      specific_access != ACCESS_PRIVATE) return 1;
-
+  if (specific_access != ACCESS_PRIVATE) {
+    if (g95_option.module_access_private == 1) {
+      if (default_access == ACCESS_PUBLIC) return 1;
+    } else {
+      if (default_access != ACCESS_PRIVATE) return 1;
+    }
+  }
   return 0;
 }
 
@@ -2304,7 +2308,7 @@ time_t now;
   p = ctime(&now);
   *strchr(p, '\n') = '\0';
 
-  fprintf(module_fp, "G95 module created by %s on %s\n", g->filename, p);
+  fprintf(module_fp, "G95 module created from %s on %s\n", g->filename, p);
   fputs("If you edit this, you'll get what you deserve.\n\n", module_fp);
 
   iomode = IO_OUTPUT;
