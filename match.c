@@ -879,6 +879,7 @@ match m, n;
   if (g95_error_check() == 0)
     g95_error("Unclassifiable statement in IF-clause at %C");
 
+  g95_free_expr(expr);
   return MATCH_ERROR;
 
 got_match:
@@ -1794,6 +1795,7 @@ match m;
 	}
 
 	sym->as = as;
+	as = NULL;
       }
 
       if (g95_match_eos() == MATCH_YES) goto done;

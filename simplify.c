@@ -2675,7 +2675,7 @@ g95_expr *result;
   result = g95_int_expr(kind);
   result->where = (p != NULL) ? p->where : q->where;
 
-  return g95_int_expr(kind);
+  return result;
 }
 
 

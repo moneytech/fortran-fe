@@ -197,6 +197,7 @@ g95_code *q;
 void g95_undo_statement(void) {
 
   g95_free_statements(new_st.block);
+  g95_free_statements(new_st.next);
 
   free_statement(&new_st);
   g95_clear_new_st();

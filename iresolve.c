@@ -260,6 +260,7 @@ void g95_resolve_cshift(g95_expr *f, g95_expr *array, g95_expr *shift,
 static char cshift0[] = "__cshift0", cshift1[] = "__cshift1";
 
   f->ts = array->ts;
+  f->rank = array->rank;
 
   if (dim == NULL)
     f->value.function.name = cshift0;
@@ -308,6 +309,7 @@ void g95_resolve_eoshift(g95_expr *f, g95_expr *array, g95_expr *shift,
       		                   g95_expr *boundary, g95_expr *dim) {
 
   f->ts = array->ts;
+  f->rank = array->rank;
 
   f->value.function.name =
     get_string("__eoshift_%c%d", g95_type_letter(array->ts.type), 

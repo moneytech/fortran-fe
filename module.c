@@ -1888,7 +1888,11 @@ g95_symbol *sym;
     if (atom_int > sym_num) sym_num = atom_int;
 
     require_atom(ATOM_STRING);
+    g95_free(atom_string);
+
     require_atom(ATOM_STRING);
+    g95_free(atom_string);
+
     skip_list();
   }
 
