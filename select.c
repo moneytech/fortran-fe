@@ -119,17 +119,46 @@ cleanup:
 }
 
 
+/* match_case_eos()-- Match the end of a case statement */
+
+static match match_case_eos(void) {
+char name[G95_MAX_SYMBOL_LEN+1];
+match m;
+
+  if (g95_match_eos() == MATCH_YES) return MATCH_YES;
+
+  if (g95_match_space() != MATCH_YES) return MATCH_NO;
+
+  m = g95_match_name(name);
+  if (m != MATCH_YES) return m;
+
+  if (strcmp(name, g95_current_block()->name) != 0) {
+    g95_error("Expected case name of '%s' at %C", g95_current_block()->name);
+    return MATCH_ERROR;
+  }
+
+  return g95_match_eos();
+}
+
+
 /* g95_match_case()-- Match a CASE statement */
 
 match g95_match_case(void) {
-g95_case c, *cp;
+g95_case c, *head, *tail;
+match m;
+
+  head = NULL;
 
   if (g95_current_state() != COMP_SELECT) {
     g95_error("Unexpected CASE statement at %C");
     return MATCH_ERROR;
   }
 
-  if (g95_match("% default%t") == MATCH_YES) {
+  if (g95_match("% default") == MATCH_YES) {
+    m = match_case_eos();
+    if (m == MATCH_NO) goto syntax;
+    if (m == MATCH_ERROR) goto cleanup;
+
     new_st.op = EXEC_SELECT;
     new_st.ext = g95_get_case();
     return MATCH_YES;
@@ -137,21 +166,28 @@ g95_case c, *cp;
 
   if (g95_match(" (") != MATCH_YES) goto syntax;
 
-  new_st.op = EXEC_SELECT;
-
   for(;;) {
     if (match_case_selector(&c) == MATCH_ERROR) goto cleanup;
 
-    cp = g95_get_case();
-    *cp = c;
+    if (head == NULL)
+      head = tail = g95_get_case();
+    else {
+      tail->next = g95_get_case();
+      tail = tail->next;
+    }
 
-    cp->next = new_st.ext;
-    new_st.ext = cp;
+    *tail = c;
 
-    if (g95_match(" )%t") == MATCH_YES) break;
-
+    if (g95_match(" )") == MATCH_YES) break;
     if (g95_match(" ,") != MATCH_YES) goto syntax;
   }
+
+  m = match_case_eos();
+  if (m == MATCH_NO) goto syntax;
+  if (m == MATCH_ERROR) goto cleanup;
+
+  new_st.op = EXEC_SELECT;
+  new_st.ext = head;
 
   return MATCH_YES;
 
@@ -159,6 +195,7 @@ syntax:
   g95_error("Syntax error in CASE-specification at %C");
 
 cleanup:
+  g95_free_case_list(head);
   g95_undo_statement();
   return MATCH_ERROR;
 }

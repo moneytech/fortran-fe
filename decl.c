@@ -1427,7 +1427,9 @@ match m;
 
 /* We haven't hit the end of statement, so what is left must be an end-name */
 
-  m = g95_match_name(name);
+  m = g95_match_space();
+  if (m == MATCH_YES) m = g95_match_name(name);
+
   if (m == MATCH_NO) g95_error("Expected terminating name at %C");
   if (m != MATCH_YES) goto cleanup;
 
