@@ -345,7 +345,11 @@ match m;
 }
 
 
-static mstring operators[] = {
+/* g95_match_intrinsic_op()-- Match an intrinsic operator.  Returns an
+ * INTRINSIC enum. */
+
+match g95_match_intrinsic_op(g95_intrinsic_op *result) {
+static mstring operators_in[] = {
   minit("+", INTRINSIC_PLUS),      minit("-", INTRINSIC_MINUS),
   minit("**", INTRINSIC_POWER),    minit("//", INTRINSIC_CONCAT),
   minit("*", INTRINSIC_TIMES),     minit("/", INTRINSIC_DIVIDE),
@@ -359,13 +363,9 @@ static mstring operators[] = {
   minit(".gt.", INTRINSIC_GT),     minit(">", INTRINSIC_GT),
   minit(".not.", INTRINSIC_NOT),   minit(NULL, INTRINSIC_NONE) };
 
-/* g95_match_intrinsic_op()-- Match an intrinsic operator.  Returns an
- * INTRINSIC enum. */
-
-match g95_match_intrinsic_op(g95_intrinsic_op *result) {
 g95_intrinsic_op op;
 
-  op = g95_match_strings(operators);
+  op = g95_match_strings(operators_in);
 
   if (op == INTRINSIC_NONE) return MATCH_NO;
 
@@ -374,10 +374,25 @@ g95_intrinsic_op op;
 }
 
 
+
 const char *g95_op2string(int i) {
+static mstring operators_out[] = {
+  minit("+", INTRINSIC_PLUS),      minit("-", INTRINSIC_MINUS),
+  minit("+", INTRINSIC_UPLUS),     minit("-", INTRINSIC_UMINUS),
+  minit("**", INTRINSIC_POWER),    minit("//", INTRINSIC_CONCAT),
+  minit("*", INTRINSIC_TIMES),     minit("/", INTRINSIC_DIVIDE),
+  minit(".and.", INTRINSIC_AND),   minit(".or.", INTRINSIC_OR),
+  minit(".eqv.", INTRINSIC_EQV),   minit(".neqv.", INTRINSIC_NEQV),
+  minit(".eq.", INTRINSIC_EQ),     minit("==", INTRINSIC_EQ),
+  minit(".ne.", INTRINSIC_NE),     minit("/=", INTRINSIC_NE),
+  minit(".ge.", INTRINSIC_GE),     minit(">=", INTRINSIC_GE),
+  minit(".le.", INTRINSIC_LE),     minit("<=", INTRINSIC_LE),
+  minit(".lt.", INTRINSIC_LT),     minit("<", INTRINSIC_LT),
+  minit(".gt.", INTRINSIC_GT),     minit(">", INTRINSIC_GT),
+  minit(".not.", INTRINSIC_NOT),   minit(NULL, INTRINSIC_NONE) };
 
   if (i == INTRINSIC_ASSIGN) return "=";
-  return g95_code2string(operators, i);
+  return g95_code2string(operators_out, i);
 }
 
 
