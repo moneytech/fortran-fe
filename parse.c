@@ -962,8 +962,8 @@ g95_state_data s;
 static g95_statement parse_spec(g95_statement);
 
 static void parse_interface(void) {
+int seen_body, new_state, current_state;
 g95_symbol *progname, *sym, *base;
-int seen_body, new_state;
 g95_interface_info save;
 g95_state_data s1, s2;
 g95_statement st;
@@ -979,6 +979,8 @@ g95_statement st;
 
   seen_body = 0;
   current_interface.ns = g95_current_ns;
+
+  current_state = COMP_NONE;
 
 loop:
   g95_current_ns = g95_get_namespace();
@@ -1015,6 +1017,29 @@ loop:
     g95_reject_statement();
     g95_free_namespace(g95_current_ns);
     goto loop;
+  }
+
+
+/* Make sure that a generic interface has only subroutines or
+ * functions and that the generic name has the right attribute */
+
+  if (current_interface.type == INTERFACE_GENERIC) {
+    if (current_state == COMP_NONE) {
+      if (new_state == COMP_FUNCTION) g95_add_function(&sym->attr, NULL);
+      if (new_state == COMP_SUBROUTINE) g95_add_subroutine(&sym->attr, NULL);
+
+      current_state = new_state;
+    } else {
+      if (new_state != current_state) {
+	if (new_state == COMP_SUBROUTINE)
+	  g95_error("SUBROUTINE at %C does not belong in a generic function "
+		    "interface");
+
+	if (new_state == COMP_FUNCTION)
+	  g95_error("FUNCTION at %C does not belong in a generic subroutine "
+		    "interface");
+      }
+    }
   }
 
   push_state(&s2, new_state, g95_new_block);
