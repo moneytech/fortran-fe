@@ -355,7 +355,7 @@ static try check_datan2(g95_expr *y, g95_expr *x) {
   }
 
   if (y->ts.type != BT_REAL || y->ts.kind != g95_default_double_kind()) {
-    type_error(x);
+    type_error(y);
     return FAILURE;
   }
 
@@ -413,7 +413,7 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
       return FAILURE;
     }
     if (x->ts.type == BT_COMPLEX) {
-    intrinsic_error("Second argument to cmplx at %%L may not be complex if first argument is complex");
+      intrinsic_error("Second argument to dcmplx at %%L must not be present if first argument is complex");
       return FAILURE;
     }
   }
@@ -426,6 +426,7 @@ static try check_cmplx(g95_expr *x, g95_expr *y, g95_expr *kind) {
 
   return SUCCESS;
 }
+
 
 static try check_cos(g95_expr *x) {
 
@@ -2057,6 +2058,13 @@ int di, dr, dd, dl, dc, dz;
   add_sym("cmplx", 0, 1, BT_COMPLEX, dz, g95_simplify_cmplx, check_cmplx,
 	  x, BT_UNKNOWN, dr, 0,   y, BT_UNKNOWN, dr, 1,
 	  knd, BT_INTEGER, di, 1, NULL);
+
+  /* FIXME: returns double complex of default double kind. */
+  add_sym("dcmplx", 0, 1, BT_COMPLEX, dd, g95_simplify_cmplx, check_cmplx,
+	  x, BT_UNKNOWN, dd, 0,   y, BT_UNKNOWN, dd, 1,
+	  knd, BT_INTEGER, di, 1, NULL); /* Extension */
+
+  make_generic("cmplx");
 
   add_sym("conjg", 0, 1, BT_COMPLEX, dz, g95_simplify_conjg, NULL,
 	  z, BT_COMPLEX, dz, 0, NULL);
