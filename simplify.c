@@ -2552,16 +2552,193 @@ int i, j, len, ncopies, nlen;
 /* simplify_reshape()-- This one is a bear, but mainly has to do with
  * shuffling elements. */
 
-g95_expr *g95_simplify_reshape(g95_expr *source, g95_expr *shape,
-			       g95_expr *pad, g95_expr *order) {
+g95_expr *g95_simplify_reshape(g95_expr *source, g95_expr *shape_exp,
+			       g95_expr *pad, g95_expr *order_exp) {
 
-int rank, i_order[G95_MAX_DIMENSIONS], i_shape[G95_MAX_DIMENSIONS];
+int i, rank, nsource, npad, x[G95_MAX_DIMENSIONS];
+int order[G95_MAX_DIMENSIONS], shape[G95_MAX_DIMENSIONS];
+g95_constructor *head, *tail;
+g95_array_spec *as;
+mpz_t index;
 g95_expr *e;
 
+/* Unpack the shape array */
 
+  mpz_init(index);
+  rank = 0;
 
+  for(;;) {
+    e = g95_get_array_element(shape_exp, rank);
+    if (e == NULL) break;
 
-  return NULL; 
+    if (rank >= G95_MAX_DIMENSIONS) {
+      g95_error("Too many dimensions in shape specification for RESHAPE "
+		"at %L", &e->where);
+
+      goto done;
+    }
+
+    if (g95_extract_int(e, &shape[rank]) != NULL) {
+      g95_error("Integer too large in shape specification at %L",
+		&e->where);
+      goto done;
+    }
+
+    if (shape[rank] < 0) {
+      g95_error("Shape specification at %L cannot be negative", &e->where);
+      goto done;
+    }
+
+    rank++;
+  }
+
+  if (rank == 0) {
+    g95_error("Shape specification at %L cannot be the null array", &e->where);
+    goto done;
+  }
+
+  /* Now unpack the order array if present */
+
+  if (order_exp == NULL) {
+    for(i=0; i<rank; i++)
+      order[i] = i;
+
+  } else {
+
+    for(i=0; i<rank; i++)
+      x[i] = 0;
+
+    for(i=0; i<rank; i++) {
+      e = g95_get_array_element(order_exp, i);
+      if (e == NULL) {
+	g95_error("ORDER parameter of RESHAPE at %L is not the same size "
+		  "as SHAPE parameter", &e->where);
+	goto done;
+      }
+
+      if (g95_extract_int(e, &order[i]) != NULL) {
+	g95_error("Error in ORDER parameter of RESHAPE at %L", &e->where);
+	goto done;
+      }
+
+      if (order[i] < 1 || order[i] > rank) {
+	g95_error("ORDER parameter of RESHAPE at %L is out of range",
+		  &e->where);
+	goto done;
+      }
+
+      order[i]--;
+
+      if (x[order[i]]) {
+	g95_error("Invalid permutation in ORDER parameter at %L", &e->where);
+	goto done;
+      }
+
+      x[order[i]] = 1;
+    }
+  }
+
+  /* Count the elements in the source and padding arrays */
+
+  npad = 0;
+
+  if (pad != NULL) {
+    for(;; npad++)
+      if (g95_get_array_element(pad, npad) == NULL) break;
+  }
+
+  nsource = 0;
+
+  head = NULL;
+
+  for(;; nsource++)
+    if (g95_get_array_element(source, nsource) == NULL) break;
+
+  /* If it weren't for that pesky permutation we could just loop
+   * through the source and round out any shortage with pad elements.
+   * But no, someone just had to have the compiler do something the
+   * user should be doing. */
+
+  for(i=0; i<rank; i++)
+    x[i] = 0;
+
+  for(;;) {
+
+    /* Figure out which element to extract */
+
+    mpz_set_ui(index, 0);
+
+    for(i=rank-1; i>=0; i--) {
+      mpz_add_ui(index, index, x[order[i]]);
+      if (i != 0) mpz_mul_ui(index, index, shape[order[i-1]]);
+    }
+
+    if (mpz_cmp_ui(index, INT_MAX) > 0) {
+      g95_internal_error("Reshaped array too large at %L", &e->where);
+      goto done;
+    }
+
+    i = mpz_get_ui(index);
+
+    if (i < nsource)
+      e = g95_get_array_element(source, i);
+    else { 
+      i = i - nsource;
+
+      if (npad == 0) {
+	g95_error("PAD parameter required for short SOURCE parameter at %L",
+		  &source->where);
+	goto done;
+      }
+
+      i = i % npad;
+      e = g95_get_array_element(pad, i);
+    }
+
+    if (head == NULL)
+      head = tail = g95_get_constructor();
+    else {
+      tail->next = g95_get_constructor();
+      tail = tail->next;
+    }
+
+    tail->where = e->where;
+    tail->expr = g95_copy_expr(e);
+
+    /* Calculate the next element */
+
+    i = 0;
+  inc:
+    if (++x[i] < shape[i]) continue;
+    x[i++] = 0;
+    if (i < rank) goto inc;
+
+    break;
+  }
+
+  mpz_clear(index);
+
+  e = g95_get_expr();
+  e->where = source->where;
+  e->expr_type = EXPR_ARRAY;
+  e->value.constructor = head;
+  e->ts = head->expr->ts;
+
+  e->as = as = g95_get_array_spec();
+
+  as->rank = rank;
+  as->type = AS_EXPLICIT;
+
+  for(i=0; i<rank; i++) {
+    as->shape[i].lower = g95_int_expr(1);
+    as->shape[i].upper = g95_int_expr(shape[i]);
+  }
+
+  return e;
+
+done:
+  mpz_clear(index);
+  return &g95_bad_expr;
 }
 
 

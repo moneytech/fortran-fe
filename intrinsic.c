@@ -598,10 +598,10 @@ static try check_reshape(g95_expr *source, g95_expr *shape,
   if (shape->ts.type != BT_INTEGER) return FAILURE;
   if (shape->as->rank != 1) return FAILURE;
 
-  if (pad->as == NULL) return FAILURE;
-
   if (pad != NULL) {
     if (!g95_compare_types(&source->ts, &pad->ts)) return FAILURE;
+
+    if (pad->as == NULL) return FAILURE;
   }
 
   if (order != NULL) {
