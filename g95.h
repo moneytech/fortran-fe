@@ -893,8 +893,6 @@ typedef struct g95_code {
 
 #define g95_get_code() g95_getmem(sizeof(g95_code))
 
-extern g95_code new_st;
-
 
 /* Storage for DATA statements */
 
