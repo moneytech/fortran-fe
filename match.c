@@ -393,10 +393,7 @@ char *g95_op2string(int i) {
 
 match g95_match_iterator(g95_iterator *iter) {
 g95_expr *var, *e1, *e2, *e3;
-locus old_loc;
 match m;
-
-  old_loc = *g95_current_locus();
 
   m = g95_match(" %e =", &var);
   if (m != MATCH_YES) return MATCH_NO;
