@@ -914,6 +914,7 @@ int n;
 
 syntax:
   g95_error("Syntax error in I/O iterator at %C");
+  m = MATCH_ERROR;
 
 cleanup:
   g95_free_iterator(iter, 1);
