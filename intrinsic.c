@@ -1865,12 +1865,16 @@ int flag;
  * If the generic name is also a specific, we check that name last, so
  * that any error message will correspond to the specific */
 
+  g95_suppress_error = 1;
+
   if (isym->specific_head != NULL) {
     for(specific=isym->specific_head; specific; specific=specific->next) {
       if (specific == isym) continue;
       if (check_specific(specific, expr, 0) == SUCCESS) goto got_specific;
     }
   }
+
+  g95_suppress_error = !error_flag;
 
   if (check_specific(isym, expr, error_flag) == FAILURE) {
     g95_suppress_error = 0;
