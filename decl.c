@@ -864,6 +864,7 @@ cleanup:
 /* g95_match_data_decl()-- Match a data declaration statement */
 
 match g95_match_data_decl(void) {
+g95_symbol *sym;
 match m;
 
   m = g95_match_type_spec(&current_ts, 1, 1);
@@ -876,13 +877,23 @@ match m;
   }
 
   if (current_ts.type == BT_DERIVED &&
-      current_ts.derived->components == NULL &&
-      (current_attr.pointer == 0 || g95_current_state() != COMP_DERIVED)) {
+      current_ts.derived->components == NULL) {
+
+    if (current_attr.pointer && g95_current_state() == COMP_DERIVED) goto ok;
+
+    if (g95_find_symbol(current_ts.derived->name,
+			current_ts.derived->ns->parent, 1, &sym)) goto ok;
+
+    /* Hope that an ambiguous symbol is itself masked by a type definition */
+
+    if (sym != NULL && sym->attr.flavor == FL_DERIVED) goto ok;
 
     g95_error("Derived type at %C has not been previously defined");
     m = MATCH_ERROR;
     goto cleanup;
   }
+
+ok:
 
 /* Explanation is required here.  If we have an old-style character
  * declaration, and no new-style attribute specifications, then there
