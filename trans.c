@@ -259,15 +259,12 @@ g95_finish_stmt (tree body, tree tail)
   tree stmt;
   tree block;
   tree head;
-  tree next;
 
   head = stmt = build_stmt (SCOPE_STMT, NULL_TREE);
 
   SCOPE_BEGIN_P (stmt) = 1;
-  for (decl = getdecls () ; decl ; decl = next)
+  for (decl = getdecls () ; decl ; decl = TREE_CHAIN (decl))
     {
-      next = TREE_CHAIN (decl);
-      TREE_CHAIN (decl) = NULL_TREE;
       TREE_CHAIN (stmt) = build_stmt (DECL_STMT, decl);
       stmt = TREE_CHAIN (stmt);
     }

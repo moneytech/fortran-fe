@@ -380,7 +380,7 @@ expand_function_body (tree fndecl, int nested)
         warning ("Function tree not simple after optimization");
     }
   else
-    warning ("Internal failure: Function is not SIMPLE. Optimization inhibited.");
+    warning ("Internal failure: Function is not SIMPLE. Optimization inhibited. This is probably an indication of other problems.");
 
   /* create RTL for startup code of function, such as saving registers */
   expand_function_start (fndecl, 0);
@@ -462,8 +462,21 @@ current_scope_stmt_stack (void)
 }
 
 static void
+g95_create_decls (void)
+{
+  /* GCC builtins.  */
+  g95_init_builtin_functions ();
+
+  /* Runtime/IO library functions.  */
+  g95_build_builtin_function_decls ();
+
+  g95_init_constants ();
+}
+
+static void
 g95_be_parse_file (void *set_yydebug ATTRIBUTE_UNUSED)
 {
+  g95_create_decls ();
   g95_parse_file ();
   g95_generate_constructors ();
 }
@@ -500,14 +513,6 @@ g95_init (const char *filename)
   g95_init_1 ();
 
   g95_init_decl_processing ();
-
-  /* GCC builtins.  */
-  g95_init_builtin_functions ();
-
-  /* Runtime/IO library functions.  */
-  g95_build_builtin_function_decls ();
-
-  g95_init_constants ();
 
   if (g95_new_file (g95_option.source, g95_option.form) != SUCCESS)
     return (NULL);
@@ -760,7 +765,12 @@ pushdecl (tree decl)
   /* For the declartion of a type, set its name if it is not already set. */
 
   if (TREE_CODE (decl) == TYPE_DECL && TYPE_NAME (TREE_TYPE (decl)) == 0)
-    TYPE_NAME (TREE_TYPE (decl)) = DECL_NAME (decl);
+    {
+      if (DECL_SOURCE_LINE (decl) == 0)
+        TYPE_NAME (TREE_TYPE (decl)) = decl;
+      else
+        TYPE_NAME (TREE_TYPE (decl)) = DECL_NAME (decl);
+    }
 
   return decl;
 }

@@ -58,7 +58,6 @@ tree g95_array_index_type;
 tree ppvoid_type_node;
 tree pchar_type_node;
 
-
 /* Create the backend type nodes. We map them to their
    equivalent C type, at least for now.  We also give
    names to the types here, and we push them in the
@@ -67,7 +66,7 @@ void
 g95_init_types (void)
 {
   /* Name the types.  */
-#define PUSH_TYPE(name, node)                   \
+#define PUSH_TYPE(name, node) \
   pushdecl (build_decl (TYPE_DECL, get_identifier (name), node))
 
   g95_int1_type_node = signed_char_type_node;
@@ -121,6 +120,12 @@ g95_init_types (void)
 
   PUSH_TYPE ("byte", unsigned_char_type_node);
   PUSH_TYPE ("void", void_type_node);
+
+  /* DBX debugging output gets upset if these aren't set.  */
+  if (! TYPE_NAME (integer_type_node))
+    PUSH_TYPE ("c_integer", integer_type_node);
+  if (! TYPE_NAME (char_type_node))
+    PUSH_TYPE ("c_char", char_type_node);
 #undef PUSH_TYPE
 
   ppvoid_type_node = build_pointer_type (build_pointer_type (void_type_node));
@@ -467,8 +472,9 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
     ggc_alloc_cleared (sizeof (struct lang_type));
   G95_TYPE_DESCRIPTOR_RANK (fat_type) = dimen;
 
-  /* TODO: Include the name of the element type in the array name.  */
   tmp = TYPE_NAME (etype);
+  if (tmp && TREE_CODE (tmp) == TYPE_DECL)
+    tmp = DECL_NAME (tmp);
   if (tmp)
     typename = IDENTIFIER_POINTER (tmp);
   else

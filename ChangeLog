@@ -1,3 +1,12 @@
+2002-09-04  Paul Brook  <paul@nowt.org>
+
+	* f95-lang.c (g95_create_decls): New function.
+	(g95_init):  Move initialization of external decls to above, and call
+	from g95_be_parse_file.
+	* trans.c (g95_finish_stmt): Don't amputate the decl chain.
+	* trans-types.c (g95_init_types): Always name integer and char types.
+	(g95_get_array_type_bounds): TYPE_NAME may be a TYPE_DECL.
+
 2002-09-02  Steven Bosscher <s.bosscher@student.tudelft.nl>
 
 	* Make-lang.in: Add options.c to F95_PARSER_OBJS
