@@ -427,10 +427,11 @@ g95_typespec ts;
   else {
     ts = sym->ns->default_type[sym->name[0] - 'a'];
 
-    if (ts.type == BT_UNKNOWN)
+    if (ts.type == BT_UNKNOWN) {
       g95_error("Function '%s' at %L has no implicit type",
 		sym->name, &expr->where);
-    else
+      return FAILURE;
+    } else
       expr->ts = ts;
   }
 
