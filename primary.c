@@ -180,7 +180,7 @@ g95_expr *e;
   e = g95_convert_integer(buffer, kind, 10);
   e->where = *g95_current_locus();
 
-  if (g95_check_integer_range(e->value.integer, kind) != ARITH_OK) {
+  if (g95_range_check(e) != ARITH_OK) {
     g95_error("Integer too big for its kind at %C");
 
     g95_free_expr(e);
@@ -265,8 +265,7 @@ mpz_t mask;
     mpz_clear(mask);
   }
 
-  if (g95_check_integer_range(e->value.integer, g95_default_integer_kind())
-      != ARITH_OK) {
+  if (g95_range_check(e) != ARITH_OK) {
     g95_error("Integer too big for default integer kind at %C");
 
     g95_free_expr(e);
@@ -422,7 +421,7 @@ done:
   e = g95_convert_real(buffer, kind);
   e->where = *g95_current_locus();
 
-  switch(g95_check_real_range(e->value.real, kind)) {
+  switch(g95_range_check(e)) {
     case ARITH_OK: break;
     case ARITH_OVERFLOW:
       g95_error("Real constant overflows its kind at %C");
@@ -433,7 +432,7 @@ done:
       goto cleanup;
 
     default:
-      g95_internal_error("g95_check_real_range() returned bad value");
+      g95_internal_error("g95_range_check() returned bad value");
   }
 
   *result = e;

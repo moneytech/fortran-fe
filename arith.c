@@ -757,7 +757,7 @@ int rc;
  * that the integer lies within the range of the kind.  Returns
  * ARITH_OK or ARITH_OVERFLOW. */
 
-arith g95_check_integer_range(mpz_t p, int kind) {
+static arith g95_check_integer_range(mpz_t p, int kind) {
 arith result;
 mpz_t t;
 int i;
@@ -780,7 +780,7 @@ int i;
  * the real lies within the range of the kind.  Returns ARITH_OK,
  * ARITH_OVERFLOW or ARITH_UNDERFLOW. */
 
-arith g95_check_real_range(mpf_t p, int kind) {
+static arith g95_check_real_range(mpf_t p, int kind) {
 arith retval;
 mpf_t q;
 int i;
@@ -903,10 +903,12 @@ g95_expr *result;
 }
 
 
-/* check_range()-- Make sure a constant numeric expression is within
- * the range for it's type and kind. */
+/* g95_range_check()-- Make sure a constant numeric expression is
+ * within the range for it's type and kind.
+ * Note that there's also a g95_check_range(), but that one deals
+ * with the intrinsic RANGE function. */
 
-static arith check_range(g95_expr *e) {
+arith g95_range_check(g95_expr *e) {
 arith rc;
 
   switch(e->ts.type) {
@@ -926,7 +928,7 @@ arith rc;
     break;
 
   default:
-    g95_internal_error("check_range(): Bad type");
+    g95_internal_error("g95_range_check(): Bad type");
   }
 
   return rc;
@@ -969,7 +971,7 @@ arith rc;
     g95_internal_error("g95_arith_uminus(): Bad basic type");
   }
 
-  rc = check_range(result);
+  rc = g95_range_check(result);
 
   if (rc != ARITH_OK)
     g95_free_expr(result);
@@ -1008,7 +1010,7 @@ arith rc;
     g95_internal_error("g95_arith_plus(): Bad basic type");
   }
 
-  rc = check_range(result);
+  rc = g95_range_check(result);
 
   if (rc != ARITH_OK)
     g95_free_expr(result);
@@ -1048,7 +1050,7 @@ arith rc;
     g95_internal_error("g95_arith_minus(): Bad basic type");
   }
 
-  rc = check_range(result);
+  rc = g95_range_check(result);
 
   if (rc != ARITH_OK)
     g95_free_expr(result);
@@ -1097,7 +1099,7 @@ arith rc;
     g95_internal_error("g95_arith_times(): Bad basic type");
   }
 
-  rc = check_range(result);
+  rc = g95_range_check(result);
 
   if (rc != ARITH_OK)
     g95_free_expr(result);
@@ -1173,7 +1175,7 @@ arith rc;
     g95_internal_error("g95_arith_divide(): Bad basic type");
   }
 
-  if (rc == ARITH_OK) rc = check_range(result);
+  if (rc == ARITH_OK) rc = g95_range_check(result);
 
   if (rc != ARITH_OK)
     g95_free_expr(result);
@@ -1335,7 +1337,7 @@ arith rc;
     }
   }
 
-  if (rc == ARITH_OK) rc = check_range(result);
+  if (rc == ARITH_OK) rc = g95_range_check(result);
 
   if (rc != ARITH_OK)
     g95_free_expr(result);

@@ -1085,8 +1085,7 @@ int g95_default_complex_kind(void);
 
 g95_expr *g95_constant_result(bt, int);
 int g95_validate_kind(bt, int);
-arith g95_check_integer_range(mpz_t, int);
-arith g95_check_real_range(mpf_t, int);
+arith g95_range_check(g95_expr *);
 
 arith g95_arith_uminus(g95_expr *, g95_expr **);
 arith g95_arith_plus(g95_expr *, g95_expr *, g95_expr **);

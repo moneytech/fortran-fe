@@ -92,30 +92,10 @@ static int xascii_table[256];
 
 static g95_expr *range_check(g95_expr *result, const char *name) {
 
-  switch(result->ts.type) {
-  case BT_REAL:
-    if (g95_check_real_range(result->value.real, result->ts.kind) == ARITH_OK)
-      return result;
-    break;
-
-  case BT_INTEGER:
-    if (g95_check_integer_range(result->value.integer, result->ts.kind)
-	== ARITH_OK) return result;
-    break;
-
-  case BT_COMPLEX:
-    if (g95_check_real_range(result->value.complex.r,
-			     result->ts.kind) == ARITH_OK &&
-	g95_check_real_range(result->value.complex.i,
-			     result->ts.kind)== ARITH_OK) return result;
-    break;
-
-  default:
-    g95_internal_error("range_check(): Bad type");
-  }
+  if (g95_range_check(result) == ARITH_OK)
+    return result;
 
   g95_error("Result of %s overflows its kind at %L", name, &result->where);
-
   g95_free_expr(result);
   return &g95_bad_expr;
 }
