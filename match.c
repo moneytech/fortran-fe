@@ -2292,12 +2292,15 @@ g95_forall_iterator *next;
 
 
 /* match_forall_iterator()-- Match an iterator as part of a FORALL
- * statement.  The format is:   <var> = <start>:<end>[:<stride>] */
+ * statement.  The format is:
+ *     <var> = <start>:<end>[:<stride>][, <scalar mask>]  */
 
 static match match_forall_iterator(g95_forall_iterator **result) {
 g95_forall_iterator *iter;
+locus where;
 match m;
 
+  where = *g95_current_locus(); 
   iter = g95_getmem(sizeof(g95_forall_iterator));
 
   m = g95_match_variable(&iter->var, 0);
@@ -2334,6 +2337,7 @@ syntax:
   m = MATCH_ERROR;
 
 cleanup:
+  g95_set_locus(&where);
   g95_free_forall_iterator(iter);
   return m;
 }
@@ -2354,7 +2358,7 @@ match m0, m;
   m0 = g95_match_label(); 
   if (m0 == MATCH_ERROR) return MATCH_ERROR;
 
-  m = g95_match("forall (");
+  m = g95_match(" forall (");
   if (m != MATCH_YES) return m;
 
   m = match_forall_iterator(&new);
