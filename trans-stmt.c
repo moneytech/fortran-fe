@@ -229,7 +229,6 @@ g95_trans_do (g95_code * code)
   tree body;
   tree expr;
   tree count;
-  tree count1;
   tree range;
   tree init;
   tree type;
@@ -253,7 +252,7 @@ g95_trans_do (g95_code * code)
   g95_conv_simple_val (&step, code->ext.iterator->step);
 
   /* We don't want this changing half way through the loop.  */
-  g95_make_tmp_expr (&step);
+  g95_make_safe_expr (&step);
 
   type = TREE_TYPE (dovar.expr);
 
@@ -346,7 +345,7 @@ g95_trans_do (g95_code * code)
   /* Collate all the stmts in dovar.pre.  */
   g95_add_stmt_to_pre (&dovar, from.pre, from.pre_tail);
   g95_add_stmt_to_pre (&dovar, to.pre, to.pre_tail);
-  g95_add_stmt_to_pre (&dovar, step.pre, to.pre_tail);
+  g95_add_stmt_to_pre (&dovar, step.pre, step.pre_tail);
   g95_add_stmt_to_pre (&dovar, init, NULL_TREE);
   g95_add_stmt_to_pre (&dovar, stmt, NULL_TREE);
 

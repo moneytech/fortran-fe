@@ -219,9 +219,7 @@ tree listify (tree chain);
 
 static struct stmt_tree_s g95_stmt_tree;
 
-static
-GTY (())
-     tree g95_scope_stmt_stack;
+static GTY (()) tree g95_scope_stmt_stack;
 
 void
 expand_function_body (tree fndecl)
@@ -283,9 +281,9 @@ expand_function_body (tree fndecl)
 /*TODO: this needs optimization*/
 
 tree
-g95_truthvalue_conversion (tree expr)
+g95_truthvalue_conversion (tree expr ATTRIBUTE_UNUSED)
 {
-  g95_todo_error ("Truthvalue_conversion called, fixme");
+  g95_todo_error ("Truthvalue_conversion called");
   /*return (expr); */
 }
 
@@ -329,6 +327,8 @@ g95_init (const char *filename)
   g95_init_1 ();
 
   g95_init_decl_processing ();
+
+  g95_build_builtin_function_decls();
 
   if (g95_new_file (g95_option.source, g95_option.form) != SUCCESS)
     {
@@ -619,6 +619,7 @@ g95_init_decl_processing (void)
      only use it for actual characters, not for INTEGER(1). Also, we
      want double_type_node to actually have double precision.   */
   build_common_tree_nodes (0);
+  set_sizetype(long_unsigned_type_node);
   build_common_tree_nodes_2 (0);
 
   /* Set up F95 type nodes.  */

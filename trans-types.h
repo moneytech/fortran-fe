@@ -53,9 +53,6 @@ extern GTY(()) tree g95_array_index_type;
 /* be-function.c */
 void g95_convert_function_code (g95_namespace *);
 
-/* backend.c */
-tree g95_get_symbol_decl (g95_symbol *);
-
 /* types.c */
 void g95_init_types (void);
 
@@ -73,6 +70,14 @@ tree g95_unsigned_type (tree);
 tree g95_signed_type (tree);
 tree g95_signed_or_unsigned_type (int, tree);
 
-/* TODO: add missing proto's once types.c is gone. */
+/* Return components of an array descriptor.  */
+tree g95_get_ubound_component (tree, int);
+tree g95_get_lbound_component (tree, int);
+tree g95_get_stride_component (tree, int);
+tree g95_get_data_component (tree);
+tree g95_get_block_component (tree);
+
+/* Return a structure type for saving descriptors of specified rank.  */
+tree g95_get_descriptorsave_type(int);
 
 #endif

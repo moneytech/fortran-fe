@@ -38,6 +38,12 @@ typedef struct
   tree expr;
 } g95_se;
 
+/* See g95_build_array_type
+   1 = Type A
+   0 = Type B
+   This should not be changed during compilation.  */
+extern int g95_use_gcc_arrays;
+
 /* cll this to initialise a g95_se structure before use
  * first parameter is structure to initialise, second is
  * g95_se to get scalarization data from, or NULL */
@@ -61,7 +67,7 @@ tree g95_create_tmp_var(tree);
 
 /* store the result of an expression on a temp variable so it can be used
  * repeatedly even if the original changes */
-void g95_make_tmp_expr(g95_se * se);
+void g95_make_safe_expr(g95_se * se);
 
 /* Only the following 4 functions should be used to translate
  * expressions outside of trans-expr.c */
@@ -83,12 +89,18 @@ void g95_conv_simple_rhs(g95_se *, g95_expr *);
 
 /* g95_trans_* shouldn't call push/poplevel, use g95_push/pop_scope */
 
-/* Start a new satement.  */
-void g95_start_stmt(void);
-/* Finish a statement.  The two paramenters are the head and tail of the
-code for the statement.  Returns a COMPOUNT_STMT containing the code, decls
-tor temporaries and scope neatly wrapped up in a single COMPOUNT_STMT.  */
-tree g95_finish_stmt(tree, tree);
+/* Start a new satement block.  */
+void g95_start_stmt (void);
+/* Finish a statement block.  The two paramenters are the head and tail of the
+   code for the block.  Returns a COMPOUNT_STMT containing the code, decls
+   for temporaries and scope neatly wrapped up in a single COMPOUNT_STMT.  */
+tree g95_finish_stmt (tree, tree);
+/* We've decided we don't need this scope, so merge it with the parent.
+   Only variable decls will be merged, you still need to add the code.  */
+void g95_merge_stmt (void);
+/* Like g95_finish_stmt, but only wraps in COMPOUND_STMT if there are variable
+   decls in the scope.  */
+void g95_finish_se_stmt (g95_se *);
 
 /* tarns-types */
 tree g95_sym_type (g95_symbol *);
@@ -109,6 +121,15 @@ tree g95_get_fake_result_decl(void);
 
 /* Get the return label for the current function.  */
 tree g95_get_return_label (void);
+
+/* Make prototypes for runtime library functions.  */
+void g95_build_builtin_function_decls (void);
+
+/* Return the variable decl for a symbol.  */
+tree g95_get_symbol_decl (g95_symbol *);
+
+/* Advance along a TREE_CHAIN.  */
+tree g95_advance_chain (tree, int);
 
 /* somewhere! */
 tree pushdecl (tree);

@@ -32,6 +32,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    assumes that no other conversions can be NOP_EXPRs.
 */
 
+/* I've added support for WITH_RECORD_EXPR.  */
+
 #include "config.h"
 #include "system.h"
 #include "tree.h"
@@ -66,11 +68,17 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    not permitted by the language being compiled.  */
 
 tree
-convert (type, expr)
-     tree type, expr;
+convert (tree type, tree expr)
 {
   tree e = expr;
   enum tree_code code = TREE_CODE (type);
+
+  if (TREE_CODE (expr) == WITH_RECORD_EXPR)
+    {
+      return build (WITH_RECORD_EXPR, type,
+                    convert (type, TREE_OPERAND (expr, 0)),
+                    TREE_OPERAND (expr, 1));
+    }
 
   if (type == TREE_TYPE (expr)
       || TREE_CODE (expr) == ERROR_MARK

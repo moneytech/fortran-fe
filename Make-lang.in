@@ -54,7 +54,7 @@ STAMP = echo timestamp >
 # this is in addition to th warning flags defined by default
 f95-warn = -Wno-write-strings
 
-G95_GENERATED = 
+G95_GENERATED =
 
 G95_EXES = f951$(exeext)
 
@@ -117,28 +117,28 @@ gt-f95-f95-lang.h gtype-f95.h gt-f95-trans-decl.c: s-gtype; @true
 
 # Object file makes
 #f95/g95.o: $(srcdir)/g95.c  $(CONFIG_H) $(TREE_H) flags.h
-#	$(GCC_FOR_TARGET) -o $@ -c $(ALL_CFLAGS) $(INCLUDES) $< 
+#	$(GCC_FOR_TARGET) -o $@ -c $(ALL_CFLAGS) $(INCLUDES) $<
 
 
 # Generated files
-# The files from lex and yacc are put into the source directory 
+# The files from lex and yacc are put into the source directory
 # in case someone wants to build but does not have lex/yacc.
 # We have a hand-crafted scanner/parser, so we don't generate
 # any files.
 
 force:
 
-$(INTL_TARGETS): 
+$(INTL_TARGETS):
 
 #
 # Build hooks:
 
 f95.all.build: f95
-f95.all.cross: 
+f95.all.cross:
 	_error_not_here_yet - havent even thought about it - it may even work
 
 f95.start.encap:
-f95.rest.encap: 
+f95.rest.encap:
 
 f95.info:
 f95.dvi:
@@ -154,7 +154,7 @@ f95.install-common: installdirs
 
 f95.install-info:
 
-f95.install-man: 
+f95.install-man:
 
 f95.uninstall:
 
@@ -174,7 +174,7 @@ f95.distclean:
 	-rm -f f95/config.status f95/Makefile
 	-rm -f f95/*.output
 
-f95.extraclean: 
+f95.extraclean:
 
 f95.maintainer-clean:
 

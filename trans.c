@@ -47,6 +47,22 @@ Boston, MA 02111-1307, USA.  */
    Coding conventions for backend interface code:
    GNU Coding Standard + GCC extensions.  */
 
+/* See g95_build_array_type
+   1 = Type A
+   0 = Type B */
+int g95_use_gcc_arrays = 0;
+
+/* Advance along a TREE_CHAIN n times.  */
+tree
+g95_advance_chain (tree t, int n)
+{
+  for ( ; n > 0 ; n--)
+    {
+      assert (t != NULL_TREE);
+      t = TREE_CHAIN (t);
+    }
+  return t;
+}
 
 /* Change the flags for the type of the node T to make it writable.  */
 static void
@@ -89,10 +105,10 @@ g95_make_type_writable (tree t)
     }
 }
 
-/* Create a temporart variable.  */
-/* TODO: Array temporaries. Small array temps. can go on the stack,
-   but larger ones should be created elsewhere (malloced, on the
-   heap).  */
+/* Create a temporary variable.  Note that it may be used for small array
+   temporaries.  Also used for array descriptors.  Be careful when you call
+   this as the temporary is added to the current scope.  It is only valid
+   inside the g95_start/finish_stmt pair in which it is created.  */
 tree
 g95_create_tmp_var (tree type)
 {
@@ -100,18 +116,8 @@ g95_create_tmp_var (tree type)
   tree tmp_var;
   char *tmp_name;
 
-  /* We cannot deal with derived types, pointers or arrays yet.  */
-  if (TREE_CODE (type) == RECORD_TYPE
-      || TREE_CODE (type) == POINTER_TYPE
-      || TREE_CODE (type) == ARRAY_TYPE)
-      g95_todo_error ("Derived type, pointer and array temporaries");
-
   /* Build the name of this temporary.  */
   ASM_FORMAT_PRIVATE_NAME (tmp_name, "T", tmp_num++);
-
-  /* If the type is an array, something is wrong.  */
-  if (TREE_CODE (type) == ARRAY_TYPE)
-    abort ();
 
   /* Build the temporary variable tree node. */
   tmp_var = build_decl (VAR_DECL, get_identifier (tmp_name), type);
@@ -122,7 +128,8 @@ g95_create_tmp_var (tree type)
 
   /* The declaration is local to this file and this scope.  */
   TREE_PUBLIC (tmp_var) = 0;
-  TREE_STATIC (tmp_var) = 1;
+  /* We don't need static storage (ie. stack is OK).  */
+  TREE_STATIC (tmp_var) = 0;
 
   /* Assuming we're sane, this variable wasn't required by the
      compiler just to fill the scope ;-)  */
@@ -145,6 +152,53 @@ void
 g95_start_stmt (void)
 {
   pushlevel (0);
+}
+
+/* We've decided we don't need this scope, so merge it with the parent.
+   Only variable decls will be merged, you still need to add the code.  */
+void
+g95_merge_stmt (void)
+{
+  tree decl;
+  tree next;
+
+  /* Remember the decls in this scope.  */
+  decl = getdecls();
+  poplevel (0, 0, 0);
+
+  /* Add them to the parent scope.  */
+  while (decl != NULL_TREE)
+    {
+      next = TREE_CHAIN (decl);
+      TREE_CHAIN (decl) = NULL_TREE;
+
+      pushdecl (decl);
+      decl = next;
+    }
+}
+
+/* Like g95_finish_stmt, but only wraps in COMPOUND_STMT if there are variable
+   decls in the scope.  Calling with se->post != NULL just doesn't make sense.
+   Used to aviod excessive and pointless scopes for expressions.  */
+void
+g95_finish_se_stmt (g95_se * se)
+{
+  tree decls;
+
+  /* This we've been called for an incomplete expression.  */
+  assert (se->post == NULL_TREE);
+  /* Should never happen.  */
+  assert (se->pre != NULL_TREE);
+
+  decls = getdecls();
+  if (decls != NULL_TREE)
+    {
+      se->pre = g95_finish_stmt (se->pre, se->pre_tail);
+      se->pre_tail = se->pre;
+      assert (TREE_CHAIN (se->pre_tail) == NULL_TREE);
+    }
+  else
+    g95_merge_stmt ();
 }
 
 /* Finish a scope containing a stmt list, and create and add DECL_STMTs
@@ -428,7 +482,7 @@ g95_generate_function_protos (g95_namespace * ns)
     }
 }
 
-/* This function is called after a complete program uni has been parsed
+/* This function is called after a complete program unit has been parsed
    and resolved. First we generate prototype declarations for all
    functions, and then we generate code for one function at a time.
 */
@@ -437,9 +491,22 @@ g95_generate_code (g95_namespace * ns)
 {
   tree fndecl;
   g95_namespace *n;
+  g95_symbol *main_program = NULL;
+  symbol_attribute attr;
 
-  if (! ns->proc_name)
-    g95_todo_error ("Main Program without symbol");
+  /* Main program subroutine.  */
+  if (! ns->proc_name) 
+    {
+      /* Lots of things get upset if a subroutine doesn't have a symbol, so we
+          make one now.  */
+      g95_get_symbol ("__main", ns, 0, &main_program);
+      attr.flavor = FL_PROCEDURE;
+      attr.proc = PROC_UNKNOWN;
+      attr.subroutine = 1;
+      attr.access = ACCESS_PUBLIC;
+      main_program->attr = attr;
+      ns->proc_name = main_program;
+    }
 
   fndecl = g95_get_function_decl (ns->proc_name);
 
@@ -449,9 +516,16 @@ g95_generate_code (g95_namespace * ns)
 
 
   for (n = ns->contained ; n ; n = n->sibling)
-    g95_generate_function_code (n);
+    {
+      g95_todo_error("contained subroutines");
+      g95_generate_function_code (n);
+    }
 
   g95_generate_function_code (ns);
+
+  /* This is freed when the namespace is freed.
+  if (main_program)
+    g95_free_symbol (main_program); */
 
   current_function_decl = NULL;
 }
@@ -461,6 +535,13 @@ g95_generate_code (g95_namespace * ns)
 void
 g95_generate_module_code (g95_namespace * ns)
 {
-  g95_todo_error ("modules");
+  g95_namespace *n;
+  tree fndecl;
+
+  for (n = ns->contained ; n ; n = n->sibling)
+    {
+      g95_get_function_decl (n);
+      g95_generate_function_code (n);
+    }
 }
 

@@ -7,10 +7,10 @@ This file is part of GNU Fortran.
 */
 
 /* This is the contribution to the `documented_lang_options' array in
-   GCC's toplev.c for g95.  It is included in a GCC file called 
+   GCC's toplev.c for g95.  It is included in a GCC file called
    options.h (generated during configure). */
 
-/* The N_ stuff is used for i18n. We don't need it, so I've created 
+/* The N_ stuff is used for i18n. We don't need it, so I've created
    in a dummy macro. */
 
 #ifdef __STDC__	/* To be consistent with lang-specs.h.  Maybe avoid
@@ -18,9 +18,9 @@ This file is part of GNU Fortran.
 
 DEFINE_LANG_NAME ("GNU Fortran 95")
 
-{ "--help", 
+{ "--help",
       N_("Display this information") },
-{ "-v", 
+{ "-v",
       N_("Output namespace and code structures") },
 { "-Wline-truncation",
       N_("Warn about truncated source lines") },

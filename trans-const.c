@@ -37,8 +37,9 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "trans.h"
 #include "trans-const.h"
+#include "trans-types.h"
 
-/*TODO: Get values > 2^31 working.  */
+/*TODO: Maybe get values > 2^31 working.  */
 tree
 g95_conv_mpz_to_tree (mpz_t i, int kind)
 {
