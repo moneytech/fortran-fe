@@ -285,7 +285,10 @@ int i;
  * place. */
 
 try g95_check_assign(g95_expr *lvalue, g95_expr *rvalue, int conform) {
+mpz_t lsize, rsize;
+int lflag, rflag;
 g95_symbol *sym;
+try t;
 
   sym = lvalue->symbol;
 
@@ -310,6 +313,31 @@ g95_symbol *sym;
   if (lvalue->ts.type == BT_UNKNOWN) {
     g95_error("Variable type is UNKNOWN in assignment at %L", &lvalue->where);
     return FAILURE;
+  }
+
+  /* Check size of array assignments */
+
+  if (lvalue->rank != 0 && rvalue->rank != 0) {
+    mpz_init(lsize);
+    mpz_init(rsize);
+
+    t = SUCCESS;
+
+    lflag = g95_array_size(lvalue, &lsize) == SUCCESS;
+    rflag = g95_array_size(rvalue, &rsize) == SUCCESS;
+
+    if (lflag && rflag && mpz_cmp(lsize, rsize) < 0) {
+
+      g95_error("Array assignment at %L has more values on the right "
+		"than left", &rvalue->where);
+
+      t = FAILURE;
+    }
+
+    if (lflag) mpz_clear(lsize);
+    if (rflag) mpz_clear(rsize);
+
+    if (t == FAILURE) return FAILURE;
   }
 
   if (g95_compare_types(&lvalue->ts, &rvalue->ts)) return SUCCESS;
