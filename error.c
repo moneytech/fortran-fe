@@ -601,6 +601,6 @@ try g95_close_status(void) {
 
 void g95_get_errors(int *w, int *e) {
 
-  *w = warnings;
-  *e = errors;
+  if (w != NULL) *w = warnings;
+  if (e != NULL) *e = errors;
 }

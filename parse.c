@@ -1765,8 +1765,8 @@ loop:
 /* g95_parse_file()-- Top level parser. */
 
 try g95_parse_file(void) {
+int seen_program, errors_before, errors;
 g95_state_data top, s;
-int seen_program;
 g95_statement st;
 locus prog_locus;
 
@@ -1823,6 +1823,8 @@ loop:
   case ST_MODULE:
     push_state(&s, COMP_MODULE, g95_new_block);
     accept_statement(st);
+
+    g95_get_errors(NULL, &errors_before);
     parse_module();
     break;
 
@@ -1842,7 +1844,10 @@ loop:
 
   if (s.state == COMP_MODULE) {
     g95_resolve(g95_current_ns);
-    g95_dump_module(s.sym->name);
+
+    g95_get_errors(NULL, &errors);
+
+    g95_dump_module(s.sym->name, errors_before == errors);
   } else {
     if (g95_option.resolve) g95_resolve(g95_current_ns);
     // generate_code(g95_current_ns);

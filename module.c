@@ -25,6 +25,7 @@ Boston, MA 02111-1307, USA.  */
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "g95.h"
 
@@ -1776,9 +1777,11 @@ int i, sym_save, visible_save;
 }
 
 
-/* g95_dump_module()-- Given module, dump it to disk */
+/* g95_dump_module()-- Given module, dump it to disk.  If there was an
+ * error while processing the module, dump_flag will be set to zero
+ * and we delete the module file, even if it was already there. */
 
-void g95_dump_module(char *name) {
+void g95_dump_module(char *name, int dump_flag) {
 char filename[PATH_MAX];
 
   filename[0] = '\0';
@@ -1786,6 +1789,11 @@ char filename[PATH_MAX];
 
   strcat(filename, name);
   strcat(filename, MODULE_EXTENSION);
+
+  if (!dump_flag) {
+    unlink(filename);
+    return;
+  }
 
   module_fp = fopen(filename, "w");
   if (module_fp == NULL)
