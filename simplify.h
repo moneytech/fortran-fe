@@ -42,6 +42,7 @@ g95_expr *g95_simplify_char(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_cmplx(g95_expr *, g95_expr *, g95_expr *);
 g95_expr *g95_simplify_conjg(g95_expr *);
 g95_expr *g95_simplify_dble(g95_expr *);
+g95_expr *g95_simplify_digits(g95_expr *);
 g95_expr *g95_simplify_dim(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_dprod(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_epsilon(g95_expr *);

@@ -622,7 +622,7 @@ typedef struct g95_expr {
 typedef struct {
   int kind;
   char *max;
-  int bit_size, range;
+  int bit_size, range, digits;
   mpz_t maxval, minval;
 } g95_integer_info;
 
@@ -630,7 +630,7 @@ typedef struct {
 typedef struct {
   int kind;
   char *max, *eps;
-  int precision, range; /* decimal digits, decimal exponent range */
+  int precision, range, digits; /* decimal digits, decimal exponent range */
   mpf_t maxval, epsilon;
 } g95_real_info;
 

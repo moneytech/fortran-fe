@@ -199,6 +199,14 @@ static try check_bit_size(g95_expr *x) {
 }
 
 
+static try check_digits(g95_expr *x) {
+
+  if (!g95_numeric_ts(&x->ts)) return FAILURE;
+
+  return SUCCESS;
+}
+
+
 static try check_dim(g95_expr *x, g95_expr *y) {
 
   if ((x->ts.type != BT_INTEGER && x->ts.type != BT_REAL) ||
@@ -658,7 +666,7 @@ int di, dr, dd, dl, dc, dz;
 	  a, BT_REAL, dr, 0, NULL);
 
 /* KAH Input can be integer or real, scalar or array */
-  add_sym("digits", 1, BT_INTEGER, di, NULL, not_ready,
+  add_sym("digits", 1, BT_INTEGER, di, g95_simplify_digits, check_digits,
 	  x, BT_REAL, dr, 0, NULL);
 
   add_sym("dim",  0, BT_REAL,    dr, g95_simplify_dim, check_dim,

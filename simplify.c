@@ -641,6 +641,31 @@ g95_expr *result;
 }
 
 
+g95_expr *g95_simplify_digits(g95_expr *x) {
+int i, digits;
+
+  i = g95_validate_kind(x->ts.type, x->ts.kind);
+  if (i < 0) goto bad;
+
+  switch(x->ts.type) {
+  case BT_INTEGER:
+    digits = g95_integer_kinds[i].digits;
+    break;
+
+  case BT_REAL:
+  case BT_COMPLEX:
+    digits = g95_real_kinds[i].digits;
+    break;
+
+  default:
+  bad:
+    g95_error("g95_simplify_digits(): Bad type");
+  }
+
+  return g95_int_expr(digits);
+}
+
+
 g95_expr *g95_simplify_dim(g95_expr *x, g95_expr *y) {
 g95_expr *result;
 
