@@ -947,14 +947,8 @@ g95_expr *x;
 
 
 static try check_max(g95_actual_arglist *arg) {
-g95_expr *x;
 
-  if (arg == NULL) return FAILURE;
-
-  x = arg->expr;
-  if (!g95_numeric_ts(&x->ts)) return FAILURE;
-
-  return check_rest(x->ts.type, x->ts.kind, arg);
+  return check_min(arg);
 }
 
 
@@ -966,19 +960,13 @@ g95_expr *x;
   x = arg->expr;
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
 
-  return check_rest(BT_INTEGER, x->ts.kind, arg);
+  return check_rest(BT_INTEGER, g95_default_integer_kind(), arg);
 }
 
 
 static try check_max0(g95_actual_arglist *arg) {
-g95_expr *x;
 
-  if (arg == NULL) return FAILURE; 
-
-  x = arg->expr;
-  if (!g95_numeric_ts(&x->ts)) return FAILURE;
-
-  return check_rest(BT_INTEGER, x->ts.kind, arg);
+  return check_min0(arg);
 }
 
 
@@ -990,20 +978,15 @@ g95_expr *x;
   x = arg->expr;
   if (!g95_numeric_ts(&x->ts)) return FAILURE;
 
-  return check_rest(BT_REAL, x->ts.kind, arg);
+  return check_rest(BT_REAL, g95_default_real_kind(), arg);
 }
 
 
 static try check_max1(g95_actual_arglist *arg) {
-g95_expr *x;
 
-  if (arg == NULL) return FAILURE;
-
-  x = arg->expr;
-  if (!g95_numeric_ts(&x->ts)) return FAILURE;
-
-  return check_rest(BT_REAL, x->ts.kind, arg);
+  return check_min1(arg);
 }
+
 
 
 static try check_amin0(g95_actual_arglist *arg) {
@@ -1016,9 +999,7 @@ static try check_amin0(g95_actual_arglist *arg) {
 
 static try check_amax0(g95_actual_arglist *arg) {
 
-  if (arg == NULL) return FAILURE; 
-
-  return check_rest(BT_INTEGER, g95_default_integer_kind(), arg);
+  return check_amin0(arg);
 }
 
 
@@ -1032,9 +1013,7 @@ static try check_amin1(g95_actual_arglist *arg) {
 
 static try check_amax1(g95_actual_arglist *arg) {
 
-  if (arg == NULL) return FAILURE; 
-
-  return check_rest(BT_REAL, g95_default_real_kind(), arg);
+  return check_amin1(arg);
 }
 
 
@@ -1048,9 +1027,7 @@ static try check_dmin1(g95_actual_arglist *arg) {
 
 static try check_dmax1(g95_actual_arglist *arg) {
 
-  if (arg == NULL) return FAILURE; 
-
-  return check_rest(BT_REAL, g95_default_double_kind(), arg); 
+  return check_dmin1(arg);
 }
 
 
@@ -1991,6 +1968,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("cabs", 0, 1, BT_REAL,    dr, g95_simplify_cabs, NULL,
 	  a, BT_COMPLEX, dz, 0, NULL);
 
+  add_sym("zabs", 0, 1, BT_REAL,    dd, g95_simplify_cabs, NULL,
+	  a, BT_COMPLEX, dd, 0, NULL);   /* Extension */
+
   make_generic("abs");
 
   add_sym("achar", 0, 1, BT_CHARACTER, dc, g95_simplify_achar, NULL,
@@ -2012,6 +1992,9 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("aimag", 0, 1, BT_REAL, dr, g95_simplify_aimag, NULL,
 	  z, BT_COMPLEX, dz, 0, NULL);
+
+  add_sym("dimag", 0, 1, BT_REAL, dd, g95_simplify_aimag, NULL,
+	  z, BT_COMPLEX, dd, 0, NULL);    /* Extension */
 
   make_generic("aimag");
 
@@ -2088,6 +2071,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("conjg", 0, 1, BT_COMPLEX, dz, g95_simplify_conjg, NULL,
 	  z, BT_COMPLEX, dz, 0, NULL);
 
+  add_sym("dconjg", 0, 1, BT_COMPLEX, dd, g95_simplify_conjg, NULL,
+	  z, BT_COMPLEX, dd, 0, NULL);   /* Extension */
+
   make_generic("conjg");
 
   add_sym("cos", 0, 1, BT_REAL,    dr, g95_simplify_cos, check_cos,
@@ -2098,6 +2084,9 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("ccos", 0, 1, BT_COMPLEX, dz, g95_simplify_cos, NULL,
 	  x, BT_COMPLEX, dz, 0, NULL);
+
+  add_sym("zcos", 0, 1, BT_COMPLEX, dd, g95_simplify_cos, NULL,
+	  x, BT_COMPLEX, dd, 0, NULL);   /* Extension */
 
   make_generic("cos");
 
@@ -2155,6 +2144,9 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("cexp", 0, 1, BT_COMPLEX, dz, g95_simplify_exp, NULL, x, BT_COMPLEX,
 	  dz, 0, NULL);
+
+  add_sym("zexp", 0, 1, BT_COMPLEX, dd, g95_simplify_exp, NULL, x, BT_COMPLEX,
+	  dd, 0, NULL);   /* Extension */
 
   make_generic("exp");
 
@@ -2267,6 +2259,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("clog", 0, 1, BT_COMPLEX, dz, g95_simplify_log, NULL,
 	  x, BT_COMPLEX, dz, 0, NULL);
 
+  add_sym("zlog", 0, 1, BT_COMPLEX, dd, g95_simplify_log, NULL,
+	  x, BT_COMPLEX, dd, 0, NULL);   /* Extension */
+
   make_generic("log");
 
   add_sym("log10", 0, 1, BT_REAL, dr, g95_simplify_log10, check_log10,
@@ -2286,8 +2281,11 @@ int di, dr, dd, dl, dc, dz;
   add_sym("matmul", 1, 1, BT_REAL, dr, NULL, check_matmul,
 	  ma, BT_REAL, dr, 0,   mb, BT_REAL, dr, 0, NULL);
 
-/* Note: amax0 is equivalent to real(max), max1 is equivalent to int(max) 
- * max function must take at least two arguments                        */
+/* Note: amax0 is equivalent to real(max), max1 is equivalent to
+ * int(max).  The max function must take at least two arguments.
+ *
+ * In order to for the generic resolve correctly,
+ *     max0 must appear before amax0  and  amax1 must appear before max1  */
 
   add_sym("max", 0, 0, BT_UNKNOWN, 0, NULL, check_max,
 	  a1, BT_UNKNOWN,    dr, 0,   a2, BT_UNKNOWN,    dr, 0, NULL);
@@ -2295,17 +2293,17 @@ int di, dr, dd, dl, dc, dz;
   add_sym("max0", 0, 0, BT_INTEGER, di, NULL, check_max0,
 	  a1, BT_INTEGER, di, 0,   a2, BT_INTEGER, di, 0, NULL);
 
-  add_sym("max1", 0, 0, BT_INTEGER, di, NULL, check_max1,
-	  a1, BT_REAL,    dr, 0,   a2, BT_REAL,    dr, 0, NULL);
+  add_sym("amax0", 0, 0, BT_REAL,    dr, NULL, check_amax0,
+	  a1, BT_INTEGER, di, 0,   a2, BT_INTEGER, di, 0, NULL);
 
   add_sym("amax1", 0, 0, BT_REAL,    dr, NULL, check_amax1,
 	  a1, BT_REAL,    dr, 0,   a2, BT_REAL,    dr, 0, NULL);
 
+  add_sym("max1", 0, 0, BT_INTEGER, di, NULL, check_max1,
+	  a1, BT_REAL,    dr, 0,   a2, BT_REAL,    dr, 0, NULL);
+
   add_sym("dmax1", 0, 0, BT_REAL,    dd, NULL, check_dmax1,
 	  a1, BT_REAL,    dd, 0,   a2, BT_REAL,    dd, 0, NULL);
-
-  add_sym("amax0", 0, 0, BT_REAL,    dr, NULL, check_amax0,
-	  a1, BT_INTEGER, di, 0,   a2, BT_INTEGER, di, 0, NULL);
 
   make_generic("max");
 
@@ -2322,7 +2320,10 @@ int di, dr, dd, dl, dc, dz;
   add_sym("merge", 0, 1, BT_REAL, dr, NULL, check_merge, ts, BT_REAL, dr, 0,
 	  fs, BT_REAL, dr, 0,   msk, BT_LOGICAL, dl, 0, NULL);
 
-/* Note: amin0 is equivalent to real(min), min1 is equivalent to int(min) */
+/* Note: amin0 is equivalent to real(min), min1 is equivalent to int(min).
+ * In order for the generic to resolve correctly,
+ *
+ *     min0 must appear before amin0  and  amin1 must appear before min1  */
 
   add_sym("min", 0, 0, BT_UNKNOWN,  0, NULL, check_min,
 	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
@@ -2330,17 +2331,17 @@ int di, dr, dd, dl, dc, dz;
   add_sym("min0", 0, 0, BT_INTEGER, di, NULL, check_min0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
 
-  add_sym("amin1", 0, 0, BT_REAL,    dr, NULL, check_amin1,
-	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
-
-  add_sym("dmin1", 0, 0, BT_REAL,    dd, NULL, check_dmin1,
-	  a1, BT_REAL,    dd, 0, a2, BT_REAL,    dd, 0, NULL);
-
   add_sym("amin0", 0, 0, BT_REAL,    dr, NULL, check_amin0,
 	  a1, BT_INTEGER, di, 0, a2, BT_INTEGER, di, 0, NULL);
 
+  add_sym("amin1", 0, 0, BT_REAL,    dr, NULL, check_amin1,
+	  a1, BT_REAL,    dr, 0, a2, BT_REAL,    dr, 0, NULL);
+
   add_sym("min1", 0, 0, BT_INTEGER, di, NULL, check_min1,
 	  a1, BT_REAL, dr, 0,   a2, BT_REAL, dr, 0, NULL);
+
+  add_sym("dmin1", 0, 0, BT_REAL,    dd, NULL, check_dmin1,
+	  a1, BT_REAL,    dd, 0, a2, BT_REAL,    dd, 0, NULL);
 
   make_generic("min");
 
@@ -2471,6 +2472,9 @@ int di, dr, dd, dl, dc, dz;
   add_sym("csin", 1, 1, BT_COMPLEX, dz, g95_simplify_sin, NULL,
 	  x, BT_COMPLEX, dz, 0, NULL);
 
+  add_sym("zsin", 1, 1, BT_COMPLEX, dd, g95_simplify_sin, NULL,
+	  x, BT_COMPLEX, dd, 0, NULL);   /* Extension */
+
   make_generic("sin");
 
   add_sym("sinh", 1, 1, BT_REAL, dr, g95_simplify_sinh, NULL,
@@ -2498,6 +2502,9 @@ int di, dr, dd, dl, dc, dz;
 
   add_sym("csqrt", 1, 1, BT_COMPLEX, dz, g95_simplify_sqrt, NULL,
 	  x, BT_COMPLEX, dz, 0, NULL);
+
+  add_sym("zsqrt", 1, 1, BT_COMPLEX, dd, g95_simplify_sqrt, NULL,
+	  x, BT_COMPLEX, dd, 0, NULL);   /* Extension */
 
   make_generic("sqrt");
 
