@@ -1600,12 +1600,12 @@ g95_expr *arg;
   
   arg = FIRST_ARG(e);
 
-  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+  if (arg->expr_type != EXPR_CONSTANT || arg->ts.type == BT_DERIVED)
+    return FAILURE;
 
-/*   g95_replace_expr(e, g95_int_expr(arg->ts.kind)); */
-   g95_replace_expr(e, arg);
+  g95_replace_expr(e, g95_int_expr(arg->ts.kind));
   return SUCCESS;
-} /* end simplify_kind */
+}
 
 
 /* simplify_len_trim() */
