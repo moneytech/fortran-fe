@@ -403,7 +403,8 @@ int i;
     return 1;
   }
 
-  if (strcmp(option, "-Wimplicit") == 0) {
+  if (strcmp(option, "-fimplicit-none") == 0 || 
+      strcmp(option, "-Wimplicit") == 0) {
     g95_option.implicit_none = 1;
     return 1;
   }
