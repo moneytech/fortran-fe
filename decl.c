@@ -133,7 +133,7 @@ g95_state_data *s;
   if (s->state != COMP_INTERFACE) goto normal;
   if (s->sym == NULL) goto normal;   /* Nameless interface */
 
-  if (strcmp(name, s->sym->name ) == 0) {
+  if (strcmp(name, s->sym->name) == 0) {
     *result = s->sym;
     return 0;
   }
@@ -1136,7 +1136,7 @@ match m;
   if (m != MATCH_YES) return m;
 
   if (g95_match(" )%t") != MATCH_YES) {
-    g95_error("Unexpected junk following function argument list at %C");
+    g95_error("Unexpected junk following RESULT variable at %C");
     return MATCH_ERROR;
   }
 
