@@ -789,7 +789,7 @@ int g95_check_include(void);
 
 void g95_skip_comment_line(void);
 void g95_skip_comments(void);
-int g95_next_char_literal(void);
+int g95_next_char_literal(int);
 int g95_next_char(void);
 int g95_peek_char(void);
 void g95_error_recovery(void);

@@ -335,7 +335,7 @@ char c;
   digit_flag = 0;
 
   for(i=0; i<5; i++) {
-    c = g95_next_char_literal();
+    c = g95_next_char_literal(0);
 
     switch(c) {
     case ' ':
@@ -364,7 +364,7 @@ char c;
 /* Since this line starts a statement, it cannot be a continuation of
  * a previous statement.  Hence we mostly ignore column 6. */
 
-  if (g95_next_char_literal() == '\n') goto blank_line;
+  if (g95_next_char_literal(0) == '\n') goto blank_line;
 
 /* Now that we've taken care of the statement label columns, we have
  * to make sure that the first nonblank character is not a '!'.  If it
@@ -372,7 +372,7 @@ char c;
 
   do { 
     loc = *g95_current_locus();
-    c = g95_next_char_literal();
+    c = g95_next_char_literal(0);
   } while(g95_is_whitespace(c));
 
   if (c == '!') goto blank_line;

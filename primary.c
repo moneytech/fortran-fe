@@ -407,14 +407,14 @@ int g95_next_string_char(char delimiter) {
 locus old_locus;
 int c;
 
-  c = g95_next_char_literal();
+  c = g95_next_char_literal(1);
 
   if (c == '\n') return -2;
 
   if (c == '\\') {
     old_locus = *g95_current_locus();
 
-    switch(g95_next_char_literal()) {
+    switch(g95_next_char_literal(1)) {
     case 'a':  c = '\a'; break;
     case 'b':  c = '\b'; break;
     case 't':  c = '\t'; break;
@@ -433,7 +433,7 @@ int c;
   if (c != delimiter) return c;
 
   old_locus = *g95_current_locus();
-  c = g95_next_char_literal();
+  c = g95_next_char_literal(1);
 
   if (c == delimiter) return c;
   g95_set_locus(&old_locus);
@@ -1356,7 +1356,7 @@ match m;
       m = match_varspec(e);
       break;
     }
-
+    
     lparen = (g95_peek_char() == '(');
 
     if (sym->attr.external || sym->attr.intrinsic) {

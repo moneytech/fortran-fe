@@ -59,7 +59,7 @@ char c;
     c = g95_next_string_char(delimiter);
     if (c < 0) c = '\0';
   } else {
-    c = g95_next_char_literal();
+    c = g95_next_char_literal(0);
     if (c == '\n') c = '\0';
   }
 
@@ -588,7 +588,7 @@ int i;
   p = q = g95_getmem(format_length+1);
 
   for(i=0; i<format_length; i++)
-    *p++ = g95_next_char_literal();
+    *p++ = g95_next_char_literal(0);
 
   g95_match_eos();   /* Guaranteed to succeed */
 

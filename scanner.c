@@ -388,9 +388,10 @@ void g95_skip_comments(void) {
  * taking continuation lines into account.  This implies that comment
  * lines between continued lines must be eaten here.  For higher-level
  * subroutines, this flattens continued lines into a single logical
- * line. */
+ * line. instring denotes whether we´re inside a character constant
+ * where '!' gets ignored */
 
-int g95_next_char_literal(void) {
+int g95_next_char_literal(int instring) {
 locus old_loc;
 int i, c;
 
@@ -443,6 +444,12 @@ restart:
     if (c != '&') g95_set_locus(&old_loc);
 
   } else {   /* Fixed form continuation */
+    if (!instring && c == '!') { /* skip comment at end of line */
+      do {
+	c = next_char();
+      }	while(c != '\n');
+    }
+
     if (c != '\n') goto done;
 
     continue_flag = 1;
@@ -486,7 +493,7 @@ int g95_next_char(void) {
 int c;
 
   do {
-    c = g95_next_char_literal();
+    c = g95_next_char_literal(0);
   } while(g95_current_file->form == FORM_FIXED && g95_is_whitespace(c));
 
   return tolower(c);
@@ -550,7 +557,7 @@ int c;
 
   do {
     old_loc = *g95_current_locus();
-    c = g95_next_char_literal();
+    c = g95_next_char_literal(0);
   } while (g95_is_whitespace(c));
 
   g95_set_locus(&old_loc);
