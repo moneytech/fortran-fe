@@ -2370,8 +2370,6 @@ g95_expr *e;
     mpz_clear(size);
   }
 
-  nsource = 0;
-
   g95_array_size(source, &size);
   nsource = mpz_get_ui(size);
   mpz_clear(size);
