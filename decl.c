@@ -786,10 +786,15 @@ try t;
     seen[d]++;
     seen_at[d] = *g95_current_locus();
 
-    if (d == DECL_DIMENSION &&
-	g95_match_array_spec(&current_as) != MATCH_YES) {
-      m = MATCH_NO;  /* If we had an error here, it'll be back */
-      goto cleanup;
+    if (d == DECL_DIMENSION) {
+      m = g95_match_array_spec(&current_as);
+
+      if (m == MATCH_NO) {
+	g95_error("Missing dimension specification at %C");
+	m = MATCH_ERROR;
+      }
+
+      if (m == MATCH_ERROR) goto cleanup;
     }
   }
 
