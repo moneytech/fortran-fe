@@ -2332,9 +2332,59 @@ int count, i, len, lentrim;
 }
 
 
-g95_expr *g95_simplify_verify(g95_expr *e) {
+g95_expr *g95_simplify_verify(g95_expr *s, g95_expr *set, g95_expr *b) {
+g95_expr *result;
+int back, len, lenset;
+int i, index;
+  
+  if (s->ts.kind != set->ts.kind) {
+    g95_error("KIND of arguments of VERIFY at %L must agree", &s->where);
+    return &g95_bad_expr;
+  }
 
-  return NULL; 
+  if (s->expr_type != EXPR_CONSTANT || set->expr_type != EXPR_CONSTANT)  
+    return NULL;
+
+  if ( b != NULL && b->ts.type != BT_LOGICAL) {
+    g95_error("Optional argument of INDEX at %L must be logical", &b->where);
+    return &g95_bad_expr;
+  }
+
+  if ( b != NULL && b->value.logical != 0  ) back = 1;
+  else back = 0;
+
+  result = g95_constant_result(BT_INTEGER, g95_default_integer_kind());
+  result->where = s->where;
+
+  len    = s->value.character.length;
+  lenset = set->value.character.length;
+
+  if ( len == 0 ) {
+    mpz_set_si(result->value.integer,0);
+    return result;
+  }
+
+  if ( back == 0 ) {
+    if (lenset == 0) {
+      mpz_set_si(result->value.integer,len);
+      return result;
+    }
+    else {
+      index = strspn(s->value.character.string,set->value.character.string)+1;
+      if ( index > len ) index = 0;
+    }
+  }
+  else {
+    if ( lenset == 0 ) {
+       mpz_set_si(result->value.integer,1);
+    }
+    else {
+      index = len-strspn(s->value.character.string,set->value.character.string);
+    }
+  }
+
+  mpz_set_si(result->value.integer,index);
+  return result;
 
 }
 

@@ -101,5 +101,5 @@ g95_expr *g95_simplify_tan(g95_expr *);
 g95_expr *g95_simplify_tanh(g95_expr *);
 g95_expr *g95_simplify_tiny(g95_expr *);
 g95_expr *g95_simplify_trim(g95_expr *);
-g95_expr *g95_simplify_verify(g95_expr *);
+g95_expr *g95_simplify_verify(g95_expr *, g95_expr *, g95_expr *);
 
