@@ -750,16 +750,32 @@ void g95_resolve_repeat(g95_expr *f, g95_expr *string, g95_expr *ncopies) {
 void g95_resolve_reshape(g95_expr *f, g95_expr *source, g95_expr *shape,
 			 g95_expr *pad, g95_expr *order) {
 mpz_t rank;
+int kind;
 
   f->ts = source->ts;
 
   g95_array_size(shape, &rank);
   f->rank = mpz_get_si(rank);
   mpz_clear(rank);
+  if (source->ts.type == BT_DERIVED)
+    kind = 0;
+  else
+    kind = source->ts.kind;
 
-  f->value.function.name =
-    g95_get_string("__reshape_%c%d", g95_type_letter(source->ts.type),
-		   source->ts.kind);
+  switch (kind)
+    {
+    case 4:
+    case 8:
+    /* case 16: */
+      f->value.function.name =
+        g95_get_string("__reshape_%d", source->ts.kind);
+      break;
+      
+    default:
+      f->value.function.name = "__reshape";
+      break;
+    }
+
 }
 
 
