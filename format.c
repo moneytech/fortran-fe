@@ -46,7 +46,6 @@ static format_token saved_token;
 static enum { MODE_STRING, MODE_FORMAT } mode;
 static locus last_locus;
 
-
 /* next_char()-- Return the next character in the format string */
 
 static char next_char(void) {
@@ -185,6 +184,11 @@ int zflag;
     delim = c;
 
     for(;;) {
+    int savedmode;
+
+      savedmode = mode; /* we´re now inside a character constant, ignore !´s */
+      mode = MODE_STRING;
+
       c = next_char();
       if (c == '\0') {
 	token = FMT_END;
@@ -205,6 +209,7 @@ int zflag;
 	  break;
 	}
       }
+      mode = savedmode;
     }
 
     break;
