@@ -1567,24 +1567,19 @@ g95_component *c;
  * the branch is conforming.  The code node described where the branch
  * is located. */
 
-static void resolve_branch(int label, g95_code *code, g95_namespace *ns) {
+static void resolve_branch(g95_st_label *label, g95_code *code,
+                           g95_namespace *ns) {
 g95_code *block, *found;
 code_stack *stack;
 g95_st_label *lp;
 
-  if (label == 0) return;
+  if (label == NULL) return;
+  lp = label;
 
-  /* Step one: find the label in this namespace */
-
-  lp = g95_find_st_label (label);
-  if (lp == NULL) /* should never happen becayse label should in the list */
-    g95_internal_error("resolve_branch(): a referenced statement label is "
-                       "missing from the label list");
-
-  /* Step two: is this a valid branching target? */
+  /* Step one: is this a valid branching target? */
 
   if (lp->defined == ST_LABEL_UNKNOWN) {
-    g95_error("Label %d referenced at %L is never defined", lp->label,
+    g95_error("Label %d referenced at %L is never defined", lp->value,
 	      &lp->where);
     return;
   }
@@ -1595,14 +1590,14 @@ g95_st_label *lp;
     return;
   }
 
-  /* Step three: make sure this branch is not a branch to itself ;-) */
+  /* Step two: make sure this branch is not a branch to itself ;-) */
 
   if (code->here == label) {
     g95_warning("Branch at %L causes an infinite loop", &code->loc);
     return;
   }
 
-  /* Step four: Try to find the label in the parse tree. To do this,
+  /* Step three: Try to find the label in the parse tree. To do this,
    * we traverse the tree block-by-block: first the block that
    * contains this GOTO, then the block that it is nested in, etc.  We
    * can ignore other blocks because branching into another block is
@@ -1627,7 +1622,7 @@ g95_st_label *lp;
     return;
   }
 
-  /* Step five: Make sure that the branching target is legal if
+  /* Step four: Make sure that the branching target is legal if
    * the statement is an END {SELECT,DO,IF}. */
 
   if (found->op == EXEC_NOP) {

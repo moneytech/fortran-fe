@@ -209,11 +209,11 @@ void g95_undo_statement(void) {
 
 /* code_indent()-- Do indentation for a specific level */
 
-static void code_indent(int level, int label) {
+static void code_indent(int level, g95_st_label *label) {
 int i;
 
-  if (label != 0)
-    g95_status("%-5d ", label);
+  if (label != NULL)
+    g95_status("%-5d ", label->value);
   else
     g95_status("      ");
 
@@ -235,7 +235,6 @@ g95_close *close;
 g95_filepos *fp;
 g95_inquire *i;
 g95_dt *dt;
-int label = 0;
 
   code_indent(level, c->here); 
 
@@ -263,7 +262,7 @@ int label = 0;
     break;
 
   case EXEC_GOTO:
-    g95_status("GOTO %d", c->label);
+    g95_status("GOTO %d", c->label->value);
     break;
 
   case EXEC_CALL:
@@ -279,11 +278,11 @@ int label = 0;
   case EXEC_STOP:
     g95_status("STOP ");
 
-    if (c->label != -1) {
+    if (c->label != NULL) {
       if (c->expr != NULL)
 	g95_show_expr(c->expr);
       else
-	g95_status("%d", c->label);
+	g95_status("%d", c->label->value);
     }
 
     break;
@@ -291,7 +290,7 @@ int label = 0;
   case EXEC_ARITHMETIC_IF:
     g95_status("IF ");
     g95_show_expr(c->expr);
-    g95_status(" %d, %d, %d", c->label, c->label2, c->label3);
+    g95_status(" %d, %d, %d", c->label->value, c->label2->value, c->label3->value);
     break;
 
   case EXEC_IF:
@@ -315,7 +314,7 @@ int label = 0;
       g95_show_code(level+1, d->next);
     }
 
-    code_indent(level, label);
+    code_indent(level, c->label);
 
     g95_status("ENDIF");
     break;
@@ -343,7 +342,7 @@ int label = 0;
       g95_show_code(level+1, d->next);
     }
 
-    code_indent(level, label);
+    code_indent(level, c->label);
     g95_status("END SELECT");
     break;
 
@@ -420,7 +419,7 @@ int label = 0;
 
     g95_show_code(level+1, c->block->next);
 
-    code_indent(level, label);
+    code_indent(level, c->label);
     g95_status("END DO");
     break;
 
@@ -479,7 +478,7 @@ int label = 0;
     if (open->action) { g95_status(" ACTION="); g95_show_expr(open->action); }
     if (open->delim) { g95_status(" DELIM="); g95_show_expr(open->delim); }
     if (open->pad) { g95_status(" PAD="); g95_show_expr(open->pad); }
-    if (open->err != 0) g95_status(" ERR=%d", open->err);
+    if (open->err != NULL) g95_status(" ERR=%d", open->err->value);
 
     break;
 
@@ -490,7 +489,7 @@ int label = 0;
     if (close->unit) { g95_status(" UNIT="); g95_show_expr(close->unit); }
     if (close->iostat) { g95_status(" IOSTAT="); g95_show_expr(close->iostat);}
     if (close->status) { g95_status(" STATUS=");g95_show_expr(close->status); }
-    if (close->err != 0) g95_status(" ERR=%d", close->err);
+    if (close->err != NULL) g95_status(" ERR=%d", close->err->value);
     break;
 
   case EXEC_BACKSPACE:
@@ -509,7 +508,7 @@ int label = 0;
 
     if (fp->unit) { g95_status(" UNIT="); g95_show_expr(fp->unit); }
     if (fp->iostat) { g95_status(" IOSTAT="); g95_show_expr(fp->iostat); }
-    if (fp->err != 0) g95_status(" ERR=%d", fp->err);
+    if (fp->err != NULL) g95_status(" ERR=%d", fp->err->value);
     break;
 
   case EXEC_INQUIRE:
@@ -545,7 +544,7 @@ int label = 0;
     if (i->delim) { g95_status(" DELIM="); g95_show_expr(i->delim); }
     if (i->pad) { g95_status(" PAD="); g95_show_expr(i->pad); }
 
-    if (i->err != 0) g95_status(" ERR=%d", i->err);
+    if (i->err != NULL) g95_status(" ERR=%d", i->err->value);
     break;
 
   case EXEC_IOLENGTH:
@@ -568,15 +567,15 @@ int label = 0;
     if (dt->format_expr) {
       g95_status(" FMT="); g95_show_expr(dt->format_expr); }
 
-    if (dt->format_label != 0) g95_status(" FMT=%d", dt->format_label);
+    if (dt->format_label != NULL) g95_status(" FMT=%d", dt->format_label->value);
     if (dt->namelist) g95_status(" NML=%s", dt->namelist->name);
     if (dt->iostat) { g95_status(" IOSTAT="); g95_show_expr(dt->iostat); }
     if (dt->size) { g95_status(" SIZE="); g95_show_expr(dt->size); }
     if (dt->rec) { g95_status(" REC="); g95_show_expr(dt->rec); }
     if (dt->advance) { g95_status(" ADVANCE="); g95_show_expr(dt->advance); }
-    if (dt->err) g95_status(" ERR=%d", dt->err);
-    if (dt->end) g95_status(" END=%d", dt->end);
-    if (dt->eor) g95_status(" EOR=%d", dt->eor);
+    if (dt->err != NULL) g95_status(" ERR=%d", dt->err->value);
+    if (dt->end != NULL) g95_status(" END=%d", dt->end->value);
+    if (dt->eor != NULL) g95_status(" EOR=%d", dt->eor->value);
 
     break;
 

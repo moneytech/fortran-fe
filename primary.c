@@ -1165,7 +1165,8 @@ cleanup:
 
 match g95_match_actual_arglist(int sub_flag, g95_actual_arglist **argp) {
 g95_actual_arglist *head, *tail;
-int label, seen_keyword;
+int seen_keyword;
+g95_st_label *label;
 locus old_loc;
 match m;
 
@@ -1189,7 +1190,7 @@ match m;
     }
 
     if (sub_flag && g95_match_char('*') == MATCH_YES) {
-      m = g95_match_st_label(&label);
+      m = g95_match_st_label(&label, 0);
       if (m == MATCH_NO) g95_error("Expected alternate return label at %C");
       if (m != MATCH_YES) goto cleanup;
 

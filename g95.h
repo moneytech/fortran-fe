@@ -385,7 +385,10 @@ typedef struct g95_formal_arglist {
 
 typedef struct g95_actual_arglist {
   char name[G95_MAX_SYMBOL_LEN+1];
-  int label;    /* Alternate return label when the expr member is null */
+
+/* Alternate return label when the expr member is null */
+  struct g95_st_label *label;
+
   struct g95_expr *expr;
   struct g95_actual_arglist *next;
 } g95_actual_arglist;
@@ -407,11 +410,11 @@ typedef struct g95_namelist {
 typedef void * tree; /* Just a dummy place holder. */
 #endif
 
-/* The g95_st_label structure is a singly linked list attached to a
+/* The g95_st_label structure is a doubly linked list attached to a
  * namespace that records the usage of statement labels within that space */
 
 typedef struct g95_st_label {
-  int label;
+  int value;
   
   g95_sl_type defined, referenced;
 
@@ -421,10 +424,8 @@ typedef struct g95_st_label {
 
   tree backend_decl;
 
-  struct g95_st_label *next;
+  struct g95_st_label *prev, *next;
 } g95_st_label;
-
-#define g95_get_st_label() g95_getmem(sizeof(g95_st_label))
 
 
 /* g95_interface()-- Interfaces are lists of symbols strung together */
@@ -579,6 +580,14 @@ typedef struct g95_state_data {
   g95_symbol *sym;            /* Block name associated with this level */
   struct g95_code *head, *tail;
   struct g95_state_data *previous;
+/* This is for block-specific state data. There used to be a g95_data
+ * and a g95_select structure, and I put their members in a union as
+ * extra member in the state data struct. I later eliminatied g95_select
+ * completely, but I guess we can use the union anyway. Just janizize
+ * parse.c :-)  */
+  union {
+    g95_st_label * end_do_label; 
+  } ext;
 } g95_state_data;
 
 extern g95_state_data *g95_state_stack;
@@ -786,22 +795,6 @@ typedef struct g95_case {
 
 
 typedef struct {
-  g95_state_data d;
-
-  bt selector_type;
-  /* root; */
-
-} g95_select;
-
-
-typedef struct {
-  g95_state_data d;
-
-  int label;
-} g95_do;
-
-
-typedef struct {
   g95_expr *var, *start, *end, *step;
 } g95_iterator;
 
@@ -821,19 +814,19 @@ typedef struct g95_alloc {
 typedef struct {
   g95_expr *unit, *file, *status, *access, *form, *recl,
            *blank, *position, *action, *delim, *pad, *iostat;
-  int err;
+  g95_st_label *err;
 } g95_open;
 
 
 typedef struct {
   g95_expr *unit, *status, *iostat;
-  int err;
+  g95_st_label *err;
 } g95_close;
 
 
 typedef struct {
   g95_expr *unit, *iostat;
-  int err;
+  g95_st_label *err;
 } g95_filepos;
 
 
@@ -843,7 +836,7 @@ typedef struct {
     *unformatted, *recl, *nextrec, *blank, *position, *action, *read,
     *write, *readwrite, *delim, *pad, *iolength;
 
-  int err;
+  g95_st_label *err;
 
 } g95_inquire;
 
@@ -852,8 +845,9 @@ typedef struct {
   g95_expr *io_unit, *format_expr, *rec, *advance, *iostat, *size;
 
   g95_symbol *namelist;
-  int format_label;  /* A format_label of -1 indicates the * format */
-  int err, end, eor;
+/* A format_label of `format_asterisk' indicates the "*" format */
+  g95_st_label *format_label;
+  g95_st_label *err, *end, *eor;
 
   locus eor_where, end_where;
 } g95_dt;
@@ -883,7 +877,7 @@ typedef struct g95_code {
   struct g95_code *block, *next;
   locus loc;
 
-  int here, label, label2, label3;
+  g95_st_label *here, *label, *label2, *label3;
   g95_symbol *sym;
   g95_expr *expr, *expr2;
   char *sub_name;
@@ -1083,7 +1077,7 @@ const char *g95_state_name(g95_compile_state);
 void g95_reject_statement(void);
 try g95_parse_file(void);
 
-extern int g95_statement_label;
+extern g95_st_label * g95_statement_label;
 
 /* arith.c */
 
@@ -1228,10 +1222,12 @@ g95_symbol *g95_use_derived(g95_symbol *);
 g95_component *g95_find_component(g95_symbol *, const char *);
 void g95_show_components(g95_symbol *);
 
-int g95_new_internal_label(void);
+g95_st_label *g95_get_st_label(int);
+void g95_free_st_label(g95_st_label *);
+g95_st_label *g95_new_internal_label(void);
 g95_st_label *g95_find_st_label(int);
-void g95_define_st_label(int, locus *, g95_sl_type);
-try g95_reference_st_label(int, g95_sl_type);
+void g95_define_st_label(g95_st_label *, g95_sl_type, locus *);
+try g95_reference_st_label(g95_st_label *, g95_sl_type);
 
 g95_namespace *g95_get_namespace(void);
 g95_symtree *g95_new_symtree(g95_symtree **, const char *);
@@ -1287,7 +1283,7 @@ void g95_simplify_done_1(void);
 match g95_match_space(void);
 match g95_match_eos(void);
 match g95_match_small_literal_int(int *);
-match g95_match_st_label(int *);
+match g95_match_st_label(g95_st_label **, int);
 match g95_match_label(void);
 match g95_match_small_int(int *);
 int g95_match_strings(mstring *);

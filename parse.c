@@ -31,7 +31,7 @@ Boston, MA 02111-1307, USA.  */
  * new_st can get wiped during statement matching, we have to keep it
  * separate. */
 
-int g95_statement_label;
+g95_st_label *g95_statement_label;
 static locus label_locus;
 static jmp_buf eof;
 
@@ -271,53 +271,40 @@ int c;
 /* next_free()-- Get the next statement in free form source */
 
 static g95_statement next_free(void) {
-locus old_locus;
+match m;
 int c;
 
   g95_gobble_whitespace();
 
-  old_locus = *g95_current_locus();
-  c = g95_next_char();
+  c = g95_peek_char();
 
-  if (!isdigit(c))
-    g95_set_locus(&old_locus);
+  if (isdigit(c)) {        /* Found a statement label? */
+    m = g95_match_st_label(&g95_statement_label, 0);
 
-  else {  /* Found a statement label */
-    g95_statement_label = c - '0';
+    if (m != MATCH_YES || ! g95_is_whitespace(g95_peek_char())) {
+      do { /* Skip the bad statement label. */
+        g95_warning_now("Ignoring bad statement label at %C");
+        c = g95_next_char();
+      } while(isdigit(c));
+    } else {
+      label_locus = g95_statement_label->where = *g95_current_locus();
 
-    for(;;) {
-      old_locus = *g95_current_locus();
-      c = g95_next_char();
+      if (g95_statement_label->value == 0) {
+        g95_warning_now("Ignoring statement label of zero at %C");
+        g95_free_st_label(g95_statement_label);
+        g95_statement_label = NULL;
+      }
 
-      if (!isdigit(c)) break;
-      g95_statement_label = g95_statement_label*10 + c - '0';
+      g95_gobble_whitespace();
 
-      if (g95_statement_label > 99999) {
-        g95_error("Statement label overflow at %C");
-
-	do {  /* Skip the bad statement label */
-	  old_locus = *g95_current_locus();
-	  c = g95_next_char();
-	} while(isdigit(c));
-
-	g95_set_locus(&old_locus);
+      if (g95_match_eos() == MATCH_YES) {
+        g95_warning_now("Ignoring statement label in empty statement at %C");
+        g95_free_st_label(g95_statement_label);
+        g95_statement_label = NULL;
         return ST_NONE;
       }
     }
-
-    label_locus = *g95_current_locus();
-
-    if (g95_statement_label == 0)
-      g95_warning_now("Ignoring statement label of zero at %C");
-
-    g95_set_locus(&old_locus);
-    g95_gobble_whitespace();
-
-    if (g95_match_eos() == MATCH_YES) {
-      g95_warning_now("Ignoring statement label in empty statement at %C");
-      return ST_NONE;
-    }
-  }
+  }  
 
   return decode_statement();
 }
@@ -326,7 +313,7 @@ int c;
 /* next_fixed()-- Get the next statement in fixed-form source */
 
 static g95_statement next_fixed(void) {
-int digit_flag, i;
+int label, digit_flag, i;
 locus loc;
 char c;
 
@@ -338,6 +325,7 @@ char c;
  * spaces.  We also check for characters that make the rest of the
  * line a comment */
 
+  label = 0;
   digit_flag = 0;
 
   for(i=0; i<5; i++) {
@@ -349,7 +337,7 @@ char c;
 
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
-      g95_statement_label = g95_statement_label*10 + c - '0';
+      label = label*10 + c - '0';
       label_locus = *g95_current_locus();
       digit_flag = 1;
       break;
@@ -364,8 +352,13 @@ char c;
     }
   }
 
-  if (digit_flag && g95_statement_label == 0)
+  if (digit_flag) {
+    if (label == 0)
       g95_warning_now("Zero is not a valid statement label at %C");
+    else { /* We've found a valid statement label.  */
+      g95_statement_label = g95_get_st_label(label);
+    }
+  }
 
 /* Since this line starts a statement, it cannot be a continuation of
  * a previous statement.  Hence we mostly ignore column 6. */
@@ -408,7 +401,7 @@ g95_statement st;
   g95_new_block = NULL;
 
   for(;;) {
-    g95_statement_label = 0;
+    g95_statement_label = NULL;
     g95_buffer_error(1);
 
     if (g95_at_eol()) g95_advance_line();
@@ -515,19 +508,17 @@ g95_state_data *p;
 static void check_statement_label(g95_statement st) {
 g95_sl_type type;
 
-  if (g95_statement_label == 0) return;
+  if (g95_statement_label == NULL) return;
 
   switch(st) {
   case ST_END_PROGRAM:    case ST_END_FUNCTION:  case ST_END_SUBROUTINE:
   case ST_ENDDO:          case ST_ENDIF:         case ST_END_SELECT:
   case_executable:
   case_exec_markers:
-    new_st.here = g95_statement_label;
     type = ST_LABEL_TARGET;
     break;
 
   case ST_FORMAT:
-    new_st.here = g95_statement_label;
     type = ST_LABEL_FORMAT;
     break;
 
@@ -540,7 +531,8 @@ g95_sl_type type;
     break;
   }
 
-  g95_define_st_label(g95_statement_label, &label_locus, type);
+  g95_define_st_label(g95_statement_label, type, &label_locus);
+  new_st.here = g95_statement_label;
 }
 
 
@@ -706,7 +698,7 @@ static void accept_statement(g95_statement st) {
      * construct. */
 
   case ST_ENDIF:  case ST_ENDDO:  case ST_END_SELECT:
-    if (g95_statement_label != 0) {
+    if (g95_statement_label != NULL) {
       new_st.op = EXEC_NOP;
       g95_add_statement();
     }
@@ -718,7 +710,7 @@ static void accept_statement(g95_statement st) {
      * branch target. */
 
   case ST_END_PROGRAM:  case ST_END_FUNCTION:  case ST_END_SUBROUTINE:
-    if (g95_statement_label != 0) {
+    if (g95_statement_label != NULL) {
       new_st.op = EXEC_RETURN;
       g95_add_statement();
     }
@@ -1406,15 +1398,14 @@ static void parse_select_block(void) {
 int seen_default;
 g95_statement st;
 g95_code *cp;
-g95_select s;
+g95_state_data s;
 
   seen_default = 0;
-  s.selector_type = new_st.expr->ts.type;
 
   accept_statement(ST_SELECT_CASE);
 
   cp = g95_state_stack->tail;
-  push_state((g95_state_data *) &s, COMP_SELECT, g95_new_block);
+  push_state(&s, COMP_SELECT, g95_new_block);
 
 /* Make sure that the next statement is a CASE or END SELECT */
 
@@ -1484,14 +1475,14 @@ g95_select s;
 static int check_do_closure(void) {
 g95_state_data *p;
 
-  if (g95_statement_label == 0) return 0;
+  if (g95_statement_label == NULL) return 0;
 
   for(p=g95_state_stack; p; p=p->previous)
     if (p->state == COMP_DO) break;
 
   if (p == NULL) return 0;  /* No loops to close */
 
-  if (((g95_do *) p)->label == g95_statement_label) {
+  if (p->ext.end_do_label == g95_statement_label) {
 
     if (p == g95_state_stack) return 1;
 
@@ -1503,7 +1494,8 @@ g95_state_data *p;
  * Make sure it doesn't terminate another one. */
 
   for(; p; p=p->previous)
-    if (p->state == COMP_DO && ((g95_do *) p)->label == g95_statement_label) {
+    if (p->state == COMP_DO
+        && p->ext.end_do_label == g95_statement_label) {
       g95_error("End of nonblock DO statement at %C is interwoven "
 		"with another DO loop");
       return 2;
@@ -1520,13 +1512,14 @@ g95_state_data *p;
 static void parse_do_block(void) {
 g95_statement st;
 g95_code *top;
-g95_do s;
+g95_state_data s;
 
-  s.label = new_st.label;
+  s.ext.end_do_label = new_st.label;
+
   accept_statement(ST_DO);
 
   top = g95_state_stack->tail;
-  push_state((g95_state_data *) &s, COMP_DO, g95_new_block);
+  push_state(&s, COMP_DO, g95_new_block);
 
   top->block = g95_new_level(top);
   top->block->op = EXEC_DO;
@@ -1539,8 +1532,9 @@ loop:
     unexpected_eof();
 
   case ST_ENDDO:
-    if (s.label != 0 && s.label != g95_statement_label)
-      g95_error("Statement label in ENDDO at %C doesn't match DO label");
+    if (s.ext.end_do_label != NULL
+        && s.ext.end_do_label != g95_statement_label)
+      g95_error_now("Statement label in ENDDO at %C doesn't match DO label");
     /* Fall through */
 
   case ST_IMPLIED_ENDDO:
@@ -1842,7 +1836,7 @@ locus prog_locus;
 
   g95_clear_new_st();
 
-  g95_statement_label = 0;
+  g95_statement_label = NULL;
 
   if (setjmp(eof)) return FAILURE;   /* Come here on unexpected EOF */
 

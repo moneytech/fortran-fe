@@ -1338,6 +1338,36 @@ void g95_get_component_attr(symbol_attribute *attr, g95_component *c) {
 
 /******************** Statement label management ********************/
 
+/* g95_find_st_label()-- Given a label number, look up the label in the
+ * label list of the current namespace. Return NULL if the label isn't
+ * in the list. */
+g95_st_label *g95_find_st_label(int labelno) {
+g95_st_label *lp;
+
+  for(lp=g95_current_ns->st_labels; lp; lp=lp->next)
+    if (lp->value == labelno) return lp;
+
+  return NULL;
+}
+
+/* Free a single g95_st_label structure, making sure the list is not
+   messed up.  This function is called only when some parse error
+   occurs.  */
+void g95_free_st_label(g95_st_label *l) {
+
+  if (l == NULL) return;
+
+  if (l->prev)
+    (l->prev->next = l->next);
+ 
+  if (l->next)
+    (l->next->prev = l->prev);
+
+  if (l->format != NULL) g95_free(l->format);
+  g95_free(l);
+}
+
+/* Free a whole list of g95_st_label structures.  */
 static void free_st_labels(g95_st_label *l1) {
 g95_st_label *l2;
 
@@ -1348,34 +1378,26 @@ g95_st_label *l2;
   }
 }
 
-/* g95_find_st_label()-- Given a label number, look up the label in the
- * label list of the current namespace. Return NULL if the label isn't
- * in the list. */
-g95_st_label *g95_find_st_label(int label) {
-g95_st_label *lp;
 
-  for(lp=g95_current_ns->st_labels; lp; lp=lp->next)
-    if (lp->label == label) return lp;
-
-  return NULL;
-}
-
-/* get_st_label()-- Given a label number, search for and return a
+/* g95_get_st_label()-- Given a label number, search for and return a
  * pointer to the label structure, creating it if it does not exist. */
 
-static g95_st_label *get_st_label(int label) {
+g95_st_label *g95_get_st_label(int labelno) {
 g95_st_label *lp;
 
-  lp = g95_find_st_label(label);
+  lp = g95_find_st_label(labelno);
   if (lp != NULL) return lp;
+  
+  lp = g95_getmem(sizeof(g95_st_label));
 
-  lp = g95_get_st_label();
-
-  lp->label = label;
+  lp->value = labelno;
   lp->defined = ST_LABEL_UNKNOWN;
   lp->referenced = ST_LABEL_UNKNOWN;
 
+  lp->prev = NULL;
   lp->next = g95_current_ns->st_labels;
+  if (g95_current_ns->st_labels)
+    g95_current_ns->st_labels->prev = lp;
   g95_current_ns->st_labels = lp;
 
   return lp;
@@ -1384,68 +1406,68 @@ g95_st_label *lp;
 
 /* g95_new_internal_label() -- create a branch label for g95 internal use */
 
-int g95_new_internal_label(void) {
+g95_st_label *g95_new_internal_label(void) {
 static int next_label = 100000; /* only initialized at startup! */
 
-  return next_label++;
+  return g95_get_st_label (next_label++);
 }
 
-
+/* TODO : redo comment */
 /* g95_define_st_label()-- Called when a statement with a statement
  * label is about to be accepted. We add the label to the list of the
  * current namespace, making sure it hasn't been defined previously
  * and referenced correctly. */
 
-void g95_define_st_label(int label, locus *label_locus,
-                         g95_sl_type type) {
-g95_st_label *lp;
+void g95_define_st_label(g95_st_label *lp, g95_sl_type type,
+                         locus *label_locus) {
+int labelno;
 
-  lp = get_st_label(label);
+  labelno = lp->value;
 
-  if (lp->defined != ST_LABEL_UNKNOWN) {
-    g95_error("Duplicate statement label %d at %L and %C", label, &lp->where);
-    return;
-  }
+  if (lp->defined != ST_LABEL_UNKNOWN)
+    g95_error("Duplicate statement label %d at %L and %C", labelno, &lp->where);
+  else {
+    lp->where = *label_locus;
 
-  lp->where = *label_locus;
+    switch(type) {
+    case ST_LABEL_FORMAT:
+      if (lp->referenced == ST_LABEL_TARGET) 
+        g95_error("Label %d at %C already referenced as branch target", labelno);
+      else
+        lp->defined = ST_LABEL_FORMAT;
 
-  switch(type) {
-  case ST_LABEL_FORMAT:
-    if (lp->referenced == ST_LABEL_TARGET) 
-      g95_error("Label %d at %C already referenced as branch target", label);
-    else
-      lp->defined = ST_LABEL_FORMAT;
+      break;
 
-    break;
+    case ST_LABEL_TARGET:
+      if (lp->referenced == ST_LABEL_FORMAT)
+        g95_error("Label %d at %C already referenced as a format label", labelno);
+      else
+        lp->defined = ST_LABEL_TARGET;
 
-  case ST_LABEL_TARGET:
-    if (lp->referenced == ST_LABEL_FORMAT)
-      g95_error("Label %d at %C already referenced as a format label", label);
-    else
-      lp->defined = ST_LABEL_TARGET;
+      break;
 
-    break;
-
-  default:
-    lp->defined = ST_LABEL_BAD_TARGET;
-    lp->referenced = ST_LABEL_BAD_TARGET;
+    default:
+      lp->defined = ST_LABEL_BAD_TARGET;
+      lp->referenced = ST_LABEL_BAD_TARGET;
+    }
   }
 }
 
 
-/* g95_reference_st_label()-- Reference a label.  Given a label number
+/* g95_reference_st_label()-- Reference a label.  Given a label
  * and its type, see if that reference is consistent with what is
  * known about that label, updating the unknown state.  Returns
  * FAILURE if something goes wrong. */
 
-try g95_reference_st_label(int label, g95_sl_type type) {
+try g95_reference_st_label(g95_st_label * lp, g95_sl_type type) {
 g95_sl_type label_type;
-g95_st_label *lp;
+int labelno;
 try rc;
 
-  if (label == 0) return SUCCESS;
+  if (lp == NULL)
+    return SUCCESS;
 
-  lp = get_st_label(label);
+  labelno = lp->value;
 
   if (lp->defined != ST_LABEL_UNKNOWN)
     label_type = lp->defined;
@@ -1455,14 +1477,14 @@ try rc;
   }
 
   if (label_type == ST_LABEL_FORMAT && type == ST_LABEL_TARGET) {
-    g95_error("Label %d at %C previously used as a FORMAT label", label);
+    g95_error("Label %d at %C previously used as a FORMAT label", labelno);
     rc = FAILURE;
     goto done;
   }
 
   if ((label_type == ST_LABEL_TARGET || label_type == ST_LABEL_BAD_TARGET)
       && type == ST_LABEL_FORMAT) {
-    g95_error("Label %d at %C previously used as branch target", label);
+    g95_error("Label %d at %C previously used as branch target", labelno);
     rc = FAILURE;
     goto done;
   }

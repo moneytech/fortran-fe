@@ -23,6 +23,10 @@ Boston, MA 02111-1307, USA.  */
 
 #include "g95.h"
 
+static g95_st_label format_asterisk_ =
+  { -1, ST_LABEL_FORMAT, ST_LABEL_FORMAT, NULL, 0 };
+
+static g95_st_label * format_asterisk = &format_asterisk_;
 
 typedef struct { 
   const char *name, *spec;
@@ -132,9 +136,9 @@ match m;
 
 /* match_ltag()-- Match a label I/O tag */
 
-static match match_ltag(io_tag *tag, int *label) {
+static match match_ltag(io_tag *tag, g95_st_label **label) {
 match m;
-int old;
+g95_st_label *old;
 
   old = *label;
   m = g95_match(tag->spec, label);
@@ -552,19 +556,22 @@ conflict:
 static match match_dt_format(g95_dt *dt) {
 locus where;
 g95_expr *e;
-int label;
+g95_st_label *label;
 
   where = *g95_current_locus(); 
 
   if (g95_match_char('*') == MATCH_YES) {
-    if (dt->format_expr != NULL || dt->format_label != 0) goto conflict;
+    if (dt->format_expr != NULL || dt->format_label != NULL) goto conflict;
 
-    dt->format_label = -1;
+    dt->format_label = format_asterisk;
     return MATCH_YES;
   }
 
-  if (g95_match_st_label(&label) == MATCH_YES) {
-    if (dt->format_expr != NULL || dt->format_label != 0) goto conflict;
+  if (g95_match_st_label(&label, 0) == MATCH_YES) {
+    if (dt->format_expr != NULL || dt->format_label != NULL) {
+      g95_free_st_label(label);
+      goto conflict;
+    }
 
     if (g95_reference_st_label(label, ST_LABEL_FORMAT) == FAILURE)
       return MATCH_ERROR;
@@ -574,7 +581,7 @@ int label;
   }
 
   if (g95_match_expr(&e) == MATCH_YES) {
-    if (dt->format_expr != NULL || dt->format_label != 0) {
+    if (dt->format_expr != NULL || dt->format_label != NULL) {
       g95_free_expr(e);
       goto conflict;
     }
@@ -727,7 +734,7 @@ g95_expr *e;
       return FAILURE;
     }
 
-    if (dt->format_label == -1) {
+    if (dt->format_label == format_asterisk) {
       g95_error("END tag at %L is incompatible with list directed format (*)",
 		&dt->end_where);
       return FAILURE;
@@ -740,7 +747,7 @@ g95_expr *e;
     }
   }
 
-  if (dt->advance != NULL && dt->format_label == -1) {
+  if (dt->advance != NULL && dt->format_label == format_asterisk) {
     g95_error("ADVANCE tag at %L is incompatible with list directed "
 	      "format (*)", &dt->advance->where);
     return FAILURE;

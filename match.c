@@ -163,7 +163,7 @@ int i;
 /* g95_match_st_label()-- Matches a statement label.  Uses
  * g95_match_small_literal_int() to do most of the work. */
 
-match g95_match_st_label(int *label) {
+match g95_match_st_label(g95_st_label **label, int allow_zero) {
 locus old_loc;
 match m;
 int i;
@@ -173,15 +173,14 @@ int i;
   m = g95_match_small_literal_int(&i);
   if (m != MATCH_YES) return m;
 
-  if (i != 0 && i <= 99999) {
-    *label = i;
+  if (((i == 0) && allow_zero)
+      || i <= 99999) {
+    *label = g95_get_st_label(i);
     return MATCH_YES;
   }
 
   g95_error("Statement label at %C is out of range");
-
   g95_set_locus(&old_loc);
-
   return MATCH_ERROR;
 }
 
@@ -514,7 +513,7 @@ locus where;
  * %n  Name, character buffer is set to name
  * %t  Matches end of statement.
  * %o  Matches an intrinsic operator, returned as an INTRINSIC enum.
- * %l  Matches a statement label number
+ * %l  Matches a statement label
  * %v  Matches a variable expression (an lvalue)
  * %   Matches a required space (in free form) and optional spaces.
  */
@@ -527,6 +526,7 @@ va_list argp;
 char c, *np;
 match m, n;
 void **vp;
+g95_st_label **label;
 
   old_loc = *g95_current_locus();
   va_start(argp, target);
@@ -576,8 +576,8 @@ loop:
       goto loop;
 
     case 'l':
-      ip = va_arg(argp, int *);
-      n = g95_match_st_label(ip);
+      label = va_arg(argp, g95_st_label **);
+      n = g95_match_st_label(label, 0);
       if (n != MATCH_YES) { m = n; goto not_yes; }
 
       matches++;
@@ -754,7 +754,7 @@ cleanup:
 
 match g95_match_if(g95_statement *if_type) {
 g95_expr *expr;
-int l1, l2, l3;
+g95_st_label *l1, *l2, *l3;
 locus old_loc;
 g95_code *p;
 match m, n;
@@ -989,12 +989,12 @@ void g95_free_iterator(g95_iterator *iter, int flag) {
 match g95_match_do(void) {
 g95_iterator iter, *ip;
 locus old_loc;
-int label;
+g95_st_label *label;
 match m;
 
   old_loc = *g95_current_locus();
-  label = 0;
 
+  label = NULL;
   iter.var = iter.start = iter.end = iter.step = NULL;
 
   m = g95_match_label();
@@ -1010,7 +1010,7 @@ match m;
     goto done;
   }
 
-  m = g95_match_st_label(&label);
+  m = g95_match_st_label(&label, 0);
   if (m == MATCH_ERROR) goto cleanup;
 
   g95_match_char(',');
@@ -1033,8 +1033,8 @@ match m;
   g95_match_label();    /* This won't error */
   g95_match(" do ");    /* This will work */
 
-  g95_match_st_label(&label);  /* Can't error out */
-  g95_match_char(',');         /* Optional comma */
+  g95_match_st_label(&label, 0);  /* Can't error out */
+  g95_match_char(',');            /* Optional comma */
 
   m = g95_match_iterator(&iter, 0);
   if (m == MATCH_NO) return MATCH_NO;
@@ -1049,7 +1049,8 @@ match m;
 
 done:
   new_st.label = label;
-  g95_reference_st_label(label, ST_LABEL_TARGET);
+  if (label != NULL)
+    g95_reference_st_label(label, ST_LABEL_TARGET);
 
   if (new_st.op == EXEC_DO_WHILE)
     new_st.expr = iter.end;
@@ -1156,47 +1157,32 @@ got_match:
 /* g95_match_stop()-- Match the STOP statement */
 
 match g95_match_stop(void) {
-const char *error_msg;
+locus old_loc;
 g95_expr *e;
-int label;
+g95_st_label *label;
 match m;
 
-  if (g95_match_eos() == MATCH_YES) {
-    new_st.op = EXEC_STOP;
-    new_st.label = -1;
-    goto done;
-  }
-
-  m = g95_match(" %e%t", &e);
-  if (m != MATCH_YES) return m;
-
-  if (e->expr_type != EXPR_CONSTANT) goto syntax;
-
-  if (e->ts.type == BT_CHARACTER) {
-    new_st.op = EXEC_STOP;
-    new_st.expr = e;
-    goto done;
-  }
-
-  if (e->ts.type != BT_INTEGER) goto syntax;
-
-  error_msg = g95_extract_int(e, &label);
-  if (error_msg != NULL) {
-    g95_error(error_msg);
-    goto cleanup;
-  }
-
-  if (label < 0 || label > 99999) {
-    g95_error("STOP label out of range at %C");
-    goto cleanup;
-  }
-
   new_st.op = EXEC_STOP;
-  new_st.label = label;
 
-  g95_free_expr(e);
+  if (g95_match_eos() == MATCH_YES) return MATCH_YES;
 
-done:
+  old_loc = *g95_current_locus();
+  m = g95_match(" %l %t", &label);
+  if (m == MATCH_YES)
+    new_st.label = label;
+  else {
+    g95_set_locus(&old_loc);
+
+    m = g95_match(" %e %t", &e);
+
+    if (m == MATCH_ERROR
+        || e->ts.type != BT_CHARACTER
+        || e->expr_type != EXPR_CONSTANT)
+      goto syntax;
+
+    new_st.expr = e;
+  }
+
   if (g95_pure(NULL)) {
     g95_error("STOP statement not allowed in PURE procedure at %C");
     goto cleanup;
@@ -1208,6 +1194,7 @@ syntax:
   g95_syntax_error(ST_STOP);
 
 cleanup:
+  g95_free_st_label(label);
   g95_free_expr(e);
   return MATCH_ERROR;
 }    
@@ -1252,7 +1239,8 @@ match g95_match_goto(void) {
 g95_code *head, *tail;
 g95_expr *expr;
 g95_case *cp;
-int i, label;
+g95_st_label *label;
+int i;
 match m;
 
   if (g95_match(" %l%t", &label) == MATCH_YES) {
@@ -1284,7 +1272,7 @@ match m;
   i = 1;
 
   do {
-    m = g95_match_st_label(&label);
+    m = g95_match_st_label(&label, 0);
     if (m != MATCH_YES) goto syntax;
 
     if (g95_reference_st_label(label, ST_LABEL_TARGET) == FAILURE)
