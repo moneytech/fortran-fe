@@ -928,6 +928,7 @@ empty:
 
   expr->value.constructor = head;
   expr->where = where;
+  expr->rank = 1;
   size_constructor(expr);
 
   *result = expr;
