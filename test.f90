@@ -6,7 +6,7 @@ function factorial(parm) result (res)
    do i = 2, parm
       tmp = tmp * i
    end do
-   
+
    res = tmp
 end function
-      
+

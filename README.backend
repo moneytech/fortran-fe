@@ -45,7 +45,7 @@ diff -u -r1.7.4.1 gengtype.c
 +  BASE_FILE_ADA,
 +  BASE_FILE_JAVA
  };
- 
+
 -static const char *const lang_names[] = {
 -  "c", "objc", "cp", "treelang", "cobol", "f", "ada", "java"
 +static const char *lang_names[] = {

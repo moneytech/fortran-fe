@@ -495,7 +495,7 @@ g95_generate_code (g95_namespace * ns)
   symbol_attribute attr;
 
   /* Main program subroutine.  */
-  if (! ns->proc_name) 
+  if (! ns->proc_name)
     {
       /* Lots of things get upset if a subroutine doesn't have a symbol, so we
           make one now.  */
