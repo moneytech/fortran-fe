@@ -331,9 +331,6 @@ try t;
   /* Check size of array assignments */
 
   if (lvalue->rank != 0 && rvalue->rank != 0) {
-    mpz_init(lsize);
-    mpz_init(rsize);
-
     t = SUCCESS;
 
     lflag = g95_array_size(lvalue, &lsize) == SUCCESS;

@@ -223,13 +223,12 @@ mpf_t negative, square, term;
     return range_check(result, "ACOS");
   }
 
-  mpf_init(negative);
-
   if (mpf_cmp_si(x->value.real, -1) == 0) {
     mpf_set(result->value.real, mpf_pi);
     return range_check(result, "ACOS");
   }
 
+  mpf_init(negative);
   mpf_init(square);
   mpf_init(term);
 
@@ -441,9 +440,8 @@ mpf_t negative, square, term;
     return range_check(result, "ASIN");
   }
 
-  mpf_init(negative);
-
   if (mpf_cmp_si(x->value.real, -1) == 0) {
+    mpf_init(negative);
     mpf_neg(negative, mpf_hpi);
     mpf_set(result->value.real, negative);
     mpf_clear(negative);
@@ -459,7 +457,6 @@ mpf_t negative, square, term;
   mpf_div(term, x->value.real, term);
   arctangent(&term, &result->value.real);
 
-  mpf_clear(negative);
   mpf_clear(square);
   mpf_clear(term);
 
@@ -1062,11 +1059,11 @@ int i;
 
   switch(e->ts.type) {
   case BT_INTEGER:
-    mpz_init_set(result->value.integer, g95_integer_kinds[i].huge);
+    mpz_set(result->value.integer, g95_integer_kinds[i].huge);
     break;
 
   case BT_REAL:
-    mpf_init_set(result->value.real, g95_real_kinds[i].huge);
+    mpf_set(result->value.real, g95_real_kinds[i].huge);
     break;
 
   bad_type:
@@ -3152,7 +3149,7 @@ int i;
   if (i < 0) g95_internal_error("g95_simplify_error(): bad kind");
 
   result = g95_constant_result(BT_REAL, e->ts.kind, &e->where);
-  mpf_init_set(result->value.real, g95_real_kinds[i].tiny);
+  mpf_set(result->value.real, g95_real_kinds[i].tiny);
 
   return result;
 }

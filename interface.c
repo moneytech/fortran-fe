@@ -879,7 +879,7 @@ int i;
 }
 
 
-int g95_symbol_rank(g95_symbol *sym) {
+static int symbol_rank(g95_symbol *sym) {
 
   return (sym->as == NULL) ? 0 : sym->as->rank;
 }
@@ -906,7 +906,7 @@ g95_ref *ref;
 
   if (!g95_compare_types(&formal->ts, &actual->ts)) return 0;
 
-  if (g95_symbol_rank(formal) == actual->rank) return 1;
+  if (symbol_rank(formal) == actual->rank) return 1;
 
   /* At this point the ranks didn't agree. */
 
