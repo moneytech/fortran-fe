@@ -729,7 +729,8 @@ g95_code *c;
      * list, calling the various subroutines with the base+offset for
      * each member. */
 
-    g95_internal_error("gen_io_pointer(): Don't know about DERIVED types yet");
+    c = g95_build_call(&io_unknown, e, NULL);
+    break;
 
   default:
     g95_internal_error("gen_io_pointer(): Bad type");
