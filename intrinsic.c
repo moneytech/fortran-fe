@@ -2187,20 +2187,12 @@ int knd;
 static try simplify_precision(g95_expr *e) {
 g95_expr *arg;
 
-/* Type checking */
-
   arg = FIRST_ARG(e);
 
-  if (arg->ts.type != BT_REAL || arg->ts.type != BT_COMPLEX) {
-    g95_warning("Argument of PRECISION at %L must be real or complex",
-		&FIRST_ARG(e)->where);
-    return FAILURE;
-  }
-
-  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+  g95_replace_expr(e, g95_simplify_precision(arg->ts.kind));
 
   return SUCCESS;
-} /* end simplify_precision */
+}
 
 
 /* simplify_radix */
@@ -2219,21 +2211,12 @@ g95_expr *arg;
 static try simplify_range(g95_expr *e) {
 g95_expr *arg;
 
-/* Type checking */
-
   arg = FIRST_ARG(e);
 
-  if (arg->ts.type != BT_INTEGER || arg->ts.type != BT_REAL 
-		  || arg->ts.type != BT_COMPLEX) {
-    g95_warning("Argument of PRECISION at %L must be integer, real, or complex",
-		&FIRST_ARG(e)->where);
-    return FAILURE;
-  }
-
-  if (arg->expr_type != EXPR_CONSTANT) return FAILURE;
+  g95_replace_expr(e, g95_simplify_range(arg->ts.type, arg->ts.kind));
 
   return SUCCESS;
-} /* end simplify_range */
+}
 
 
 /* simplify_real() */
@@ -3299,8 +3282,19 @@ int di, dr, dd, dl, dc, dz;
   add_sym("pack", 1, BT_REAL, dr, NULL, not_ready, ar, BT_REAL, dr, 0,
 	  msk, BT_LOGICAL, dl, 0, v, BT_REAL, dr, 1, NULL);
 
-  add_sym("precision",1, BT_INTEGER, di, simplify_precision, not_ready,
+  add_sym("precision",1, BT_INTEGER, di, simplify_precision, NULL,
 	  x, BT_REAL, dr, 0, NULL);
+
+  add_sym("precision",1, BT_INTEGER, di, simplify_precision, NULL,
+	  x, BT_REAL, dd, 0, NULL);
+
+  add_sym("precision",1, BT_INTEGER, di, simplify_precision, NULL,
+	  x, BT_COMPLEX, dr, 0, NULL);
+
+  add_sym("precision",1, BT_INTEGER, di, simplify_precision, NULL,
+	  x, BT_COMPLEX, dd, 0, NULL);
+
+  make_generic("precision");
 
 /* KAH Takes any type, including pointer */
   add_sym("present", 1, BT_LOGICAL, dl, NULL, not_ready,
@@ -3325,8 +3319,26 @@ int di, dr, dd, dl, dc, dz;
   make_generic("radix");
 
 
-  add_sym("range", 1, BT_INTEGER, di, simplify_range, not_ready,
+  add_sym("range", 1, BT_INTEGER, di, simplify_range, NULL,
 	  x, BT_REAL, dr, 0, NULL);
+
+  add_sym("range", 1, BT_INTEGER, di, simplify_range, NULL,
+	  x, BT_INTEGER, dr, 0, NULL);
+
+  add_sym("range", 1, BT_INTEGER, di, simplify_range, NULL,
+	  x, BT_REAL, dr, 0, NULL);
+
+  add_sym("range", 1, BT_INTEGER, di, simplify_range, NULL,
+	  x, BT_REAL, dd, 0, NULL);
+
+  add_sym("range", 1, BT_INTEGER, di, simplify_range, NULL,
+	  x, BT_COMPLEX, dr, 0, NULL);
+
+  add_sym("range", 1, BT_INTEGER, di, simplify_range, NULL,
+	  x, BT_COMPLEX, dd, 0, NULL);
+
+  make_generic("range");
+
 
   add_sym("real",  0, BT_REAL, dr, simplify_real, check_real,
 	  a, BT_INTEGER, di, 0, knd, BT_INTEGER, di, 1, NULL);

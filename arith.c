@@ -1523,3 +1523,41 @@ int i;
   return result;
 }
 
+
+/* g95_simplify_precision()-- Simplify the PRECISION intrinsic */
+
+g95_expr *g95_simplify_precision(int kind) {
+int i;
+
+  i = validate_real(kind);
+  if (i == -1) g95_internal_error("g95_simplify_precision(): Bad kind");
+
+  return g95_int_expr(g95_real_kinds[i].precision);
+}
+
+
+/* g95_simplify_range()-- Simplify the RANGE intrinsic */
+
+g95_expr *g95_simplify_range(bt type, int kind) {
+int i;
+
+  switch(type) {
+  case BT_INTEGER:
+    i = validate_integer(kind);
+    if (i == -1) goto bad_type;
+    i = g95_integer_kinds[i].range;
+    break;
+
+  case BT_REAL:
+    i = validate_real(kind);
+    if (i == -1) goto bad_type;
+    i = g95_real_kinds[i].range;
+    break;
+
+  bad_type:
+  default:
+    g95_internal_error("g95_simplify_range(): Bad kind");
+  }
+
+  return g95_int_expr(i);
+}

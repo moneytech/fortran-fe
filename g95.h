@@ -965,6 +965,8 @@ try g95_simplify_selected_real_kind(g95_expr *);
 g95_expr *g95_simplify_huge(bt, int);
 g95_expr *g95_simplify_radix(bt, int);
 g95_expr *g95_simplify_epsilon(int);
+g95_expr *g95_simplify_precision(int);
+g95_expr *g95_simplify_range(bt, int);
 
 /* symbol.c */
 
