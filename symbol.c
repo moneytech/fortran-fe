@@ -2503,7 +2503,9 @@ int i;
   g95_status_char('\n');
   g95_status_char('\n');
 
+#ifdef G95_DEBUG
   g95_show_code(0, ns->code);
+#endif
 
   for(ns=ns->contained; ns; ns=ns->sibling) {
     g95_status("CONTAINS\n");
