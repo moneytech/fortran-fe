@@ -163,10 +163,10 @@ int rc;
 
   /* Deal with ENTRY problem */
 
-  st = g95_new_symtree(g95_current_ns, name);
+  st = g95_new_symtree(&g95_current_ns->sym_root, name);
 
   sym = *result;
-  st->sym = sym;
+  st->n.sym = sym;
 
   /* See if the procedure should be a module procedure */
 
@@ -1735,6 +1735,7 @@ match g95_match_target(void) {
 static match access_attr_decl(g95_statement st) {
 char name[G95_MAX_SYMBOL_LEN+1];
 interface_type type;
+g95_user_op *uop;
 g95_symbol *sym;
 int operator;
 match m;
@@ -1772,11 +1773,10 @@ match m;
       break;
 
     case INTERFACE_USER_OP:
-      if (g95_get_symbol(name, NULL, 0, &sym)) goto done;
+      uop = g95_get_uop(name);
 
-      if (sym->operator_access == ACCESS_UNKNOWN) {
-	sym->operator_access =
-	  (st == ST_PUBLIC) ? ACCESS_PUBLIC : ACCESS_PRIVATE;
+      if (uop->access == ACCESS_UNKNOWN) {
+	uop->access = (st == ST_PUBLIC) ? ACCESS_PUBLIC : ACCESS_PRIVATE;
       } else {
 	g95_error("Access specification of the .%s. operator at %C has "
 		  "already been specified", sym->name);

@@ -1082,7 +1082,7 @@ g95_symbol *sym;
 
   if (st == NIL) return;
 
-  sym = st->sym;
+  sym = st->n.sym;
   if (sym->ts.type == BT_DERIVED && sym->ts.derived == from)
     sym->ts.derived = to;
 
@@ -1134,8 +1134,8 @@ int i;
     if (t->derived == sym) t->derived = s;
   }
 
-  st = g95_find_symtree(sym->ns, sym->name);
-  st->sym = s;
+  st = g95_find_symtree(sym->ns->sym_root, sym->name);
+  st->n.sym = s;
 
   s->refs++;
 
@@ -1150,7 +1150,7 @@ int i;
 	break;
       }
 
-  switch_types(sym->ns->root, sym, s);
+  switch_types(sym->ns->sym_root, sym, s);
 
   /* TODO: Also have to replace sym -> s in other lists like
    * namelists, common lists and interface lists.  */
@@ -1434,7 +1434,7 @@ done:
  * this case, that symbol has been used as a host associated variable
  * at some previous time.  */
 
-g95_symtree g95_st_sentinel = { { '\0' }, 0, NULL, NIL, NIL, NIL, BLACK };
+g95_symtree g95_st_sentinel = { { '\0' }, 0, { NULL }, NIL, NIL, NIL, BLACK };
 
 #define CompLT(a,b) (strcmp(a,b) < 0)
 #define CompEQ(a,b) (strcmp(a,b) == 0)
@@ -1447,7 +1447,8 @@ g95_namespace *ns;
 int i;
  
   ns = g95_getmem(sizeof(g95_namespace));
-  ns->root = NIL;
+  ns->sym_root = NIL;
+  ns->uop_root = NIL;
   ns->default_access = ACCESS_UNKNOWN;
 
   for(i=0; i<G95_INTRINSIC_OPS; i++)
@@ -1477,7 +1478,7 @@ int i;
 
 /* rotateLeft()-- rotate node x to left */
 
-static void rotateLeft(g95_namespace *ns, g95_symtree *x) {
+static void rotateLeft(g95_symtree **root, g95_symtree *x) {
 g95_symtree *y = x->right;
   
   x->right = y->left;    /* establish x->right link */
@@ -1491,7 +1492,7 @@ g95_symtree *y = x->right;
     else
       x->parent->right = y;
   } else {
-    ns->root = y;
+    *root = y;
   }
 
   /* link x and y */
@@ -1502,7 +1503,7 @@ g95_symtree *y = x->right;
 
 /* rotateRight()-- rotate node x to right */
 
-static void rotateRight(g95_namespace *ns, g95_symtree *x) {
+static void rotateRight(g95_symtree **root, g95_symtree *x) {
 g95_symtree *y = x->left;
 
   /* establish x->left link */
@@ -1517,7 +1518,7 @@ g95_symtree *y = x->left;
     else
       x->parent->left = y;
   } else {
-    ns->root = y;
+    *root = y;
   }
 
   /* link x and y */
@@ -1528,11 +1529,11 @@ g95_symtree *y = x->left;
 
 /* insertFixup()-- maintain Red-Black tree balance after inserting node x */
 
-static void insertFixup(g95_namespace *ns, g95_symtree *x) {
+static void insertFixup(g95_symtree **root, g95_symtree *x) {
 
   /* check Red-Black properties */
 
-  while (x != ns->root && x->parent->color == RED) {  /* we have a violation */
+  while (x != *root && x->parent->color == RED) {  /* we have a violation */
     if (x->parent == x->parent->parent->left) {
       g95_symtree *y = x->parent->parent->right;
       if (y->color == RED) {
@@ -1548,13 +1549,13 @@ static void insertFixup(g95_namespace *ns, g95_symtree *x) {
 	if (x == x->parent->right) {
 	  /* make x a left child */
 	  x = x->parent;
-	  rotateLeft(ns, x);
+	  rotateLeft(root, x);
 	}
 
 	/* recolor and rotate */
 	x->parent->color = BLACK;
 	x->parent->parent->color = RED;
-	rotateRight(ns, x->parent->parent);
+	rotateRight(root, x->parent->parent);
       }
     } else {
 
@@ -1572,25 +1573,25 @@ static void insertFixup(g95_namespace *ns, g95_symtree *x) {
 	/* uncle is BLACK */
 	if (x == x->parent->left) {
 	  x = x->parent;
-	  rotateRight(ns, x);
+	  rotateRight(root, x);
 	}
 	x->parent->color = BLACK;
 	x->parent->parent->color = RED;
-	rotateLeft(ns, x->parent->parent);
+	rotateLeft(root, x->parent->parent);
       }
     }
   }
-  ns->root->color = BLACK;
+  (*root)->color = BLACK;
 }
 
 
 /* g95_new_symtree()-- Allocate a new red/black node and associate it
  * with the new symbol. */
 
-g95_symtree *g95_new_symtree(g95_namespace *ns, const char *name) {
+g95_symtree *g95_new_symtree(g95_symtree **root, const char *name) {
 g95_symtree *current, *parent, *x;
 
-  current = ns->root;     /* find future parent */
+  current = *root;     /* find future parent */
   parent = NULL;
   while (current != NIL) {
     if (CompEQ(name, current->name))
@@ -1618,10 +1619,10 @@ g95_symtree *current, *parent, *x;
     else
       parent->right = x;
   } else {
-    ns->root = x;
+    *root = x;
   }
 
-  insertFixup(ns, x);
+  insertFixup(root, x);
 
   return x;
 }
@@ -1629,16 +1630,16 @@ g95_symtree *current, *parent, *x;
 
 /* deleteFixup()-- maintain Red-Black tree balance after deleting node x */
 
-static void deleteFixup(g95_namespace *ns, g95_symtree *x) {
+static void deleteFixup(g95_symtree **root, g95_symtree *x) {
 
-  while (x != ns->root && x->color == BLACK) {
+  while (x != *root && x->color == BLACK) {
     if (x == x->parent->left) {
       g95_symtree *w = x->parent->right;
 
       if (w->color == RED) {
 	w->color = BLACK;
 	x->parent->color = RED;
-	rotateLeft(ns, x->parent);
+	rotateLeft(root, x->parent);
 	w = x->parent->right;
       }
       if (w->left->color == BLACK && w->right->color == BLACK) {
@@ -1648,21 +1649,21 @@ static void deleteFixup(g95_namespace *ns, g95_symtree *x) {
 	if (w->right->color == BLACK) {
 	  w->left->color = BLACK;
 	  w->color = RED;
-	  rotateRight(ns, w);
+	  rotateRight(root, w);
 	  w = x->parent->right;
 	}
 	w->color = x->parent->color;
 	x->parent->color = BLACK;
 	w->right->color = BLACK;
-	rotateLeft(ns, x->parent);
-	x = ns->root;
+	rotateLeft(root, x->parent);
+	x = *root;
       }
     } else {
       g95_symtree *w = x->parent->left;
       if (w->color == RED) {
 	w->color = BLACK;
 	x->parent->color = RED;
-	rotateRight(ns, x->parent);
+	rotateRight(root, x->parent);
 	w = x->parent->left;
       }
       if (w->right->color == BLACK && w->left->color == BLACK) {
@@ -1672,14 +1673,14 @@ static void deleteFixup(g95_namespace *ns, g95_symtree *x) {
 	if (w->left->color == BLACK) {
 	  w->right->color = BLACK;
 	  w->color = RED;
-	  rotateLeft(ns, w);
+	  rotateLeft(root, w);
 	  w = x->parent->left;
 	}
 	w->color = x->parent->color;
 	x->parent->color = BLACK;
 	w->left->color = BLACK;
-	rotateRight(ns, x->parent);
-	x = ns->root;
+	rotateRight(root, x->parent);
+	x = *root;
       }
     }
   }
@@ -1691,15 +1692,14 @@ static void deleteFixup(g95_namespace *ns, g95_symtree *x) {
 /* delete_node()-- delete a symbol from the tree.  Does not free the
  * symbol itself! */
 
-static void delete_node(g95_namespace *ns, g95_symbol *sym) {
+static void delete_node(g95_symtree **root, char *name) {
 g95_symtree *x, *y, *z;
 
   /* find node in tree */
-  z = ns->root;
+  z = *root;
   while(z != NIL) {
-    if (CompEQ(sym->name, z->name)) break;
-
-    z = CompLT(sym->name, z->name) ? z->left : z->right;
+    if (CompEQ(name, z->name)) break;
+    z = CompLT(name, z->name) ? z->left : z->right;
   }
 
   if (z == NIL) g95_internal_error("delete_node(): node not found!");
@@ -1726,15 +1726,15 @@ g95_symtree *x, *y, *z;
     else
       y->parent->right = x;
   else
-    ns->root = x;
+    *root = x;
 
   if (y != z) {  /* Copy non red/black information */
-    z->sym = y->sym;
+    z->n = y->n;
     z->ambiguous = y->ambiguous;
     strcpy(z->name, y->name);
   }
 
-  if (y->color == BLACK) deleteFixup(ns, x);
+  if (y->color == BLACK) deleteFixup(root, x);
 
   g95_free(y);
 }
@@ -1743,8 +1743,8 @@ g95_symtree *x, *y, *z;
 /* g95_find_symtree()-- Given a namespace and a name, try to find the
  * symbol within the namespace.  Returns NULL if the symbol is not found. */
 
-g95_symtree *g95_find_symtree(g95_namespace *ns, const char *name) {
-g95_symtree *current = ns->root;
+g95_symtree *g95_find_symtree(g95_symtree *root, const char *name) {
+g95_symtree *current = root;
 
   while(current != NIL) {
     if (CompEQ(name, current->name)) return current;
@@ -1754,6 +1754,41 @@ g95_symtree *current = ns->root;
   }
 
   return NULL;
+}
+
+
+/* g95_get_uop()-- Given a name find a user operator node, creating it
+ * if it doesn't exist.  These are much simpler than symbols because
+ * they can't be ambiguous with one another */
+
+g95_user_op *g95_get_uop(const char *name) {
+g95_user_op *uop;
+g95_symtree *st;
+
+  st = g95_find_symtree(g95_current_ns->uop_root, name);
+  if (st != NULL) return st->n.uop;
+
+  st = g95_new_symtree(&g95_current_ns->uop_root, name);
+
+  uop = st->n.uop = g95_getmem(sizeof(g95_user_op));
+  strcpy(uop->name, name);
+  uop->access = ACCESS_UNKNOWN;
+  uop->ns = g95_current_ns;
+
+  return uop;
+}
+
+
+/* g95_find_uop()-- Given a name find the user operator node.  Returns
+ * NULL if it does not exist. */
+
+g95_user_op *g95_find_uop(const char *name, g95_namespace *ns) {
+g95_symtree *st;
+
+  if (ns == NULL) ns = g95_current_ns;
+
+  st = g95_find_symtree(ns->uop_root, name);
+  return (st == NULL) ? NULL : st->n.uop;
 }
 
 
@@ -1775,7 +1810,6 @@ void g95_free_symbol(g95_symbol *sym) {
   g95_free_namespace(sym->formal_ns);
 
   g95_free_interface(sym->generic);
-  g95_free_interface(sym->operator);
 
   g95_free_formal_arglist(sym->formal);
 
@@ -1795,8 +1829,6 @@ g95_symbol *p;
   p->ns = ns;
 
   p->declared_at = *g95_current_locus();
-
-  p->operator_access = ACCESS_UNKNOWN;
 
   if (strlen(name) > G95_MAX_SYMBOL_LEN)
     g95_internal_error("new_symbol(): Symbol name too long");
@@ -1822,11 +1854,11 @@ g95_symtree *st;
   if (ns == NULL) ns = g95_current_ns;
 
   do {
-    st = g95_find_symtree(ns, name);
+    st = g95_find_symtree(ns->sym_root, name);
     if (st != NULL) {
       if (st->ambiguous) return 1;
 
-      *result = st->sym;
+      *result = st->n.sym;
       return 0;
     }
 
@@ -1863,7 +1895,7 @@ g95_symbol *p;
   st = NULL;
 
   for(current_ns=ns; current_ns; current_ns=current_ns->parent) {
-    st = g95_find_symtree(current_ns, name);
+    st = g95_find_symtree(current_ns->sym_root, name);
     if (st != NULL || !parent_flag) break;
   }
 
@@ -1876,23 +1908,24 @@ g95_symbol *p;
     p->new = 1;
     changed = p;
 
-    g95_new_symtree(ns, name)->sym = p;
+    g95_new_symtree(&ns->sym_root, name)->n.sym = p;
     p->refs++;
 
   } else {    /* Make sure the existing symbol is OK */
 
     if (st->ambiguous) {
-      if (st->sym->module[0])
+      if (st->n.sym->module[0])
 	g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
-		  "from module '%s'", name, st->sym->name, st->sym->module);
+		  "from module '%s'", name, st->n.sym->name,
+		  st->n.sym->module);
       else
 	g95_error("Name '%s' at %C is an ambiguous reference to '%s' "
-		  "from current program unit", name, st->sym->name);
+		  "from current program unit", name, st->n.sym->name);
 
       return 1;
     }
 
-    p = st->sym;
+    p = st->n.sym;
 
     if (p->ns != ns && (!p->attr.function || ns->proc_name != p)) {
            /* Symbol is from another namespace */
@@ -1902,7 +1935,7 @@ g95_symbol *p;
       }
 
       if (current_ns != ns) {  /* Was found in a parent namespace */
-	g95_new_symtree(ns, name)->sym = p;
+	g95_new_symtree(&ns->sym_root, name)->n.sym = p;
 	p->refs++;
       }
     }
@@ -1955,7 +1988,7 @@ g95_symbol *p, *q, *old;
     /*    g95_status("Undoing %s\n", p->name); */
 
     if (p->new) {  /* Symbol was new */
-      delete_node(p->ns, p);
+      delete_node(&p->ns->sym_root, p->name);
 
       p->refs--;
       if (p->refs == 0) g95_free_symbol(p);
@@ -1983,8 +2016,6 @@ g95_symbol *p, *q, *old;
     }
 
     p->generic = old->generic;
-    p->operator = old->operator;
-    p->operator_access = old->operator_access;
     p->component_access = old->component_access;
 
     if (p->namelist != NULL && old->namelist == NULL) {
@@ -2040,18 +2071,35 @@ g95_symbol *p, *q;
 }
 
 
-/* free_rb_tree()-- Recursive function that deletes an entire
+/* free_uop_tree()-- Recursive function that deletes an entire
+ * red-black tree and all the user operator nodes that it contains. */
+
+static void free_uop_tree(g95_symtree *rb) {
+
+  if (rb == NIL) return;
+
+  free_uop_tree(rb->left);
+  free_uop_tree(rb->right);
+
+  g95_free_interface(rb->n.uop->operator);
+
+  g95_free(rb->n.uop);
+  g95_free(rb);
+}
+
+
+/* free_sym_tree()-- Recursive function that deletes an entire
  * red-black tree and all the symbols that it contains. */
 
-static void free_rb_tree(g95_symtree *rb) {
+static void free_sym_tree(g95_symtree *rb) {
 g95_symbol *sym;
 
   if (rb == NIL) return;
 
-  free_rb_tree(rb->left);
-  free_rb_tree(rb->right);
+  free_sym_tree(rb->left);
+  free_sym_tree(rb->right);
 
-  sym = rb->sym;
+  sym = rb->n.sym;
   sym->refs--;
   if (sym->refs == 0) g95_free_symbol(sym);
 
@@ -2071,7 +2119,8 @@ int i;
 
   g95_free_statements(ns->code);
 
-  free_rb_tree(ns->root);
+  free_sym_tree(ns->sym_root);
+  free_uop_tree(ns->uop_root);
 
   for(cl=ns->cl_list; cl; cl=cl2) {
     cl2 = cl->next;
@@ -2169,13 +2218,6 @@ g95_symbol *s;
     g95_show_array_spec(sym->as);
   }
 
-  if (sym->operator) {
-    show_indent();
-    g95_status("Operator interfaces:");
-    for(intr=sym->operator; intr; intr=intr->next)
-      g95_status(" %s", intr->sym->name);
-  }
-
   if (sym->generic) {
     show_indent();
     g95_status("Generic interfaces:");
@@ -2219,6 +2261,17 @@ g95_symbol *s;
 }
 
 
+static void show_uop(g95_user_op *uop) {
+g95_interface *intr;
+
+  show_indent();
+  g95_status("%s:", uop->name);
+  
+  for(intr=uop->operator; intr; intr=intr->next)
+    g95_status(" %s", intr->sym->name);
+}
+
+
 /* show_symtree()-- Worker function to display the symbol tree */
 
 static void show_symtree(g95_symtree *st) {
@@ -2226,10 +2279,10 @@ static void show_symtree(g95_symtree *st) {
   show_indent();
   g95_status("symtree: %s  Ambig %d", st->name, st->ambiguous);
 
-  if (st->sym->ns != g95_current_ns)
-    g95_status(" from namespace %s", st->sym->ns->proc_name->name);
+  if (st->n.sym->ns != g95_current_ns)
+    g95_status(" from namespace %s", st->n.sym->ns->proc_name->name);
   else
-    g95_show_symbol(st->sym);
+    g95_show_symbol(st->n.sym);
 }
 
 
@@ -2238,7 +2291,7 @@ static void show_symtree(g95_symtree *st) {
 
 static void clear_sym_mark(g95_symtree *st) {
 
-  st->sym->mark = 0;
+  st->n.sym->mark = 0;
 }
 
 
@@ -2257,21 +2310,21 @@ static void traverse_symtree(g95_symtree *st, void (*func)(g95_symtree *)) {
 
 void g95_traverse_symtree(g95_namespace *ns, void (*func)(g95_symtree *)) {
 
-  traverse_symtree(ns->root, func);
+  traverse_symtree(ns->sym_root, func);
 }
 
 
 /* traverse_ns()-- Recursive namespace traversal function. */
 
-static void traverse_ns(g95_symtree *rb, void (*func)(g95_symbol *)) {
+static void traverse_ns(g95_symtree *st, void (*func)(g95_symbol *)) {
 
-  if (rb != NIL) {
-    if (rb->sym->mark == 0) (*func)(rb->sym);
-    rb->sym->mark = 1;
+  if (st == NIL) return;
 
-    traverse_ns(rb->left, func);
-    traverse_ns(rb->right, func);
-  }
+  if (st->n.sym->mark == 0) (*func)(st->n.sym);
+  st->n.sym->mark = 1;
+
+  traverse_ns(st->left, func);
+  traverse_ns(st->right, func);
 }
 
 
@@ -2283,7 +2336,28 @@ void g95_traverse_ns(g95_namespace *ns, void (*func)(g95_symbol *)) {
 
   g95_traverse_symtree(ns, clear_sym_mark);
 
-  traverse_ns(ns->root, func);
+  traverse_ns(ns->sym_root, func);
+}
+
+
+/* traverse_uop()-- Function for traversing the user operator symtree */
+
+static void traverse_uop(g95_symtree *st, void (*func)(g95_user_op *)) {
+
+  if (st == NIL) return;
+
+  (*func)(st->n.uop);
+
+  traverse_uop(st->left, func);
+  traverse_uop(st->right, func);
+}
+
+
+/* g95_traverse_user_op()-- Traverse the tree of user operator nodes.  */
+
+void g95_traverse_user_op(g95_namespace *ns, void (*func)(g95_user_op *)) {
+
+  traverse_uop(ns->uop_root, func);
 }
 
 
@@ -2350,6 +2424,12 @@ int i;
 
       for(; intr; intr=intr->next)
 	g95_status(" %s", intr->sym->name);
+    }
+
+    if (ns->uop_root != NULL) {
+      show_indent();
+      g95_status("User operators:\n");
+      g95_traverse_user_op(ns, show_uop);
     }
   }
 

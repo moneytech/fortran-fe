@@ -950,7 +950,7 @@ char name[G95_MAX_SYMBOL_LEN+1];
 static int serial=0;
 
   sprintf(name, "@%d", serial++); 
-  return g95_new_symtree(ns, name);
+  return g95_new_symtree(&ns->sym_root, name);
 }
 
 
@@ -1629,9 +1629,7 @@ static void mio_symbol_interface(char *name, char *module,
 
 /* mio_symbol()-- Unlike most other routines, the address of the
  * symbol node is already fixed on input and the name/module has
- * already been filled in.  The append_interface() subroutines assumes
- * that the first five elements of symbol information are as they are
- * here. */
+ * already been filled in. */
 
 static void mio_symbol(g95_symbol *sym) {
 
@@ -1705,7 +1703,7 @@ g95_symbol *result;
 
   if (st == NIL) return NULL;
 
-  result = st->sym;
+  result = st->n.sym;
 
   if (strcmp(result->name, info->true_name) == 0 &&
       strcmp(result->module, info->module) == 0)
@@ -1731,7 +1729,7 @@ g95_namespace *ns;
   if (!check_module(info->module)) return NULL; /* Module not loaded */
 
   for(ns=g95_current_ns; ns; ns=ns->parent) {
-    result = bf_search(ns->root, info);
+    result = bf_search(ns->sym_root, info);
     if (result != NULL) return result;
   }
 
@@ -1760,17 +1758,48 @@ g95_symbol *sym;
   skip_list();
   skip_list();
 
-  mio_interface(&sym->operator);
   mio_interface(&sym->generic);
 
   set_module_locus(&save);
 }
 
 
-/* load_interfaces()-- Load interfaces from the module.  Interfaces
- * are unusual in that they attach themselves to existing symbols.  */
+/* load_operator_interfaces()-- Load operator interfaces from the
+ * module.  Interfaces are unusual in that they attach themselves to
+ * existing symbols. */
 
-void load_interfaces(int generic_flag) {
+void load_operator_interfaces(void) {
+char *p, name[G95_MAX_SYMBOL_LEN+1], module[G95_MAX_SYMBOL_LEN+1];
+g95_user_op *uop;
+
+  mio_lparen();
+
+  while(peek_atom() != ATOM_RPAREN) {
+    mio_lparen();
+
+    mio_internal_string(name);
+    mio_internal_string(module);
+
+    /* Decide if we need to load this one or not */
+
+    p = find_use_name(name);
+    if (p == NULL) {
+      while(parse_atom() != ATOM_RPAREN);
+    } else {
+      uop = g95_get_uop(p);
+      mio_interface_rest(&uop->operator);
+    }
+  }
+
+  mio_rparen();
+}
+
+
+/* load_generic_interfaces()-- Load interfaces from the module.
+ * Interfaces are unusual in that they attach themselves to existing
+ * symbols.  */
+
+void load_generic_interfaces(void) {
 char *p, name[G95_MAX_SYMBOL_LEN+1], module[G95_MAX_SYMBOL_LEN+1];
 g95_symbol *sym;
 
@@ -1785,26 +1814,21 @@ g95_symbol *sym;
     /* Decide if we need to load this one or not */
 
     p = find_use_name(name);
-    if (p == NULL) goto eat_rest;
 
-    if (g95_find_symbol(p, NULL, 0, &sym)) goto eat_rest;
+    if (p == NULL || g95_find_symbol(p, NULL, 0, &sym)) {
+      while(parse_atom() != ATOM_RPAREN);
+      continue;
+    }
 
     if (sym == NULL) {
       g95_get_symbol(p, NULL, 0, &sym);
 
-      if (generic_flag) {
-	sym->attr.flavor = FL_PROCEDURE;
-	sym->attr.generic = 1;
-      }
-
+      sym->attr.flavor = FL_PROCEDURE;
+      sym->attr.generic = 1;
       sym->attr.use_assoc = 1;
     }
 
-    mio_interface_rest(generic_flag ? &sym->generic : &sym->operator);
-    continue;
-
-  eat_rest:
-    while(parse_atom() != ATOM_RPAREN);
+    mio_interface_rest(&sym->generic);
   }
 
   mio_rparen();
@@ -1879,14 +1903,6 @@ g95_symbol *sym;
     }
   }
 
-  /* Append to interfaces of existing symbols */
-
-  info = sym_table;
-  for(i=0; i<sym_num; i++, info++) {
-    if (info->state != USED) continue;
-    append_interface(info);
-  }
-
   mio_rparen();
 
   /* Parse the symtree lists.  This lets us mark which symbols need to
@@ -1910,17 +1926,17 @@ g95_symbol *sym;
     p = find_use_name(name);
     if (p == NULL) continue;
 
-    st = g95_find_symtree(ns, p);
+    st = g95_find_symtree(ns->sym_root, p);
 
     if (st != NULL) {
-      if (st->sym != info->sym) st->ambiguous = 1;
+      if (st->n.sym != info->sym) st->ambiguous = 1;
     } else {
       st = check_unique_name(p) ? get_unique_symtree(ns) :
-	g95_new_symtree(ns, p);
+	g95_new_symtree(&ns->sym_root, p);
 
-      st->sym = info->sym;
+      st->n.sym = info->sym;
       st->ambiguous = ambiguous;
-      st->sym->refs++;
+      st->n.sym->refs++;
 
       if (info->state == UNUSED) info->state = NEEDED;
       info->referenced = 1;
@@ -1959,8 +1975,8 @@ g95_symbol *sym;
 
   set_module_locus(&user_operators);
 
-  load_interfaces(0);
-  load_interfaces(1);
+  load_operator_interfaces();
+  load_generic_interfaces();
 
   /* At this point, we read those symbols that are needed but haven't
    * been loaded yet.  If one symbol requires another, the other gets
@@ -2028,7 +2044,7 @@ g95_symbol *sym;
       if (info->referenced) break;
 
       st = get_unique_symtree(ns);
-      st->sym = info->sym;
+      st->n.sym = info->sym;
       break;
 
     default:
@@ -2097,12 +2113,13 @@ static void write_symbol0(g95_symbol *sym) {
 
 /* write_operator()-- Write operator interfaces associated with a symbol. */
 
-static void write_operator(g95_symbol *sym) {
+static void write_operator(g95_user_op *uop) {
+static char nullstring[] = "";
 
-  if (sym->operator == NULL ||
-      !check_access(sym->operator_access, sym->ns->default_access)) return;
+  if (uop->operator == NULL ||
+      !check_access(uop->access, uop->ns->default_access)) return;
 
-  mio_symbol_interface(sym->name, sym->module, &sym->operator);
+  mio_symbol_interface(uop->name, nullstring, &uop->operator);
 }
 
 
@@ -2120,7 +2137,7 @@ static void write_generic(g95_symbol *sym) {
 static void write_symtree(g95_symtree *st) {
 g95_symbol *sym;
 
-  sym = st->sym;
+  sym = st->n.sym;
   if (!check_access(sym->attr.access, sym->ns->default_access) ||
       (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic &&
        !sym->attr.subroutine && !sym->attr.function)) return;
@@ -2156,7 +2173,7 @@ int i;
   write_char('\n');  write_char('\n');
 
   mio_lparen();
-  g95_traverse_ns(ns, write_operator);
+  g95_traverse_user_op(ns, write_operator);
   mio_rparen();
   write_char('\n');  write_char('\n');
 

@@ -436,6 +436,17 @@ typedef struct g95_interface {
 #define g95_get_interface() g95_getmem(sizeof(g95_interface))
 
 
+/* User operator nodes.  These are like stripped down symbols */
+
+typedef struct {
+  char name[G95_MAX_SYMBOL_LEN+1];
+
+  g95_interface *operator;
+  struct g95_namespace *ns;
+  g95_access access;
+} g95_user_op;
+
+
 /* Symbol nodes.  These are important things.  They are what the
  * standard refers to as "entities".  The possibly multiple names that
  * refer to the same entity are accomplished by a binary tree of
@@ -454,8 +465,8 @@ typedef struct g95_symbol {
  * symbol is a function or subroutine name.  If the symbol is a
  * generic name, the generic member points to the list of interfaces. */
 
-  g95_interface *operator, *generic;
-  g95_access operator_access, component_access;
+  g95_interface *generic;
+  g95_access component_access;
 
   g95_formal_arglist *formal;
   struct g95_namespace *formal_ns;
@@ -506,7 +517,10 @@ typedef struct g95_symbol {
 typedef struct g95_symtree {
   char name[G95_MAX_SYMBOL_LEN+1];
   int ambiguous;
-  g95_symbol *sym;             /* Symbol associated with this node */
+  union {
+    g95_symbol *sym;             /* Symbol associated with this node */
+    g95_user_op *uop;
+  } n;
 
   struct g95_symtree *left, *right, *parent;
   enum { BLACK, RED } color;   /* node color (BLACK, RED) */
@@ -517,7 +531,7 @@ extern g95_symtree g95_st_sentinel;
 
 
 typedef struct g95_namespace {
-  g95_symtree *root;    /* Root of the red/black symbol tree */
+  g95_symtree *sym_root, *uop_root;   /* Roots of the red/black symbol trees */
 
   int set_flag[G95_LETTERS];
   g95_typespec default_type[G95_LETTERS];    /* IMPLICIT typespecs */
@@ -547,6 +561,7 @@ typedef struct {
   interface_type type;
   g95_symbol *sym;
   g95_namespace *ns;
+  g95_user_op *uop;
   int op;
 } g95_interface_info;
 
@@ -663,6 +678,7 @@ typedef struct g95_expr {
 
   g95_intrinsic_op operator;
   g95_symbol *symbol;   /* Nonnull for functions and structure constructors */
+  g95_user_op *uop;
   g95_ref *ref;
 
   struct g95_expr *op1, *op2;
@@ -1180,8 +1196,10 @@ void g95_define_st_label(int, locus *, int, g95_sl_type);
 try g95_reference_st_label(int, g95_sl_type);
 
 g95_namespace *g95_get_namespace(void);
-g95_symtree *g95_new_symtree(g95_namespace *, const char *);
-g95_symtree *g95_find_symtree(g95_namespace *, const char *);
+g95_symtree *g95_new_symtree(g95_symtree **, const char *);
+g95_symtree *g95_find_symtree(g95_symtree *, const char *);
+g95_user_op *g95_get_uop(const char *);
+g95_user_op *g95_find_uop(const char *, g95_namespace *);
 void g95_free_symbol(g95_symbol *);
 g95_symbol *g95_new_symbol(const char *, g95_namespace *);
 int g95_find_symbol(const char *, g95_namespace *, int, g95_symbol **);
@@ -1198,6 +1216,7 @@ void g95_show_symbol(g95_symbol *);
 
 void g95_traverse_symtree(g95_namespace *, void (*)(g95_symtree *));
 void g95_traverse_ns(g95_namespace *, void (*)(g95_symbol *));
+void g95_traverse_user_op(g95_namespace *, void (*)(g95_user_op *));
 void g95_save_all(g95_namespace *);
 
 void g95_show_namespace(g95_namespace *);

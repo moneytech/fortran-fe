@@ -47,8 +47,9 @@ Generic interfaces:
    which the interface is added later when the module procedure is parsed.
 
 User operators:
-   If a symbol is a user-defined operator, the operator member heads up
-   the list of relevant interfaces.
+   User-defined operators are stored in a their own set of symtrees
+   separate from regular symbols.  The symtrees point to g95_user_op
+   structures which in turn head up a list of relevant interfaces.
 
 Extended intrinsics and assignment:
    The head of these interface lists are stored in the containing namespace.
@@ -190,9 +191,7 @@ int operator;
     break;
 
   case INTERFACE_USER_OP:
-    if (g95_get_symbol(name, NULL, 0, &sym)) return MATCH_ERROR;
-
-    current_interface.sym = sym;
+    current_interface.uop = g95_get_uop(name);
     break;
 
   case INTERFACE_INTRINSIC_OP:
@@ -812,19 +811,22 @@ g95_symbol *s2;
       if (g95_find_symbol(sym->name, s2->ns->parent, 1, &s2)) break;
     }
   }
+}
 
-  if (sym->operator != NULL) {
-    sprintf(interface_name, "operator interface '%s'", sym->name);
-    if (check_interface0(sym->operator, interface_name)) return;
 
-    s2 = sym;
-    while(s2 != NULL) {
-      if (check_interface1(sym->operator, s2->operator, 0, interface_name))
-	return;
+static void check_uop_interfaces(g95_user_op *uop) {
+char interface_name[100];
+g95_user_op *uop2;
+g95_namespace *ns;
 
-      if (s2->ns->parent == NULL) break;
-      if (g95_find_symbol(sym->name, s2->ns->parent, 1, &s2)) break;
-    }
+  sprintf(interface_name, "operator interface '%s'", uop->name);
+  if (check_interface0(uop->operator, interface_name)) return;
+
+  for(ns=g95_current_ns; ns; ns=ns->parent) {
+    uop2 = g95_find_uop(uop->name, ns);
+    if (uop2 == NULL) continue;
+
+    check_interface1(uop->operator, uop2->operator, 0, interface_name);
   }
 }
 
@@ -844,6 +846,8 @@ int i;
   g95_current_ns = ns;
 
   g95_traverse_ns(ns, check_sym_interfaces);
+
+  g95_traverse_user_op(ns, check_uop_interfaces);
 
   for(i=0; i<G95_INTRINSIC_OPS; i++) {
     if (i == INTRINSIC_USER) continue;
@@ -1011,6 +1015,7 @@ try g95_extend_expr(g95_expr *e) {
 g95_actual_arglist *actual;
 g95_symbol *ip, *sym;
 g95_namespace *ns;
+g95_user_op *uop;
 int i;
 
   ip = sym = NULL;
@@ -1025,9 +1030,15 @@ int i;
 
   i = fold_unary(e->operator);
 
-  if (i == INTRINSIC_USER)
-    sym = g95_search_interface(e->symbol->operator, 0, actual);
-  else {
+  if (i == INTRINSIC_USER) {
+    for(ns=g95_current_ns; ns; ns=ns->parent) {
+      uop = g95_find_uop(e->uop->name, ns);
+      if (uop == NULL) continue;
+
+      sym = g95_search_interface(uop->operator, 0, actual);
+      if (sym != NULL) break;
+    }
+  } else {
     for(ns=g95_current_ns; ns; ns=ns->parent) {
       sym = g95_search_interface(ns->operator[i], 0, actual);
       if (sym != NULL) break;
@@ -1153,15 +1164,10 @@ g95_symbol *sym;
     break;
 
   case INTERFACE_USER_OP:
-    for(ns=current_interface.ns; ns; ns=ns->parent) {
-      g95_find_symbol(current_interface.sym->name, ns, 0, &sym);
-      if (sym == NULL) continue;
+    if (check_new_interface(current_interface.uop->operator, new) == FAILURE)
+      return FAILURE;
 
-      if (check_new_interface(sym->operator, new) == FAILURE)
-	return FAILURE;
-    }
-
-    head = &current_interface.sym->operator;
+    head = &current_interface.uop->operator;
     break;
 
   default:

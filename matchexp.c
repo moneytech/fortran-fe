@@ -81,17 +81,14 @@ error:
 /* match_defined_operator()-- Match a user defined operator.  The
  * symbol found must be an operator already. */
 
-static match match_defined_operator(g95_symbol **result) {
+static match match_defined_operator(g95_user_op **result) {
 char name[G95_MAX_SYMBOL_LEN+1];
-g95_symbol *sym;
 match m;
 
   m = g95_match_defined_op_name(name, 0);
   if (m != MATCH_YES) return m;
 
-  if (g95_get_symbol(name, NULL, 1, &sym)) return MATCH_ERROR;
-
-  *result = sym;
+  *result = g95_get_uop(name);
   return MATCH_YES;
 }
 
@@ -172,20 +169,26 @@ g95_expr *new;
 /* match_level_1()-- Match a level 1 expression */
 
 static match match_level_1(g95_expr **result) {
-g95_symbol *sym;
-g95_expr *e;
+g95_user_op *uop;
+g95_expr *e, *f;
 locus where;
 match m;
 
   where = *g95_current_locus(); 
-  sym = NULL; 
-  m = match_defined_operator(&sym);
+  uop = NULL; 
+  m = match_defined_operator(&uop);
   if (m == MATCH_ERROR) return m;
 
   m = match_primary(&e);
   if (m != MATCH_YES) return m;
 
-  *result = (sym == NULL) ? e : build_node(INTRINSIC_USER, &where, e, NULL);
+  if (uop == NULL)
+    *result = e;
+  else {
+    f = build_node(INTRINSIC_USER, &where, e, NULL);
+    f->uop = uop;
+    *result = f;
+  }
 
   return MATCH_YES;
 }
@@ -633,7 +636,7 @@ int i;
 
 match g95_match_expr(g95_expr **result) {
 g95_expr *all, *e;
-g95_symbol *sym;
+g95_user_op *uop;
 locus where;
 match m;
 
@@ -641,7 +644,7 @@ match m;
   if (m != MATCH_YES) return m;
 
   for(;;) {
-    m = match_defined_operator(&sym);
+    m = match_defined_operator(&uop);
     if (m == MATCH_NO) break;
     if (m == MATCH_ERROR) {
       g95_free_expr(all);
@@ -658,7 +661,7 @@ match m;
     }
 
     all = build_node(INTRINSIC_USER, &where, all, e);
-    all->symbol = sym;
+    all->uop = uop;
 
     where = *g95_current_locus();
   }
