@@ -1350,7 +1350,8 @@ try t;
     t = FAILURE;
 
     if (ar->start[dimen] == NULL) {
-      if (ar->as->lower[dimen] == NULL) goto cleanup;
+      if (ar->as->lower[dimen] == NULL ||
+	  ar->as->lower[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
       mpz_set(lower, ar->as->lower[dimen]->value.integer);
     } else {
       if (ar->start[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
@@ -1358,7 +1359,8 @@ try t;
     }
 
     if (ar->end[dimen] == NULL) {
-      if (ar->as->upper[dimen] == NULL) goto cleanup;
+      if (ar->as->upper[dimen] == NULL ||
+	  ar->as->upper[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
       mpz_set(upper, ar->as->upper[dimen]->value.integer);
     } else {
       if (ar->end[dimen]->expr_type != EXPR_CONSTANT) goto cleanup;
