@@ -786,6 +786,117 @@ g95_get_symbol_for_expr (g95_expr * expr)
   return sym;
 }
 
+/* ANY and ALL intrinsics. ANY->op == NE_EXPR, ALL->op == EQ_EXPR.
+   Implemented as
+    any(a)
+    {
+      forall (i=...)
+        if (a[i] != 0)
+          return 1
+      end forall
+      return 0
+    }
+    all(a)
+    {
+      forall (i=...)
+        if (a[i] == 0)
+          return 0
+      end forall
+      return 1
+    }
+ */
+static void
+g95_conv_intrinsic_anyall (g95_se * se, g95_expr * expr, int op)
+{
+  tree resvar;
+  tree type;
+  tree head;
+  tree tail;
+  tree tmp;
+  tree stmt;
+  g95_loopinfo loop;
+  g95_actual_arglist *actual;
+  g95_ss *arrayss;
+  g95_se arrayse;
+  g95_symbol *sym;
+
+  actual = expr->value.function.actual;
+  if (se->ss)
+    {
+      assert (se->ss->expr == expr);
+
+      sym = g95_get_symbol_for_expr (expr);
+      g95_conv_function_call (se, sym, actual);
+      return;
+    }
+
+  type = g95_typenode_for_spec (&expr->ts);
+  /* Initialize the result.  */
+  resvar = create_tmp_var (type, "test");
+  if (op == EQ_EXPR)
+    tmp = g95_build_const (type, integer_zero_node);
+  else
+    tmp = g95_build_const (type, integer_one_node);
+  tmp = build (MODIFY_EXPR, type, resvar, tmp);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_pre (se, stmt, stmt);
+
+  /* Walk the arguments.  */
+  arrayss = g95_walk_expr (g95_ss_terminator, actual->expr);
+  assert (arrayss != g95_ss_terminator);
+  arrayss = g95_reverse_ss (arrayss);
+
+  /* Initialize the scalarizer.  */
+  g95_init_loopinfo (&loop);
+  g95_add_ss_to_loop (&loop, arrayss);
+
+  /* Initialize the loop.  */
+  g95_conv_ss_startstride (&loop);
+  g95_conv_loop_setup (&loop);
+
+  g95_mark_ss_chain_used (arrayss, 1);
+  /* Generate the loop body.  */
+  g95_start_scalarized_body (&loop);
+  head = tail = NULL_TREE;
+
+  /* If the condition matches then set the return value.  */
+  g95_start_stmt ();
+  assert (head == NULL_TREE);
+  if (op == EQ_EXPR)
+    tmp = g95_build_const (type, integer_zero_node);
+  else
+    tmp = g95_build_const (type, integer_one_node);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (resvar), resvar, tmp);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+
+  /* And break out of the loop.  */
+  stmt = build_stmt (BREAK_STMT);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+  stmt = g95_finish_stmt (head, tail);
+
+  /* The main loop body.  */
+  head = tail = NULL_TREE;
+
+  /* Check this element.  */
+  g95_init_se (&arrayse, NULL);
+  g95_copy_loopinfo_to_se (&arrayse, &loop);
+  arrayse.ss = arrayss;
+  g95_conv_simple_val (&arrayse, actual->expr);
+
+  g95_add_stmt_to_list (&head, &tail, arrayse.pre, arrayse.pre_tail);
+  tmp = build (op, boolean_type_node, arrayse.expr, integer_zero_node);
+  stmt = build_stmt (IF_STMT, tmp, stmt, NULL_TREE);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+  g95_add_stmt_to_list (&head, &tail, arrayse.post, arrayse.post_tail);
+
+  g95_trans_scalarizing_loops (&loop, head, tail);
+
+  g95_add_stmt_to_pre (se, loop.pre, loop.pre_tail);
+  g95_add_stmt_to_pre (se, loop.post, loop.post_tail);
+  se->expr = resvar;
+}
+
 static void
 g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
 {
@@ -1361,10 +1472,8 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_ADJUSTR:
     case G95_ISYM_AINT:
     case G95_ISYM_ANINT:
-    case G95_ISYM_ALL:
     case G95_ISYM_ALLOCATED:
     case G95_ISYM_ANINIT:
-    case G95_ISYM_ANY:
     case G95_ISYM_ASSOCIATED:
     case G95_ISYM_CEILING:
     case G95_ISYM_CHAR:
@@ -1419,6 +1528,14 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 
     case G95_ISYM_AIMAG:
       g95_conv_intrinsic_imagpart (se, expr);
+      break;
+
+    case G95_ISYM_ALL:
+      g95_conv_intrinsic_anyall (se, expr, EQ_EXPR);
+      break;
+
+    case G95_ISYM_ANY:
+      g95_conv_intrinsic_anyall (se, expr, NE_EXPR);
       break;
 
     case G95_ISYM_BTEST:
@@ -1603,6 +1720,8 @@ g95_walk_intrinsic_function (g95_ss * ss, g95_expr * expr,
     case G95_ISYM_UBOUND:
       return g95_walk_intrinsic_bound (ss, expr);
 
+    case G95_ISYM_ALL:
+    case G95_ISYM_ANY:
     case G95_ISYM_MAXVAL:
     case G95_ISYM_MINVAL:
     case G95_ISYM_SUM:

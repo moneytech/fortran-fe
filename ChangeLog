@@ -1,4 +1,20 @@
+2002-09-01  Paul Brook  <paul@nowt.org>
 
-	Chronicles the changes to g95.
+	* README.backend: Warn about the dangers of extra config.h files.
+	Remove obsolete libgfor stuff.
+	* config-lang.in: Add target-libgfor dependancy.
+	* g95_conv_mpf_to_tree: Use & free allocated buffer p rather than buff.
 
-	
+2002-09-01  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+        * g95_conv_mpz_to_tree: Free storage pointed to by q,
+        not by buff.
+
+2002-08-30  Paul Brook  <paul@nowt.org>
+
+	* trans-intrinsic.c (g95_conv_intrinsic_function,
+	g95_walk_intrinsic_function): Added ANY and ALL.
+	(g95_conv_intrinsic_anyall): New function.
+	* iresolve.c (g95_resolve_any, g95_resolve_all): Include rank in
+	mangled name
+

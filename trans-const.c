@@ -227,23 +227,23 @@ g95_conv_mpf_to_tree (mpf_t f, int kind)
   else
     p = buff;
 
-  mpf_get_str (&buff[1], &exp, 10, digits , f);
-  if (buff[1])
+  mpf_get_str (&p[1], &exp, 10, digits , f);
+  if (p[1])
     {
-      buff[0] = '.';
-      strcat (buff, "e");
-      sprintf (&buff[strlen (buff)], "%d", (int) exp);
+      p[0] = '.';
+      strcat (p, "e");
+      sprintf (&p[strlen (p)], "%d", (int) exp);
     }
   else
     {
-      strcpy (buff, "0");
+      strcpy (p, "0");
     }
 
   type = g95_get_real_type (kind);
-  res = build_real (type, REAL_VALUE_ATOF (buff, TYPE_MODE (type)));
+  res = build_real (type, REAL_VALUE_ATOF (p, TYPE_MODE (type)));
 
   if (p != buff)
-    g95_free (buff);
+    g95_free (p);
 
   return (res);
 }
