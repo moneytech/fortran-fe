@@ -1,8 +1,19 @@
 2002-09-06  Paul Brook  <paul@nowt.org>
 
-	* Make-lang.in (F95_ADDITIONAL_OBJS): Add tree_alias_comon.o
+	* Make-lang.in (F95_ADDITIONAL_OBJS): Add tree_alias_comon.o.
+	(gt-f95-trans-types.h): Add dependancy information.
+	* config-lang.in (gtfiles): Add trans-types.c
 	* f95-lang.c (g95_be_parse_file): Pass error and warning counts
 	back to top-level code.
+	* trans-array.c, trans-types.c: Change format of array descriptor.
+	(g95_conv_descriptor_dimension): New function.
+	* trans-types.h (g95_conv_descriptor_rank): define.
+	* trans-intrinsic.c: Implement PRODUCT, COUNT. MINLOC and MAXLOC
+	intrinsics.
+
+2002-09-02  Steven Bosscher <s.bosscher@student.tudelft.nl>
+
+	* trans-array.c, trans-types.c:	Add rank information to descriptor.
 
 2002-09-06  Tobias Schlueter  <Tobias.Schlueter@physik.uni-muenchen.de>
 

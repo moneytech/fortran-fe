@@ -898,9 +898,82 @@ g95_conv_intrinsic_anyall (g95_se * se, g95_expr * expr, int op)
 }
 
 static void
-g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
+g95_conv_intrinsic_count (g95_se * se, g95_expr * expr)
 {
-  tree sum;
+  tree resvar;
+  tree type;
+  tree head;
+  tree tail;
+  tree tmp;
+  tree stmt;
+  g95_loopinfo loop;
+  g95_actual_arglist *actual;
+  g95_ss *arrayss;
+  g95_se arrayse;
+  g95_symbol *sym;
+
+  actual = expr->value.function.actual;
+
+  if (se->ss)
+    {
+      assert (se->ss->expr == expr);
+
+      sym = g95_get_symbol_for_expr (expr);
+      g95_conv_function_call (se, sym, actual);
+      return;
+    }
+
+  type = g95_typenode_for_spec (&expr->ts);
+  /* Initialize the result.  */
+  resvar = create_tmp_var (type, "count");
+  tmp = build (MODIFY_EXPR, type, resvar, integer_zero_node);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_pre (se, stmt, stmt);
+
+  /* Walk the arguments.  */
+  arrayss = g95_walk_expr (g95_ss_terminator, actual->expr);
+  assert (arrayss != g95_ss_terminator);
+  arrayss = g95_reverse_ss (arrayss);
+
+  /* Initialize the scalarizer.  */
+  g95_init_loopinfo (&loop);
+  g95_add_ss_to_loop (&loop, arrayss);
+
+  /* Initialize the loop.  */
+  g95_conv_ss_startstride (&loop);
+  g95_conv_loop_setup (&loop);
+
+  g95_mark_ss_chain_used (arrayss, 1);
+  /* Generate the loop body.  */
+  g95_start_scalarized_body (&loop);
+  head = tail = NULL_TREE;
+
+  tmp = build (PLUS_EXPR, TREE_TYPE (resvar), resvar, integer_one_node);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (resvar), resvar, tmp);
+  stmt = build_stmt (EXPR_STMT, tmp);
+
+  g95_init_se (&arrayse, NULL);
+  g95_copy_loopinfo_to_se (&arrayse, &loop);
+  arrayse.ss = arrayss;
+  g95_conv_simple_cond (&arrayse, actual->expr);
+  stmt = build_stmt (IF_STMT, arrayse.expr, stmt, NULL);
+
+  g95_add_stmt_to_list (&head, &tail, arrayse.pre, arrayse.pre_tail);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+  g95_add_stmt_to_list (&head, &tail, arrayse.post, arrayse.post_tail);
+
+  g95_trans_scalarizing_loops (&loop, head, tail);
+
+  g95_add_stmt_to_pre (se, loop.pre, loop.pre_tail);
+  g95_add_stmt_to_pre (se, loop.post, loop.post_tail);
+  se->expr = resvar;
+}
+
+/* Inline implementation of the sum and product intrinsics.  */
+static void
+g95_conv_intrinsic_arith (g95_se * se, g95_expr * expr, int op)
+{
+  tree resvar;
   tree type;
   tree head;
   tree tail;
@@ -927,9 +1000,13 @@ g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
 
   type = g95_typenode_for_spec (&expr->ts);
   /* Initialize the result.  */
-  sum = create_tmp_var (type, "sum");
-  tmp = g95_build_const (type, integer_zero_node);
-  tmp = build (MODIFY_EXPR, type, sum, tmp);
+  resvar = create_tmp_var (type, "val");
+  if (op == PLUS_EXPR)
+    tmp = g95_build_const (type, integer_zero_node);
+  else
+    tmp = g95_build_const (type, integer_one_node);
+
+  tmp = build (MODIFY_EXPR, type, resvar, tmp);
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_pre (se, stmt, stmt);
 
@@ -980,15 +1057,177 @@ g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
       g95_start_stmt();
     }
 
-  /* Do the actual summation.  */
+  /* Do the actual summation/product.  */
   g95_init_se (&arrayse, NULL);
   g95_copy_loopinfo_to_se (&arrayse, &loop);
   arrayse.ss = arrayss;
   g95_conv_simple_val (&arrayse, arrayexpr);
   g95_add_stmt_to_list (&head, &tail, arrayse.pre, arrayse.pre_tail);
-  tmp = build (PLUS_EXPR, type, sum, arrayse.expr);
-  tmp = build (MODIFY_EXPR, type, sum, tmp);
+  tmp = build (op, type, resvar, arrayse.expr);
+  tmp = build (MODIFY_EXPR, type, resvar, tmp);
   stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+  g95_add_stmt_to_list (&head, &tail, arrayse.post, arrayse.post_tail);
+
+  if (maskss)
+    {
+      /* We enclose the above in if (mask) {...} .  */
+      stmt = g95_finish_stmt (head, tail);
+      /* The actual body of the loop.  */
+      head = tail = NULL_TREE;
+      g95_add_stmt_to_list (&head, &tail, maskse.pre, maskse.pre_tail);
+      assert (maskse.post == NULL_TREE);
+
+      stmt = build_stmt (IF_STMT, maskse.expr, stmt, NULL_TREE);
+      g95_add_stmt_to_list (&head, &tail, stmt, stmt);
+    }
+
+  g95_trans_scalarizing_loops (&loop, head, tail);
+
+  g95_add_stmt_to_pre (se, loop.pre, loop.pre_tail);
+  g95_add_stmt_to_pre (se, loop.post, loop.post_tail);
+  se->expr = resvar;
+}
+
+static void
+g95_conv_intrinsic_minmaxloc (g95_se * se, g95_expr * expr, int op)
+{
+  tree limit;
+  tree type;
+  tree head;
+  tree tail;
+  tree tmp;
+  tree stmt;
+  g95_loopinfo loop;
+  g95_actual_arglist *actual;
+  g95_ss *arrayss;
+  g95_ss *maskss;
+  g95_se arrayse;
+  g95_se maskse;
+  g95_expr *arrayexpr;
+  g95_expr *maskexpr;
+  g95_symbol *sym;
+  tree pos;
+  tree body;
+  tree body_tail;
+  int n;
+
+  actual = expr->value.function.actual;
+  if (! actual->next->expr)
+    {
+      g95_todo_error ("min/maxloc without DIM parameter");
+    }
+
+  if (se->ss)
+    {
+      assert (se->ss->expr == expr);
+
+      sym = g95_get_symbol_for_expr (expr);
+      g95_conv_function_call (se, sym, expr->value.function.actual);
+      return;
+    }
+
+  type = g95_typenode_for_spec (&expr->ts);
+  /* Initialize the result.  */
+  limit = create_tmp_var (type, "limit");
+  pos = create_tmp_var (g95_array_index_type, "pos");
+  n = g95_validate_kind (expr->ts.type, expr->ts.kind);
+  switch (expr->ts.type)
+    {
+    case BT_REAL:
+      tmp = g95_conv_mpf_to_tree (g95_real_kinds[n].huge, expr->ts.kind);
+      break;
+
+    case BT_INTEGER:
+      tmp = g95_conv_mpz_to_tree (g95_integer_kinds[n].huge, expr->ts.kind);
+      break;
+
+    default:
+      abort ();
+    }
+
+  /* Most negative(+HUGE) for maxval, most negative (-HUGE) for minval.  */
+  if (op == GT_EXPR)
+    tmp = fold (build1(NEGATE_EXPR, TREE_TYPE (tmp), tmp));
+  tmp = build (MODIFY_EXPR, type, limit, tmp);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_pre (se, stmt, stmt);
+
+  /* Walk the arguments.  */
+  actual = expr->value.function.actual;
+  arrayexpr = actual->expr;
+  arrayss = g95_walk_expr (g95_ss_terminator, arrayexpr);
+  assert (arrayss != g95_ss_terminator);
+  arrayss = g95_reverse_ss (arrayss);
+
+  actual = actual->next->next;
+  assert (actual);
+  maskexpr = actual->expr;
+  if (maskexpr)
+    {
+      maskss = g95_walk_expr (g95_ss_terminator, maskexpr);
+      assert (maskss != g95_ss_terminator);
+      maskss = g95_reverse_ss (maskss);
+    }
+  else
+    maskss = NULL;
+
+  /* Initialize the scalarizer.  */
+  g95_init_loopinfo (&loop);
+  g95_add_ss_to_loop (&loop, arrayss);
+  if (maskss)
+    g95_add_ss_to_loop (&loop, maskss);
+
+  /* Initialize the loop.  */
+  g95_conv_ss_startstride (&loop);
+  g95_conv_loop_setup (&loop);
+
+  assert (loop.dimen == 1);
+
+  g95_mark_ss_chain_used (arrayss, 1);
+  if (maskss)
+      g95_mark_ss_chain_used (maskss, 1);
+  /* Generate the loop body.  */
+  g95_start_scalarized_body (&loop);
+  head = tail = NULL_TREE;
+
+  /* If we have a mask, only check this element if the mask is set.  */
+  if (maskss)
+    {
+      g95_init_se (&maskse, NULL);
+      g95_copy_loopinfo_to_se (&maskse, &loop);
+      maskse.ss = maskss;
+      g95_conv_simple_cond (&maskse, maskexpr);
+
+      g95_start_stmt();
+    }
+
+  /* Compare with the current limit.  */
+  g95_init_se (&arrayse, NULL);
+  g95_copy_loopinfo_to_se (&arrayse, &loop);
+  arrayse.ss = arrayss;
+  g95_conv_simple_val (&arrayse, arrayexpr);
+  g95_add_stmt_to_list (&head, &tail, arrayse.pre, arrayse.pre_tail);
+
+  /* We do the following if this is a more extreme value.  */
+  g95_start_stmt ();
+  body = body_tail = NULL;
+
+  /* Assign the value to the limit...  */
+  tmp = build (MODIFY_EXPR, type, limit, arrayse.expr);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&body, &body_tail, stmt, stmt);
+
+  /* Remember where we are.  */
+  tmp = build (MODIFY_EXPR, type, pos, loop.loopvar[0]);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&body, &body_tail, stmt, stmt);
+
+  stmt = g95_finish_stmt (body, body_tail);
+
+  /* If it is a more extreme value.  */
+  tmp = build (op, boolean_type_node, arrayse.expr, limit);
+  stmt = build_stmt (IF_STMT, tmp, stmt, NULL_TREE);
   g95_add_stmt_to_list (&head, &tail, stmt, stmt);
   g95_add_stmt_to_list (&head, &tail, arrayse.post, arrayse.post_tail);
 
@@ -1009,7 +1248,16 @@ g95_conv_intrinsic_sum (g95_se * se, g95_expr * expr)
 
   g95_add_stmt_to_pre (se, loop.pre, loop.pre_tail);
   g95_add_stmt_to_pre (se, loop.post, loop.post_tail);
-  se->expr = sum;
+
+  /* Return a value in the range 1..SIZE(array).  */
+  head = tail = NULL_TREE;
+  tmp = build (MINUS_EXPR, g95_array_index_type, loop.from[0],
+               integer_one_node);
+  tmp = g95_simple_fold (tmp, &head, &tail, NULL);
+  tmp = build (MINUS_EXPR, g95_array_index_type, pos, tmp);
+  tmp = g95_simple_fold_tmp (tmp, &head, &tail, &pos);
+
+  se->expr = g95_simple_convert (type, tmp);
 }
 
 static void
@@ -1477,7 +1725,6 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_ASSOCIATED:
     case G95_ISYM_CEILING:
     case G95_ISYM_CHAR:
-    case G95_ISYM_COUNT:
     case G95_ISYM_CPU_TIME:
     case G95_ISYM_CSHIFT:
     case G95_ISYM_DATE_AND_TIME:
@@ -1494,9 +1741,7 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_LLE:
     case G95_ISYM_LLT:
     case G95_ISYM_MATMUL:
-    case G95_ISYM_MAXLOC:
     case G95_ISYM_MERGE:
-    case G95_ISYM_MINLOC:
     case G95_ISYM_MOD:
     case G95_ISYM_MODULO:
     case G95_ISYM_MVBITS:
@@ -1504,7 +1749,6 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     case G95_ISYM_NINT:
     case G95_ISYM_PACK:
     case G95_ISYM_PRESENT:
-    case G95_ISYM_PRODUCT:
     case G95_ISYM_RANDOM_NUMBER:
     case G95_ISYM_RANDOM_SEED:
     case G95_ISYM_REPEAT:
@@ -1556,6 +1800,10 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
 
     case G95_ISYM_CONJG:
       g95_conv_intrinsic_conjg (se, expr);
+      break;
+
+    case G95_ISYM_COUNT:
+      g95_conv_intrinsic_count (se, expr);
       break;
 
     case G95_ISYM_DIM:
@@ -1614,12 +1862,20 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
       g95_conv_intrinsic_minmax(se, expr, GT_EXPR);
       break;
 
+    case G95_ISYM_MAXLOC:
+      g95_conv_intrinsic_minmaxloc (se, expr, GT_EXPR);
+      break;
+
     case G95_ISYM_MAXVAL:
       g95_conv_intrinsic_minmaxval (se, expr, GT_EXPR);
       break;
 
     case G95_ISYM_MIN:
       g95_conv_intrinsic_minmax(se, expr, LT_EXPR);
+      break;
+
+    case G95_ISYM_MINLOC:
+      g95_conv_intrinsic_minmaxloc (se, expr, LT_EXPR);
       break;
 
     case G95_ISYM_MINVAL:
@@ -1630,12 +1886,16 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
       g95_conv_intrinsic_not (se, expr);
       break;
 
+    case G95_ISYM_PRODUCT:
+      g95_conv_intrinsic_arith (se, expr, MULT_EXPR);
+      break;
+
     case G95_ISYM_SIGN:
       g95_conv_intrinsic_sign (se, expr);
       break;
 
     case G95_ISYM_SUM:
-      g95_conv_intrinsic_sum (se, expr);
+      g95_conv_intrinsic_arith (se, expr, PLUS_EXPR);
       break;
 
     case G95_ISYM_UBOUND:
@@ -1722,9 +1982,11 @@ g95_walk_intrinsic_function (g95_ss * ss, g95_expr * expr,
 
     case G95_ISYM_ALL:
     case G95_ISYM_ANY:
+    case G95_ISYM_COUNT:
     case G95_ISYM_MAXVAL:
     case G95_ISYM_MINVAL:
     case G95_ISYM_SUM:
+    case G95_ISYM_PRODUCT:
       return g95_walk_intrinsic_libfunc (ss, expr);
       break;
 

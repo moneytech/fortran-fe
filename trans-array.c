@@ -149,6 +149,25 @@ g95_descriptor_data_type (tree desc)
   return type;
 }
 
+/* Build expressions to access the members of an array descriptor.
+   It's surprisingly easy to mess up here, so never access
+   an array descriptor by "brute force", always use these
+   functions.  This also aviods problems if we change the format
+   of an array descriptor.
+
+   To understand these magic numbers, look at the comments
+   before g95_build_array_type() in trans-types.c.
+
+   Don't forget to #undef these!  */
+
+#define DATA_FIELD 0
+#define BASE_FIELD 1
+#define RANK_FIELD 2
+#define DIMENSION_FIELD 3
+#define STRIDE_SUBFIELD 0
+#define LBOUND_SUBFIELD 1
+#define UBOUND_SUBFIELD 2
+
 tree
 g95_conv_descriptor_data (tree desc)
 {
@@ -159,6 +178,7 @@ g95_conv_descriptor_data (tree desc)
   assert (G95_DESCRIPTOR_TYPE_P (type));
 
   field = TYPE_FIELDS (type);
+  assert (DATA_FIELD == 0);
   assert (field != NULL_TREE
           && TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
           && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
@@ -175,7 +195,7 @@ g95_conv_descriptor_base (tree desc)
   type = TREE_TYPE (desc);
   assert (G95_DESCRIPTOR_TYPE_P (type));
 
-  field = g95_advance_chain (TYPE_FIELDS (type), 1);
+  field = g95_advance_chain (TYPE_FIELDS (type), BASE_FIELD);
   assert (field != NULL_TREE
           && TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
           && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
@@ -184,23 +204,56 @@ g95_conv_descriptor_base (tree desc)
 }
 
 tree
-g95_conv_descriptor_stride (tree desc, tree dim)
+g95_conv_descriptor_rank (tree desc)
 {
-  tree tmp;
   tree field;
   tree type;
 
   type = TREE_TYPE (desc);
   assert (G95_DESCRIPTOR_TYPE_P (type));
 
-  field = g95_advance_chain (TYPE_FIELDS (type), 2);
+  field = g95_advance_chain (TYPE_FIELDS (type), RANK_FIELD);
   assert (field != NULL_TREE
-          && TREE_CODE (TREE_TYPE (field)) == ARRAY_TYPE
-          && TREE_TYPE (TREE_TYPE (field)) == g95_array_index_type);
+          && TREE_TYPE (field) == g95_array_index_type);
+
+  return build (COMPONENT_REF, TREE_TYPE (field), desc, field);
+}
+
+static tree
+g95_conv_descriptor_dimension (tree desc, tree dim)
+{
+  tree field;
+  tree type;
+  tree tmp;
 
   assert (is_simple_val (dim));
+
+  type = TREE_TYPE (desc);
+  assert (G95_DESCRIPTOR_TYPE_P (type));
+
+  field = g95_advance_chain (TYPE_FIELDS (type), DIMENSION_FIELD);
+  assert (field != NULL_TREE
+          && TREE_CODE (TREE_TYPE (field)) == ARRAY_TYPE
+          && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == RECORD_TYPE);
+
   tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
-  tmp = build (ARRAY_REF, g95_array_index_type, tmp, dim);
+  tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, dim);
+  return tmp;
+}
+
+tree
+g95_conv_descriptor_stride (tree desc, tree dim)
+{
+  tree tmp;
+  tree field;
+
+  tmp = g95_conv_descriptor_dimension (desc, dim);
+  field = TYPE_FIELDS (TREE_TYPE (tmp));
+  field = g95_advance_chain (field, STRIDE_SUBFIELD);
+  assert (field != NULL_TREE
+          && TREE_TYPE (field) == g95_array_index_type);
+
+  tmp = build (COMPONENT_REF, TREE_TYPE (field), tmp, field);
   return tmp;
 }
 
@@ -209,19 +262,14 @@ g95_conv_descriptor_lbound (tree desc, tree dim)
 {
   tree tmp;
   tree field;
-  tree type;
 
-  type = TREE_TYPE (desc);
-  assert (G95_DESCRIPTOR_TYPE_P (type));
-
-  field = g95_advance_chain (TYPE_FIELDS (type), 3);
+  tmp = g95_conv_descriptor_dimension (desc, dim);
+  field = TYPE_FIELDS (TREE_TYPE (tmp));
+  field = g95_advance_chain (field, LBOUND_SUBFIELD);
   assert (field != NULL_TREE
-          && TREE_CODE (TREE_TYPE (field)) == ARRAY_TYPE
-          && TREE_TYPE (TREE_TYPE (field)) == g95_array_index_type);
+          && TREE_TYPE (field) == g95_array_index_type);
 
-  assert (is_simple_val (dim));
-  tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
-  tmp = build (ARRAY_REF, g95_array_index_type, tmp, dim);
+  tmp = build (COMPONENT_REF, TREE_TYPE (field), tmp, field);
   return tmp;
 }
 
@@ -230,21 +278,25 @@ g95_conv_descriptor_ubound (tree desc, tree dim)
 {
   tree tmp;
   tree field;
-  tree type;
 
-  type = TREE_TYPE (desc);
-  assert (G95_DESCRIPTOR_TYPE_P (type));
-
-  field = g95_advance_chain (TYPE_FIELDS (type), 4);
+  tmp = g95_conv_descriptor_dimension (desc, dim);
+  field = TYPE_FIELDS (TREE_TYPE (tmp));
+  field = g95_advance_chain (field, UBOUND_SUBFIELD);
   assert (field != NULL_TREE
-          && TREE_CODE (TREE_TYPE (field)) == ARRAY_TYPE
-          && TREE_TYPE (TREE_TYPE (field)) == g95_array_index_type);
+          && TREE_TYPE (field) == g95_array_index_type);
 
-  assert (is_simple_val (dim));
-  tmp = build (COMPONENT_REF, TREE_TYPE (field), desc, field);
-  tmp = build (ARRAY_REF, g95_array_index_type, tmp, dim);
+  tmp = build (COMPONENT_REF, TREE_TYPE (field), tmp, field);
   return tmp;
 }
+
+/* Cleanup those #defines.  */
+#undef DATA_FIELD
+#undef BASE_FIELD
+#undef RANK_FIELD
+#undef DIMENSION_FIELD
+#undef STRIDE_SUBFIELD
+#undef LBOUND_SUBFIELD
+#undef UBOUND_SUBFIELD
 
 /* Mark a SS chain as used.  Flags specifies in which loops the SS is used.
    flags & 1 = Main loop body.
@@ -540,6 +592,13 @@ g95_trans_allocate_temp_array (g95_loopinfo * loop, g95_ss_info * info,
   tmpvar = NULL_TREE;
   sizevar = NULL_TREE;
   size = integer_one_node;
+
+  /* Fill in the array rank.  */
+  tmp = g95_conv_descriptor_rank (desc);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, g95_rank_cst[info->dimen]);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_pre (loop, stmt, stmt);
+
   /* Fill in the bounds and stride.  This is a packed array, so:
       size = 1;
       for (n = 0; n < rank; n++)
@@ -2494,6 +2553,12 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
   offsetvar = NULL_TREE;
   offset = integer_zero_node;
 
+  /* Set the rank.  */
+  tmp = g95_conv_descriptor_rank (descriptor);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, g95_rank_cst[rank]);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (phead, ptail, stmt, stmt);
+
   for (n = 0; n < rank; n++)
     {
       /* Set lower bound.  */
@@ -3033,6 +3098,11 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
   else
     needpack = packedvar = NULL_TREE;
 
+  /* Set the rank.  */
+  tmp = g95_conv_descriptor_rank (tmpdesc);
+  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, g95_rank_cst[sym->as->rank]);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (&head, &tail, stmt, stmt);
   oldstride = create_tmp_var (g95_array_index_type, "stride");
 
   for (n = 0; n < sym->as->rank; n++)
@@ -3615,6 +3685,14 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
              The bounds of the scaralization are the bounds of the section.
              We don't have to worry about numeric overflows when calculating
              the offsets because all elements are within the array data.  */
+
+          /* Set the Rank.  */
+          tmp = g95_conv_descriptor_rank (parm);
+          tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
+                       g95_rank_cst[info->ref->u.ar.dimen]);
+          stmt = build_stmt (EXPR_STMT, tmp);
+          g95_add_stmt_to_pre (&loop, stmt, stmt);
+
           for (n = 0; n < info->ref->u.ar.dimen; n++)
             {
               /* Work out the offset.  */

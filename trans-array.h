@@ -92,9 +92,10 @@ extern unsigned HOST_WIDE_INT g95_stack_space_left;
 /* Returns true if a variable of specified size should go on the stack.  */
 int g95_can_put_var_on_stack (tree);
 
-/* Translate expressions for components of an array descriptor.  */
+/* Build expressions for accessing components of an array descriptor.  */
 tree g95_conv_descriptor_data (tree);
 tree g95_conv_descriptor_base (tree);
+tree g95_conv_descriptor_rank (tree);
 tree g95_conv_descriptor_stride (tree, tree);
 tree g95_conv_descriptor_lbound (tree, tree);
 tree g95_conv_descriptor_ubound (tree, tree);

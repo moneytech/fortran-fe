@@ -57,6 +57,7 @@ int g95_array_index_kind;
 tree g95_array_index_type;
 tree ppvoid_type_node;
 tree pchar_type_node;
+static GTY(()) tree g95_desc_dim_type = NULL;
 
 /* Create the backend type nodes. We map them to their
    equivalent C type, at least for now.  We also give
@@ -344,10 +345,18 @@ g95_get_stack_array_type (tree size)
     {
       array *data
       array *base;
-      //index dimensions -  Maybe we should include this for error checking?
+      index rank;
+      struct descriptor_dimension dimension[N_DIM];
       index stride[N_DIM];
       index lbound[N_DIM];
       index ubound[N_DIM];
+    }
+
+    struct descriptor_dimension
+    {
+      index stride;
+      index lbound;
+      index ubound;
     }
 
    Translation code should use g95_conv_descriptor_* rather than accessing
@@ -370,14 +379,15 @@ g95_get_stack_array_type (tree size)
    An element is accessed by
    base[index0*stride0 + index1*stride1 + index2*stride2]
    This gives good performance as this computation does not involve the
-   bounds of the array.  For packed arrays, this is simplified further by
+   bounds of the array.  For packed arrays, this is optimized further by
    substituting the known strides.
 
    This system has one problem: all array bounds must be withing 2^31 elements
    of the origin (2^63 on 64-bit machines).  For example
    integer, dimension (80000:90000, 80000:90000, 2) :: array
-   would not work properly on 32-bit machines because 80000*80000 > 2^31, so
-   the calculation for stride02 would overflow.
+   may not work properly on 32-bit machines because 80000*80000 > 2^31, so
+   the calculation for stride02 would overflow.  This may still work, but
+   I haven't checked and it relies on the overflow doing the right thing.
 
    The way to fix this problem is to access alements as follows:
    base[(index0-lbound0)*stride0 + (index1-lobound1)*stride1]
@@ -448,7 +458,53 @@ g95_build_array_type (tree type, g95_array_spec * as)
   return g95_get_array_type_bounds (type, as->rank, lbound, ubound);
 }
 
+/* Returns the struct descriptor_dimension type.  */
+static tree
+g95_get_desc_dim_type (void)
+{
+  tree type;
+  tree decl;
+  tree fieldlist;
+
+  if (g95_desc_dim_type)
+    return g95_desc_dim_type;
+
+  /* Build the type node.  */
+  type = make_node (RECORD_TYPE);
+
+  TYPE_NAME (type) = get_identifier ("descriptor_dimension");
+  TYPE_PACKED (type) = 1;
+
+  /* Consists of the stride, lbound and ubound members.  */
+  decl = build_decl (FIELD_DECL,
+                     get_identifier ("stride"),
+                     g95_array_index_type);
+  DECL_CONTEXT (decl) = type;
+  fieldlist = decl;
+
+  decl = build_decl (FIELD_DECL,
+                     get_identifier ("lbound"),
+                     g95_array_index_type);
+  DECL_CONTEXT (decl) = type;
+  fieldlist = chainon (fieldlist, decl);
+
+  decl = build_decl (FIELD_DECL,
+                     get_identifier ("ubound"),
+                     g95_array_index_type);
+  DECL_CONTEXT (decl) = type;
+  fieldlist = chainon (fieldlist, decl);
+
+  /* Finish off the type.  */
+  TYPE_FIELDS (type) = fieldlist;
+
+  g95_finish_type (type);
+
+  g95_desc_dim_type = type;
+  return type;
+}
+
 /* Build an array (descriptor) type with given bounds.  */
+/* TODO: remember and reuse array types.  */
 /*GCC ARRAYS*/
 tree
 g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
@@ -551,24 +607,17 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
   DECL_CONTEXT (decl) = fat_type;
   fieldlist = chainon (fieldlist, decl);
 
+  /* Add the rank component.  */
+  decl = build_decl (FIELD_DECL, get_identifier ("rank"),
+                     g95_array_index_type);
+  DECL_CONTEXT (decl) = fat_type;
+  fieldlist = chainon (fieldlist, decl);
+
   /* Build the array type for the stride and bound components.  */
-  arraytype = build_array_type (g95_array_index_type, build_range_type (
+  arraytype = build_array_type (g95_get_desc_dim_type (), build_range_type (
         g95_array_index_type, integer_zero_node, g95_rank_cst[dimen - 1]));
 
-  /* Add the stride component.  */
-  decl = build_decl (FIELD_DECL, get_identifier ("stride"), arraytype);
-  DECL_CONTEXT (decl) = fat_type;
-  DECL_INITIAL (decl) = NULL_TREE;
-  fieldlist = chainon (fieldlist, decl);
-
-  /* Add the lower bound component.  */
-  decl = build_decl (FIELD_DECL, get_identifier ("lbound"), arraytype);
-  DECL_CONTEXT (decl) = fat_type;
-  DECL_INITIAL (decl) = NULL_TREE;
-  fieldlist = chainon (fieldlist, decl);
-
-  /* Add the upper bound component.  */
-  decl = build_decl (FIELD_DECL, get_identifier ("ubound"), arraytype);
+  decl = build_decl (FIELD_DECL, get_identifier ("dim"), arraytype);
   DECL_CONTEXT (decl) = fat_type;
   DECL_INITIAL (decl) = NULL_TREE;
   fieldlist = chainon (fieldlist, decl);
@@ -1056,3 +1105,5 @@ g95_signed_or_unsigned_type (int unsignedp, tree type)
 
   return type;
 }
+
+#include "gt-f95-trans-types.h"
