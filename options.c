@@ -62,6 +62,7 @@ void g95_init_options(void) {
   g95_option.pedantic = 0;
   g95_option.surprising = 0;
   g95_option.aliasing = 0;
+  g95_option.unused_label = 0;
   g95_option.line_truncation = 0;
   g95_option.implicit_none = 0;
   g95_option.fixed_line_length = 72;
@@ -189,27 +190,32 @@ char *p;
   strcat(dir->path, "/");     /* make '/' last character */
 }
 
-/* Set the options for -Wall.  */
-static void g95_set_Wall (int on) {
 
-  g95_option.surprising = on;
-  g95_option.line_truncation = on;
-  g95_option.aliasing = on;
+/* set_Wall()-- Set the options for -Wall.  */
+
+static void set_Wall(void) {
+
+  g95_option.surprising = 1;
+  g95_option.line_truncation = 1;
+  g95_option.aliasing = 1;
+  g95_option.unused_label = 1;
 
 #ifdef IN_GCC
-  set_Wunused (on);
-  warn_return_type = on;
-  warn_switch = on;
+  set_Wunused(1);
+  warn_return_type = 1;
+  warn_switch = 1;
 
   /* We save the value of warn_uninitialized, since if they put
      -Wuninitialized on the command line, we need to generate a
      warning about not using it without also specifying -O.  */
 
-  if (warn_uninitialized != 1) warn_uninitialized = (on ? 2 : 0);
+  if (warn_uninitialized != 1) warn_uninitialized = 2;
 #endif
 }
 
-/* g95_parse_arg()-- Parse an argument on the command line. */
+
+/* g95_parse_arg()-- Parse an argument on the command line.  Returns
+ * the number of elements used in the argv array. */
 
 int g95_parse_arg(int argc, char *argv[]) {
 char *option;
@@ -250,7 +256,15 @@ int i;
     return 1;
   }
 
-  if (strcmp(option, "-Wall") == 0) g95_set_Wall(1);
+  if (strcmp(option, "-Wunused-label") == 0) {
+    g95_option.unused_label = 1;
+    return 1;
+  }
+
+  if (strcmp(option, "-Wall") == 0) {
+    set_Wall();
+    return 1;
+  }
 
   if (strcmp(option, "-fimplicit-none") == 0 ||
       strcmp(option, "-Wimplicit") == 0) {
@@ -359,14 +373,15 @@ int i;
     if (option[2] != '\0') {
       add_path(&g95_option.include_dirs, &option[2]);
       return 1;
-    } else {
-      if (argv[1][0] == '-') {
-	g95_status("g95: Directory required after -I\n");
-	exit(3);
-      }
-      add_path(&g95_option.include_dirs, argv[1]);
-      return 2;
     }
+
+    if (argv[1][0] == '-') {
+      g95_status("g95: Directory required after -I\n");
+      exit(3);
+    }
+
+    add_path(&g95_option.include_dirs, argv[1]);
+    return 2;
   }
 
   if (option[0] == '-' && option[1] == 'M') {
@@ -374,21 +389,23 @@ int i;
       g95_status("g95: Only one -M option allowed\n");
       exit(3);
     }
+
     if (option[2] != '\0') {
-      g95_option.module_dir = (char *)g95_getmem(strlen(&option[2])+2);
+      g95_option.module_dir = (char *) g95_getmem(strlen(&option[2])+2);
       strcpy(g95_option.module_dir, &option[2]);
       strcat(g95_option.module_dir, "/");
       return 1;
-    } else {
-      if (argv[1][0] == '-') {
-	g95_status("g95: Directory required after -M\n");
-	exit(3);
-      }
-      g95_option.module_dir = (char *)g95_getmem(strlen(argv[1])+2);
-      strcpy(g95_option.module_dir, argv[1]);
-      strcat(g95_option.module_dir, "/");
-      return 2;
     }
+
+    if (argv[1][0] == '-') {
+      g95_status("g95: Directory required after -M\n");
+      exit(3);
+    }
+
+    g95_option.module_dir = (char *) g95_getmem(strlen(argv[1])+2);
+    strcpy(g95_option.module_dir, argv[1]);
+    strcat(g95_option.module_dir, "/");
+    return 2;
   }
 
 #ifdef IN_GCC

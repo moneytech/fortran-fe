@@ -928,10 +928,10 @@ typedef struct g95_directorylist {
 
 typedef struct {
   char *source, *object;
-  int verbose, pedantic, surprising, aliasing, line_truncation, implicit_none,
-    fixed_line_length, module_access_private, fmode, dollar, q_kind,
-    quiet, r8, i8, d8, l1, pack_derived, max_stack_var_size, no_repack_arrays,
-    inline_repack_arrays;
+  int verbose, pedantic, surprising, aliasing, unused_label, line_truncation,
+    implicit_none, fixed_line_length, module_access_private, fmode, dollar,
+    q_kind, quiet, r8, i8, d8, l1, pack_derived, max_stack_var_size,
+    no_repack_arrays, inline_repack_arrays;
   g95_directorylist *include_dirs;
   char *module_dir;
   g95_source_form form;

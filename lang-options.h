@@ -30,6 +30,8 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
       N_("Same as -fimplicit-none") },
 { "-Wsurprising",
       N_("Warn about \"suspicious\" constructs") },
+{ "-Wunused-label",
+      N_("Warn when a label is unused") },
 { "-Wall",
       N_("Enable most warning messages") },
 { "-std=F",

@@ -2204,6 +2204,37 @@ symbol_attribute attr;
 }
 
 
+/* warn_unused_label()-- Warn about unused labels. */
+
+static void warn_unused_label(g95_namespace *ns){
+g95_st_label *l;
+
+  l = ns->st_labels;
+  if (l == NULL) return;
+
+  while(l->next)
+    l = l->next;
+  
+  for(; l; l=l->prev) {
+    if (l->defined == ST_LABEL_UNKNOWN) continue;
+
+    switch(l->referenced){
+    case ST_LABEL_UNKNOWN:
+      g95_warning("Label %d at %L defined but not used", l->value, &l->where);
+      break;
+
+    case ST_LABEL_BAD_TARGET:
+      g95_warning("Label %d at %L defined but cannot be used", l->value,
+		  &l->where);
+      break;
+
+    default:
+      break;
+    }
+  }
+}
+
+
 /* g95_resolve()-- This function is called after a complete program
  * unit has been compiled.  Its purpose is to examine all of the
  * expressions associated with a program unit, assign types to all
@@ -2253,6 +2284,9 @@ g95_data *d;
 
   cs_base = NULL;
   resolve_code(ns->code, ns);
+
+  /* Warn about unused labels */
+  if (g95_option.unused_label) warn_unused_label(ns);
 
   g95_current_ns = old_ns;
 }
