@@ -270,10 +270,13 @@ done:
 /* g95_match_array_ref()-- Match an array reference, whether it is the
  * whole array or a particular elements or a section. */
 
-match g95_match_array_ref(g95_array_ref *ar) {
+match g95_match_array_ref(g95_array_ref *ar, g95_array_spec *as) {
 match m;
 
+  memset(ar, '\0', sizeof(ar));
+
   ar->where = *g95_current_locus(); 
+  ar->as = as;
 
   if (g95_match(" (") != MATCH_YES) {
     ar->type = AR_FULL;
@@ -1125,7 +1128,6 @@ cleanup:
  * constructors without any iterators. */
 
 static try expand_constructor(g95_constructor *c) {
-g95_expr *e;
 
   for(; c; c=c->next) {
     if (c->iterator != NULL) {
@@ -1146,7 +1148,7 @@ g95_expr *e;
 	new_tail = new_tail->next;
       }
 
-      new_tail->where = e->where;
+      new_tail->where = c->where;
       new_tail->expr = g95_copy_expr(c->expr);
 
       if (g95_simplify_expr(new_tail->expr, 1) == FAILURE) return FAILURE;
@@ -1180,6 +1182,65 @@ try g95_expand_constructor(g95_constructor **cp) {
   return SUCCESS;
 }
 
+
+/* count_elements()-- Recursive functions to count the number of
+ * elements in a constructor.  If we hit an iterator, we give up and
+ * return -1.  */
+
+static int count_elements(g95_constructor *c) {
+g95_expr *e;
+int i, total;
+
+  total = 0;
+
+  for(; c; c=c->next) {
+    e = c->expr;
+    i = 0;
+
+    if (e != NULL) {
+      if (e->expr_type == EXPR_ARRAY)
+	i = count_elements(e->value.constructor);
+      else
+	i = 1;
+    } else if (c->iterator != NULL) i = -1;
+
+    if (i == -1) {
+      total = -1;
+      break;
+    }
+
+    total += i;
+  }
+
+  return total;
+}
+
+
+/* g95_size_constuctor()-- Given an expression node that represents an
+ * array constructor, attempt to figure out how large the array is.
+ * Constructors are always rank-1 arrays. */
+
+void g95_size_constructor(g95_expr *e) {
+g95_array_spec *as;
+int size;
+
+  size = count_elements(e->value.constructor);
+
+  if (e->as != NULL) g95_free_array_spec(e->as);
+
+  as = g95_get_array_spec();
+  e->as = as;
+
+  if (size == -1)
+    as->type = AS_UNKNOWN;
+  else {
+    as->type = AS_EXPLICIT;
+    as->rank = 1;
+
+    as->shape[0].lower = g95_int_expr(1);
+    as->shape[0].upper = g95_int_expr(size);
+  }    
+}
 
 
 /* resolve_array_list()-- Recursive array list resolution function.

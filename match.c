@@ -1857,14 +1857,13 @@ match m;
 
 /* match_variable() and its callees only check to see if a variable
  * has an array reference only if the variable already has the
- * dimension attribute.  Check for an array reference prior to
- * declaring the variable as an array. */
+ * dimension attribute.  We have to check for an array reference prior
+ * to declaring the variable as an array. */
 
       if (expr->ref == NULL && expr->symbol->attr.dimension == 0 &&
 	  expr->symbol->ts.type != BT_DERIVED) {
 
-	memset(&ar, '\0', sizeof(ar));
-	m = g95_match_array_ref(&ar);
+	m = g95_match_array_ref(&ar, NULL);
 	if (m == MATCH_ERROR) goto cleanup;
 
 	if (ar.type != AR_FULL) {

@@ -529,6 +529,7 @@ typedef struct g95_array_ref {
   ar_type type;
   int rank;
   locus where;
+  g95_array_spec *as;
 
   struct {
     locus where;         /* Need this because all expression can be NULL */
@@ -1234,7 +1235,7 @@ g95_array_spec *g95_copy_array_spec(g95_array_spec *);
 void g95_resolve_array_spec(g95_array_spec *);
 match g95_match_array_spec(g95_array_spec **);
 
-match g95_match_array_ref(g95_array_ref *);
+match g95_match_array_ref(g95_array_ref *, g95_array_spec *);
 try g95_resolve_array_ref(g95_array_ref *, g95_array_spec *);
 int g95_compare_array_spec(g95_array_spec *, g95_array_spec *);
 

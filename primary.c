@@ -1168,7 +1168,7 @@ match m;
     tail = extend_ref(primary, tail);
     tail->type = REF_ARRAY;
 
-    m = g95_match_array_ref(&tail->ar);
+    m = g95_match_array_ref(&tail->ar, primary->as);
     if (m != MATCH_YES) return m;
   }
 
@@ -1200,7 +1200,7 @@ match m;
       tail = extend_ref(primary, tail);
       tail->type = REF_ARRAY;
 
-      m = g95_match_array_ref(&tail->ar);
+      m = g95_match_array_ref(&tail->ar, component->as);
       if (m != MATCH_YES) return m;
     }
 
@@ -1657,14 +1657,16 @@ match m;
     return m;
   }
 
-/* Follow the reference list to see if there is an array at the end of
- * it all */
+/* Follow the reference list to see if there is an array section
+ * somewhere in it all (there can be only one) */
 
   for(ref=expr->ref; ref; ref=ref->next)
-    if (ref->type == REF_ARRAY) break;
+    if (ref->type == REF_ARRAY &&
+	(ref->ar.type == AR_SECTION || ref->ar.type == AR_FULL)) break;
 
   if (ref != NULL) { /* Convert array ref to an array spec */
-    
+
+
 
   }
 
