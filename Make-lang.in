@@ -72,8 +72,9 @@ G95_OBJS = $(G95_PARSER_OBJS) \
     f95/trans-stmt.o f95/trans-io.o f95/trans-array.o f95/trans-intrinsic.o
 
 G95_ADDITIONAL_OBJS = c-semantics.o c-pretty-print.o \
-	tree-cfg.o tree-dfa.o tree-optimize.o tree-ssa.o \
-	tree-ssa-pre.o tree-ssa-ccp.o tree-simple.o
+	tree-cfg.o tree-dfa.o tree-optimize.o tree-simple.o \
+	tree-ssa.o tree-ssa-pre.o tree-ssa-ccp.o disjoint-set.o \
+	tree-alias-ecr.o tree-alias-type.o tree-alias-steen.o
 
 # G95 uses GMP for its internal arithmetics.
 G95_LIBS = $(LIBS) -lgmp
