@@ -626,13 +626,6 @@ try g95_add_external(symbol_attribute *attr, locus *loc) {
 
   attr->external = 1;
 
-  if (attr->dummy) {
-    if (g95_add_flavor(attr, FL_DUMMY_PROC, loc) == FAILURE) return FAILURE;
-  } else {
-    if (g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
-    attr->scope = SCOPE_EXTERNAL;
-  }
-
   return check_conflict(attr, loc);
 }
 
@@ -641,14 +634,6 @@ try g95_add_intrinsic(symbol_attribute *attr, locus *loc) {
   if (check_used(attr, loc)) return FAILURE;
 
   attr->intrinsic = 1;
-
-  if (attr->dummy) {
-    if (g95_add_flavor(attr, FL_DUMMY_PROC, loc) == FAILURE) return FAILURE;
-  } else {
-    if (attr->flavor != FL_PROCEDURE &&
-	g95_add_flavor(attr, FL_PROCEDURE, loc) == FAILURE) return FAILURE;
-    attr->scope = SCOPE_INTRINSIC;
-  }
 
   return check_conflict(attr, loc);
 }
