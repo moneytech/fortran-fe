@@ -40,4 +40,32 @@ tree g95_trans_deferred_array (g95_symbol *, tree);
 /* Generate scalarization information for an expression.  */
 g95_ss * g95_walk_expr (g95_ss *, g95_expr *);
 
+/* Add the pre and post chains from an SS chain to a loopinfo.  */
+void g95_add_ss_stmts (g95_loopinfo *, g95_ss *);
+/* Reverse a SS chain.  */
+g95_ss * g95_reverse_ss (g95_ss *);
+
+/* Calculates the lower bound and stride of array sections.  */
+void g95_conv_ss_startstride (g95_loopinfo *);
+
+void g95_init_loopinfo (g95_loopinfo *);
+void g95_copy_loopinfo_to_se (g95_se *, g95_loopinfo *);
+
+/* Generates the actual loops for a scalarized expression.  */
+tree g95_trans_scalarizing_loops (g95_loopinfo *, tree);
+/* Initialise the scalarization loop parameters.  */
+void g95_conv_loopvars (g95_loopinfo *);
+
+/* Translate an array reference.  */
+void g95_conv_array_index_ref (g95_se *, tree, tree *, int);
+
+/* Return either an INT_CST or a COMPONENT_REF. */
+tree g95_conv_array_stride (tree, int);
+tree g95_conv_array_lbound (tree, int);
+tree g95_conv_array_ubound (tree, int);
+
+/* The remaining space available for stack variables.  */
+extern unsigned HOST_WIDE_INT g95_stack_space_left;
+/* Returns true if a variable of specified size should go on the stack.  */
+int g95_can_put_var_on_stack (tree);
 

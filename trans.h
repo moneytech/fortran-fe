@@ -29,10 +29,8 @@ Boston, MA 02111-1307, USA.  */
 typedef struct g95_se
 {
   /* two chains of *_STMT trees */
-  tree pre;
-  tree pre_tail;
-  tree post;
-  tree post_tail;
+  tree pre, pre_tail;
+  tree post, post_tail;
 
   /* the result of the expression */
   tree expr;
@@ -45,8 +43,8 @@ typedef struct g95_se
      scalarizing variables have been setup, it will throw an error.
      Setting this also causes the pointer for non array POINTER or ALLOCATABLE
      variables to be returned, rather than the value.  */
-  int descriptor_only;
-  int want_pointer;
+  unsigned descriptor_only:1;
+  unsigned want_pointer:1;
 
   /* Scalarization parameters.  */
   struct g95_se *parent;
@@ -61,10 +59,17 @@ typedef struct g95_se
    indicates to g95_conv_* that this should be a scalar expression.  */
 typedef struct g95_ss_info
 {
+  /* The ref that holds information on this section.  */
   g95_ref *ref;
+  /* The descriptor of this array.  */
   tree descriptor;
+  /* holds the pointer to the data array.  */
   tree data;
   tree pdata;
+  /* holds the SS for a vector subscript.  */
+  struct g95_ss *vector[G95_MAX_DIMENSIONS];
+  /* stride and delta are used to acces this inside a scalarization loop.
+     start is used in the calculation of these.  */
   tree start[G95_MAX_DIMENSIONS];
   tree stride[G95_MAX_DIMENSIONS];
   tree delta[G95_MAX_DIMENSIONS];
@@ -98,6 +103,9 @@ extern g95_ss *g95_ss_terminator;
 /* Holds information about an expression while it is being scalarized.  */
 typedef struct g95_loopinfo
 {
+  tree pre, pre_tail;
+  tree post, post_tail;
+
   int dimen;
 
   g95_ss *ss;
@@ -111,15 +119,9 @@ typedef struct g95_loopinfo
   /* Order in which the dimensions should be looped, innermost first.  */
   int order[G95_MAX_DIMENSIONS];
 
-  tree pre, pre_tail;
-  tree post, post_tail;
+  /* If set we don't need the loop variables.  */
+  unsigned array_parameter:1;
 } g95_loopinfo;
-
-/* See g95_build_array_type
-   1 = Type A
-   0 = Type B
-   This should not be changed during compilation.  */
-extern int g95_use_gcc_arrays;
 
 /* Advance the SS chain to the next term.  */
 void g95_advance_se_ss_chain (g95_se *);
@@ -144,11 +146,8 @@ void g95_add_stmt_to_list(tree *, tree *, tree, tree);
 /* create a temporary variable in the current scope.  */
 tree g95_create_tmp_var(tree);
 
-/* create a temporary variable, but do NOT put it in the current scope.  */
-tree g95_create_tmp_alias_var(tree);
-
 /* store the result of an expression on a temp variable so it can be used
- * repeatedly even if the original changes */
+   repeatedly even if the original changes */
 void g95_make_safe_expr(g95_se * se);
 
 /* Makes sure se is suitable for passing as a function string parameter.  */
@@ -235,8 +234,11 @@ tree g95_get_symbol_decl (g95_symbol *);
 /* Advance along a TREE_CHAIN.  */
 tree g95_advance_chain (tree, int);
 
-/* Helper routine for constant folding.  */
+/* Helper routine for constant folding.  Please read comments above
+   declaration in trans.c to avoid subtle bugs.  */
 tree g95_simple_fold(tree, tree *, tree *, tree *);
+/* Safer version of the above.  */
+tree g95_simple_fold_tmp(tree, tree *, tree *, tree *);
 
 /* Generate the code for a function.  */
 void g95_generate_function_code (g95_namespace *);
@@ -278,7 +280,6 @@ extern struct g95_io_fndecl_t g95_io_fndecls[GFORIO_NUM_FNDECLS];
 /* Runtime library function decls.  */
 extern GTY(()) tree g95_fndecl_push_context;
 extern GTY(()) tree g95_fndecl_pop_context;
-extern GTY(()) tree g95_fndecl_array_mismatch;
 extern GTY(()) tree g95_fndecl_internal_malloc;
 extern GTY(()) tree g95_fndecl_internal_malloc64;
 extern GTY(()) tree g95_fndecl_internal_free;
@@ -286,6 +287,8 @@ extern GTY(()) tree g95_fndecl_allocate;
 extern GTY(()) tree g95_fndecl_allocate64;
 extern GTY(()) tree g95_fndecl_deallocate;
 extern GTY(()) tree g95_fndecl_stop;
+extern GTY(()) tree g95_fndecl_runtime_error;
+extern GTY(()) tree g95_fndecl_repack[G95_MAX_DIMENSIONS];
 
 /* String functions.  */
 extern GTY(()) tree g95_fndecl_copy_string;
@@ -315,9 +318,12 @@ struct lang_type GTY (())
 struct lang_decl GTY (())
 {
   tree stringlength;
+  tree saved_descriptor;
 };
 
 #define G95_DECL_STRING_LENGTH(node) (DECL_LANG_SPECIFIC(node)->stringlength)
+#define G95_DECL_SAVED_DESCRIPTOR(node) \
+  (DECL_LANG_SPECIFIC(node)->saved_descriptor)
 #define G95_DECL_STRING(node) DECL_LANG_FLAG_0(node)
 #define G95_DECL_PACKED_ARRAY(node) DECL_LANG_FLAG_1(node)
 #define G95_DECL_PARTIAL_PACKED_ARRAY(node) DECL_LANG_FLAG_2(node)
@@ -334,7 +340,7 @@ struct lang_decl GTY (())
 #define G95_TYPE_DESCRIPTOR_SIZE(node) (TYPE_LANG_SPECIFIC(node)->size)
 
 /* I changed this from sorry(...) because it should not return.  */
-/* TODO: Removed g95_todo_error before releasing g95.  */
+/* TODO: Remove g95_todo_error before releasing g95.  */
 #define g95_todo_error(args...) fatal_error("g95_todo: Not Implemented: " args)
 
 #endif /* G95_TRANS_H */

@@ -206,25 +206,6 @@ convert_and_check (type, expr)
   return t;
 }
 
-/** Create a new temporary variable declaration of type TYPE.  Returns the
-    newly created decl and pushes it into the current binding.  */
-
-tree
-create_tmp_var (type)
-     tree type;
-{
-  return g95_create_tmp_var (type);
-}
-
-/*  Create a new temporary alias variable declaration of type TYPE.  Returns the
-    newly created decl. Does NOT push it into the current binding.  */
-tree
-create_tmp_alias_var (type)
-     tree type;
-{
-  return g95_create_tmp_alias_var (type);
-}
-
 /** Declares all the variables in VARS in SCOPE.  Returns the last
     DECL_STMT emitted.  */
 

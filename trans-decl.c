@@ -56,7 +56,6 @@ static GTY (()) tree saved_function_decls = NULL_TREE;
 /* Function declarations for builtin library functions.  */
 tree g95_fndecl_push_context;
 tree g95_fndecl_pop_context;
-tree g95_fndecl_array_mismatch;
 tree g95_fndecl_internal_malloc;
 tree g95_fndecl_internal_malloc64;
 tree g95_fndecl_internal_free;
@@ -64,6 +63,8 @@ tree g95_fndecl_allocate;
 tree g95_fndecl_allocate64;
 tree g95_fndecl_deallocate;
 tree g95_fndecl_stop;
+tree g95_fndecl_runtime_error;
+tree g95_fndecl_repack[G95_MAX_DIMENSIONS];
 
 /* String functions.  */
 tree g95_fndecl_copy_string;
@@ -283,6 +284,62 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
     TREE_STATIC (decl) = 1;
 }
 
+/* Get a temporary decl for a dummy array parameter.  */
+static tree
+g95_build_packed_array_decl (g95_symbol * sym)
+{
+  tree decl;
+  tree type;
+  tree stmt;
+  char *name;
+
+  type = TREE_TYPE (sym->backend_decl);
+  assert (TREE_CODE (sym->backend_decl) == PARM_DECL
+         && TREE_CODE (type) == REFERENCE_TYPE);
+  type = TREE_TYPE (type);
+  assert (G95_DESCRIPTOR_TYPE_P (type));
+  ASM_FORMAT_PRIVATE_NAME (name,
+      IDENTIFIER_POINTER (DECL_NAME (sym->backend_decl)), 0);
+  decl = build_decl (VAR_DECL, get_identifier (name), type);
+  DECL_ARTIFICIAL (decl) = 1;
+  TREE_PUBLIC (decl) = 0;
+  TREE_STATIC (decl) = 0;
+  DECL_EXTERNAL (decl) = 0;
+
+  if (sym->as->type == AS_DEFERRED
+      && ! (sym->attr.pointer || sym->attr.dimension))
+    internal_error("possible g95 frontend bug: deferred shape dummy array");
+
+  if (! g95_option.no_repack_arrays)
+    {
+      if (sym->as->type == AS_EXPLICIT)
+        G95_DECL_PACKED_ARRAY (decl) = 1;
+      else
+        G95_DECL_PARTIAL_PACKED_ARRAY (decl) = 1;
+    }
+
+  if (DECL_LANG_SPECIFIC (sym->backend_decl))
+    DECL_LANG_SPECIFIC (decl) = DECL_LANG_SPECIFIC (sym->backend_decl);
+  else
+    {
+      DECL_LANG_SPECIFIC (decl) = (struct lang_decl *)
+        ggc_alloc_cleared (sizeof (struct lang_decl));
+    }
+  G95_DECL_SAVED_DESCRIPTOR (decl) = sym->backend_decl;
+  G95_DECL_STRING (decl) = G95_DECL_STRING (sym->backend_decl);
+
+  sym->tlink = sym->ns->proc_name->tlink;
+  sym->ns->proc_name->tlink = sym;
+
+  stmt = build_stmt (DECL_STMT, decl);
+  TREE_CHAIN (stmt) = saved_function_decls;
+  saved_function_decls = stmt;
+
+  sym->backend_decl = decl;
+
+  return decl;
+}
+
 /* Return the decl for a g95_symbol, create it if it doesn't already
    exist.  */
 tree
@@ -293,9 +350,16 @@ g95_get_symbol_decl (g95_symbol * sym)
 
   if (sym->attr.dummy)
     {
-      /* Dummy variables should already have been created.  */
       assert (sym->backend_decl);
+      if (sym->attr.dimension
+          && ! (sym->attr.pointer || sym->attr.allocatable)
+          && TREE_CODE (sym->backend_decl) == PARM_DECL)
+        {
+          return g95_build_packed_array_decl (sym);
+        }
+      /* Dummy variables should already have been created.  */
       TREE_USED (sym->backend_decl) = 1;
+      return sym->backend_decl;
     }
 
   if (sym->backend_decl)
@@ -708,71 +772,9 @@ g95_build_io_library_fndecls (void)
     }
 }
 
-/* Make prototypes for runtime library functions.  */
-void
-g95_build_builtin_function_decls (void)
+static void
+g95_build_intrinsic_function_decls (void)
 {
-  g95_fndecl_internal_malloc = g95_build_library_function_decl (
-            get_identifier ("__g95_internal_malloc"),
-            void_type_node,
-            2,
-            ppvoid_type_node,
-            g95_int4_type_node);
-
-  g95_fndecl_internal_malloc64 = g95_build_library_function_decl (
-            get_identifier ("__g95_internal_malloc64"),
-            void_type_node,
-            2,
-            ppvoid_type_node,
-            g95_int8_type_node);
-
-  g95_fndecl_internal_free = g95_build_library_function_decl (
-            get_identifier ("__g95_internal_free"),
-            void_type_node,
-            1,
-            ppvoid_type_node);
-
-  g95_fndecl_push_context = g95_build_library_function_decl (
-            get_identifier ("__g95_push_context"),
-            void_type_node,
-            0);
-
-  g95_fndecl_pop_context = g95_build_library_function_decl (
-            get_identifier ("__g95_pop_context"),
-            void_type_node,
-            0);
-
-  g95_fndecl_array_mismatch = g95_build_library_function_decl (
-            get_identifier ("__g95_array_mismatch"),
-            void_type_node,
-            0);
-
-  g95_fndecl_allocate = g95_build_library_function_decl (
-            get_identifier ("__g95_allocate"),
-            void_type_node,
-            2,
-            ppvoid_type_node,
-            g95_int4_type_node);
-
-  g95_fndecl_allocate64 = g95_build_library_function_decl (
-            get_identifier ("__g95_allocate64"),
-            void_type_node,
-            2,
-            ppvoid_type_node,
-            g95_int8_type_node);
-
-  g95_fndecl_deallocate = g95_build_library_function_decl (
-            get_identifier ("__g95_deallocate"),
-            void_type_node,
-            1,
-            ppvoid_type_node);
-
-  g95_fndecl_stop = g95_build_library_function_decl (
-            get_identifier ("__g95_stop"),
-            void_type_node,
-            1,
-            g95_int4_type_node);
-
   /* String functions.  */
   g95_fndecl_copy_string =
     g95_build_library_function_decl (get_identifier ("__g95_copy_string"),
@@ -806,7 +808,88 @@ g95_build_builtin_function_decls (void)
     g95_build_library_function_decl (get_identifier ("_gforio_write_character"),
                                     void_type_node,
                                     2, g95_strlen_type_node, pchar_type_node);
+}
 
+/* Make prototypes for runtime library functions.  */
+void
+g95_build_builtin_function_decls (void)
+{
+  int n;
+
+  g95_fndecl_internal_malloc = g95_build_library_function_decl (
+            get_identifier ("__g95_internal_malloc"),
+            void_type_node,
+            2,
+            ppvoid_type_node,
+            g95_int4_type_node);
+
+  g95_fndecl_internal_malloc64 = g95_build_library_function_decl (
+            get_identifier ("__g95_internal_malloc64"),
+            void_type_node,
+            2,
+            ppvoid_type_node,
+            g95_int8_type_node);
+
+  g95_fndecl_internal_free = g95_build_library_function_decl (
+            get_identifier ("__g95_internal_free"),
+            void_type_node,
+            1,
+            ppvoid_type_node);
+
+  g95_fndecl_push_context = g95_build_library_function_decl (
+            get_identifier ("__g95_push_context"),
+            void_type_node,
+            0);
+
+  g95_fndecl_pop_context = g95_build_library_function_decl (
+            get_identifier ("__g95_pop_context"),
+            void_type_node,
+            0);
+
+  g95_fndecl_allocate = g95_build_library_function_decl (
+            get_identifier ("__g95_allocate"),
+            void_type_node,
+            2,
+            ppvoid_type_node,
+            g95_int4_type_node);
+
+  g95_fndecl_allocate64 = g95_build_library_function_decl (
+            get_identifier ("__g95_allocate64"),
+            void_type_node,
+            2,
+            ppvoid_type_node,
+            g95_int8_type_node);
+
+  g95_fndecl_deallocate = g95_build_library_function_decl (
+            get_identifier ("__g95_deallocate"),
+            void_type_node,
+            1,
+            ppvoid_type_node);
+
+  g95_fndecl_stop = g95_build_library_function_decl (
+            get_identifier ("__g95_stop"),
+            void_type_node,
+            1,
+            g95_int4_type_node);
+
+  g95_fndecl_runtime_error =
+    g95_build_library_function_decl (get_identifier ("__g95_runtime_error"),
+                                    void_type_node,
+                                    1,
+                                    pchar_type_node);
+
+  for (n = 0; n < G95_MAX_DIMENSIONS; n++)
+    {
+      char name[16];
+      sprintf (name, "__g95_repack_%d", n);
+      g95_fndecl_repack[n] =
+        g95_build_library_function_decl (get_identifier (name),
+                                        void_type_node,
+                                        3, ppvoid_type_node, ppvoid_type_node,
+                                        g95_int4_type_node);
+    }
+
+  g95_build_intrinsic_function_decls ();
   g95_build_io_library_fndecls ();
 }
 
@@ -942,7 +1025,6 @@ g95_generate_function_code (g95_namespace * ns)
   tree body;
   tree result;
   g95_symbol *sym;
-  g95_formal_arglist *f;
 
   old_context = current_function_decl;
 
@@ -1002,16 +1084,6 @@ g95_generate_function_code (g95_namespace * ns)
                       build_stmt (LABEL_STMT, current_function_return_label));
     }
 
-  /* Add array parameters to the list of arrays which need cleanup.  */
-  for (f = sym->formal ; f ; f = f->next)
-    {
-      if (f->sym->attr.dimension && TREE_USED (f->sym->backend_decl))
-        {
-          assert (f->sym->tlink == NULL);
-          f->sym->tlink = sym->tlink;
-          sym->tlink = f->sym;
-        }
-    }
   /* Add code to create and cleanup arrays.  */
   if (sym->tlink != NULL)
     {

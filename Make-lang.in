@@ -198,7 +198,7 @@ check-f95-fix: force
 # Everything depends on g95.h
 $(G95_PARSER_OBJS): f95/g95.h
 
-f95/f95-lang.o: f95/g95.h
+f95/f95-lang.o: f95/g95.h f95/trans.h
 f95/support.o: f95/g95.h
 f95/convert.o: f95/g95.h
 f95/trans.o: f95/g95.h f95/trans.h

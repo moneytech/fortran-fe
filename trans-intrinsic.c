@@ -58,6 +58,30 @@ g95_conv_intrinsic_conversion (g95_se * se, g95_expr * expr,
   g95_conv_simple_val_type (se, expr->value.function.actual->expr, type);
 }
 
+static void
+g95_conv_builtin_function (g95_se * se, g95_expr * expr,
+                          g95_intrinsic_sym * isym, int code)
+{
+  tree fndecl;
+  g95_actual_arglist *actual;
+  tree args;
+  tree type;
+  g95_se argse;
+
+  fndecl = built_in_decls[code];
+  args = NULL_TREE;
+  for (actual = expr->value.function.actual; actual; actual = actual->next)
+    {
+      g95_init_se (&argse, se);
+      type = g95_typenode_for_spec (&isym->ts);
+      g95_conv_simple_val_type (&argse, actual->expr, type);
+      g95_add_stmt_to_pre (se, argse.pre, argse.pre_tail);
+      g95_add_stmt_to_post (se, argse.post, argse.post_tail);
+
+      args = g95_chainon_list (args, argse.expr);
+    }
+  se->expr = g95_build_function_call (fndecl, args);
+}
 
 void
 g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
@@ -69,6 +93,10 @@ g95_conv_intrinsic_function (g95_se * se, g95_expr * expr)
     {
       g95_conv_intrinsic_conversion (se, expr, isym);
       return;
+    }
+  else if (strcmp (isym->lib_name, "sin") == 0)
+    {
+      g95_conv_builtin_function (se, expr, isym, BUILT_IN_SIN);
     }
 
   g95_todo_error ("Intrinsic function: %s", isym->name);

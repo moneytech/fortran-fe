@@ -48,6 +48,7 @@ Boston, MA 02111-1307, USA.  */
 #include "g95.h"
 #include "trans.h"
 #include "trans-types.h"
+#include "trans-const.h"
 #include "g95-support.h"
 
 /* Language-dependent contents of an identifier.  */
@@ -328,16 +329,6 @@ g95_init (const char *filename)
       filename = "";
     }
 
-  if (g95_use_gcc_arrays)
-    {
-      /* Setting this will use the GCC ARRAY_TYPE to implement arrays.
-         This isn't really fleible enough for what we want, and generated
-         poor good code for assumed/deferred size arrays of rank > 1.
-         It's some time since I looked at this code, so it might not work any
-         more.  */
-      internal_error ("Only use this if you know what you are doing");
-    }
-
   g95_option.source = (char *) filename;
   g95_init_1 ();
 
@@ -345,10 +336,10 @@ g95_init (const char *filename)
 
   g95_build_builtin_function_decls ();
 
+  g95_init_string_constants ();
+
   if (g95_new_file (g95_option.source, g95_option.form) != SUCCESS)
-    {
-      return (NULL);
-    }
+    return (NULL);
 
   return filename;
 }

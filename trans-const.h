@@ -25,3 +25,8 @@ tree g95_conv_mpz_to_tree (mpz_t i, int kind);
 /* only really for use by g95_trans_simple_expr */
 void g95_conv_constant (g95_se *, g95_expr *);
 
+/* Initialise the string constants.  */
+void g95_init_string_constants (void);
+
+/* Strinng constants.  */
+extern GTY(()) tree g95_strconst_bounds;

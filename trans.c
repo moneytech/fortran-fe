@@ -49,11 +49,6 @@ Boston, MA 02111-1307, USA.  */
    Coding conventions for backend interface code:
    GNU Coding Standard + GCC extensions.  */
 
-/* See g95_build_array_type
-   1 = Type A
-   0 = Type B */
-int g95_use_gcc_arrays = 0;
-
 /* Advance along a TREE_CHAIN n times.  */
 tree
 g95_advance_chain (tree t, int n)
@@ -107,50 +102,67 @@ g95_make_type_writable (tree t)
     }
 }
 
-/* Create a temporary variable.  Note that it may be used for small array
-   temporaries.  Also used for array descriptors.  Be careful when you call
-   this as the temporary is added to the current scope.  It is only valid
-   inside the g95_start/finish_stmt pair in which it is created.  */
+/* Strip off a legitimate source ending from the input string NAME of
+   length LEN.  Rather than having to know the names used by all of
+   our front ends, we strip off an ending of a period followed by
+   up to five characters.  (Java uses ".class".)  */
+
+static inline void
+remove_suffix (name, len)
+     char *name;
+     int len;
+{
+  int i;
+
+  for (i = 2;  i < 8 && len > i;  i++)
+    {
+      if (name[len - i] == '.')
+	{
+	  name[len - i] = '\0';
+	  break;
+	}
+    }
+}
+
+/** Create a new temporary variable declaration of type TYPE.  Returns the
+    newly created decl and pushes it into the current binding.  */
 tree
-g95_create_tmp_var (tree type)
+create_tmp_var (tree type, const char * prefix)
 {
   tree tmp_var;
 
-  /* Get the tempoary. */
-  tmp_var = g95_create_tmp_var (type);
-  
-  /* Put the new variable in the current scope.  */
+  /* Get a temporary.  */
+  tmp_var = create_tmp_alias_var (type, prefix);
+
+  /* Add it to the current scope.  */
   pushdecl (tmp_var);
 
   return tmp_var;
 }
 
-/* Like g95_create_tmp_var() but don't add the decl to the current scope.  */
+/*  Create a new temporary alias variable declaration of type TYPE.  Returns the
+    newly created decl. Does NOT push it into the current binding.  */
 tree
-g95_create_tmp_alias_var (tree type)
+create_tmp_alias_var (tree type, const char * prefix)
 {
-  static unsigned int tmp_num = 1; /* 2^32 temporaries should be enough.  */
-  tree tmp_var;
+  static unsigned int id_num = 1;
   char *tmp_name;
+  char *preftmp = NULL;
+  tree tmp_var;
 
-  /* Build the name of this temporary.  */
-  ASM_FORMAT_PRIVATE_NAME (tmp_name, "T", tmp_num++);
+  if (prefix)
+    {
+      preftmp = ASTRDUP (prefix);
+      remove_suffix (preftmp, strlen (preftmp));
+      prefix = preftmp;
+    }
 
-  /* Build the temporary variable tree node. */
+  ASM_FORMAT_PRIVATE_NAME (tmp_name, (prefix ? prefix : "T"), id_num++);
+
   tmp_var = build_decl (VAR_DECL, get_identifier (tmp_name), type);
 
-  /* The variable was locally declared by the compiler.  */
-  DECL_ARTIFICIAL (tmp_var)=1;
-  DECL_EXTERNAL (tmp_var)=0;
-
-  /* The declaration is local to this file and this scope.  */
-  TREE_PUBLIC (tmp_var) = 0;
-  /* We don't need static storage (ie. stack is OK).  */
-  TREE_STATIC (tmp_var) = 0;
-
-  /* Assuming we're sane, this variable wasn't required by the
-     compiler just to fill the scope ;-)  */
-  TREE_USED (tmp_var) = 1;
+  /* The variable was declared by the compiler.  */
+  DECL_ARTIFICIAL (tmp_var) = 1;
 
   /* Make the variable writable.  */
   TREE_READONLY (tmp_var) = 0;
@@ -158,14 +170,30 @@ g95_create_tmp_alias_var (tree type)
   /* Make the type of the variable writable.  */
   g95_make_type_writable (tmp_var);
 
+  DECL_EXTERNAL (tmp_var) = 0;
+  TREE_STATIC (tmp_var) = 0;
+  TREE_USED (tmp_var) = 1;
+
+
   return tmp_var;
+}
+
+/* Create a temporary variable.  Note that it may be used for small array
+   temporaries.  Also used for array descriptors.  Be careful when you call
+   this as the temporary is added to the current scope.  It is only valid
+   inside the g95_start/finish_stmt pair in which it is created.  */
+tree
+g95_create_tmp_var (tree type)
+{
+  return create_tmp_var (type, NULL);
 }
 
 /* SIMPLE constant folding helper, returns a simple_val.  If tmpvar does
    not point to an existing temporary a new one will be created as neccessary.
-   The expression should already be a simple_rhs.  */
+   The expression should already be a simple_rhs.  Use with tmpvar=NULL is
+   safe.  Care must be taken when reusing temporary variables.  See below.  */
 tree
-g95_simple_fold(tree expr, tree * phead, tree * ptail, tree *tmpvar)
+g95_simple_fold(tree expr, tree * phead, tree * ptail, tree * tmpvar)
 {
   tree tmp;
   tree var;
@@ -175,6 +203,65 @@ g95_simple_fold(tree expr, tree * phead, tree * ptail, tree *tmpvar)
 
   tmp = fold (expr);
   if (is_simple_val (tmp))
+    return tmp;
+
+  if (! is_simple_rhs (expr))
+      warning ("Internal inconsistancy: fold broke SIMPLE");
+
+  if (tmpvar != NULL)
+    {
+      var = *tmpvar;
+      assert (var == NULL_TREE || TREE_CODE (var) == VAR_DECL);
+    }
+  else
+    var = NULL_TREE;
+
+  if (var == NULL_TREE)
+    {
+      var = g95_create_tmp_var (TREE_TYPE (tmp));
+      if (tmpvar != NULL)
+        *tmpvar = var;
+    }
+
+  tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), var, tmp);
+  stmt = build_stmt (EXPR_STMT, tmp);
+  g95_add_stmt_to_list (phead, ptail, stmt, stmt);
+
+  return var;
+}
+
+static int
+g95_is_artificial_decl (tree t)
+{
+  if (TREE_CODE (t) == NON_LVALUE_EXPR)
+    t = TREE_OPERAND (t, 0);
+  return (DECL_ARTIFICIAL (t));
+}
+
+/* Like g95_simple_fold, but will not return annother temporary variable.
+   Used when the value of the operands may change before the result is used.
+
+   eg:
+    tmp1 = 2;
+    tmp2 = fold_tmp (tmp1 * 1); // folds to assign(tmp2, tmp1), not tmp2=>tmp1
+    tmp1 = 3;
+    tmp2 = tmp2 + tmp1;
+   This situation can easily happen inside loops.
+   if g95_simple_fold was used, the final value of tmp would be 3, not 5.  */
+tree
+g95_simple_fold_tmp(tree expr, tree * phead, tree * ptail, tree * tmpvar)
+{
+  tree tmp;
+  tree var;
+  tree stmt;
+
+  assert (is_simple_rhs (expr));
+
+  tmp = fold (expr);
+  if (is_simple_val (tmp)
+      && (is_simple_const (tmp)
+          || tmp == *tmpvar
+          || ! g95_is_artificial_decl (tmp)))
     return tmp;
 
   if (! is_simple_rhs (expr))
@@ -243,7 +330,7 @@ g95_finish_se_stmt (g95_se * se)
   /* Check we haven't been called with an incomplete expression.  */
   assert (se->post == NULL_TREE);
   /* Should never happen.  */
-  assert (se->pre != NULL_TREE);
+  assert (se->pre != NULL_TREE && TREE_CHAIN (se->pre_tail) == NULL_TREE);
 
   decls = getdecls();
   if (decls != NULL_TREE)
@@ -261,16 +348,19 @@ g95_finish_se_stmt (g95_se * se)
 tree
 g95_finish_stmt (tree body, tree tail)
 {
-  tree  decl;
-  tree  stmt;
-  tree  block;
-  tree  head;
+  tree decl;
+  tree stmt;
+  tree block;
+  tree head;
+  tree next;
 
   head = stmt = build_stmt (SCOPE_STMT, NULL_TREE);
 
   SCOPE_BEGIN_P (stmt) = 1;
-  for (decl = getdecls () ; decl ; decl = TREE_CHAIN (decl))
+  for (decl = getdecls () ; decl ; decl = next)
     {
+      next = TREE_CHAIN (decl);
+      TREE_CHAIN (decl) = NULL_TREE;
       TREE_CHAIN (stmt) = build_stmt (DECL_STMT, decl);
       stmt = TREE_CHAIN (stmt);
     }
@@ -280,11 +370,12 @@ g95_finish_stmt (tree body, tree tail)
   TREE_CHAIN (stmt) = body;
 
   if (tail == NULL_TREE)
-    tail = stmt;
-  else
-    assert (TREE_CHAIN (tail) == NULL_TREE);
-  while (TREE_CHAIN (tail))
-    tail = TREE_CHAIN (tail);
+    {
+      tail = stmt;
+      while (TREE_CHAIN (tail))
+        tail = TREE_CHAIN (tail);
+    }
+  assert (TREE_CHAIN (tail) == NULL_TREE);
 
   /* Empty scope.  */
   if (TREE_CHAIN (head) == NULL_TREE)
@@ -624,21 +715,5 @@ g95_generate_module_code (g95_namespace * ns)
       g95_get_function_decl (n->proc_name);
       g95_generate_function_code (n);
     }
-}
-
-void
-g95_simple_convert (g95_se * se, tree type, tree * pvar)
-{
-  tree val;
-  tree tmp;
-
-  assert (is_simple_val (se->expr));
-
-  se->expr = convert (type, se->expr);
-
-  if (! is_simple_rhs (se->expr))
-    internal_error ("Convert broke SIMPLE");
-  if (! is_simple_val (se->expr))
-    se->expr = g95_simple_fold (se->expr, &se->pre, &se->pre_tail, pvar);
 }
 

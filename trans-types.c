@@ -303,23 +303,6 @@ g95_typenode_for_spec (g95_typespec * spec)
   return basetype;
 }
 
-/* Used for array boundaries.  Returns either a constant or a placeholder
-   for the specified field.  The C pretty-printer doesn't know about arrays
-   with non-constant bounds, or about placeholders.  The SIMPLE tree expander
-   does though, so the correct assembly is generated.  */
-static tree
-g95_build_spec_expr (tree expr, tree field)
-{
-  tree placeholder;
-
-  if (expr != NULL_TREE)
-    return expr;
-
-  assert (g95_use_gcc_arrays);
-  placeholder = build (PLACEHOLDER_EXPR, TREE_TYPE (DECL_CONTEXT (field)));
-  return build (COMPONENT_REF, g95_array_index_type, placeholder, field);
-}
-
 static tree
 g95_conv_array_bound (g95_expr * expr)
 {
@@ -334,6 +317,7 @@ g95_conv_array_bound (g95_expr * expr)
 /* Return a structure type for saving descriptors of specified rank.
    We need one member for each dimension. Type B arrays also need to
    store the data member. */
+/*GCC ARRAYS*/
 tree
 g95_get_descriptorsave_type(int rank)
 {
@@ -351,24 +335,21 @@ g95_get_descriptorsave_type(int rank)
   TYPE_PACKED (typenode) = g95_option.pack_derived;
 
   fieldlist = NULL_TREE;
-  /* Add a data field for Type B descriptors.  */
-  if (! g95_use_gcc_arrays)
-    {
-      field = build_decl (FIELD_DECL,
-			  get_identifier ("data"),
-			  build_pointer_type (void_type_node));
 
-      DECL_CONTEXT (field) = typenode;
-      DECL_PACKED (field) |= TYPE_PACKED (typenode);
-      DECL_INITIAL (field) = 0;
+  field = build_decl (FIELD_DECL,
+                      get_identifier ("data"),
+                      build_pointer_type (void_type_node));
 
-      DECL_ALIGN (field) = 0;
-      DECL_USER_ALIGN (field) = 0;
+  DECL_CONTEXT (field) = typenode;
+  DECL_PACKED (field) |= TYPE_PACKED (typenode);
+  DECL_INITIAL (field) = 0;
 
-      TREE_CHAIN (field) = NULL_TREE;
+  DECL_ALIGN (field) = 0;
+  DECL_USER_ALIGN (field) = 0;
 
-      fieldlist = chainon (fieldlist, field);
-    }
+  TREE_CHAIN (field) = NULL_TREE;
+
+  fieldlist = chainon (fieldlist, field);
 
   /* Add the delta fields.  */
   for (n = 0 ; n < rank ; n++)
@@ -482,12 +463,11 @@ g95_get_base_component (tree type)
 {
   tree field;
 
-  assert (! g95_use_gcc_arrays);
   assert (G95_DESCRIPTOR_TYPE_P (type));
 
   field = g95_advance_chain (TYPE_FIELDS (type), 1);
   assert (field != NULL_TREE
-          &&TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
+          && TREE_CODE (TREE_TYPE (field)) == POINTER_TYPE
           && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == ARRAY_TYPE);
 
   return field;
@@ -516,13 +496,13 @@ g95_get_stack_array_type (tree size)
       array *data
       array *base;
       //index dimensions -  Maybe we should include this for error checking?
-      index stride00;
-      index stride01;
+      index stride0;
+      index stride1;
       ...
-      index lbound00;
-      index ubound00;
-      index lbound01;
-      index ubound01;
+      index lbound0;
+      index ubound0;
+      index lbound1;
+      index ubound1;
       ...
     }
 
@@ -531,58 +511,41 @@ g95_get_stack_array_type (tree size)
 
    This is represented internaly as a RECORD_TYPE. The index nodes are
    g95_array_index_type and the data node is a pointer to the data.
-   I've written two different implementations:
 
-   Type A (g95_use_gcc_arrays == 0)
+   I originaly used nested ARRAY_TYPE nodes to represent arrays, but this
+   generated poor code for assumed/deferred size arrays.  These require
+   use of PLACEHOLDER_EXPR/WITH_RECORD_EXPR, which isn't part of SIMPLE
+   grammar.  Also, There is no way to explicitly set the array stride, so
+   all data must be packed(1).  I've tried to mark all the functions which
+   would require modification with a GCC ARRAYS comment.
 
-   This uses the GCC ARRAY_TYPE.
-   Higher dimension arrays are represented using nested 1D ARRAY_TYPEs.
-   The ordering is the same as gor g95_array_spec, array(bound0, bound1)
-   with bound0 being the most rapidly changing.
-   The data type is pointer(array(bound1, array(bound0)))
-   This generates fairly poor code for >1D arrays where the size is not known
-   at compile time. This includes assumed shape/size array parameters,
-   automatic array variables and allocated/pointer arrays without a fixed size.
-   However it potentialy allows better loop optimization when the array
-   size is known (induction varables, etc).
-   It will also provide better output for debugging fortran programs, and
-   array bound checking is possible (I think there's a GCC patch for this).
-   Array data is fully contiguous.
-   All dimensions have stride == 0 as it isn't used.
-   Identifiable by stride00 == 0
+   The data component points to the first element in the array.
+   The base component points to the origin (ie. array(0, 0...)).  If the array
+   does not contain the origin, base points to where it would be in memory.
 
-   Type B (g95_use_gcc_arrays == 1)
-
-   This is my manual implementation optimized for arrays where the size is
-   not known at compile time.
-   The data component points to element(0, 0).  This is a requirement.
-   If there is no element (0, 0) data points to where it would be.
-   An element is accessed by data[index0 + index1*stride1 + index2*stride2].
+   An element is accessed by
+   base[index0*stride0 + index1*stride1 + index2*stride2]
    This gives good performance as this computation does not involve the
-   bounds of the array.  Optimization of known-size arrays is fairly simple to
-   implement, I just haven't got round to it yet.  The first dimension is
-   guaranteed to be contiguous, however other dimensions may not be.
-   The block component points to the actual block of memory allocated for
-   the array.  This can be 0.
-   Identifiable by stride00 == 1
+   bounds of the array.  For packed arrays, this is simplified further by
+   substituting the known strides.
 
-   ( Allowing stride00 > 1 would make array section creation free (ie. no
-     temporary or copy required). However it makes access slower.  It could
-     also impede future vector optimizations (eg. SSE, 3DNow) as the data
-     would no longer be contiguous.)
+   This system has one problem: all array bounds must be withing 2^31 elements
+   of the origin (2^63 on 64-bit machines).  For example
+   integer, dimension (80000:90000, 80000:90000, 2) :: array
+   would not work properly on 32-bit machines because 80000*80000 > 2^31, so
+   the calculation for stride02 would overflow.
 
+   The way to fix this problem is to access alements as follows:
+   base[(index0-lbound0)*stride0 + (index1-lobound1)*stride1]
+   Obviously this is much slower.  I will make this a compile time option,
+   something like -fsmall-array-offsets.  Mixing code compiled with and without
+   this switch will work.
 
-   The two methods could, in theory, both be used within the same program if
-   the proper conversions were performed. Conversion from A->B is easy,
-   you just rewrite the descriptor.  Converting from B->A requires a temporary
-   and copy in the general case.  This is OK for function parameters (runtime
-   libraries?) but gets messy if you have shared data structures within a
-   program.
-
-   I've implemented simple runtime checking of array parameters to prevent
-   accidental mixing of the two systems.  Performace hit is negligible as this
-   is only done in function entry code.
-   TODO: possibly disable this checking at -O2?  */
+   (1) This can be worked around by modifying the upper bound of the previous
+   dimension.  This requires extra fields in the descriptor (both real_ubound
+   and fake_ubound).  In tree.def there is mention of TYPE_SEP, which
+   may allow us to do this, however I can't find mention of this anywhere else.
+ */
 
 static tree
 g95_build_array_type (tree type, g95_array_spec * as)
@@ -630,6 +593,7 @@ g95_build_array_type (tree type, g95_array_spec * as)
 }
 
 /* Build an array type with given bounds.  */
+/*GCC ARRAYS*/
 tree
 g95_get_array_type_bounds (tree type, int dimen, tree * lbound, tree * ubound)
 {
@@ -720,15 +684,6 @@ g95_get_array_type_bounds (tree type, int dimen, tree * lbound, tree * ubound)
       DECL_CONTEXT (upper) = fat_type;
       DECL_INITIAL (upper) = NULL_TREE;
       fieldlist = chainon (fieldlist, upper);
-
-      if (g95_use_gcc_arrays)
-        {
-          lower = g95_build_spec_expr (lbound[n], lower);
-          upper = g95_build_spec_expr (ubound[n], upper);
-          /* Build this dimension onto the array.  */
-          arraytype = build_array_type (arraytype,
-                build_range_type (g95_array_index_type, lower, upper));
-        }
     }
 
    /* We define data as an unknown size array. Much better than doing

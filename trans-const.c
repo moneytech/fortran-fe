@@ -40,6 +40,15 @@ Boston, MA 02111-1307, USA.  */
 #include "trans-const.h"
 #include "trans-types.h"
 
+/* Strinng constants.  */
+tree g95_strconst_bounds;
+
+void
+g95_init_string_constants ()
+{
+  g95_strconst_bounds = build_string (30, "Array parameter bound mismatch");
+}
+
 /*TODO: Maybe get values > 2^31 working.  */
 tree
 g95_conv_mpz_to_tree (mpz_t i, int kind)
