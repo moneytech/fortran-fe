@@ -1726,6 +1726,9 @@ match m;
   if (g95_match_eos() == MATCH_YES) goto syntax;
 
   for(;;) {
+    m = match_common_name(&common_name);
+    if (m == MATCH_ERROR) goto cleanup;
+
     if (common_name == NULL)
       head = &g95_current_ns->blank_common;
     else {
@@ -1747,10 +1750,6 @@ match m;
 /* Grab the list of symbols */
 
     for(;;) {
-      m = match_common_name(&common_name);
-      if (m == MATCH_ERROR) goto cleanup;
-      if (m == MATCH_YES) break;
-
       m = g95_match_symbol(&sym);
       if (m == MATCH_ERROR) goto cleanup;
       if (m == MATCH_NO) goto syntax;
@@ -1802,12 +1801,8 @@ match m;
       }
 
       if (g95_match_eos() == MATCH_YES) goto done;
-
-      m = match_common_name(&common_name);
-      if (m == MATCH_ERROR) goto cleanup;
-      if (m == MATCH_YES) break;
-
       if (g95_match_char(',') != MATCH_YES) goto syntax;
+      if (g95_peek_char() == '/') break;
     }
   }
 
