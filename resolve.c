@@ -1064,15 +1064,16 @@ bad_op:
 
 typedef enum { CMP_LT, CMP_EQ, CMP_GT, CMP_UNKNOWN } comparison;
 
-/* compare_bound()-- Compare two integer expressions to see if a<b.
- * Returns nonzero if this is so, zero if not so.  If either a or b is
- * indeterminate at compile time, zero is returned. */
+/* compare_bound()-- Compare two integer expressions. */
 
 static comparison compare_bound(g95_expr *a, g95_expr *b) {
 int i;
 
   if (a == NULL || a->expr_type != EXPR_CONSTANT ||
       b == NULL || b->expr_type != EXPR_CONSTANT) return CMP_UNKNOWN;
+
+  if (a->ts.type != BT_INTEGER || b->ts.type != BT_INTEGER)
+    g95_internal_error("compare_bound(): Bad expression");
 
   i = mpz_cmp(a->value.integer, b->value.integer);
 
@@ -1088,6 +1089,9 @@ static int compare_bound_int(g95_expr *a, int b) {
 int i;
 
   if (a == NULL || a->expr_type != EXPR_CONSTANT) return CMP_UNKNOWN;
+ 
+  if (a->ts.type != BT_INTEGER)
+    g95_internal_error("compare_bound_int(): Bad expression");
 
   i = mpz_cmp_si(a->value.integer, b);
 
@@ -1116,14 +1120,16 @@ static try check_dimension(int i, g95_array_ref *ar, g95_array_spec *as) {
     break;
 
   case AR_SECTION:
-    if (ar->stride[i] != NULL &&
-	compare_bound_int(ar->stride[i], 0) == CMP_EQ) {
+    if (compare_bound_int(ar->stride[i], 0) == CMP_EQ) {
       g95_error("Illegal stride of zero at %L", &ar->c_where[i]);
       return FAILURE;
     }
 
-    /* TODO: More complicated range check in which the sign of the
-     * stride figures */
+    if (compare_bound(ar->start[i], as->lower[i]) == CMP_LT) goto bound;
+    if (compare_bound(ar->start[i], as->upper[i]) == CMP_GT) goto bound;
+
+    /* TODO: Possibly, we could warn about end[i] being out-of-bound although
+     * it is legal (see 6.2.2.3.1). */
 
     break;
 
