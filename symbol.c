@@ -1883,7 +1883,8 @@ g95_symbol *p;
 
     p = st->sym;
 
-    if (p->ns != ns) {  /* Symbol is from another namespace */
+    if (p->ns != ns && (!p->attr.function || ns->proc_name != p)) {
+           /* Symbol is from another namespace */
       if (!parent_flag) {
 	g95_error("Symbol '%s' at %C has already been host associated", name);
 	return 2;

@@ -145,17 +145,27 @@ normal:
 
 /* get_proc_name()-- Special subroutine for getting a symbol node
  * associated with a procedure name, used in SUBROUTINE and FUNCTION
- * statements.  Normally, we just g95_get_symbol() without searching
- * any parent units.  If we are compiling an interface, we
- * search/create in the parent unit and create a link from the current
- * namespace.  Returns value from g95_get_symbol() */
+ * statements.  The symbol is created in the parent using with symtree
+ * node in the child unit pointing to the symbol.  If the current
+ * namespace has no parent, then the symbol is just created in the
+ * current unit. */
 
 static int get_proc_name(const char *name, g95_symbol **result) {
+g95_symtree *st;
+int rc;
 
-  if (g95_current_state() == COMP_INTERFACE)
-    return g95_get_symbol(name, g95_current_ns->parent, 0, result);
+  if (g95_current_ns->parent == NULL)
+    return g95_get_symbol(name, NULL, 0, result);    
 
-  return g95_get_symbol(name, NULL, 0, result);
+  rc = g95_get_symbol(name, g95_current_ns->parent, 0, result);
+  if (*result == NULL) return rc;
+
+  /* Deal with ENTRY problem */
+
+  st = g95_new_symtree(g95_current_ns, name);
+  st->sym = *result;
+
+  return rc;
 }
 
 
@@ -390,8 +400,10 @@ try t;
 
   if (g95_current_state() == COMP_FUNCTION && g95_current_block() != NULL &&
       g95_current_block()->result != NULL &&
+      g95_current_block()->result != g95_current_block() &&
       strcmp(g95_current_block()->name, name) == 0) {
     g95_error("Function name '%s' not allowed at %C", name);
+    m = MATCH_ERROR;
     goto cleanup;
   }
 
@@ -1184,7 +1196,6 @@ locus old_loc;
 match m;
 
   g95_clear_attr(&current_attr);
-
   g95_clear_ts(&current_ts);
 
   arglist = NULL;
@@ -1231,23 +1242,27 @@ match m;
     goto cleanup;
   }
 
-  if (g95_current_state() == COMP_INTERFACE || result != NULL) {
-    if (g95_add_function(&sym->attr, NULL) == FAILURE) goto cleanup;
-  } else {
-    if (g95_add_flavor(&sym->attr, FL_VARIABLE, NULL) == FAILURE) goto cleanup;
-  }
+  if (g95_add_function(&sym->attr, NULL) == FAILURE) goto cleanup;
 
   if (g95_missing_attr(&sym->attr, NULL) == FAILURE ||
       g95_copy_attr(&sym->attr, &current_attr, NULL) == FAILURE) goto cleanup;
 
-  sym->result = result;
+  if (current_ts.type != BT_UNKNOWN && sym->ts.type != BT_UNKNOWN) {
+    g95_error("Function '%s' at %C already has a type of %s", name,
+	      g95_typename(sym->ts.type));
+    m = MATCH_ERROR;
+    goto cleanup;
+  }
 
-  if (result == NULL)
+  if (result == NULL) {
     sym->ts = current_ts;
-  else
+    sym->result = sym;
+  } else {
     result->ts = current_ts;
+    sym->result = result;
+  }
 
-  if (g95_parent_procedure(sym, 0) == FAILURE) goto cleanup;
+  // if (g95_parent_procedure(sym, 0) == FAILURE) goto cleanup;
 
   return MATCH_YES;
 
@@ -1293,7 +1308,6 @@ match m;
       if (g95_add_entry(&entry->attr, NULL) == FAILURE ||
 	  g95_add_function(&entry->attr, NULL) == FAILURE)
 	return MATCH_ERROR;
-
     } else {
       m = match_result(function, &result);
       if (m == MATCH_NO) g95_syntax_error(ST_ENTRY);
@@ -1310,7 +1324,7 @@ match m;
       return MATCH_ERROR;
     }
 
-    if (g95_parent_procedure(entry, 0) == FAILURE) return MATCH_ERROR;
+    // if (g95_parent_procedure(entry, 0) == FAILURE) return MATCH_ERROR;
 
     break;
 
@@ -1324,7 +1338,6 @@ match m;
   }
 
   return MATCH_YES;
-
 
 exec_construct:
   g95_error("ENTRY statement at %C cannot appear within %s",
@@ -1363,7 +1376,7 @@ match m;
     return MATCH_ERROR;
   }
 
-  if (g95_parent_procedure(sym, 1) == FAILURE) return MATCH_ERROR;
+  // if (g95_parent_procedure(sym, 1) == FAILURE) return MATCH_ERROR;
 
   return MATCH_YES;
 }

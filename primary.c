@@ -1558,6 +1558,8 @@ match m;
   e = NULL;
   where = *g95_current_locus();
 
+  if (sym->attr.function && sym->result == sym) goto variable;
+
   if (sym->attr.function || sym->attr.external || sym->attr.intrinsic)
     goto function0;
 
@@ -1565,6 +1567,7 @@ match m;
 
   switch(sym->attr.flavor) {
   case FL_VARIABLE:
+  variable:
     e = g95_get_expr();
 
     e->expr_type = EXPR_VARIABLE;
@@ -1785,7 +1788,6 @@ match m;
  * not been previously seen, we assume it is a variable. */
 
 match g95_match_variable(g95_expr **result, int equiv_flag) {
-g95_state_data *st;
 g95_symbol *sym;
 g95_expr *expr;
 locus where;
@@ -1806,11 +1808,7 @@ match m;
     break;
 
   case FL_PROCEDURE:  /* Check for a nonrecursive function result */
-    if (sym->attr.function) {
-      st = g95_enclosing_unit(NULL);
-      if (st != NULL && st->state == COMP_FUNCTION && st->sym == sym &&
-	  !sym->attr.recursive) break;
-    }
+    if (sym->attr.function && sym->result == sym) break;
 
     /* Fall through to error */
 
