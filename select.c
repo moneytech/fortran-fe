@@ -463,7 +463,7 @@ static try check_case_expr(g95_expr *e, bt type) {
  * is a scalar integer expression.
  */
 
-void g95_resolve_select(g95_code *code, g95_namespace *ns) {
+void g95_resolve_select(g95_code *code) {
 g95_code *body;
 g95_expr *expr;
 g95_case *cp;
@@ -555,7 +555,7 @@ try t;
         }
       }
 
-      if (check_case_overlap(tree,cp) != SUCCESS) overlap = 1;
+      if (check_case_overlap(tree, cp) != SUCCESS) overlap = 1;
     }
   }
 

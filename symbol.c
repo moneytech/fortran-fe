@@ -1338,18 +1338,6 @@ void g95_get_component_attr(symbol_attribute *attr, g95_component *c) {
 
 /******************** Statement label management ********************/
 
-/* g95_find_st_label()-- Given a label number, look up the label in the
- * label list of the current namespace. Return NULL if the label isn't
- * in the list. */
-g95_st_label *g95_find_st_label(int labelno) {
-g95_st_label *lp;
-
-  for(lp=g95_current_ns->st_labels; lp; lp=lp->next)
-    if (lp->value == labelno) return lp;
-
-  return NULL;
-}
-
 /* Free a single g95_st_label structure, making sure the list is not
    messed up.  This function is called only when some parse error
    occurs.  */
@@ -1385,7 +1373,9 @@ g95_st_label *l2;
 g95_st_label *g95_get_st_label(int labelno) {
 g95_st_label *lp;
 
-  lp = g95_find_st_label(labelno);
+/* First see if the label is already in this namespace.  */
+  for(lp=g95_current_ns->st_labels; lp; lp=lp->next)
+    if (lp->value == labelno) break;
   if (lp != NULL) return lp;
   
   lp = g95_getmem(sizeof(g95_st_label));

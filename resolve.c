@@ -1567,8 +1567,7 @@ g95_component *c;
  * the branch is conforming.  The code node described where the branch
  * is located. */
 
-static void resolve_branch(g95_st_label *label, g95_code *code,
-                           g95_namespace *ns) {
+static void resolve_branch(g95_st_label *label, g95_code *code) {
 g95_code *block, *found;
 code_stack *stack;
 g95_st_label *lp;
@@ -1703,7 +1702,7 @@ try t;
       break;
 
     case EXEC_GOTO:
-      resolve_branch(code->label, code, ns);
+      resolve_branch(code->label, code);
       break;
 
     case EXEC_RETURN:
@@ -1748,9 +1747,9 @@ try t;
 	g95_error("Arithmetic IF statement at %L requires a numeric "
 		  "expression", &code->expr->where);
 
-      resolve_branch(code->label, code, ns);
-      resolve_branch(code->label2, code, ns);
-      resolve_branch(code->label3, code, ns);
+      resolve_branch(code->label, code);
+      resolve_branch(code->label2, code);
+      resolve_branch(code->label3, code);
       break;
 
     case EXEC_IF:
@@ -1767,7 +1766,7 @@ try t;
     case EXEC_SELECT:
       /* Select is complicated. Also, a SELECT construct could be
          a transformed computed GOTO.  */
-      g95_resolve_select(code, ns);
+      g95_resolve_select(code);
       break;
 
     case EXEC_DO:
@@ -1806,13 +1805,13 @@ try t;
     case EXEC_OPEN:
       if (g95_resolve_open(code->ext.open) == FAILURE) break;
 
-      resolve_branch(code->ext.open->err, code, ns);
+      resolve_branch(code->ext.open->err, code);
       break;
 
     case EXEC_CLOSE:
       if (g95_resolve_close(code->ext.close) == FAILURE) break;
 
-      resolve_branch(code->ext.close->err, code, ns);
+      resolve_branch(code->ext.close->err, code);
       break;
 
     case EXEC_BACKSPACE:
@@ -1820,22 +1819,22 @@ try t;
     case EXEC_REWIND:
       if (g95_resolve_filepos(code->ext.filepos) == FAILURE) break;
 
-      resolve_branch(code->ext.filepos->err, code, ns);
+      resolve_branch(code->ext.filepos->err, code);
       break;
 
     case EXEC_INQUIRE:
       if (g95_resolve_inquire(code->ext.inquire) == FAILURE) break;
 
-      resolve_branch(code->ext.inquire->err, code, ns);
+      resolve_branch(code->ext.inquire->err, code);
       break;
 
     case EXEC_READ:
     case EXEC_WRITE:
       if (g95_resolve_dt(code->ext.dt) == FAILURE) break;
 
-      resolve_branch(code->ext.dt->err, code, ns);
-      resolve_branch(code->ext.dt->end, code, ns);
-      resolve_branch(code->ext.dt->eor, code, ns);
+      resolve_branch(code->ext.dt->err, code);
+      resolve_branch(code->ext.dt->end, code);
+      resolve_branch(code->ext.dt->eor, code);
       break;
 
     case EXEC_FORALL:

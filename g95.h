@@ -1225,7 +1225,6 @@ void g95_show_components(g95_symbol *);
 g95_st_label *g95_get_st_label(int);
 void g95_free_st_label(g95_st_label *);
 g95_st_label *g95_new_internal_label(void);
-g95_st_label *g95_find_st_label(int);
 void g95_define_st_label(g95_st_label *, g95_sl_type, locus *);
 try g95_reference_st_label(g95_st_label *, g95_sl_type);
 
@@ -1480,7 +1479,7 @@ try g95_add_interface(g95_symbol *sym);
 void g95_free_case_list(g95_case *);
 match g95_match_case(void);
 match g95_match_select(void);
-void g95_resolve_select(g95_code *, g95_namespace *ns);
+void g95_resolve_select(g95_code *);
 
 /* io.c */
 
