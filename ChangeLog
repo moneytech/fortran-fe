@@ -1,3 +1,19 @@
+2002-10-01  Paul Brook  <paul@nowt.org>
+
+	* trans-array.c: Add support for descriptorless arrays.
+	(g95_conv_array_data): New function.
+	(g95_conv_array_base): New function.
+	* trans-array.h: Declare these here.
+	* trans-decl.c(g95_create_mopdule_variable): Perform variable
+	initialization and creation here.
+	(g95_create_module_vars): Instead of here.
+	* trans.h (G95_TYPE_ARRAY_*: Rename from G95_TYPE_DESCRIPTOR_*.
+	* trans-intrinsic.c: Ditto.
+	* trans-types.c (g95_is_nodesc_array): New function.
+	(g95_get_nodesc_array_type): New function.
+	(g95_sym_type, g95_get_derived_type): Use them.
+	* trans-const.c (g95_conv_mpf_to_tree): Remove workaround.
+
 2002-09-28  Paul Brook  <paul@nowt.org>
 
 	* trans-const.c (g95_conv_mpf_to_tree): Work around backend bug.

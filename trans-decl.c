@@ -313,7 +313,10 @@ g95_finish_var_decl (tree decl, g95_symbol * sym)
 
   /* If a variable is USE associated, it's always external.  */
   if (sym->attr.use_assoc)
-    DECL_EXTERNAL (decl) = 1;
+    {
+      DECL_EXTERNAL (decl) = 1;
+      TREE_PUBLIC (decl) = 1;
+    }
   else if (sym->module[0])
     {
       assert (current_function_decl == NULL_TREE);
@@ -1267,24 +1270,11 @@ g95_create_module_variable (g95_symbol * sym)
   /* We want to allocate storage for this variable.  */
   TREE_STATIC (decl) = 1;
 
-  /* Create the variable.  */
-  pushdecl (decl);
-  rest_of_decl_compilation (decl, NULL, 1, 0);
-
-  /* Also add length of strings.  */
-  if (G95_DECL_STRING (decl))
-    {
-      tree length;
-
-      length = G95_DECL_STRING_LENGTH (decl);
-      pushdecl (length);
-      rest_of_decl_compilation (length, NULL, 1, 0);
-    }
-
   if (sym->attr.dimension)
     {
-      g95_todo_error ("Initialization of module arrays");
-     // DECL_INITIAL (decl) = g95_build_constructor ();
+      assert (sym->attr.pointer || sym->attr.allocatable
+              || G95_ARRAY_TYPE_P (TREE_TYPE (sym->backend_decl)));
+      g95_trans_auto_array_allocation (sym->backend_decl, sym);
     }
   else if (sym->ts.type == BT_DERIVED)
     {
@@ -1299,6 +1289,20 @@ g95_create_module_variable (g95_symbol * sym)
           assert (se.pre == NULL_TREE && se.post == NULL_TREE);
           DECL_INITIAL (decl) = se.expr;
         }
+    }
+
+  /* Create the variable.  */
+  pushdecl (decl);
+  rest_of_decl_compilation (decl, NULL, 1, 0);
+
+  /* Also add length of strings.  */
+  if (G95_DECL_STRING (decl))
+    {
+      tree length;
+
+      length = G95_DECL_STRING_LENGTH (decl);
+      pushdecl (length);
+      rest_of_decl_compilation (length, NULL, 1, 0);
     }
 }
 
@@ -1321,7 +1325,6 @@ g95_generate_module_vars (g95_namespace * ns)
     {
       if (sym->attr.dimension)
         {
-          g95_trans_auto_array_allocation (sym->backend_decl, sym);
         }
       else
         g95_todo_error ("deferred initialization of module variable");

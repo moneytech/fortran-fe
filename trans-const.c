@@ -269,7 +269,7 @@ g95_conv_mpf_to_tree (mpf_t f, int kind)
         }
       else
         {
-      p[0] = '.';
+          p[0] = '.';
         }
       strcat (p, "e");
       sprintf (&p[strlen (p)], "%d", (int) exp);
@@ -280,15 +280,7 @@ g95_conv_mpf_to_tree (mpf_t f, int kind)
     }
 
   type = g95_get_real_type (kind);
-  /* REAL_VALUE_ATOF is buggy when dealing with negative values.  */
-  if (p[0] == '-')
-    {
-      res = build_real (type, REAL_VALUE_ATOF (&p[1], TYPE_MODE (type)));
-      res = fold (build1 (NEGATE_EXPR, TREE_TYPE (res), res));
-    }
-  else
   res = build_real (type, REAL_VALUE_ATOF (p, TYPE_MODE (type)));
-
   if (p != buff)
     g95_free (p);
 

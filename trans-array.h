@@ -82,6 +82,9 @@ void g95_conv_tmp_ref (g95_se *);
 /* Convert an array for passing as an actual function parameter.  */
 void g95_conv_array_parameter (g95_se *, g95_expr *, g95_ss *);
 
+/* These work with both descriptors and descriptorless arrays.  */
+tree g95_conv_array_base (tree);
+tree g95_conv_array_data (tree);
 /* Return either an INT_CST or an expression for that part of the descriptor. */
 tree g95_conv_array_stride (tree, int);
 tree g95_conv_array_lbound (tree, int);

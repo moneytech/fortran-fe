@@ -323,13 +323,22 @@ g95_get_element_type (tree type)
 {
   tree element;
 
-  element = TREE_TYPE (TYPE_FIELDS (type));
+  if (G95_ARRAY_TYPE_P (type))
+    {
+      assert (TREE_CODE (type) == ARRAY_TYPE);
+      element = TREE_TYPE (type);
+    }
+  else
+    {
+      assert (G95_DESCRIPTOR_TYPE_P (type));
+      element = TREE_TYPE (TYPE_FIELDS (type));
 
-  assert (TREE_CODE (element) == POINTER_TYPE);
-  element = TREE_TYPE (element);
+      assert (TREE_CODE (element) == POINTER_TYPE);
+      element = TREE_TYPE (element);
 
-  assert (TREE_CODE (element) == ARRAY_TYPE);
-  element = TREE_TYPE (element);
+      assert (TREE_CODE (element) == ARRAY_TYPE);
+      element = TREE_TYPE (element);
+    }
 
   return element;
 }
@@ -428,6 +437,37 @@ g95_get_stack_array_type (tree size)
       data.pstr[i] = data.data[i * 20];
  */
 
+/* Resurns true if the array sym does not require a descriptor.  */
+static int
+g95_is_nodesc_array (g95_symbol * sym)
+{
+  int n;
+
+  assert (sym->attr.dimension);
+
+  /* We only want local arrays with known size.  */
+  if (sym->attr.pointer || sym->attr.allocatable)
+    return 0;
+
+  if (sym->attr.dummy)
+    return 0;
+
+  if (sym->attr.result || sym->attr.function)
+    return 0;
+
+  if (sym->as->type != AS_EXPLICIT)
+    return 0;
+
+  for (n = 0; n < sym->as->rank; n++)
+    {
+      if (sym->as->lower[n]->expr_type != EXPR_CONSTANT
+          || sym->as->upper[n]->expr_type != EXPR_CONSTANT)
+        return 0;
+    }
+
+  return 1;
+}
+
 static tree
 g95_build_array_type (tree type, g95_array_spec * as)
 {
@@ -437,8 +477,7 @@ g95_build_array_type (tree type, g95_array_spec * as)
 
   for (n = 0 ; n < as->rank; n++)
     {
-      /* Create expressions for the bounds of the array.
-         Note we re-use ubound and lbound.  */
+      /* Create expressions for the bounds of the array.  */
       switch (as->type)
         {
         case AS_EXPLICIT:
@@ -524,8 +563,8 @@ g95_get_dtype_cst (tree type, int rank)
   tree size;
   int n;
 
-  if (G95_DESCRIPTOR_TYPE_P (type))
-    return (G95_TYPE_DESCRIPTOR_DTYPE(type));
+  if (G95_DESCRIPTOR_TYPE_P (type) || G95_ARRAY_TYPE_P (type))
+    return (G95_TYPE_ARRAY_DTYPE(type));
 
   /* TODO: Correctly identify LOGICAL types.  */
   switch (TREE_CODE (type))
@@ -542,15 +581,16 @@ g95_get_dtype_cst (tree type, int rank)
       n = G95_DTYPE_COMPLEX;
       break;
 
+    /* Arrays have already been dealt with.  */
     case RECORD_TYPE:
-      /* Array descriptors have already been dealt with.  */
       n = G95_DTYPE_DERIVED;
       break;
-
-    case POINTER_TYPE:
+/* Arrays of strings are currently broken.  */
+#if 0
+    case ARRAY_TYPE:
       n = G95_DTYPE_CHARACTER;
       break;
-
+#endif
     default:
       abort ();
     }
@@ -567,6 +607,79 @@ g95_get_dtype_cst (tree type, int rank)
       (TREE_INT_CST_LOW (size) << G95_DTYPE_SIZE_SHIFT);
 
   return build_int_2 (n, 0);
+}
+
+/* Build an array type for use without a descriptor.  */
+static tree
+g95_get_nodesc_array_type (tree etype, g95_array_spec * as)
+{
+  tree range;
+  tree type;
+  int n;
+  mpz_t offset;
+  mpz_t stride;
+  mpz_t delta;
+
+  mpz_init_set_ui (offset, 0);
+  mpz_init_set_ui (stride, 1);
+  mpz_init (delta);
+
+  /* We don't use build_array_type because this does not include include
+     lang-specific information (ie. the bounds of the array) when checking
+     for duplicates.  */
+  type = make_node (ARRAY_TYPE);
+
+  G95_ARRAY_TYPE_P (type) = 1;
+  TYPE_LANG_SPECIFIC (type) = (struct lang_type *)
+    ggc_alloc_cleared (sizeof (struct lang_type));
+
+  for (n = 0; n < as->rank; n++)
+    {
+      /* Fill in the stride and bound components of the type.  */
+      G95_TYPE_ARRAY_STRIDE(type, n) =
+        g95_conv_mpz_to_tree (stride, g95_array_index_kind);
+      G95_TYPE_ARRAY_LBOUND(type, n) =
+        g95_conv_mpz_to_tree (as->lower[n]->value.integer,
+                              g95_array_index_kind);
+      G95_TYPE_ARRAY_UBOUND(type, n) =
+        g95_conv_mpz_to_tree (as->upper[n]->value.integer,
+                              g95_array_index_kind);
+
+      /* Calculate the stride and offset.  */
+      mpz_mul (delta, stride, as->lower[n]->value.integer);
+      mpz_sub (offset, offset, delta);
+
+      mpz_sub (delta, as->upper[n]->value.integer,
+               as->lower[n]->value.integer);
+      mpz_add_ui (delta, delta, 1);
+      mpz_mul (stride, stride, delta);
+    }
+  G95_TYPE_ARRAY_OFFSET (type) =
+    g95_conv_mpz_to_tree (offset, g95_array_index_kind);
+  G95_TYPE_ARRAY_SIZE (type) =
+    g95_conv_mpz_to_tree (stride, g95_array_index_kind);
+  G95_TYPE_ARRAY_DTYPE (type) = g95_get_dtype_cst (etype, as->rank);
+  G95_TYPE_ARRAY_RANK (type) = as->rank;
+  range = build_range_type (g95_array_index_type, integer_zero_node,
+                            NULL_TREE);
+  G95_TYPE_ARRAY_DATAPTR_TYPE (type) =
+    build_pointer_type (build_array_type (etype,range));
+
+  mpz_sub_ui (stride, stride, 1);
+  range = g95_conv_mpz_to_tree (stride, g95_array_index_kind);
+  range = build_range_type (g95_array_index_type, integer_zero_node, range);
+  TYPE_DOMAIN (type) = range;
+
+  build_pointer_type (etype);
+  TREE_TYPE (type) = etype;
+
+  layout_type (type);
+
+  mpz_clear (offset);
+  mpz_clear (stride);
+  mpz_clear (delta);
+
+  return type;
 }
 
 /* Build an array (descriptor) type with given bounds.  */
@@ -592,8 +705,8 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
   G95_DESCRIPTOR_TYPE_P (fat_type) = 1;
   TYPE_LANG_SPECIFIC (fat_type) = (struct lang_type *)
     ggc_alloc_cleared (sizeof (struct lang_type));
-  G95_TYPE_DESCRIPTOR_RANK (fat_type) = dimen;
-  G95_TYPE_DESCRIPTOR_DTYPE (fat_type) = g95_get_dtype_cst (etype, dimen);
+  G95_TYPE_ARRAY_RANK (fat_type) = dimen;
+  G95_TYPE_ARRAY_DTYPE (fat_type) = g95_get_dtype_cst (etype, dimen);
 
   tmp = TYPE_NAME (etype);
   if (tmp && TREE_CODE (tmp) == TYPE_DECL)
@@ -615,7 +728,7 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
 
   for (n = 0 ; n < dimen; n++)
     {
-      G95_TYPE_DESCRIPTOR_STRIDE (fat_type, n) = stride;
+      G95_TYPE_ARRAY_STRIDE (fat_type, n) = stride;
       if (lbound)
         lower = lbound[n];
       else
@@ -624,7 +737,7 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
       if (lower != NULL_TREE)
         {
           if (INTEGER_CST_P (lower))
-            G95_TYPE_DESCRIPTOR_LBOUND (fat_type, n) = lower;
+            G95_TYPE_ARRAY_LBOUND (fat_type, n) = lower;
           else
             lower = NULL_TREE;
         }
@@ -633,7 +746,7 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
       if (upper != NULL_TREE)
         {
           if (INTEGER_CST_P (upper))
-            G95_TYPE_DESCRIPTOR_UBOUND (fat_type, n) = upper;
+            G95_TYPE_ARRAY_UBOUND (fat_type, n) = upper;
           else
             upper = NULL_TREE;
         }
@@ -652,25 +765,26 @@ g95_get_array_type_bounds (tree etype, int dimen, tree * lbound, tree * ubound)
       else
         stride = NULL_TREE;
     }
-  G95_TYPE_DESCRIPTOR_SIZE (fat_type) = stride;
+  G95_TYPE_ARRAY_SIZE (fat_type) = stride;
+  /* TODO: known offsets for descriptoors.  */
+  G95_TYPE_ARRAY_OFFSET (fat_type) = NULL_TREE;
 
    /* We define data as an unknown size array. Much better than doing
       pointer arithmetic.  */
   arraytype = build_array_type (etype, build_range_type (
         g95_array_index_type, integer_zero_node, NULL_TREE));
+  arraytype = build_pointer_type (arraytype);
+  G95_TYPE_ARRAY_DATAPTR_TYPE (fat_type) = arraytype;
 
   /* The pointer to the array data.  */
-  decl = build_decl (FIELD_DECL,
-                     get_identifier ("data"),
-                     build_pointer_type (arraytype));
+  decl = build_decl (FIELD_DECL, get_identifier ("data"), arraytype);
 
   DECL_CONTEXT (decl) = fat_type;
   /* Add the data member as the first element of the descriptor.  */
   fieldlist = decl;
 
   /* Add the base component.  */
-  decl = build_decl (FIELD_DECL, get_identifier ("base"),
-                      build_pointer_type (arraytype));
+  decl = build_decl (FIELD_DECL, get_identifier ("base"), arraytype);
   DECL_CONTEXT (decl) = fat_type;
   fieldlist = chainon (fieldlist, decl);
 
@@ -745,7 +859,10 @@ g95_sym_type (g95_symbol * sym)
 
   if (sym->attr.dimension)
     {
-      type = g95_build_array_type (type, sym->as);
+      if (g95_is_nodesc_array (sym))
+        type = g95_get_nodesc_array_type (type, sym->as);
+      else
+        type = g95_build_array_type (type, sym->as);
     }
   else if (sym->ts.type != BT_CHARACTER)
     {
@@ -815,16 +932,22 @@ g95_get_derived_type (g95_symbol * derived)
       /* This returns an array descriptor type.  Initialisation may be
          required.  */
       if (c->dimension)
-	  field_type = g95_build_array_type (field_type, c->as);
-
-      /* Pointers to arrays aren't actualy pointer types.  The descriptors
-         are seperate, but the data is common.  */
+        {
+          if (c->pointer)
+            {
+              /* Pointers to arrays aren't actualy pointer types.  The
+                 descriptors are seperate, but the data is common.  */
+              field_type = g95_build_array_type (field_type, c->as);
+            }
+          else
+            field_type = g95_get_nodesc_array_type (field_type, c->as);
+        }
       else if (c->pointer)
-	field_type = build_pointer_type (field_type);
+        field_type = build_pointer_type (field_type);
 
       field = build_decl (FIELD_DECL,
-			  get_identifier (c->name),
-			  field_type);
+                          get_identifier (c->name),
+                          field_type);
 
       DECL_CONTEXT (field) = typenode;
       DECL_PACKED (field) |= TYPE_PACKED (typenode);
@@ -966,11 +1089,11 @@ g95_type_for_size (unsigned bits, int unsignedp)
 
   if (bits == TYPE_PRECISION (long_long_integer_type_node))
     return (unsignedp ? long_long_unsigned_type_node
-	    : long_long_integer_type_node);
+            : long_long_integer_type_node);
 /*TODO: We currently don't initialise this...
   if (bits == TYPE_PRECISION (widest_integer_literal_type_node))
     return (unsignedp ? widest_unsigned_literal_type_node
-	    : widest_integer_literal_type_node);*/
+            : widest_integer_literal_type_node);*/
 
   if (bits <= TYPE_PRECISION (intQI_type_node))
     return unsignedp ? unsigned_intQI_type_node : intQI_type_node;
@@ -1051,32 +1174,32 @@ g95_type_for_mode (enum machine_mode mode, int unsignedp)
   if (VECTOR_MODE_SUPPORTED_P (mode))
     {
       switch (mode)
-	{
-	case V16QImode:
-	  return unsignedp ? unsigned_V16QI_type_node : V16QI_type_node;
-	case V8HImode:
-	  return unsignedp ? unsigned_V8HI_type_node : V8HI_type_node;
-	case V4SImode:
-	  return unsignedp ? unsigned_V4SI_type_node : V4SI_type_node;
-	case V2DImode:
-	  return unsignedp ? unsigned_V2DI_type_node : V2DI_type_node;
-	case V2SImode:
-	  return unsignedp ? unsigned_V2SI_type_node : V2SI_type_node;
-	case V4HImode:
-	  return unsignedp ? unsigned_V4HI_type_node : V4HI_type_node;
-	case V8QImode:
-	  return unsignedp ? unsigned_V8QI_type_node : V8QI_type_node;
-	case V16SFmode:
-	  return V16SF_type_node;
-	case V4SFmode:
-	  return V4SF_type_node;
-	case V2SFmode:
-	  return V2SF_type_node;
-	case V2DFmode:
-	  return V2DF_type_node;
-	default:
-	  break;
-	}
+        {
+        case V16QImode:
+          return unsignedp ? unsigned_V16QI_type_node : V16QI_type_node;
+        case V8HImode:
+          return unsignedp ? unsigned_V8HI_type_node : V8HI_type_node;
+        case V4SImode:
+          return unsignedp ? unsigned_V4SI_type_node : V4SI_type_node;
+        case V2DImode:
+          return unsignedp ? unsigned_V2DI_type_node : V2DI_type_node;
+        case V2SImode:
+          return unsignedp ? unsigned_V2SI_type_node : V2SI_type_node;
+        case V4HImode:
+          return unsignedp ? unsigned_V4HI_type_node : V4HI_type_node;
+        case V8QImode:
+          return unsignedp ? unsigned_V8QI_type_node : V8QI_type_node;
+        case V16SFmode:
+          return V16SF_type_node;
+        case V4SFmode:
+          return V4SF_type_node;
+        case V2SFmode:
+          return V2SF_type_node;
+        case V2DFmode:
+          return V2DF_type_node;
+        default:
+          break;
+        }
     }
 #endif
 
@@ -1174,11 +1297,11 @@ g95_signed_or_unsigned_type (int unsignedp, tree type)
     return unsignedp ? long_unsigned_type_node : long_integer_type_node;
   if (TYPE_PRECISION (type) == TYPE_PRECISION (long_long_integer_type_node))
     return (unsignedp ? long_long_unsigned_type_node
-	    : long_long_integer_type_node);
+            : long_long_integer_type_node);
 /*TODO: see others
   if (TYPE_PRECISION (type) == TYPE_PRECISION (widest_integer_literal_type_node))
     return (unsignedp ? widest_unsigned_literal_type_node
-	    : widest_integer_literal_type_node);
+            : widest_integer_literal_type_node);
 */
 #if HOST_BITS_PER_WIDE_INT >= 64
   if (TYPE_PRECISION (type) == TYPE_PRECISION (intTI_type_node))

@@ -379,7 +379,9 @@ struct lang_type GTY (())
   tree ubound[G95_MAX_DIMENSIONS];
   tree stride[G95_MAX_DIMENSIONS];
   tree size;
+  tree offset;
   tree dtype;
+  tree dataptr_type;
 };
 
 /* String nodes only.  */
@@ -397,16 +399,24 @@ struct lang_decl GTY (())
 #define G95_DECL_PARTIAL_PACKED_ARRAY(node) DECL_LANG_FLAG_2(node)
 
 #define G95_KNOWN_SIZE_STRING_TYPE(node) TYPE_LANG_FLAG_0(node)
+/* An array descriptor.  */
 #define G95_DESCRIPTOR_TYPE_P(node) TYPE_LANG_FLAG_1(node)
-#define G95_TYPE_DESCRIPTOR_LBOUND(node, dim) \
+/* An array without a descriptor.  */
+#define G95_ARRAY_TYPE_P(node) TYPE_LANG_FLAG_2(node)
+/* The G95_TYPE_ARRAY_* members are present in both descriptor and
+   descriptorless array types.  */
+#define G95_TYPE_ARRAY_LBOUND(node, dim) \
   (TYPE_LANG_SPECIFIC(node)->lbound[dim])
-#define G95_TYPE_DESCRIPTOR_UBOUND(node, dim) \
+#define G95_TYPE_ARRAY_UBOUND(node, dim) \
   (TYPE_LANG_SPECIFIC(node)->ubound[dim])
-#define G95_TYPE_DESCRIPTOR_STRIDE(node, dim) \
+#define G95_TYPE_ARRAY_STRIDE(node, dim) \
   (TYPE_LANG_SPECIFIC(node)->stride[dim])
-#define G95_TYPE_DESCRIPTOR_RANK(node) (TYPE_LANG_SPECIFIC(node)->rank)
-#define G95_TYPE_DESCRIPTOR_SIZE(node) (TYPE_LANG_SPECIFIC(node)->size)
-#define G95_TYPE_DESCRIPTOR_DTYPE(node) (TYPE_LANG_SPECIFIC(node)->dtype)
+#define G95_TYPE_ARRAY_RANK(node) (TYPE_LANG_SPECIFIC(node)->rank)
+#define G95_TYPE_ARRAY_SIZE(node) (TYPE_LANG_SPECIFIC(node)->size)
+#define G95_TYPE_ARRAY_OFFSET(node) (TYPE_LANG_SPECIFIC(node)->offset)
+#define G95_TYPE_ARRAY_DTYPE(node) (TYPE_LANG_SPECIFIC(node)->dtype)
+#define G95_TYPE_ARRAY_DATAPTR_TYPE(node) \
+  (TYPE_LANG_SPECIFIC(node)->dataptr_type)
 
 /* I changed this from sorry(...) because it should not return.  */
 /* TODO: Remove g95_todo_error before releasing g95.  */

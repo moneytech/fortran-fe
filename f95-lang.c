@@ -432,6 +432,7 @@ expand_function_body (tree fndecl, int nested)
 tree
 g95_truthvalue_conversion (tree expr ATTRIBUTE_UNUSED)
 {
+  /* We shouldn't need this at all.  */
   g95_todo_error ("Truthvalue_conversion called");
   /*return (expr); */
 }

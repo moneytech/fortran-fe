@@ -19,7 +19,7 @@ gcc and libiberty directories.  Then apply libgfor/gcc_config.patch to the
 top-level gcc source directory.
 
 Configure GCC as normal with --enable-languages=c,f95
-Don't use the G95 configure system. Specifically make sure you don't have any
+Do not use the G95 configure system. Specifically make sure you don't have any
  extra config.h files floating about. These can confuse the GCC build system.
  If you're getting 'parse error before "tree"' in g95.h this is probably
  the cause. There should _not_ be a config.h file in the f95 directory.

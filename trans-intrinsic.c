@@ -385,6 +385,7 @@ g95_conv_intrinsic_bound (g95_se * se, g95_expr * expr, int upper)
   g95_add_stmt_to_pre (se, argse.pre, argse.pre_tail);
   g95_add_stmt_to_post (se, argse.post, argse.post_tail);
   desc = argse.expr;
+  /* TODO: bounds of arrays without descriptors.  */
   assert (G95_DESCRIPTOR_TYPE_P (TREE_TYPE (desc)));
 
   if (INTEGER_CST_P (bound))
@@ -392,7 +393,7 @@ g95_conv_intrinsic_bound (g95_se * se, g95_expr * expr, int upper)
       /* We know the second argument, so supply the bound directly.  */
       assert (TREE_INT_CST_HIGH (bound) == 0);
       n = TREE_INT_CST_LOW (bound);
-      assert (n >= 0 && n < G95_TYPE_DESCRIPTOR_RANK (TREE_TYPE (desc)));
+      assert (n >= 0 && n < G95_TYPE_ARRAY_RANK (TREE_TYPE (desc)));
 
       if (upper)
         se->expr = g95_conv_array_ubound (desc, n);
@@ -410,7 +411,7 @@ g95_conv_intrinsic_bound (g95_se * se, g95_expr * expr, int upper)
           g95_trans_runtime_check (cond, g95_strconst_fault, &se->pre,
                                    &se->pre_tail);
           cond = build (GT_EXPR, boolean_type_node, bound,
-              g95_rank_cst[G95_TYPE_DESCRIPTOR_RANK (TREE_TYPE (desc))]);
+              g95_rank_cst[G95_TYPE_ARRAY_RANK (TREE_TYPE (desc))]);
           g95_trans_runtime_check (cond, g95_strconst_fault, &se->pre,
                                    &se->pre_tail);
         }

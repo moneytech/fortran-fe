@@ -137,29 +137,26 @@ g95_can_put_var_on_stack (tree size)
 }
 
 static tree
-g95_descriptor_data_type (tree desc)
+g95_array_dataptr_type (tree desc)
 {
-  tree type;
-
-  type = TREE_TYPE (desc);
-  type = TREE_TYPE (TYPE_FIELDS (type));
-
-  assert (TREE_CODE (type) == POINTER_TYPE
-          && TREE_CODE (TREE_TYPE (type)) == ARRAY_TYPE);
-  return type;
+  return (G95_TYPE_ARRAY_DATAPTR_TYPE (TREE_TYPE (desc)));
 }
 
 /* Build expressions to access the members of an array descriptor.
    It's surprisingly easy to mess up here, so never access
    an array descriptor by "brute force", always use these
-   functions.  This also aviods problems if we change the format
+   functions.  This also avoids problems if we change the format
    of an array descriptor.
 
    To understand these magic numbers, look at the comments
    before g95_build_array_type() in trans-types.c.
 
    The code within these defines should be the only code which knows the format
-   or an array descriptor.
+   of an array descriptor.
+
+   Any code just needing to read obtain the bounds of an array should use
+   g95_conv_array_* rather than the following functions as these will return
+   know constant values, and work with arrays which do not have descriptors.
 
    Don't forget to #undef these!  */
 
@@ -167,6 +164,7 @@ g95_descriptor_data_type (tree desc)
 #define BASE_FIELD 1
 #define DTYPE_FIELD 2
 #define DIMENSION_FIELD 3
+
 #define STRIDE_SUBFIELD 0
 #define LBOUND_SUBFIELD 1
 #define UBOUND_SUBFIELD 2
@@ -354,20 +352,21 @@ g95_build_array_initializer (g95_symbol * sym)
 
   mpz_neg (offset, offset);
   /* Now allocate the data for the array.  */
-  mpz_sub_ui (s, s, 1);
-  tmp = g95_conv_mpz_to_tree (s, g95_array_index_kind);
-  type = build_range_type (g95_array_index_type, integer_zero_node, tmp);
-  type = build_array_type (g95_get_element_type (
-          TREE_TYPE (sym->backend_decl)), type);
-  data = create_tmp_var (type, "A");
-  TREE_STATIC (data) = 1;
-  TREE_ADDRESSABLE (data) = 1;
-
+  if (! sym->attr.use_assoc)
+    {
+      mpz_sub_ui (s, s, 1);
+      tmp = g95_conv_mpz_to_tree (s, g95_array_index_kind);
+      type = build_range_type (g95_array_index_type, integer_zero_node, tmp);
+      type = build_array_type (g95_get_element_type (
+              TREE_TYPE (sym->backend_decl)), type);
+      data = create_tmp_var (type, "A");
+      TREE_STATIC (data) = 1;
+      TREE_ADDRESSABLE (data) = 1;
   /* TODO: array initializers.  */
 
   field = TYPE_FIELDS (TREE_TYPE (sym->backend_decl));
   field = g95_advance_chain (field, DTYPE_FIELD);
-  init = G95_TYPE_DESCRIPTOR_DTYPE (TREE_TYPE (sym->backend_decl));
+  init = G95_TYPE_ARRAY_DTYPE (TREE_TYPE (sym->backend_decl));
   list = tree_cons (field, init, list);
 
   /* We can't set the base member at compile time because it may not point to
@@ -384,6 +383,7 @@ g95_build_array_initializer (g95_symbol * sym)
   init = build (CONSTRUCTOR, TREE_TYPE (sym->backend_decl), NULL_TREE, list);
   TREE_CONSTANT (init) = 1;
   DECL_INITIAL (sym->backend_decl) = init;
+    }
 
   tmp = g95_conv_mpz_to_tree (offset, g95_array_index_kind);
 
@@ -701,7 +701,7 @@ g95_trans_allocate_temp_array (g95_loopinfo * loop, g95_ss_info * info,
   /* Fill in the array dtype.  */
   tmp = g95_conv_descriptor_dtype (desc);
   tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
-               G95_TYPE_DESCRIPTOR_DTYPE (TREE_TYPE (desc)));
+               G95_TYPE_ARRAY_DTYPE (TREE_TYPE (desc)));
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_pre (loop, stmt, stmt);
 
@@ -1154,7 +1154,7 @@ g95_conv_ss_descriptor (g95_loopinfo * loop, g95_ss * ss)
   if (! loop->array_parameter)
     {
       /* Also the data pointer.  */
-      se.expr = g95_conv_descriptor_base (se.expr);
+      se.expr = g95_conv_array_base (se.expr);
       ss->data.info.data =
         g95_simple_fold (se.expr, &loop->pre, &loop->pre_tail, NULL);
     }
@@ -1184,7 +1184,8 @@ g95_copy_loopinfo_to_se (g95_se * se, g95_loopinfo * loop)
 }
 
 /* Returns 2 if an array is packed, 1 if the first dimension of an array is
-   packed and 0 is an array is not packed.  */
+   packed and 0 is an array is not packed.  If the state of the array data
+   cannot be determined at compile time (eg. pointers) this will return 0.  */
 static int
 g95_array_is_packed (tree descriptor)
 {
@@ -1192,7 +1193,11 @@ g95_array_is_packed (tree descriptor)
 
   decl = descriptor;
 
-  assert (G95_DESCRIPTOR_TYPE_P (TREE_TYPE (descriptor)));
+  /* Arrays without descriptors are always packed.  */
+  if (G95_ARRAY_TYPE_P (TREE_TYPE (decl)))
+    return 2;
+
+  assert (G95_DESCRIPTOR_TYPE_P (TREE_TYPE (decl)));
 
   /* Derived type array components are always packed.  */
   if (TREE_CODE (decl) == COMPONENT_REF)
@@ -1213,6 +1218,41 @@ g95_array_is_packed (tree descriptor)
   return 0;
 }
 
+tree
+g95_conv_array_data (tree descriptor)
+{
+  if (G95_ARRAY_TYPE_P (TREE_TYPE (descriptor)))
+    {
+      if (TREE_CODE (descriptor) == VAR_DECL)
+        TREE_ADDRESSABLE (descriptor) = 1;
+      if (TREE_CODE (descriptor) == INDIRECT_REF)
+        return TREE_OPERAND (descriptor, 0);
+      return build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (descriptor)),
+                     descriptor);
+    }
+  else
+    return g95_conv_descriptor_data (descriptor);
+}
+
+tree
+g95_conv_array_base (tree descriptor)
+{
+  tree tmp;
+  tree type;
+
+  if (G95_ARRAY_TYPE_P (TREE_TYPE (descriptor)))
+    {
+      TREE_ADDRESSABLE (descriptor) = 1;
+      type = TREE_TYPE (descriptor);
+      tmp = build (ARRAY_REF, g95_get_element_type (type), descriptor,
+                   G95_TYPE_ARRAY_OFFSET (type));
+      tmp = build1 (ADDR_EXPR, g95_array_dataptr_type (descriptor), tmp);
+      return tmp;
+    }
+  else
+    return g95_conv_descriptor_base (descriptor);
+}
+
 /* Get an expression for the array stride.  Either a constant or a
    COMPONENT_REF.  */
 tree
@@ -1230,7 +1270,7 @@ g95_conv_array_stride (tree descriptor, int dim)
   /* Use the array size, if known.  */
   if (packed == 2)
     {
-      tmp = G95_TYPE_DESCRIPTOR_STRIDE (type, dim);
+      tmp = G95_TYPE_ARRAY_STRIDE (type, dim);
       if (tmp != NULL_TREE)
         {
           assert (INTEGER_CST_P (tmp));
@@ -1251,7 +1291,7 @@ g95_conv_array_lbound (tree descriptor, int dim)
 
   type = TREE_TYPE (descriptor);
 
-  tmp = G95_TYPE_DESCRIPTOR_LBOUND (type, dim);
+  tmp = G95_TYPE_ARRAY_LBOUND (type, dim);
   if (tmp != NULL_TREE)
     {
       assert (INTEGER_CST_P (tmp));
@@ -1271,7 +1311,7 @@ g95_conv_array_ubound (tree descriptor, int dim)
 
   type = TREE_TYPE (descriptor);
 
-  tmp = G95_TYPE_DESCRIPTOR_UBOUND (type, dim);
+  tmp = G95_TYPE_ARRAY_UBOUND (type, dim);
   if (tmp != NULL_TREE)
     {
       assert (INTEGER_CST_P (tmp));
@@ -1526,7 +1566,8 @@ g95_conv_tmp_array_ref (g95_se * se)
 
 /* Build an array reference. se->expr already holds the array descriptor.
    This should be either a variable, indirect variable reference or component
-   reference.  */
+   reference.  For arrays which do not have a descriptor, se->expr will be
+   the data pointer.  */
 void
 g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
 {
@@ -1603,7 +1644,7 @@ g95_conv_array_ref (g95_se * se, g95_array_ref * ar)
           &se->pre_tail);
     }
 
-  tmp = g95_conv_descriptor_base (se->expr);
+  tmp = g95_conv_array_base (se->expr);
   tmp = g95_simple_fold (tmp, &se->pre, &se->pre_tail, NULL);
   tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
   se->expr = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, index);
@@ -1877,7 +1918,7 @@ g95_conv_section_upper_bound (g95_ss * ss, int n, tree * phead, tree * ptail,
   else
     {
       /* No upper bound was specified, so use the bound of the array. */
-      bound = G95_TYPE_DESCRIPTOR_UBOUND (TREE_TYPE (desc), dim);
+      bound = G95_TYPE_ARRAY_UBOUND (TREE_TYPE (desc), dim);
 
       if (bound == NULL_TREE)
         {
@@ -1935,8 +1976,7 @@ g95_conv_section_startstride (g95_loopinfo * loop, g95_ss * ss, int n)
   else
     {
       /* No lower bound specified so use the bound of the array.  */
-      info->start[n] =
-        G95_TYPE_DESCRIPTOR_LBOUND (TREE_TYPE (desc), dim);
+      info->start[n] = G95_TYPE_ARRAY_LBOUND (TREE_TYPE (desc), dim);
 
       if (info->start[n] == NULL_TREE)
         {
@@ -2881,7 +2921,7 @@ g95_array_init_size (tree descriptor, int rank, tree * poffset,
   /* Set the dtype.  */
   tmp = g95_conv_descriptor_dtype (descriptor);
   tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
-               G95_TYPE_DESCRIPTOR_DTYPE (TREE_TYPE (descriptor)));
+               G95_TYPE_ARRAY_DTYPE (TREE_TYPE (descriptor)));
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_list (phead, ptail, stmt, stmt);
 
@@ -3101,13 +3141,23 @@ g95_trans_auto_array_allocation (tree descriptor, g95_symbol * sym)
   tree len;
   g95_array_spec *as;
 
-  if (sym->attr.use_assoc)
-    internal_error ("Use associated local array???");
-
   assert (! sym->attr.pointer || sym->attr.allocatable);
 
+  if (G95_ARRAY_TYPE_P (TREE_TYPE (descriptor)))
+    {
+      if (sym->value)
+        g95_todo_error ("Initialization of arrays");
+      if (sym->ts.type == BT_CHARACTER)
+        g95_todo_error ("arrays of strings");
+      return NULL_TREE;
+    }
+
+  /* TODO: initialization of descriptorless arrays.  */
   if (TREE_STATIC (descriptor) || sym->attr.use_assoc)
     {
+      /* These should all be descriptorless arrays.  */
+      abort ();
+
       assert (G95_DESCRIPTOR_TYPE_P (TREE_TYPE (descriptor)));
       offset = g95_build_array_initializer (sym);
 
@@ -3226,6 +3276,9 @@ g95_trans_auto_array_allocation (tree descriptor, g95_symbol * sym)
   if (tmpvar != NULL_TREE)
     pushdecl (tmpvar);
 
+  if (sym->value)
+    internal_error ("non-static array with initializer");
+
   return head;
 }
 
@@ -3308,14 +3361,14 @@ g95_trans_repack_array (tree * phead, tree * ptail, tree dest, tree src,
     }
 
   /* Setup the SS.  */
-  tmp = g95_conv_descriptor_base (dest);
+  tmp = g95_conv_array_base (dest);
   lss->data.info.data = g95_simple_fold (tmp, phead, ptail, NULL);
   lss->data.info.descriptor = dest;
   lss->type = G95_SS_SECTION;
   lss->next = g95_ss_terminator;
   lss->data.info.dimen = dimen;
 
-  tmp = g95_conv_descriptor_base (src);
+  tmp = g95_conv_array_base (src);
   rss->data.info.data = g95_simple_fold (tmp, phead, ptail, NULL);
   rss->data.info.descriptor = src;
   rss->type = G95_SS_SECTION;
@@ -3439,7 +3492,8 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
       repack = 1;
       unpack = create_tmp_var (boolean_type_node, "unpack");
       /* We need to save the passed descriptor base.  */
-      base = create_tmp_var (g95_descriptor_data_type (dumdesc), "base");
+      base = create_tmp_var (g95_array_dataptr_type (dumdesc), "base");
+      //base = create_tmp_var (integer_type_node, "base");
     }
 
   g95_start_stmt ();
@@ -3462,7 +3516,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
   /* Set the dtype.  */
   tmp = g95_conv_descriptor_dtype (tmpdesc);
   tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
-               G95_TYPE_DESCRIPTOR_DTYPE(TREE_TYPE (tmpdesc)));
+               G95_TYPE_ARRAY_DTYPE(TREE_TYPE (tmpdesc)));
   stmt = build_stmt (EXPR_STMT, tmp);
   g95_add_stmt_to_list (&head, &tail, stmt, stmt);
   oldstride = create_tmp_var (g95_array_index_type, "stride");
@@ -3715,7 +3769,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
       tmp = g95_simple_fold (tmp, &repack_stmt, &pack_tail, &pointervar);
       tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
       tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
-      tmp = build1 (ADDR_EXPR, g95_descriptor_data_type (dumdesc), tmp);
+      tmp = build1 (ADDR_EXPR, g95_array_dataptr_type (dumdesc), tmp);
 
       ref = g95_conv_descriptor_base (dumdesc);
       tmp = build (MODIFY_EXPR, TREE_TYPE (ref), ref, tmp);
@@ -3750,7 +3804,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
       tmp = g95_simple_fold (tmp, &nopack_stmt, &pack_tail, &pointervar);
       tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
       tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, packoffset);
-      tmp = build1 (ADDR_EXPR, g95_descriptor_data_type (tmpdesc), tmp);
+      tmp = build1 (ADDR_EXPR, g95_array_dataptr_type (tmpdesc), tmp);
 
       ref = g95_conv_descriptor_base (tmpdesc);
       tmp = build (MODIFY_EXPR, TREE_TYPE (ref), ref, tmp);
@@ -3786,7 +3840,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
   tmp = g95_simple_fold (tmp, &nopack_stmt, &pack_tail, NULL);
   tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
   tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
-  tmp = build1 (ADDR_EXPR, g95_descriptor_data_type (tmpdesc), tmp);
+  tmp = build1 (ADDR_EXPR, g95_array_dataptr_type (tmpdesc), tmp);
 
   ref = g95_conv_descriptor_base (tmpdesc);
   tmp = build (MODIFY_EXPR, TREE_TYPE (ref), ref, tmp);
@@ -3997,7 +4051,12 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
       desc = info->descriptor;
 
       full = 1;
-      if (info->ref->u.ar.type != AR_FULL)
+      if (G95_ARRAY_TYPE_P(TREE_TYPE (desc)))
+        {
+          /* Create a descriptor if the array doesn't have one.  */
+          full = 0;
+        }
+      else if (info->ref->u.ar.type != AR_FULL)
         {
           assert (info->ref->u.ar.type == AR_SECTION);
 
@@ -4058,7 +4117,7 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
           /* Set the dtype.  */
           tmp = g95_conv_descriptor_dtype (parm);
           tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp,
-                       G95_TYPE_DESCRIPTOR_DTYPE (parmtype));
+                       G95_TYPE_ARRAY_DTYPE (parmtype));
           stmt = build_stmt (EXPR_STMT, tmp);
           g95_add_stmt_to_pre (&loop, stmt, stmt);
 
@@ -4120,11 +4179,16 @@ g95_conv_array_parameter (g95_se * se, g95_expr * expr, g95_ss * ss)
             }
 
           /* Point the data pointer at the first element in the section.  */
-          tmp = g95_conv_descriptor_data (desc);
-          tmp = g95_simple_fold (tmp, &loop.pre, &loop.pre_tail, NULL);
-          tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
+          tmp = g95_conv_array_data (desc);
+          if (TREE_CODE (tmp) == INDIRECT_REF)
+            tmp = TREE_OPERAND (tmp, 0);
+          else
+            {
+              tmp = g95_simple_fold (tmp, &loop.pre, &loop.pre_tail, NULL);
+              tmp = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp);
+            }
           tmp = build (ARRAY_REF, TREE_TYPE (TREE_TYPE (tmp)), tmp, offset);
-          offset = build1 (ADDR_EXPR, g95_descriptor_data_type (desc), tmp);
+          offset = build1 (ADDR_EXPR, g95_array_dataptr_type (desc), tmp);
 
           tmp = g95_conv_descriptor_data (parm);
           tmp = build (MODIFY_EXPR, TREE_TYPE (tmp), tmp, offset);
