@@ -1464,15 +1464,17 @@ done:
 try g95_array_ref_shape(g95_array_ref *ar, mpz_t *shape) {
 int d;
 
+  d = 0;
+
   switch(ar->type) {
   case AR_FULL:
-    for(d=0; d<ar->as->rank; d++)
+    for(; d<ar->as->rank; d++)
       if (spec_dimen_size(ar->as, d, &shape[d]) == FAILURE) goto cleanup;
 
     return SUCCESS;
 
   case AR_SECTION:
-    for(d=0; d<ar->dimen; d++)
+    for(; d<ar->dimen; d++)
       if (ref_dimen_size(ar, d, &shape[d]) == FAILURE) goto cleanup;
 
     return SUCCESS;
