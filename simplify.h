@@ -47,6 +47,7 @@ g95_expr *g95_simplify_dprod(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_epsilon(g95_expr *);
 g95_expr *g95_simplify_exp(g95_expr *);
 g95_expr *g95_simplify_exponent(g95_expr *);
+g95_expr *g95_simplify_float_sngl(g95_expr *);
 g95_expr *g95_simplify_floor(g95_expr *, g95_expr *);
 g95_expr *g95_simplify_fraction(g95_expr *);
 g95_expr *g95_simplify_huge(g95_expr *);

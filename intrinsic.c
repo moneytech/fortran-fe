@@ -888,13 +888,14 @@ int di, dr, dd, dl, dc, dz;
   add_sym("range", 1, BT_INTEGER, di, g95_simplify_range, check_range,
 	  x, BT_REAL, dr, 0, NULL);
 
-  add_sym("real",  0, BT_REAL, dr, g95_simplify_real, check_real,
+  add_sym("real",  1, BT_REAL, dr, g95_simplify_real, check_real,
 	  a, BT_INTEGER, di, 0, knd, BT_INTEGER, di, 1, NULL);
-  add_sym("float", 0, BT_REAL, dr, g95_simplify_real, check_real,
+
+  add_sym("float", 1, BT_REAL, dr, g95_simplify_float_sngl, NULL,
 	  a, BT_INTEGER, di, 0, NULL);
-  add_sym("sngl",  0, BT_REAL, dr, g95_simplify_real, check_real,
+
+  add_sym("sngl",  1, BT_REAL, dr, g95_simplify_float_sngl, NULL,
 	  a, BT_REAL,    dd, 0, NULL);
-  make_generic("real");
 
   add_sym("repeat", 1, BT_CHARACTER, dc, NULL, NULL,
 	  stg, BT_CHARACTER, dc, 0, n, BT_INTEGER, di, 0, NULL);
