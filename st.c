@@ -778,7 +778,7 @@ g95_dt *dt;
     break;
 
   case EXEC_INQUIRE:
-    g95_status("INQURE");
+    g95_status("INQUIRE");
     i = c->ext;
 
     if (i->unit) { g95_status(" UNIT="); g95_show_expr(i->unit); }
