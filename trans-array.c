@@ -76,6 +76,7 @@ Boston, MA 02111-1307, USA.  */
 #include "function.h"
 #include "expr.h"
 #include "real.h"
+#include "flags.h"
 #include <assert.h>
 #include <gmp.h>
 #define BACKEND_CODE
@@ -1434,8 +1435,7 @@ g95_trans_dummy_array_bias (g95_symbol * sym, tree tmpdesc, tree body)
   lboundvar = NULL_TREE;
   eqvar = NULL_TREE;
 
-  checkparm = sym->as->type == AS_EXPLICIT
-              && g95_option.check_array_bounds;
+  checkparm = (sym->as->type == AS_EXPLICIT && flag_bounds_check);
 
   if (g95_option.no_repack_arrays)
     {

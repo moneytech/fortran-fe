@@ -61,8 +61,6 @@ DEFINE_LANG_NAME ("GNU Fortran 95")
       N_("Generate inline code to repack array parameters") },
 { "-fno-inline-repack-arrays",
       N_("Generate library calls to repack array parameters") },
-{ "-fcheck-array-bounds",
-      N_("Check the array boundaries at runtime") },
 { "-i8",
       N_("Set the default integer kind to double precision") },
 { "-pedantic",
